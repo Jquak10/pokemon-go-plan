@@ -2725,3 +2725,15 @@ main:not(.dashboard-shell) {
     opacity: .22;
   }
 }
+
+
+/* Event override admin tab */
+.admin-section-nav-four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 700px) {
+  .admin-section-nav-four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
