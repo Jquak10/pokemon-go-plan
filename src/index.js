@@ -1321,6 +1321,292 @@ function remoteRaidRulesFromOfficialText(text, sourceUrl) {
   return [...dedupe.values()];
 }
 
+
+function addDaysIso(dateValue, days) {
+  const match = String(dateValue || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const date = new Date(
+    Date.UTC(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]) + Number(days || 0)
+    )
+  );
+
+  return date.toISOString().slice(0, 10);
+}
+
+function compactIcsDate(dateValue) {
+  return String(dateValue || "").replace(/-/g, "");
+}
+
+function officialRaidDateFromLine(line, defaultYear) {
+  const monthPattern =
+    "(January|February|March|April|May|June|July|August|September|October|November|December)";
+
+  const regex = new RegExp(
+    `^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\\\s*,?\\\\s*${monthPattern}\\\\s+(\\\\d{1,2})(?:\\\\s*,\\\\s*(\\\\d{4}))?$`,
+    "i"
+  );
+
+  const match = String(line || "").trim().match(regex);
+  if (!match) return null;
+
+  const month = MONTH_INDEX[String(match[1]).toLowerCase()];
+  const day = Number(match[2]);
+  const year = match[3] ? Number(match[3]) : Number(defaultYear);
+
+  if (!month || !day || !year) return null;
+  return isoDate(year, month, day);
+}
+
+function looksLikeMegaPokemonLine(line) {
+  const value = String(line || "").trim();
+
+  if (!/^Mega\s+/i.test(value)) return false;
+  if (value.length > 48) return false;
+  if (/Mega\s+(Raids?|Ascension|Evolution|Finale|Energy)/i.test(value)) {
+    return false;
+  }
+
+  if (
+    /\b(?:will|may|during|throughout|event|appear|following|majority)\b/i.test(
+      value
+    )
+  ) {
+    return false;
+  }
+
+  return /^Mega\s+[A-Za-z0-9À-ž.'’\- ]+(?:\s[XY])?$/u.test(value);
+}
+
+function megaAscensionRaidSupplementsFromOfficialText(text, sourceUrl) {
+  const fullText = String(text || "");
+  const lines = fullText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const introIndex = lines.findIndex((line) =>
+    /following Mega-Evolved Pokémon will appear in raids during the Mega Ascension event/i.test(
+      line
+    )
+  );
+
+  if (introIndex < 0) return [];
+
+  let endIndex = lines.findIndex(
+    (line, index) =>
+      index > introIndex &&
+      /^Wild Encounters$/i.test(line)
+  );
+
+  if (endIndex < 0) {
+    endIndex = Math.min(lines.length, introIndex + 90);
+  }
+
+  const yearMatch =
+    fullText.match(
+      /Mega Ascension[\s\S]{0,500}?September\s+\d{1,2}\s*,\s*(\d{4})/i
+    ) ||
+    fullText.match(/\b(20\d{2})\b/);
+
+  const defaultYear = yearMatch
+    ? Number(yearMatch[1])
+    : new Date().getUTCFullYear();
+
+  const eventRangeWindow = fullText.slice(
+    Math.max(0, fullText.toLowerCase().indexOf("mega ascension")),
+    Math.max(0, fullText.toLowerCase().indexOf("mega ascension")) + 900
+  );
+
+  const eventRange =
+    inferDateRangeFromText(eventRangeWindow) ||
+    {
+      start_date: `${defaultYear}-08-31`,
+      end_date: `${defaultYear}-09-04`
+    };
+
+  const supplements = [];
+  let currentDate = null;
+
+  for (let index = introIndex + 1; index < endIndex; index++) {
+    const line = lines[index];
+
+    const parsedDate = officialRaidDateFromLine(line, defaultYear);
+    if (parsedDate) {
+      currentDate = parsedDate;
+      continue;
+    }
+
+    if (currentDate && looksLikeMegaPokemonLine(line)) {
+      supplements.push({
+        event_name: "Mega Ascension",
+        pokemon_name: line,
+        start_date: currentDate,
+        end_date: currentDate,
+        certainty: "featured",
+        source_url: sourceUrl
+      });
+    }
+
+    if (
+      /Mega Latias and Mega Latios may also appear in Mega Raids throughout the Mega Ascension event/i.test(
+        line
+      )
+    ) {
+      for (const pokemonName of ["Mega Latias", "Mega Latios"]) {
+        supplements.push({
+          event_name: "Mega Ascension",
+          pokemon_name: pokemonName,
+          start_date: eventRange.start_date,
+          end_date: eventRange.end_date,
+          certainty: "possible",
+          source_url: sourceUrl
+        });
+      }
+    }
+  }
+
+  const dedupe = new Map();
+
+  for (const item of supplements) {
+    const key = [
+      normalizeName(item.pokemon_name),
+      item.start_date,
+      item.end_date,
+      item.certainty
+    ].join("|");
+
+    if (!dedupe.has(key)) dedupe.set(key, item);
+  }
+
+  return [...dedupe.values()];
+}
+
+async function officialRaidSupplementStatements(env, supplements, timestamp) {
+  const statements = [];
+
+  // Only stale rows created by the official supplement importer.
+  statements.push(
+    env.DB.prepare(`
+      UPDATE events
+      SET status = 'stale',
+          sequence = sequence + 1,
+          updated_at = ?
+      WHERE source_uid LIKE 'official-supplement:%'
+        AND status = 'active'
+        AND COALESCE(end_date, start_date, '9999-12-31') >= date('now', '-1 day')
+    `).bind(timestamp)
+  );
+
+  for (const item of supplements) {
+    const sourceUid = [
+      "official-supplement",
+      normalizeName(item.event_name).replace(/\s+/g, "-"),
+      item.start_date,
+      normalizeName(item.pokemon_name).replace(/\s+/g, "-"),
+      item.certainty
+    ].join(":");
+
+    const id = await sha256Hex(`raid_battles|${sourceUid}`);
+
+    const dateRange =
+      item.start_date === item.end_date
+        ? item.start_date
+        : `${item.start_date} → ${item.end_date}`;
+
+    const description = [
+      `Official Pokémon GO raid schedule supplement for ${item.event_name}.`,
+      item.certainty === "possible"
+        ? `${item.pokemon_name} is listed by Pokémon GO as a possible Mega Raid appearance throughout the event; this is not guaranteed on every day.`
+        : `${item.pokemon_name} is listed as a featured Mega Raid boss for ${dateRange}.`,
+      `Official source: ${item.source_url}`
+    ].join("\n");
+
+    const summary =
+      item.certainty === "possible"
+        ? `${item.pokemon_name} — possible during ${item.event_name}`
+        : `${item.pokemon_name} — ${item.event_name}`;
+
+    const eventObject = {
+      source_uid: sourceUid,
+      summary,
+      description,
+      dtstart_line: `DTSTART;VALUE=DATE:${compactIcsDate(item.start_date)}`,
+      dtend_line: null,
+      other_lines: [
+        `UID:${sourceUid}`,
+        `URL:${item.source_url}`,
+        "CATEGORIES:raid_battles",
+        "X-POGO-SOURCE:official"
+      ].join("\n"),
+      start_date: item.start_date,
+      end_date: item.end_date,
+      source_url: item.source_url
+    };
+
+    const contentHash = await sha256Hex(JSON.stringify(eventObject));
+
+    statements.push(
+      env.DB.prepare(`
+        INSERT INTO events (
+          id,
+          source_type,
+          source_uid,
+          summary,
+          description,
+          dtstart_line,
+          dtend_line,
+          other_lines,
+          start_date,
+          end_date,
+          source_url,
+          content_hash,
+          sequence,
+          status,
+          updated_at
+        )
+        VALUES (?, 'raid_battles', ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, 0, 'active', ?)
+        ON CONFLICT(id) DO UPDATE SET
+          summary = excluded.summary,
+          description = excluded.description,
+          dtstart_line = excluded.dtstart_line,
+          dtend_line = NULL,
+          other_lines = excluded.other_lines,
+          start_date = excluded.start_date,
+          end_date = excluded.end_date,
+          source_url = excluded.source_url,
+          sequence = CASE
+            WHEN events.content_hash != excluded.content_hash
+              OR events.status != 'active'
+            THEN events.sequence + 1
+            ELSE events.sequence
+          END,
+          content_hash = excluded.content_hash,
+          status = 'active',
+          updated_at = excluded.updated_at
+      `).bind(
+        id,
+        sourceUid,
+        summary,
+        description,
+        eventObject.dtstart_line,
+        eventObject.other_lines,
+        item.start_date,
+        item.end_date,
+        item.source_url,
+        contentHash,
+        timestamp
+      )
+    );
+  }
+
+  return statements;
+}
+
+
 async function fetchOfficialHtml(url) {
   const response = await fetch(url, {
     headers: {
@@ -1339,31 +1625,42 @@ async function fetchOfficialHtml(url) {
 
 async function syncOfficialRemoteRaidLimits(env) {
   const detected = [];
+  const officialRaidSupplements = [];
   const errors = [];
 
   let indexHtml = "";
+
   try {
     indexHtml = await fetchOfficialHtml(OFFICIAL_POKEMON_GO_NEWS_URL);
   } catch (error) {
     errors.push(String(error.message || error));
   }
 
-  const urls = officialEventLinksFromHtml(indexHtml, OFFICIAL_POKEMON_GO_NEWS_URL);
+  const urls = officialEventLinksFromHtml(
+    indexHtml,
+    OFFICIAL_POKEMON_GO_NEWS_URL
+  );
 
-  // Always include pinned high-value current event pages even if the news index
-  // changes its HTML structure.
   for (const pinned of PINNED_OFFICIAL_EVENT_PAGES) {
     if (!urls.includes(pinned)) urls.unshift(pinned);
   }
 
-  const pageUrls = [...new Set(urls)].slice(0, MAX_OFFICIAL_EVENT_PAGES_PER_SYNC);
+  const pageUrls = [...new Set(urls)]
+    .slice(0, MAX_OFFICIAL_EVENT_PAGES_PER_SYNC);
+
   const timestamp = nowIso();
+  const dbStatements = [];
 
   for (const url of pageUrls) {
     try {
       const html = await fetchOfficialHtml(url);
       const plainText = htmlToPlainText(html);
-      const rules = remoteRaidRulesFromOfficialText(plainText, url);
+
+      const rules =
+        remoteRaidRulesFromOfficialText(
+          plainText,
+          url
+        );
 
       for (const rule of rules) {
         const id = await sha256Hex(
@@ -1372,62 +1669,115 @@ async function syncOfficialRemoteRaidLimits(env) {
             rule.source_url,
             rule.start_date,
             rule.end_date,
-            rule.is_unlimited ? "unlimited" : String(rule.remote_raid_limit)
+            rule.is_unlimited
+              ? "unlimited"
+              : String(rule.remote_raid_limit)
           ].join("|")
         );
 
-        await env.DB.prepare(`
-          INSERT INTO remote_raid_limit_overrides (
+        dbStatements.push(
+          env.DB.prepare(`
+            INSERT INTO remote_raid_limit_overrides (
+              id,
+              event_name,
+              start_date,
+              end_date,
+              remote_raid_limit,
+              source_url,
+              active,
+              updated_at,
+              is_unlimited,
+              detected_automatically,
+              source_excerpt,
+              detected_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, 1, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              event_name = excluded.event_name,
+              start_date = excluded.start_date,
+              end_date = excluded.end_date,
+              remote_raid_limit = excluded.remote_raid_limit,
+              source_url = excluded.source_url,
+              active = 1,
+              updated_at = excluded.updated_at,
+              is_unlimited = excluded.is_unlimited,
+              detected_automatically = 1,
+              source_excerpt = excluded.source_excerpt,
+              detected_at = excluded.detected_at
+          `).bind(
             id,
-            event_name,
-            start_date,
-            end_date,
-            remote_raid_limit,
-            source_url,
-            active,
-            updated_at,
-            is_unlimited,
-            detected_automatically,
-            source_excerpt,
-            detected_at
+            rule.event_name,
+            rule.start_date,
+            rule.end_date,
+            rule.remote_raid_limit,
+            rule.source_url,
+            timestamp,
+            rule.is_unlimited,
+            rule.source_excerpt,
+            timestamp
           )
-          VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, 1, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET
-            event_name = excluded.event_name,
-            start_date = excluded.start_date,
-            end_date = excluded.end_date,
-            remote_raid_limit = excluded.remote_raid_limit,
-            source_url = excluded.source_url,
-            active = 1,
-            updated_at = excluded.updated_at,
-            is_unlimited = excluded.is_unlimited,
-            detected_automatically = 1,
-            source_excerpt = excluded.source_excerpt,
-            detected_at = excluded.detected_at
-        `).bind(
-          id,
-          rule.event_name,
-          rule.start_date,
-          rule.end_date,
-          rule.remote_raid_limit,
-          rule.source_url,
-          timestamp,
-          rule.is_unlimited,
-          rule.source_excerpt,
-          timestamp
-        ).run();
+        );
 
-        detected.push({ id, ...rule });
+        detected.push({
+          id,
+          ...rule
+        });
+      }
+
+      const supplements =
+        megaAscensionRaidSupplementsFromOfficialText(
+          plainText,
+          url
+        );
+
+      for (const item of supplements) {
+        const key = [
+          normalizeName(item.pokemon_name),
+          item.start_date,
+          item.end_date,
+          item.certainty
+        ].join("|");
+
+        if (
+          !officialRaidSupplements.some(
+            (existing) =>
+              [
+                normalizeName(existing.pokemon_name),
+                existing.start_date,
+                existing.end_date,
+                existing.certainty
+              ].join("|") === key
+          )
+        ) {
+          officialRaidSupplements.push(item);
+        }
       }
     } catch (error) {
       errors.push(String(error.message || error));
     }
   }
 
+  const supplementStatements =
+    await officialRaidSupplementStatements(
+      env,
+      officialRaidSupplements,
+      timestamp
+    );
+
+  dbStatements.push(...supplementStatements);
+
+  if (dbStatements.length) {
+    await env.DB.batch(dbStatements);
+  }
+
   return {
     pages_checked: pageUrls.length,
     rules_detected: detected.length,
     detected,
+    official_raid_supplements: {
+      count: officialRaidSupplements.length,
+      events: officialRaidSupplements
+    },
     errors
   };
 }
@@ -1804,7 +2154,13 @@ async function calendarEventsApi(request, env) {
       AND start_date IS NOT NULL
       AND start_date <= ?
       AND COALESCE(end_date, start_date) >= ?
-    ORDER BY start_date, summary
+    ORDER BY
+      start_date,
+      CASE
+        WHEN source_uid LIKE 'official-supplement:%' THEN 0
+        ELSE 1
+      END,
+      summary
     LIMIT 700
   `).bind(...included, bounds.end, bounds.start).all();
 
@@ -1813,8 +2169,11 @@ async function calendarEventsApi(request, env) {
 
   for (const event of results) {
     const key =
-      event.source_uid ||
-      `${normalizeName(event.summary)}|${event.dtstart_line}|${event.dtend_line || ""}`;
+      calendarEventDedupeKey(
+        event,
+        targets,
+        metas
+      );
 
     if (dedupe.has(key)) continue;
     dedupe.add(key);
@@ -2086,6 +2445,32 @@ function targetTypeLabel(type) {
   }[type] || type;
 }
 
+
+function calendarEventDedupeKey(event, targets, metas) {
+  if (event.source_type === "raid_battles") {
+    const matches = findMatches(event.summary, targets, metas);
+
+    if (matches.length) {
+      return [
+        "raid",
+        event.start_date || "",
+        normalizeName(matches[0].name)
+      ].join("|");
+    }
+  }
+
+  return (
+    event.source_uid ||
+    `${normalizeName(event.summary)}|${event.dtstart_line}|${event.dtend_line || ""}`
+  );
+}
+
+function isOfficialSupplementEvent(event) {
+  return String(event.source_uid || "")
+    .startsWith("official-supplement:");
+}
+
+
 function personalizeEvent(event, user, targets, metas) {
   const matches = findMatches(event.summary, targets, metas);
   const recommendations = matches.map((match) =>
@@ -2195,7 +2580,13 @@ async function calendarFeedForUser(request, env, user) {
           AND COALESCE(end_date, start_date, '0000-01-01') >= date('now', '-14 days')
         )
       )
-    ORDER BY COALESCE(start_date, '9999-12-31'), summary
+    ORDER BY
+      COALESCE(start_date, '9999-12-31'),
+      CASE
+        WHEN source_uid LIKE 'official-supplement:%' THEN 0
+        ELSE 1
+      END,
+      summary
     LIMIT 1500
   `).bind(...included).all();
 
@@ -2346,6 +2737,39 @@ async function adminRemoteRaidLimits(request, env) {
   return json({ rules: results });
 }
 
+
+async function adminOfficialRaidSupplements(request, env) {
+  const url = new URL(request.url);
+  const key = url.searchParams.get("key");
+
+  if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
+    return bad("Invalid admin key.", 401);
+  }
+
+  const { results } = await env.DB.prepare(`
+    SELECT
+      id,
+      summary,
+      description,
+      start_date,
+      end_date,
+      source_url,
+      status,
+      updated_at
+    FROM events
+    WHERE source_uid LIKE 'official-supplement:%'
+    ORDER BY
+      start_date DESC,
+      summary
+    LIMIT 100
+  `).all();
+
+  return json({
+    events: results
+  });
+}
+
+
 async function readAdminKey(request, env) {
   let body = {};
   try {
@@ -2458,6 +2882,10 @@ async function handleFetch(request, env) {
 
     if (request.method === "GET" && path === "/api/admin/remote-limits") {
       return adminRemoteRaidLimits(request, env);
+    }
+
+    if (request.method === "GET" && path === "/api/admin/official-raids") {
+      return adminOfficialRaidSupplements(request, env);
     }
 
 
