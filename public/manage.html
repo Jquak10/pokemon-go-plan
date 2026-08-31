@@ -3,268 +3,1410 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css">
+
+  <link rel="stylesheet" href="/styles.css?v=3">
 </head>
+
 <body>
+
 <main>
+
+  <!-- =========================================================
+       PAGE HEADER / LOADING
+       ========================================================= -->
+
   <section class="card">
+
     <h1>My Pokémon GO Raid Planner</h1>
-    <p class="muted">Progress changes save to the database immediately. Apple Calendar refreshes the ICS feed on its own schedule.</p>
-    <p id="loadStatus">Loading…</p>
+
+    <p class="muted">
+      Your recommendations combine general raid value with your own
+      targets, progress and preferences.
+    </p>
+
+    <p class="muted">
+      Progress changes save to the database immediately.
+      Your personalized ICS feed is updated immediately on the server,
+      while Apple Calendar refreshes subscribed calendars on its own schedule.
+    </p>
+
+    <p id="loadStatus">
+      Loading…
+    </p>
+
   </section>
+
+
+  <!-- =========================================================
+       MAIN APPLICATION
+       ========================================================= -->
 
   <section id="app" class="hidden">
+
+
+    <!-- =======================================================
+         EVENT FILTERS + RECOMMENDATION PREFERENCES
+         ======================================================= -->
+
     <section class="card">
+
       <h2>Event filters</h2>
-      <div id="sourceChecks" class="checks"></div>
+
+      <p class="muted">
+        Choose which types of Pokémon GO events should appear in your
+        personal calendar.
+      </p>
+
+      <div
+        id="sourceChecks"
+        class="checks"
+      ></div>
+
 
       <h3>Recommendation preferences</h3>
+
+      <p class="muted">
+        These settings control how strongly different factors influence
+        your raid recommendations.
+      </p>
+
+      <p class="muted">
+        Higher values make that factor more important.
+        A value of <strong>0</strong> means the factor is ignored.
+      </p>
+
+
+      <div class="preference-guide">
+
+        <strong>Suggested values</strong>
+
+        <p>
+          <strong>0</strong> — Ignore this factor<br>
+          <strong>0.5</strong> — Slight importance<br>
+          <strong>1.0</strong> — Normal importance<br>
+          <strong>1.5</strong> — High importance<br>
+          <strong>2.0</strong> — Very high importance
+        </p>
+
+      </div>
+
+
       <div class="grid">
+
+
+        <!-- PvE -->
+
         <div>
-          <label for="pveWeight">PvE importance (0–2)</label>
-          <input id="pveWeight" type="number" min="0" max="2" step="0.1">
+
+          <label for="pveWeight">
+            PvE importance (0–2)
+          </label>
+
+          <input
+            id="pveWeight"
+            type="number"
+            min="0"
+            max="2"
+            step="0.1"
+          >
+
+          <p class="field-help">
+            Controls how much a Pokémon's usefulness in raids and other
+            PvE content affects your recommendation.
+          </p>
+
+          <p class="field-help">
+            Increase this if your main goal is building strong raid attackers.
+          </p>
+
         </div>
+
+
+        <!-- PvP -->
+
         <div>
-          <label for="pvpWeight">PvP importance (0–2)</label>
-          <input id="pvpWeight" type="number" min="0" max="2" step="0.1">
+
+          <label for="pvpWeight">
+            PvP importance (0–2)
+          </label>
+
+          <input
+            id="pvpWeight"
+            type="number"
+            min="0"
+            max="2"
+            step="0.1"
+          >
+
+          <p class="field-help">
+            Controls how much PvP performance influences recommendations.
+          </p>
+
+          <p class="field-help">
+            Set this to <strong>0</strong> if you do not care about
+            GO Battle League or PvP.
+          </p>
+
         </div>
+
+
+        <!-- Collection -->
+
         <div>
-          <label for="collectorWeight">Rarity/collection importance (0–2)</label>
-          <input id="collectorWeight" type="number" min="0" max="2" step="0.1">
+
+          <label for="collectorWeight">
+            Rarity / collection importance (0–2)
+          </label>
+
+          <input
+            id="collectorWeight"
+            type="number"
+            min="0"
+            max="2"
+            step="0.1"
+          >
+
+          <p class="field-help">
+            Gives more weight to Pokémon that are rare, limited-time,
+            Legendary, Mythical, Mega or otherwise difficult to obtain.
+          </p>
+
+          <p class="field-help">
+            Increase this if collection value matters to you even when
+            a Pokémon is not a top raid attacker.
+          </p>
+
         </div>
+
+
+        <!-- Timezone -->
+
         <div>
-          <label for="timezone">Timezone</label>
+
+          <label for="timezone">
+            Timezone
+          </label>
+
           <input id="timezone">
+
+          <p class="field-help">
+            Used when interpreting event dates and times for your calendar.
+          </p>
+
+          <p class="field-help">
+            Example:
+            <code>Asia/Singapore</code>
+          </p>
+
         </div>
+
+
       </div>
-      <p><button id="saveSettings">Save settings</button> <span id="settingsStatus"></span></p>
+
+
+      <p>
+
+        <button id="saveSettings">
+          Save settings
+        </button>
+
+        <span id="settingsStatus"></span>
+
+      </p>
+
     </section>
 
+
+    <!-- =======================================================
+         CURRENT RECOMMENDATIONS
+         ======================================================= -->
+
     <section class="card">
+
       <h2>Current raid recommendations</h2>
-      <p class="muted">These combine internet/meta scores stored by the service with your own target and progress.</p>
-      <div id="recommendations"></div>
-    </section>
 
-    <section class="card">
-      <h2>Add or update a target</h2>
-      <div class="grid">
-        <div>
-          <label for="pokemonName">Pokémon name</label>
-          <input id="pokemonName" placeholder="Mega Skarmory">
-        </div>
-        <div>
-          <label for="targetType">Target type</label>
-          <select id="targetType">
-            <option value="mega_energy">Mega Energy</option>
-            <option value="raids">Number of raids</option>
-            <option value="candy_xl">Candy XL</option>
-            <option value="candy">Candy</option>
-            <option value="custom">Custom progress</option>
-          </select>
-        </div>
-        <div>
-          <label for="currentValue">Current progress</label>
-          <input id="currentValue" type="number" step="1" value="0">
-        </div>
-        <div>
-          <label for="targetValue">Desired target</label>
-          <input id="targetValue" type="number" step="1" placeholder="3000">
-        </div>
-        <div>
-          <label for="priority">Personal priority</label>
-          <select id="priority">
-            <option value="high">High</option>
-            <option value="medium" selected>Medium</option>
-            <option value="low">Low</option>
-            <option value="skip">Skip</option>
-          </select>
-        </div>
-        <div>
-          <label for="completed">Completed?</label>
-          <select id="completed">
-            <option value="0">No</option>
-            <option value="1">Yes</option>
-          </select>
-        </div>
+      <p class="muted">
+        These recommendations combine the Pokémon's general
+        internet/meta value with your own targets, progress,
+        completion status and preferences.
+      </p>
+
+
+      <div class="preference-guide">
+
+        <strong>How recommendations work</strong>
+
+        <p>
+          <strong>Internet value</strong>
+          = Is this Pokémon generally worth raiding?
+        </p>
+
+        <p>
+          <strong>Personal value</strong>
+          = Do you personally still need it?
+        </p>
+
+        <p>
+          <strong>Your recommendation</strong>
+          = A combination of both.
+        </p>
+
       </div>
-      <label for="notes">Notes</label>
-      <textarea id="notes" placeholder="Use free passes first."></textarea>
-      <p><button id="saveTarget">Save target</button> <span id="targetStatus"></span></p>
+
+
+      <div id="recommendations"></div>
+
     </section>
 
+
+    <!-- =======================================================
+         ADD / UPDATE TARGET
+         ======================================================= -->
+
     <section class="card">
-      <h2>My targets</h2>
-      <div id="targets"></div>
+
+      <h2>Add or update a target</h2>
+
+      <p class="muted">
+        Targets tell the recommendation engine what you personally
+        want to achieve for a Pokémon.
+      </p>
+
+      <p class="muted">
+        Your target does not replace the general raid-value assessment.
+        Instead, the two are combined to decide how strongly the raid
+        should be recommended to you.
+      </p>
+
+
+      <div class="preference-guide">
+
+        <strong>Example</strong>
+
+        <p>
+          A very strong raid Pokémon may still be recommended even if
+          you have completed your personal target.
+        </p>
+
+        <p>
+          A weaker Pokémon may become more important to you if you have
+          a large unfinished Mega Energy, Candy XL or raid target.
+        </p>
+
+      </div>
+
+
+      <div class="grid">
+
+
+        <!-- Pokémon name -->
+
+        <div>
+
+          <label for="pokemonName">
+            Pokémon name
+          </label>
+
+          <input
+            id="pokemonName"
+            placeholder="Mega Skarmory"
+          >
+
+          <p class="field-help">
+            Enter the Pokémon as it appears in raid events.
+          </p>
+
+          <p class="field-help">
+            For Mega raids, include <strong>Mega</strong>.
+            For example:
+            <strong>Mega Skarmory</strong>.
+          </p>
+
+        </div>
+
+
+        <!-- Target type -->
+
+        <div>
+
+          <label for="targetType">
+            Target type
+          </label>
+
+          <select id="targetType">
+
+            <option value="mega_energy">
+              Mega Energy
+            </option>
+
+            <option value="raids">
+              Number of raids
+            </option>
+
+            <option value="candy_xl">
+              Candy XL
+            </option>
+
+            <option value="candy">
+              Candy
+            </option>
+
+            <option value="custom">
+              Custom progress
+            </option>
+
+          </select>
+
+          <p class="field-help">
+            Choose what you are trying to accumulate or complete for
+            this Pokémon.
+          </p>
+
+        </div>
+
+
+        <!-- Current progress -->
+
+        <div>
+
+          <label for="currentValue">
+            Current progress
+          </label>
+
+          <input
+            id="currentValue"
+            type="number"
+            step="1"
+            value="0"
+          >
+
+          <p class="field-help">
+            Enter how much progress you currently have.
+          </p>
+
+          <p class="field-help">
+            Example: if you currently have
+            <strong>1,400 Mega Energy</strong>,
+            enter <strong>1400</strong>.
+          </p>
+
+        </div>
+
+
+        <!-- Desired target -->
+
+        <div>
+
+          <label for="targetValue">
+            Desired target
+          </label>
+
+          <input
+            id="targetValue"
+            type="number"
+            step="1"
+            placeholder="3000"
+          >
+
+          <p class="field-help">
+            The amount you ultimately want to reach.
+          </p>
+
+          <p class="field-help">
+            The amount remaining influences how strongly the raid is
+            recommended to you.
+          </p>
+
+        </div>
+
+
+        <!-- Priority -->
+
+        <div>
+
+          <label for="priority">
+            Personal priority
+          </label>
+
+          <select id="priority">
+
+            <option value="high">
+              High
+            </option>
+
+            <option
+              value="medium"
+              selected
+            >
+              Medium
+            </option>
+
+            <option value="low">
+              Low
+            </option>
+
+            <option value="skip">
+              Skip
+            </option>
+
+          </select>
+
+          <p class="field-help">
+            Tells the recommendation engine how strongly you personally
+            care about this Pokémon.
+          </p>
+
+        </div>
+
+
+        <!-- Completed -->
+
+        <div>
+
+          <label for="completed">
+            Completed?
+          </label>
+
+          <select id="completed">
+
+            <option value="0">
+              No
+            </option>
+
+            <option value="1">
+              Yes
+            </option>
+
+          </select>
+
+          <p class="field-help">
+            Mark this as complete when you have reached your personal goal.
+          </p>
+
+          <p class="field-help">
+            A completed Pokémon may still be recommended if its general
+            raid value is exceptionally high.
+          </p>
+
+        </div>
+
+
+      </div>
+
+
+      <!-- Priority guide -->
+
+      <div class="preference-guide">
+
+        <strong>Personal priority guide</strong>
+
+        <p>
+          <strong>High</strong>
+          — You actively want to work on this Pokémon.
+        </p>
+
+        <p>
+          <strong>Medium</strong>
+          — Worth doing when convenient.
+        </p>
+
+        <p>
+          <strong>Low</strong>
+          — Only consider it when there are no better options.
+        </p>
+
+        <p>
+          <strong>Skip</strong>
+          — You normally do not want to spend raid passes on it.
+        </p>
+
+      </div>
+
+
+      <!-- Notes -->
+
+      <label for="notes">
+        Notes
+      </label>
+
+      <textarea
+        id="notes"
+        placeholder="Use free passes first."
+      ></textarea>
+
+      <p class="field-help">
+        Optional personal reminders such as shiny goals,
+        Candy XL needs, raid-pass limits or anything else
+        relevant to your decision.
+      </p>
+
+
+      <p>
+
+        <button id="saveTarget">
+          Save target
+        </button>
+
+        <span id="targetStatus"></span>
+
+      </p>
+
     </section>
+
+
+    <!-- =======================================================
+         EXISTING TARGETS
+         ======================================================= -->
+
+    <section class="card">
+
+      <h2>My targets</h2>
+
+      <p class="muted">
+        Edit these whenever your progress changes.
+        Your recommendation is recalculated using the latest saved values.
+      </p>
+
+      <div id="targets"></div>
+
+    </section>
+
+
   </section>
+
 </main>
 
+
 <script>
-const token = location.pathname.split("/").filter(Boolean)[1];
-const app = document.getElementById("app");
-const loadStatus = document.getElementById("loadStatus");
+
+const token =
+  location.pathname
+    .split("/")
+    .filter(Boolean)[1];
+
+
+const app =
+  document.getElementById("app");
+
+
+const loadStatus =
+  document.getElementById("loadStatus");
+
+
 let state = null;
 
+
+/* ============================================================
+   EVENT TYPE LABELS
+   ============================================================ */
+
 const labels = {
-  community_day: "Community Day",
-  event: "General Events",
-  go_battle_league: "GO Battle League",
-  go_pass: "GO Pass",
-  max_battles: "Max Battles",
-  max_mondays: "Max Mondays",
-  pokemon_go_fest: "Pokémon GO Fest",
-  pokemon_spotlight_hour: "Spotlight Hour",
-  raid_battles: "Raid Battles",
-  raid_day: "Raid Day",
-  raid_hour: "Raid Hour",
-  research: "Research",
-  season: "Season"
+
+  community_day:
+    "Community Day",
+
+  event:
+    "General Events",
+
+  go_battle_league:
+    "GO Battle League",
+
+  go_pass:
+    "GO Pass",
+
+  max_battles:
+    "Max Battles",
+
+  max_mondays:
+    "Max Mondays",
+
+  pokemon_go_fest:
+    "Pokémon GO Fest",
+
+  pokemon_spotlight_hour:
+    "Spotlight Hour",
+
+  raid_battles:
+    "Raid Battles",
+
+  raid_day:
+    "Raid Day",
+
+  raid_hour:
+    "Raid Hour",
+
+  research:
+    "Research",
+
+  season:
+    "Season"
+
 };
+
+
+/* ============================================================
+   HTML ESCAPING
+   ============================================================ */
 
 function esc(value) {
-  return String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c]));
+
+  return String(value ?? "")
+    .replace(
+      /[&<>"']/g,
+      c => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[c])
+    );
+
 }
 
-async function api(path, options = {}) {
-  const response = await fetch(path, options);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Request failed.");
+
+/* ============================================================
+   API HELPER
+   ============================================================ */
+
+async function api(
+  path,
+  options = {}
+) {
+
+  const response =
+    await fetch(
+      path,
+      options
+    );
+
+
+  const data =
+    await response.json();
+
+
+  if (!response.ok) {
+
+    throw new Error(
+      data.error
+      || "Request failed."
+    );
+
+  }
+
+
   return data;
+
 }
+
+
+/* ============================================================
+   LOAD PROFILE
+   ============================================================ */
 
 async function load() {
+
   try {
-    state = await api(`/api/me?token=${encodeURIComponent(token)}`);
+
+    state =
+      await api(
+        `/api/me?token=${encodeURIComponent(token)}`
+      );
+
+
     render();
-    loadStatus.textContent = "";
-    app.classList.remove("hidden");
-  } catch (error) {
-    loadStatus.textContent = error.message;
-    loadStatus.className = "error";
+
+
+    loadStatus.textContent =
+      "";
+
+
+    app.classList.remove(
+      "hidden"
+    );
+
   }
+
+  catch (error) {
+
+    loadStatus.textContent =
+      error.message;
+
+
+    loadStatus.className =
+      "error";
+
+  }
+
 }
+
+
+/* ============================================================
+   RENDER DASHBOARD
+   ============================================================ */
 
 function render() {
-  const included = new Set(state.user.included_sources);
 
-  document.getElementById("sourceChecks").innerHTML =
-    state.available_sources.map(source => `
-      <label>
-        <input type="checkbox" data-source="${esc(source)}" ${included.has(source) ? "checked" : ""}>
-        ${esc(labels[source] || source)}
-      </label>
-    `).join("");
+  const included =
+    new Set(
+      state.user.included_sources
+    );
 
-  document.getElementById("pveWeight").value = state.user.pve_weight;
-  document.getElementById("pvpWeight").value = state.user.pvp_weight;
-  document.getElementById("collectorWeight").value = state.user.collector_weight;
-  document.getElementById("timezone").value = state.user.timezone;
 
-  document.getElementById("recommendations").innerHTML =
-    state.recommendations.length
-      ? state.recommendations.map(rec => `
-        <div class="recommendation">
-          <div class="score">${esc(rec.emoji)} ${esc(rec.pokemon_name)} — ${esc(rec.label)} (${rec.score}/100)</div>
-          <div class="muted">${esc(rec.event_title || "")}</div>
-          <ul>${rec.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>
-        </div>
-      `).join("")
-      : `<p class="muted">No matching active raid recommendations yet. This is normal until event data has synced and meta entries have been added.</p>`;
+  /* ----------------------------------------------------------
+     EVENT FILTERS
+     ---------------------------------------------------------- */
 
-  document.getElementById("targets").innerHTML =
-    state.targets.length
-      ? state.targets.map(target => `
-        <div class="target">
-          <strong>${esc(target.pokemon_name)}</strong>
-          <div>
-            ${esc(target.target_type)}:
-            ${Number(target.current_value || 0).toLocaleString()}
-            ${target.target_value == null ? "" : " / " + Number(target.target_value).toLocaleString()}
-          </div>
-          <div>Priority: ${esc(target.priority)} ${Number(target.completed) ? "• COMPLETE" : ""}</div>
-          <div class="row" style="margin-top:8px">
-            <button class="secondary" onclick='editTarget(${JSON.stringify(target)})'>Edit</button>
-            <button class="danger" onclick='removeTarget(${JSON.stringify(target.id)})'>Delete</button>
-          </div>
-        </div>
-      `).join("")
-      : `<p class="muted">No personal targets yet.</p>`;
+  document
+    .getElementById(
+      "sourceChecks"
+    )
+    .innerHTML =
+
+      state.available_sources
+        .map(
+          source => `
+
+            <label>
+
+              <input
+                type="checkbox"
+                data-source="${esc(source)}"
+                ${included.has(source) ? "checked" : ""}
+              >
+
+              ${esc(labels[source] || source)}
+
+            </label>
+
+          `
+        )
+        .join("");
+
+
+  /* ----------------------------------------------------------
+     PREFERENCES
+     ---------------------------------------------------------- */
+
+  document
+    .getElementById(
+      "pveWeight"
+    )
+    .value =
+      state.user.pve_weight;
+
+
+  document
+    .getElementById(
+      "pvpWeight"
+    )
+    .value =
+      state.user.pvp_weight;
+
+
+  document
+    .getElementById(
+      "collectorWeight"
+    )
+    .value =
+      state.user.collector_weight;
+
+
+  document
+    .getElementById(
+      "timezone"
+    )
+    .value =
+      state.user.timezone;
+
+
+  /* ----------------------------------------------------------
+     RECOMMENDATIONS
+     ---------------------------------------------------------- */
+
+  document
+    .getElementById(
+      "recommendations"
+    )
+    .innerHTML =
+
+      state.recommendations.length
+
+        ?
+
+        state.recommendations
+          .map(
+            rec => `
+
+              <div class="recommendation">
+
+                <div class="score">
+
+                  ${esc(rec.emoji)}
+                  ${esc(rec.pokemon_name)}
+                  —
+                  ${esc(rec.label)}
+                  (${rec.score}/100)
+
+                </div>
+
+
+                <div class="muted">
+
+                  ${esc(
+                    rec.event_title
+                    || ""
+                  )}
+
+                </div>
+
+
+                <ul>
+
+                  ${rec.reasons
+                    .map(
+                      reason =>
+                        `<li>${esc(reason)}</li>`
+                    )
+                    .join("")
+                  }
+
+                </ul>
+
+              </div>
+
+            `
+          )
+          .join("")
+
+        :
+
+        `
+
+          <p class="muted">
+
+            No matching active raid recommendations yet.
+
+            This is normal until event data has synced
+            and automatic meta assessments are available.
+
+          </p>
+
+        `;
+
+
+  /* ----------------------------------------------------------
+     TARGETS
+     ---------------------------------------------------------- */
+
+  document
+    .getElementById(
+      "targets"
+    )
+    .innerHTML =
+
+      state.targets.length
+
+        ?
+
+        state.targets
+          .map(
+            target => `
+
+              <div class="target">
+
+                <strong>
+
+                  ${esc(
+                    target.pokemon_name
+                  )}
+
+                </strong>
+
+
+                <div>
+
+                  ${esc(
+                    target.target_type
+                  )}:
+
+                  ${Number(
+                    target.current_value
+                    || 0
+                  ).toLocaleString()}
+
+                  ${
+                    target.target_value
+                    == null
+
+                      ? ""
+
+                      : " / "
+                        + Number(
+                          target.target_value
+                        ).toLocaleString()
+                  }
+
+                </div>
+
+
+                <div>
+
+                  Priority:
+                  ${esc(
+                    target.priority
+                  )}
+
+                  ${
+                    Number(
+                      target.completed
+                    )
+
+                      ? " • COMPLETE"
+
+                      : ""
+                  }
+
+                </div>
+
+
+                ${
+                  target.notes
+
+                    ? `
+
+                      <div class="field-help">
+
+                        ${esc(
+                          target.notes
+                        )}
+
+                      </div>
+
+                    `
+
+                    : ""
+                }
+
+
+                <div
+                  class="row"
+                  style="margin-top:8px"
+                >
+
+                  <button
+                    class="secondary"
+                    onclick='editTarget(
+                      ${JSON.stringify(target)}
+                    )'
+                  >
+
+                    Edit
+
+                  </button>
+
+
+                  <button
+                    class="danger"
+                    onclick='removeTarget(
+                      ${JSON.stringify(target.id)}
+                    )'
+                  >
+
+                    Delete
+
+                  </button>
+
+                </div>
+
+              </div>
+
+            `
+          )
+          .join("")
+
+        :
+
+        `
+
+          <p class="muted">
+
+            No personal targets yet.
+
+          </p>
+
+        `;
+
 }
 
-document.getElementById("saveSettings").addEventListener("click", async () => {
-  const included_sources = [...document.querySelectorAll("[data-source]:checked")]
-    .map(el => el.dataset.source);
-  const status = document.getElementById("settingsStatus");
-  status.textContent = "Saving…";
-  try {
-    await api("/api/settings", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        token,
-        included_sources,
-        pve_weight: Number(document.getElementById("pveWeight").value),
-        pvp_weight: Number(document.getElementById("pvpWeight").value),
-        collector_weight: Number(document.getElementById("collectorWeight").value),
-        timezone: document.getElementById("timezone").value
-      })
+
+/* ============================================================
+   SAVE SETTINGS
+   ============================================================ */
+
+document
+  .getElementById(
+    "saveSettings"
+  )
+  .addEventListener(
+    "click",
+    async () => {
+
+      const included_sources =
+        [
+          ...document.querySelectorAll(
+            "[data-source]:checked"
+          )
+        ]
+        .map(
+          el =>
+            el.dataset.source
+        );
+
+
+      const status =
+        document.getElementById(
+          "settingsStatus"
+        );
+
+
+      status.textContent =
+        "Saving…";
+
+
+      try {
+
+        await api(
+          "/api/settings",
+          {
+
+            method:
+              "POST",
+
+            headers: {
+              "content-type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify({
+
+                token,
+
+                included_sources,
+
+                pve_weight:
+                  Number(
+                    document
+                      .getElementById(
+                        "pveWeight"
+                      )
+                      .value
+                  ),
+
+                pvp_weight:
+                  Number(
+                    document
+                      .getElementById(
+                        "pvpWeight"
+                      )
+                      .value
+                  ),
+
+                collector_weight:
+                  Number(
+                    document
+                      .getElementById(
+                        "collectorWeight"
+                      )
+                      .value
+                  ),
+
+                timezone:
+                  document
+                    .getElementById(
+                      "timezone"
+                    )
+                    .value
+
+              })
+
+          }
+        );
+
+
+        status.textContent =
+          "Saved ✓";
+
+
+        await load();
+
+      }
+
+      catch (error) {
+
+        status.textContent =
+          error.message;
+
+      }
+
+    }
+  );
+
+
+/* ============================================================
+   SAVE TARGET
+   ============================================================ */
+
+document
+  .getElementById(
+    "saveTarget"
+  )
+  .addEventListener(
+    "click",
+    async () => {
+
+      const status =
+        document.getElementById(
+          "targetStatus"
+        );
+
+
+      status.textContent =
+        "Saving…";
+
+
+      try {
+
+        await api(
+          "/api/targets",
+          {
+
+            method:
+              "POST",
+
+            headers: {
+              "content-type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify({
+
+                token,
+
+                pokemon_name:
+                  document
+                    .getElementById(
+                      "pokemonName"
+                    )
+                    .value
+                    .trim(),
+
+                target_type:
+                  document
+                    .getElementById(
+                      "targetType"
+                    )
+                    .value,
+
+                current_value:
+                  document
+                    .getElementById(
+                      "currentValue"
+                    )
+                    .value,
+
+                target_value:
+                  document
+                    .getElementById(
+                      "targetValue"
+                    )
+                    .value,
+
+                priority:
+                  document
+                    .getElementById(
+                      "priority"
+                    )
+                    .value,
+
+                completed:
+                  document
+                    .getElementById(
+                      "completed"
+                    )
+                    .value
+                  === "1",
+
+                notes:
+                  document
+                    .getElementById(
+                      "notes"
+                    )
+                    .value
+
+              })
+
+          }
+        );
+
+
+        status.textContent =
+          "Saved ✓";
+
+
+        await load();
+
+      }
+
+      catch (error) {
+
+        status.textContent =
+          error.message;
+
+      }
+
+    }
+  );
+
+
+/* ============================================================
+   EDIT TARGET
+   ============================================================ */
+
+window.editTarget =
+  target => {
+
+    document
+      .getElementById(
+        "pokemonName"
+      )
+      .value =
+        target.pokemon_name;
+
+
+    document
+      .getElementById(
+        "targetType"
+      )
+      .value =
+        target.target_type;
+
+
+    document
+      .getElementById(
+        "currentValue"
+      )
+      .value =
+        target.current_value
+        ?? 0;
+
+
+    document
+      .getElementById(
+        "targetValue"
+      )
+      .value =
+        target.target_value
+        ?? "";
+
+
+    document
+      .getElementById(
+        "priority"
+      )
+      .value =
+        target.priority;
+
+
+    document
+      .getElementById(
+        "completed"
+      )
+      .value =
+        Number(
+          target.completed
+        )
+          ? "1"
+          : "0";
+
+
+    document
+      .getElementById(
+        "notes"
+      )
+      .value =
+        target.notes
+        || "";
+
+
+    window.scrollTo({
+
+      top:
+        document
+          .getElementById(
+            "pokemonName"
+          )
+          .offsetTop
+        - 80,
+
+      behavior:
+        "smooth"
+
     });
-    status.textContent = "Saved ✓";
+
+  };
+
+
+/* ============================================================
+   DELETE TARGET
+   ============================================================ */
+
+window.removeTarget =
+  async id => {
+
+    if (
+      !confirm(
+        "Delete this target?"
+      )
+    ) {
+
+      return;
+
+    }
+
+
+    await api(
+
+      `/api/targets?token=${
+        encodeURIComponent(token)
+      }&id=${
+        encodeURIComponent(id)
+      }`,
+
+      {
+        method:
+          "DELETE"
+      }
+
+    );
+
+
     await load();
-  } catch (error) {
-    status.textContent = error.message;
-  }
-});
 
-document.getElementById("saveTarget").addEventListener("click", async () => {
-  const status = document.getElementById("targetStatus");
-  status.textContent = "Saving…";
-  try {
-    await api("/api/targets", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        token,
-        pokemon_name: document.getElementById("pokemonName").value.trim(),
-        target_type: document.getElementById("targetType").value,
-        current_value: document.getElementById("currentValue").value,
-        target_value: document.getElementById("targetValue").value,
-        priority: document.getElementById("priority").value,
-        completed: document.getElementById("completed").value === "1",
-        notes: document.getElementById("notes").value
-      })
-    });
-    status.textContent = "Saved ✓";
-    await load();
-  } catch (error) {
-    status.textContent = error.message;
-  }
-});
+  };
 
-window.editTarget = (target) => {
-  document.getElementById("pokemonName").value = target.pokemon_name;
-  document.getElementById("targetType").value = target.target_type;
-  document.getElementById("currentValue").value = target.current_value ?? 0;
-  document.getElementById("targetValue").value = target.target_value ?? "";
-  document.getElementById("priority").value = target.priority;
-  document.getElementById("completed").value = Number(target.completed) ? "1" : "0";
-  document.getElementById("notes").value = target.notes || "";
-  window.scrollTo({ top: document.getElementById("pokemonName").offsetTop - 80, behavior: "smooth" });
-};
 
-window.removeTarget = async (id) => {
-  if (!confirm("Delete this target?")) return;
-  await api(`/api/targets?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`, {
-    method: "DELETE"
-  });
-  await load();
-};
+/* ============================================================
+   INITIAL LOAD
+   ============================================================ */
 
 load();
+
 </script>
+
 </body>
 </html>
