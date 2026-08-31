@@ -1205,7 +1205,7 @@ function dateTokensFromText(value) {
     "(January|February|March|April|May|June|July|August|September|October|November|December)";
 
   const regex = new RegExp(
-    `(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)?\\\\s*,?\\\\s*${monthPattern}\\\\s+(\\\\d{1,2})(?:\\\\s*,\\\\s*(\\\\d{4}))?`,
+    `(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)?\\s*,?\\s*${monthPattern}\\s+(\\d{1,2})(?:\\s*,\\s*(\\d{4}))?`,
     "gi"
   );
 
@@ -1346,7 +1346,7 @@ function officialRaidDateFromLine(line, defaultYear) {
     "(January|February|March|April|May|June|July|August|September|October|November|December)";
 
   const regex = new RegExp(
-    `^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\\\s*,?\\\\s*${monthPattern}\\\\s+(\\\\d{1,2})(?:\\\\s*,\\\\s*(\\\\d{4}))?$`,
+    `^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\s*,?\\s*${monthPattern}\\s+(\\d{1,2})(?:\\s*,\\s*(\\d{4}))?$`,
     "i"
   );
 
