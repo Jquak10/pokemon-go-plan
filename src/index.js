@@ -3547,29 +3547,9 @@ async function buildRemoteRaidBudgetForecast(
       }
 
       const topRecommendations =
-        day.recommendations
-          .filter(
-            rec =>
-              !Number(
-                rec.target?.completed
-              ) &&
-              String(
-                rec.target?.priority || ""
-              ).toLowerCase() !== "skip"
-          )
-          .slice(0, 3)
-          .map(rec => ({
-            pokemon_name:
-              rec.pokemon_name,
-            score:
-              rec.score,
-            label:
-              rec.label,
-            source_kind:
-              rec.source_kind,
-            source_label:
-              rec.source_label
-          }));
+        recommendationCoLeaders(
+          day.recommendations
+        );
 
       return {
         date: day.date,
@@ -4514,6 +4494,66 @@ async function targetOptionsForUser(
 
 
 
+
+function recommendationCoLeaders(
+  recommendations
+) {
+  const eligible =
+    (recommendations || [])
+      .filter(
+        rec =>
+          !Number(
+            rec.target?.completed
+          ) &&
+          String(
+            rec.target?.priority || ""
+          ).toLowerCase() !== "skip"
+      );
+
+  if (!eligible.length) {
+    return [];
+  }
+
+  const first =
+    eligible[0];
+
+  const visibleScore =
+    Math.round(
+      Number(first.score || 0)
+    );
+
+  const label =
+    String(
+      first.label || ""
+    );
+
+  return eligible
+    .filter(
+      rec =>
+        Math.round(
+          Number(rec.score || 0)
+        ) === visibleScore &&
+        String(
+          rec.label || ""
+        ) === label
+    )
+    .map(rec => ({
+      pokemon_name:
+        rec.pokemon_name,
+      score:
+        rec.score,
+      label:
+        rec.label,
+      emoji:
+        rec.emoji,
+      source_kind:
+        rec.source_kind,
+      source_label:
+        rec.source_label
+    }));
+}
+
+
 function normalizedRecommendationNames(day) {
   return (day?.top_recommendations || [])
     .map(item =>
@@ -4527,17 +4567,13 @@ function dashboardOverview(
   recommendations,
   remoteRaidPlan
 ) {
+  const topPicks =
+    recommendationCoLeaders(
+      recommendations
+    );
+
   const topPick =
-    recommendations
-      .filter(
-        rec =>
-          !Number(
-            rec.target?.completed
-          ) &&
-          String(
-            rec.target?.priority || ""
-          ).toLowerCase() !== "skip"
-      )[0] || null;
+    topPicks[0] || null;
 
   const forecast =
     remoteRaidPlan.budget_forecast || [];
@@ -4583,22 +4619,11 @@ function dashboardOverview(
     local_date:
       remoteRaidPlan.local_date,
     top_pick:
-      topPick
-        ? {
-            pokemon_name:
-              topPick.pokemon_name,
-            score:
-              topPick.score,
-            label:
-              topPick.label,
-            emoji:
-              topPick.emoji,
-            source_kind:
-              topPick.source_kind,
-            source_label:
-              topPick.source_label
-          }
-        : null,
+      topPick,
+    top_picks:
+      topPicks,
+    top_pick_is_tie:
+      topPicks.length > 1,
     paid_raid_guidance:
       remoteRaidPlan.purchase_advice,
     planner_budget:
