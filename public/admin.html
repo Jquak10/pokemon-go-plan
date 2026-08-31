@@ -116,8 +116,9 @@
       </details>
     </section>
 
-    <nav class="admin-section-nav">
+    <nav class="admin-section-nav admin-section-nav-four">
       <button type="button" data-admin-section="official">Official raids</button>
+      <button type="button" data-admin-section="overrides">Overrides</button>
       <button type="button" data-admin-section="limits">Remote limits</button>
       <button type="button" data-admin-section="meta">Assessments</button>
     </nav>
@@ -138,6 +139,26 @@
       </div>
 
       <div id="officialRaids" class="admin-card-list muted">
+        Enter the admin key, then refresh.
+      </div>
+    </section>
+
+    <section id="adminOverrides" class="dashboard-card admin-data-section hidden">
+      <div class="section-heading-row">
+        <div>
+          <span class="section-eyebrow">OFFICIAL EVENT OVERRIDES</span>
+          <h2>Suppressed seasonal schedules</h2>
+          <p class="section-subtitle">
+            These rules hide normal upstream schedule entries when an official event temporarily replaces them. Official event supplements remain visible.
+          </p>
+        </div>
+
+        <button id="loadSuppressions" type="button" class="secondary">
+          Refresh
+        </button>
+      </div>
+
+      <div id="suppressionRules" class="admin-card-list muted">
         Enter the admin key, then refresh.
       </div>
     </section>
@@ -243,6 +264,9 @@ function showAdminSection(name) {
   const map = {
     official:
       document.getElementById("adminOfficial"),
+
+    overrides:
+      document.getElementById("adminOverrides"),
 
     limits:
       document.getElementById("adminLimits"),
@@ -382,6 +406,7 @@ document
 
         await Promise.all([
           loadOfficialRaids(),
+          loadSuppressions(),
           loadRemoteLimits(),
           loadMeta()
         ]);
@@ -457,6 +482,77 @@ async function loadOfficialRaids() {
       error.message;
   }
 }
+
+
+async function loadSuppressions() {
+  const entries =
+    document.getElementById("suppressionRules");
+
+  entries.textContent =
+    "Loading…";
+
+  try {
+    const data =
+      await requestJson(
+        `/api/admin/suppressions?key=${encodeURIComponent(key())}`
+      );
+
+    entries.innerHTML =
+      data.rules.length
+        ? data.rules.map(rule => `
+            <article class="admin-data-card">
+              <div class="admin-data-card-head">
+                <div>
+                  <span class="section-eyebrow">OFFICIAL OVERRIDE</span>
+                  <strong>${esc(rule.event_name)}</strong>
+                </div>
+
+                <span class="status-badge ${Number(rule.active) ? "badge-green" : "badge-neutral"}">
+                  ${Number(rule.active) ? "ACTIVE" : "INACTIVE"}
+                </span>
+              </div>
+
+              <p>
+                ${esc(rule.start_date)}
+                →
+                ${esc(rule.end_date)}
+              </p>
+
+              <div class="admin-score-strip">
+                ${rule.suppressed_source_types
+                  .map(source => `
+                    <span>
+                      Hide
+                      <strong>${esc(source)}</strong>
+                    </span>
+                  `)
+                  .join("")
+                }
+              </div>
+
+              <div class="assessment-notes">
+                ${esc(rule.note || "")}
+              </div>
+
+              ${rule.source_url
+                ? `<a class="admin-source-link" href="${esc(rule.source_url)}" target="_blank" rel="noopener">Official source ↗</a>`
+                : ""
+              }
+            </article>
+          `).join("")
+        : `
+          <div class="empty-state">
+            <span>⌫</span>
+            <strong>No official suppression rules stored yet.</strong>
+            <p>Run the Official schedules sync.</p>
+          </div>
+        `;
+  } catch (error) {
+    entries.textContent =
+      error.message;
+  }
+}
+
 
 async function loadRemoteLimits() {
   const entries =
@@ -580,6 +676,13 @@ document
   .addEventListener(
     "click",
     loadOfficialRaids
+  );
+
+document
+  .getElementById("loadSuppressions")
+  .addEventListener(
+    "click",
+    loadSuppressions
   );
 
 document
