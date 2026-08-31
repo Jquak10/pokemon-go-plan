@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   pve_weight REAL NOT NULL DEFAULT 1.0,
   pvp_weight REAL NOT NULL DEFAULT 0.0,
   collector_weight REAL NOT NULL DEFAULT 0.4,
+  remote_raid_budget INTEGER,
+  remote_raid_min_score REAL NOT NULL DEFAULT 60,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -20,6 +22,7 @@ CREATE TABLE IF NOT EXISTS targets (
   target_type TEXT NOT NULL DEFAULT 'mega_energy',
   target_value REAL,
   current_value REAL NOT NULL DEFAULT 0,
+  expected_progress_per_raid REAL,
   priority TEXT NOT NULL DEFAULT 'medium',
   completed INTEGER NOT NULL DEFAULT 0,
   notes TEXT,
@@ -80,3 +83,27 @@ CREATE TABLE IF NOT EXISTS meta_sources (
 
 CREATE INDEX IF NOT EXISTS idx_meta_sources_pokemon
 ON meta_sources(pokemon_name);
+
+
+CREATE TABLE IF NOT EXISTS remote_raid_usage (
+  user_id TEXT NOT NULL,
+  local_date TEXT NOT NULL,
+  raids_used INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, local_date),
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS remote_raid_limit_overrides (
+  id TEXT PRIMARY KEY,
+  event_name TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  remote_raid_limit INTEGER NOT NULL,
+  source_url TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_remote_raid_limit_dates
+ON remote_raid_limit_overrides(start_date, end_date, active);
