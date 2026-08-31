@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=13">
+  <link rel="stylesheet" href="/styles.css?v=14">
 </head>
 
 <body class="manage-page">
@@ -77,6 +77,47 @@
             <small>Goals still in progress</small>
           </div>
         </article>
+      </section>
+
+      <!-- =======================================================
+           TODAY / NEXT CHANGE
+           ======================================================= -->
+      <section class="today-command-card" aria-label="Today's priority briefing">
+        <div class="today-command-main">
+          <div>
+            <span id="todayDateLabel" class="section-eyebrow">TODAY</span>
+            <h2 id="todayTopPick">Loading today's priority…</h2>
+            <div id="todayTopPickMeta" class="today-top-pick-meta"></div>
+          </div>
+
+          <div id="todaySpendSignal" class="today-spend-signal">
+            <span>PAID RAID GUIDANCE</span>
+            <strong>Calculating…</strong>
+            <small></small>
+          </div>
+        </div>
+
+        <div class="today-command-grid">
+          <article>
+            <span>Planner budget</span>
+            <strong id="todayPlannerBudget">—</strong>
+            <small>Worthwhile paid raids</small>
+          </article>
+
+          <article>
+            <span>Today's ceiling</span>
+            <strong id="todayEffectiveBudget">—</strong>
+            <small>After preference / override</small>
+          </article>
+
+          <article class="today-next-change">
+            <span>Next schedule change</span>
+            <strong id="todayNextChange">—</strong>
+            <small id="todayNextChangeDetail">Checking the next few days…</small>
+          </article>
+        </div>
+
+        <div id="freshnessStrip" class="freshness-strip"></div>
       </section>
 
       <!-- =======================================================
@@ -552,6 +593,14 @@
       </section>
 
     </section>
+
+    <footer class="dashboard-footer">
+      <span>
+        Independent Pokémon GO planning tool · Not affiliated with Niantic,
+        The Pokémon Company, Nintendo, or GAME FREAK.
+      </span>
+      <a href="/sources" target="_blank" rel="noopener">Data sources</a>
+    </footer>
   </main>
 
   <!-- =========================================================
@@ -808,6 +857,199 @@ function updateSliderOutput(inputId, outputId, decimals = 1) {
   input.addEventListener("input", sync);
   sync();
 }
+
+
+function compactDateLabel(dateValue) {
+  const match =
+    String(dateValue || "")
+      .match(
+        /^(\d{4})-(\d{2})-(\d{2})$/
+      );
+
+  if (!match) {
+    return dateValue || "Today";
+  }
+
+  const date =
+    new Date(
+      Date.UTC(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+        12
+      )
+    );
+
+  return new Intl.DateTimeFormat(
+    undefined,
+    {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC"
+    }
+  ).format(date);
+}
+
+function relativeFreshness(value) {
+  if (!value) {
+    return "Not yet available";
+  }
+
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "Updated";
+  }
+
+  const minutes =
+    Math.max(
+      0,
+      Math.floor(
+        (Date.now() - date.getTime()) /
+        60000
+      )
+    );
+
+  if (minutes < 2) return "Just updated";
+  if (minutes < 60) return `${minutes} min ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function renderTodayBriefing() {
+  const dashboard =
+    state.dashboard || {};
+
+  const freshness =
+    state.data_freshness || {};
+
+  document
+    .getElementById("todayDateLabel")
+    .textContent =
+      `TODAY · ${compactDateLabel(dashboard.local_date)}`;
+
+  const topPick =
+    dashboard.top_pick;
+
+  document
+    .getElementById("todayTopPick")
+    .textContent =
+      topPick
+        ? `${topPick.emoji || ""} ${topPick.pokemon_name}`.trim()
+        : "No urgent paid raid target";
+
+  document
+    .getElementById("todayTopPickMeta")
+    .innerHTML =
+      topPick
+        ? `
+          <span class="status-badge ${scoreTone(topPick.score)}">${esc(topPick.label)}</span>
+          <span class="score-pill">${formatNumber(topPick.score)}</span>
+          ${
+            topPick.source_label
+              ? `
+                <span class="source-confidence-badge source-${esc(topPick.source_kind || "calendar")}">
+                  ${topPick.source_kind === "official" ? "✓ " : ""}${esc(topPick.source_label)}
+                </span>
+              `
+              : ""
+          }
+        `
+        : `
+          <span class="status-badge badge-neutral">SAVE / REVIEW LATER</span>
+        `;
+
+  const advice =
+    dashboard.paid_raid_guidance || {};
+
+  const spend =
+    document.getElementById("todaySpendSignal");
+
+  spend.className =
+    `today-spend-signal signal-${esc(advice.code || "selective")}`;
+
+  spend.innerHTML = `
+    <span>${esc(advice.label || "PAID RAID GUIDANCE")}</span>
+    <strong>${esc(advice.headline || "Be selective today.")}</strong>
+    <small>${esc(advice.detail || "")}</small>
+  `;
+
+  document
+    .getElementById("todayPlannerBudget")
+    .textContent =
+      formatNumber(dashboard.planner_budget);
+
+  document
+    .getElementById("todayEffectiveBudget")
+    .textContent =
+      formatNumber(dashboard.effective_budget);
+
+  const next =
+    dashboard.next_change;
+
+  document
+    .getElementById("todayNextChange")
+    .textContent =
+      next
+        ? next.label
+        : "No change found";
+
+  document
+    .getElementById("todayNextChangeDetail")
+    .textContent =
+      next?.top_recommendations?.length
+        ? next.top_recommendations
+            .map(item => item.pokemon_name)
+            .join(" · ")
+        : (
+            next
+              ? `Planner budget ≈ ${formatNumber(next.recommended_budget)}`
+              : "Within the current forecast window"
+          );
+
+  const freshnessItems = [
+    {
+      label: "Event feeds",
+      value: freshness.event_feeds
+    },
+    {
+      label: "Official schedules",
+      value: freshness.official_schedules
+    },
+    {
+      label: "Raid assessments",
+      value: freshness.raid_assessments
+    }
+  ];
+
+  document
+    .getElementById("freshnessStrip")
+    .innerHTML =
+      freshnessItems
+        .map(item => `
+          <span class="freshness-item">
+            <i aria-hidden="true"></i>
+            <strong>${esc(item.label)}</strong>
+            <small>${esc(relativeFreshness(item.value))}</small>
+          </span>
+        `)
+        .join("") +
+      `
+        <a href="/sources" target="_blank" rel="noopener" class="freshness-source-link">
+          Data sources ↗
+        </a>
+      `;
+}
+
 
 function renderHero() {
   const plan = state.remote_raid_plan;
@@ -1085,6 +1327,16 @@ function renderRecommendations() {
 
         <div class="recommendation-card-meta">
           <span class="status-badge ${scoreTone(rec.score)}">${esc(rec.label)}</span>
+
+          ${
+            rec.source_label
+              ? `
+                <span class="source-confidence-badge source-${esc(rec.source_kind || "calendar")}">
+                  ${rec.source_kind === "official" ? "✓ " : ""}${esc(rec.source_label)}
+                </span>
+              `
+              : ""
+          }
         </div>
 
         <details class="compact-details">
@@ -1509,6 +1761,7 @@ function renderPreferences() {
 
 function render() {
   renderHero();
+  renderTodayBriefing();
   renderRemoteRaidPlan();
   renderRecommendations();
   renderTargets();
