@@ -1113,13 +1113,13 @@ async function handleFetch(request, env) {
       return calendarFeed(request, env, calendarMatch[1]);
     }
 
-    if (request.method === "GET" && /^\/manage\/[A-Za-z0-9_-]+\/?$/.test(path)) {
-      return asset(request, env, "/manage.html");
-    }
+  if (request.method === "GET" && /^\/manage\/[A-Za-z0-9_-]+\/?$/.test(path)) {
+    return asset(request, env, "/manage");
+  }
 
-    if (request.method === "GET" && path === "/admin") {
-      return asset(request, env, "/admin.html");
-    }
+  if (request.method === "GET" && path === "/admin") {
+    return asset(request, env, "/admin");
+  }
 
     return env.ASSETS.fetch(request);
   } catch (error) {
