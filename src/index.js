@@ -2161,7 +2161,8 @@ async function officialRaidSupplementStatements(env, supplements, timestamp) {
       summary,
       description,
       dtstart_line: `DTSTART;VALUE=DATE:${compactIcsDate(item.start_date)}`,
-      dtend_line: null,
+      dtend_line:
+        `DTEND;VALUE=DATE:${compactIcsDate(addDaysIso(item.end_date, 1))}`,
       other_lines: [
         `UID:${sourceUid}`,
         `URL:${item.source_url}`,
@@ -2194,12 +2195,12 @@ async function officialRaidSupplementStatements(env, supplements, timestamp) {
           status,
           updated_at
         )
-        VALUES (?, 'raid_battles', ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, 0, 'active', ?)
+        VALUES (?, 'raid_battles', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?)
         ON CONFLICT(id) DO UPDATE SET
           summary = excluded.summary,
           description = excluded.description,
           dtstart_line = excluded.dtstart_line,
-          dtend_line = NULL,
+          dtend_line = excluded.dtend_line,
           other_lines = excluded.other_lines,
           start_date = excluded.start_date,
           end_date = excluded.end_date,
@@ -2219,6 +2220,7 @@ async function officialRaidSupplementStatements(env, supplements, timestamp) {
         summary,
         description,
         eventObject.dtstart_line,
+        eventObject.dtend_line,
         eventObject.other_lines,
         item.start_date,
         item.end_date,
@@ -5233,7 +5235,31 @@ function buildVevent(event, personalized) {
   }
 
   lines.push(event.dtstart_line);
-  if (event.dtend_line) lines.push(event.dtend_line);
+
+  let effectiveDtendLine =
+    event.dtend_line || null;
+
+  if (
+    !effectiveDtendLine &&
+    event.end_date &&
+    isAllDayIcsLine(event.dtstart_line)
+  ) {
+    const exclusiveEnd =
+      addDaysIso(
+        event.end_date,
+        1
+      );
+
+    if (exclusiveEnd) {
+      effectiveDtendLine =
+        `DTEND;VALUE=DATE:${compactIcsDate(exclusiveEnd)}`;
+    }
+  }
+
+  if (effectiveDtendLine) {
+    lines.push(effectiveDtendLine);
+  }
+
   lines.push(`SEQUENCE:${Number(event.sequence || 0)}`);
 
   if (event.status === "stale") {
