@@ -123,6 +123,52 @@ async function sha256Hex(value) {
     .join("");
 }
 
+function bytesToBase64Url(bytes) {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+async function feedSigningKey(env) {
+  if (!env.FEED_LINK_KEY) {
+    throw new Error(
+      "FEED_LINK_KEY is not configured. Add it as a Worker runtime secret."
+    );
+  }
+
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(String(env.FEED_LINK_KEY)),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"]
+  );
+}
+
+async function recoverableFeedSignature(env, userId) {
+  const key = await feedSigningKey(env);
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`pokemon-go-calendar-feed:${userId}`)
+  );
+
+  // 24 bytes is plenty for an unguessable read-only feed signature.
+  return bytesToBase64Url(new Uint8Array(signature).slice(0, 24));
+}
+
+async function verifyRecoverableFeedSignature(env, userId, signature) {
+  const expected = await recoverableFeedSignature(env, userId);
+  if (expected.length !== String(signature || "").length) return false;
+
+  let difference = 0;
+  for (let i = 0; i < expected.length; i++) {
+    difference |= expected.charCodeAt(i) ^ String(signature).charCodeAt(i);
+  }
+  return difference === 0;
+}
+
 function escapeIcs(value) {
   return String(value ?? "")
     .replace(/\\/g, "\\\\")
@@ -1689,6 +1735,135 @@ async function remoteRaidPlanForUser(env, user, recommendations) {
   return { local_date: localDate, ...plan };
 }
 
+function monthBounds(month) {
+  const match = String(month || "").match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const monthNumber = Number(match[2]);
+
+  if (
+    !Number.isInteger(year) ||
+    year < 2000 ||
+    year > 2200 ||
+    !Number.isInteger(monthNumber) ||
+    monthNumber < 1 ||
+    monthNumber > 12
+  ) {
+    return null;
+  }
+
+  const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+
+  return {
+    month: `${String(year).padStart(4, "0")}-${String(monthNumber).padStart(2, "0")}`,
+    start: `${String(year).padStart(4, "0")}-${String(monthNumber).padStart(2, "0")}-01`,
+    end: `${String(year).padStart(4, "0")}-${String(monthNumber).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+  };
+}
+
+async function calendarEventsApi(request, env) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token");
+  const user = await userByManageToken(env, token);
+
+  if (!user) return bad("Invalid management link.", 401);
+
+  const localDate = localDateForTimezone(user.timezone);
+  const bounds = monthBounds(
+    url.searchParams.get("month") || localDate.slice(0, 7)
+  );
+
+  if (!bounds) return bad("Month must use YYYY-MM.");
+
+  const included = parseSources(user);
+
+  if (!included.length) {
+    return json({
+      month: bounds.month,
+      timezone: user.timezone,
+      events: []
+    });
+  }
+
+  const targets = await getTargets(env, user.id);
+  const metas = await getMeta(env);
+  const placeholders = included.map(() => "?").join(",");
+
+  const { results } = await env.DB.prepare(`
+    SELECT *
+    FROM events
+    WHERE source_type IN (${placeholders})
+      AND (
+        status = 'active'
+        OR (
+          status = 'stale'
+          AND COALESCE(end_date, start_date, '0000-01-01') >= date('now', '-14 days')
+        )
+      )
+      AND start_date IS NOT NULL
+      AND start_date <= ?
+      AND COALESCE(end_date, start_date) >= ?
+    ORDER BY start_date, summary
+    LIMIT 700
+  `).bind(...included, bounds.end, bounds.start).all();
+
+  const dedupe = new Set();
+  const events = [];
+
+  for (const event of results) {
+    const key =
+      event.source_uid ||
+      `${normalizeName(event.summary)}|${event.dtstart_line}|${event.dtend_line || ""}`;
+
+    if (dedupe.has(key)) continue;
+    dedupe.add(key);
+
+    const personalized = personalizeEvent(event, user, targets, metas);
+
+    events.push({
+      id: event.id,
+      title: personalized.title,
+      description: personalized.description || "",
+      source_type: event.source_type,
+      start_date: event.start_date,
+      end_date: event.end_date || event.start_date,
+      original_title: event.summary
+    });
+  }
+
+  return json({
+    month: bounds.month,
+    timezone: user.timezone,
+    events
+  });
+}
+
+async function feedLinkApi(request, env) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token");
+  const user = await userByManageToken(env, token);
+
+  if (!user) return bad("Invalid management link.", 401);
+
+  if (!env.FEED_LINK_KEY) {
+    return bad(
+      "ICS link recovery is not enabled yet. Add the FEED_LINK_KEY Worker runtime secret.",
+      503
+    );
+  }
+
+  const signature = await recoverableFeedSignature(env, user.id);
+
+  return json({
+    calendar_url:
+      `${url.origin}/calendar/recover/${user.id}.${signature}.ics`,
+    read_only: true,
+    note:
+      "This is a recoverable read-only feed URL. Existing subscription URLs continue to work."
+  });
+}
+
 async function updateRemoteRaidUsage(request, env) {
   const body = await request.json();
   const user = await userByManageToken(env, body.token);
@@ -1991,12 +2166,7 @@ function buildVevent(event, personalized) {
   return lines.join("\r\n");
 }
 
-async function calendarFeed(request, env, feedToken) {
-  const user = await userByFeedToken(env, feedToken);
-  if (!user) {
-    return new Response("Calendar not found.", { status: 404 });
-  }
-
+async function calendarFeedForUser(request, env, user) {
   const included = parseSources(user);
   if (!included.length) {
     return new Response(
@@ -2072,6 +2242,43 @@ async function calendarFeed(request, env, feedToken) {
       etag
     }
   });
+}
+
+async function calendarFeed(request, env, feedToken) {
+  const user = await userByFeedToken(env, feedToken);
+  if (!user) {
+    return new Response("Calendar not found.", { status: 404 });
+  }
+
+  return calendarFeedForUser(request, env, user);
+}
+
+async function recoverableCalendarFeed(request, env, userId, signature) {
+  if (!env.FEED_LINK_KEY) {
+    return new Response("Calendar not found.", { status: 404 });
+  }
+
+  const valid = await verifyRecoverableFeedSignature(
+    env,
+    userId,
+    signature
+  );
+
+  if (!valid) {
+    return new Response("Calendar not found.", { status: 404 });
+  }
+
+  const user = await env.DB.prepare(`
+    SELECT *
+    FROM users
+    WHERE id = ?
+  `).bind(userId).first();
+
+  if (!user) {
+    return new Response("Calendar not found.", { status: 404 });
+  }
+
+  return calendarFeedForUser(request, env, user);
 }
 
 
@@ -2221,6 +2428,14 @@ async function handleFetch(request, env) {
       return getMe(request, env);
     }
 
+    if (request.method === "GET" && path === "/api/calendar-events") {
+      return calendarEventsApi(request, env);
+    }
+
+    if (request.method === "GET" && path === "/api/feed-link") {
+      return feedLinkApi(request, env);
+    }
+
     if (request.method === "POST" && path === "/api/settings") {
       return updateSettings(request, env);
     }
@@ -2260,6 +2475,18 @@ async function handleFetch(request, env) {
 
     if (request.method === "POST" && path === "/api/admin/sync") {
       return adminSyncLegacy(request, env);
+    }
+
+    const recoverableCalendarMatch =
+      path.match(/^\/calendar\/recover\/([0-9a-fA-F-]{36})\.([A-Za-z0-9_-]+)\.ics$/);
+
+    if (request.method === "GET" && recoverableCalendarMatch) {
+      return recoverableCalendarFeed(
+        request,
+        env,
+        recoverableCalendarMatch[1],
+        recoverableCalendarMatch[2]
+      );
     }
 
     const calendarMatch = path.match(/^\/calendar\/([A-Za-z0-9_-]+)\.ics$/);
