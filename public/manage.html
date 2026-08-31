@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>My Pokémon GO Raid Planner</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main>
+  <section class="card">
+    <h1>My Pokémon GO Raid Planner</h1>
+    <p class="muted">Progress changes save to the database immediately. Apple Calendar refreshes the ICS feed on its own schedule.</p>
+    <p id="loadStatus">Loading…</p>
+  </section>
+
+  <section id="app" class="hidden">
+    <section class="card">
+      <h2>Event filters</h2>
+      <div id="sourceChecks" class="checks"></div>
+
+      <h3>Recommendation preferences</h3>
+      <div class="grid">
+        <div>
+          <label for="pveWeight">PvE importance (0–2)</label>
+          <input id="pveWeight" type="number" min="0" max="2" step="0.1">
+        </div>
+        <div>
+          <label for="pvpWeight">PvP importance (0–2)</label>
+          <input id="pvpWeight" type="number" min="0" max="2" step="0.1">
+        </div>
+        <div>
+          <label for="collectorWeight">Rarity/collection importance (0–2)</label>
+          <input id="collectorWeight" type="number" min="0" max="2" step="0.1">
+        </div>
+        <div>
+          <label for="timezone">Timezone</label>
+          <input id="timezone">
+        </div>
+      </div>
+      <p><button id="saveSettings">Save settings</button> <span id="settingsStatus"></span></p>
+    </section>
+
+    <section class="card">
+      <h2>Current raid recommendations</h2>
+      <p class="muted">These combine internet/meta scores stored by the service with your own target and progress.</p>
+      <div id="recommendations"></div>
+    </section>
+
+    <section class="card">
+      <h2>Add or update a target</h2>
+      <div class="grid">
+        <div>
+          <label for="pokemonName">Pokémon name</label>
+          <input id="pokemonName" placeholder="Mega Skarmory">
+        </div>
+        <div>
+          <label for="targetType">Target type</label>
+          <select id="targetType">
+            <option value="mega_energy">Mega Energy</option>
+            <option value="raids">Number of raids</option>
+            <option value="candy_xl">Candy XL</option>
+            <option value="candy">Candy</option>
+            <option value="custom">Custom progress</option>
+          </select>
+        </div>
+        <div>
+          <label for="currentValue">Current progress</label>
+          <input id="currentValue" type="number" step="1" value="0">
+        </div>
+        <div>
+          <label for="targetValue">Desired target</label>
+          <input id="targetValue" type="number" step="1" placeholder="3000">
+        </div>
+        <div>
+          <label for="priority">Personal priority</label>
+          <select id="priority">
+            <option value="high">High</option>
+            <option value="medium" selected>Medium</option>
+            <option value="low">Low</option>
+            <option value="skip">Skip</option>
+          </select>
+        </div>
+        <div>
+          <label for="completed">Completed?</label>
+          <select id="completed">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+      </div>
+      <label for="notes">Notes</label>
+      <textarea id="notes" placeholder="Use free passes first."></textarea>
+      <p><button id="saveTarget">Save target</button> <span id="targetStatus"></span></p>
+    </section>
+
+    <section class="card">
+      <h2>My targets</h2>
+      <div id="targets"></div>
+    </section>
+  </section>
+</main>
+
+<script>
+const token = location.pathname.split("/").filter(Boolean)[1];
+const app = document.getElementById("app");
+const loadStatus = document.getElementById("loadStatus");
+let state = null;
+
+const labels = {
+  community_day: "Community Day",
+  event: "General Events",
+  go_battle_league: "GO Battle League",
+  go_pass: "GO Pass",
+  max_battles: "Max Battles",
+  max_mondays: "Max Mondays",
+  pokemon_go_fest: "Pokémon GO Fest",
+  pokemon_spotlight_hour: "Spotlight Hour",
+  raid_battles: "Raid Battles",
+  raid_day: "Raid Day",
+  raid_hour: "Raid Hour",
+  research: "Research",
+  season: "Season"
+};
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, options);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Request failed.");
+  return data;
+}
+
+async function load() {
+  try {
+    state = await api(`/api/me?token=${encodeURIComponent(token)}`);
+    render();
+    loadStatus.textContent = "";
+    app.classList.remove("hidden");
+  } catch (error) {
+    loadStatus.textContent = error.message;
+    loadStatus.className = "error";
+  }
+}
+
+function render() {
+  const included = new Set(state.user.included_sources);
+
+  document.getElementById("sourceChecks").innerHTML =
+    state.available_sources.map(source => `
+      <label>
+        <input type="checkbox" data-source="${esc(source)}" ${included.has(source) ? "checked" : ""}>
+        ${esc(labels[source] || source)}
+      </label>
+    `).join("");
+
+  document.getElementById("pveWeight").value = state.user.pve_weight;
+  document.getElementById("pvpWeight").value = state.user.pvp_weight;
+  document.getElementById("collectorWeight").value = state.user.collector_weight;
+  document.getElementById("timezone").value = state.user.timezone;
+
+  document.getElementById("recommendations").innerHTML =
+    state.recommendations.length
+      ? state.recommendations.map(rec => `
+        <div class="recommendation">
+          <div class="score">${esc(rec.emoji)} ${esc(rec.pokemon_name)} — ${esc(rec.label)} (${rec.score}/100)</div>
+          <div class="muted">${esc(rec.event_title || "")}</div>
+          <ul>${rec.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>
+        </div>
+      `).join("")
+      : `<p class="muted">No matching active raid recommendations yet. This is normal until event data has synced and meta entries have been added.</p>`;
+
+  document.getElementById("targets").innerHTML =
+    state.targets.length
+      ? state.targets.map(target => `
+        <div class="target">
+          <strong>${esc(target.pokemon_name)}</strong>
+          <div>
+            ${esc(target.target_type)}:
+            ${Number(target.current_value || 0).toLocaleString()}
+            ${target.target_value == null ? "" : " / " + Number(target.target_value).toLocaleString()}
+          </div>
+          <div>Priority: ${esc(target.priority)} ${Number(target.completed) ? "• COMPLETE" : ""}</div>
+          <div class="row" style="margin-top:8px">
+            <button class="secondary" onclick='editTarget(${JSON.stringify(target)})'>Edit</button>
+            <button class="danger" onclick='removeTarget(${JSON.stringify(target.id)})'>Delete</button>
+          </div>
+        </div>
+      `).join("")
+      : `<p class="muted">No personal targets yet.</p>`;
+}
+
+document.getElementById("saveSettings").addEventListener("click", async () => {
+  const included_sources = [...document.querySelectorAll("[data-source]:checked")]
+    .map(el => el.dataset.source);
+  const status = document.getElementById("settingsStatus");
+  status.textContent = "Saving…";
+  try {
+    await api("/api/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token,
+        included_sources,
+        pve_weight: Number(document.getElementById("pveWeight").value),
+        pvp_weight: Number(document.getElementById("pvpWeight").value),
+        collector_weight: Number(document.getElementById("collectorWeight").value),
+        timezone: document.getElementById("timezone").value
+      })
+    });
+    status.textContent = "Saved ✓";
+    await load();
+  } catch (error) {
+    status.textContent = error.message;
+  }
+});
+
+document.getElementById("saveTarget").addEventListener("click", async () => {
+  const status = document.getElementById("targetStatus");
+  status.textContent = "Saving…";
+  try {
+    await api("/api/targets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token,
+        pokemon_name: document.getElementById("pokemonName").value.trim(),
+        target_type: document.getElementById("targetType").value,
+        current_value: document.getElementById("currentValue").value,
+        target_value: document.getElementById("targetValue").value,
+        priority: document.getElementById("priority").value,
+        completed: document.getElementById("completed").value === "1",
+        notes: document.getElementById("notes").value
+      })
+    });
+    status.textContent = "Saved ✓";
+    await load();
+  } catch (error) {
+    status.textContent = error.message;
+  }
+});
+
+window.editTarget = (target) => {
+  document.getElementById("pokemonName").value = target.pokemon_name;
+  document.getElementById("targetType").value = target.target_type;
+  document.getElementById("currentValue").value = target.current_value ?? 0;
+  document.getElementById("targetValue").value = target.target_value ?? "";
+  document.getElementById("priority").value = target.priority;
+  document.getElementById("completed").value = Number(target.completed) ? "1" : "0";
+  document.getElementById("notes").value = target.notes || "";
+  window.scrollTo({ top: document.getElementById("pokemonName").offsetTop - 80, behavior: "smooth" });
+};
+
+window.removeTarget = async (id) => {
+  if (!confirm("Delete this target?")) return;
+  await api(`/api/targets?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`, {
+    method: "DELETE"
+  });
+  await load();
+};
+
+load();
+</script>
+</body>
+</html>

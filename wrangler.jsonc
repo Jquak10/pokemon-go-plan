@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pokemon-go-personal-calendar",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-31",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*",
+      "/calendar/*",
+      "/manage/*",
+      "/admin"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pokemon-go-calendar-db",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "23 */6 * * *"
+    ]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

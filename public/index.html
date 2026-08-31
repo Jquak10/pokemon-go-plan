@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pokémon GO Personal Calendar</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main>
+  <section class="card">
+    <h1>Pokémon GO Personal Calendar</h1>
+    <p>
+      Create a private personalized calendar feed. Each subscriber gets their own
+      targets, progress, event filters and recommendations.
+    </p>
+    <p class="muted">
+      This starter uses GO Calendar for event timing. GO Battle League, GO Pass
+      and Season are off by default, but each subscriber can change their own filters.
+    </p>
+
+    <label for="timezone">Timezone</label>
+    <input id="timezone" value="Asia/Singapore">
+
+    <p><button id="create">Create my calendar</button></p>
+    <p id="status" class="muted"></p>
+  </section>
+
+  <section id="result" class="card hidden">
+    <h2>Calendar created</h2>
+    <p><strong>Save your management link.</strong> This starter version has no password recovery.</p>
+
+    <label>Management link</label>
+    <div id="manageUrl" class="mono"></div>
+
+    <label>Calendar subscription link</label>
+    <div id="calendarUrl" class="mono"></div>
+
+    <p class="row">
+      <a id="manageButton" class="button" href="#">Open my dashboard</a>
+      <button id="copyCalendar" class="secondary">Copy calendar URL</button>
+    </p>
+  </section>
+</main>
+
+<script>
+const createButton = document.getElementById("create");
+const status = document.getElementById("status");
+const result = document.getElementById("result");
+let calendarUrl = "";
+
+createButton.addEventListener("click", async () => {
+  createButton.disabled = true;
+  status.textContent = "Creating…";
+  try {
+    const response = await fetch("/api/create", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        timezone: document.getElementById("timezone").value.trim()
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not create calendar.");
+
+    document.getElementById("manageUrl").textContent = data.management_url;
+    document.getElementById("calendarUrl").textContent = data.calendar_url;
+    document.getElementById("manageButton").href = data.management_url;
+    calendarUrl = data.calendar_url;
+    result.classList.remove("hidden");
+    status.textContent = "Created successfully.";
+  } catch (error) {
+    status.textContent = error.message;
+    status.className = "error";
+  } finally {
+    createButton.disabled = false;
+  }
+});
+
+document.getElementById("copyCalendar").addEventListener("click", async () => {
+  if (!calendarUrl) return;
+  await navigator.clipboard.writeText(calendarUrl);
+  document.getElementById("copyCalendar").textContent = "Copied";
+});
+</script>
+</body>
+</html>
