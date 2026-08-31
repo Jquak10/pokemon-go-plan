@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=7">
+  <link rel="stylesheet" href="/styles.css?v=9">
 </head>
 
 <body class="manage-page">
@@ -390,34 +390,121 @@
            TAB: CALENDAR
            ======================================================= -->
       <section class="tab-panel" data-panel="calendar">
-        <section class="dashboard-card">
-          <div class="section-heading-row">
-            <div>
-              <span class="section-eyebrow">SUBSCRIPTION FILTER</span>
-              <h2>Calendar Events</h2>
-              <p class="section-subtitle">
-                Tap a category to include or exclude it from your private subscribed calendar.
-              </p>
-            </div>
+
+        <section class="dashboard-card feed-link-card">
+          <div class="feed-link-copy">
+            <span class="section-eyebrow">YOUR PRIVATE SUBSCRIPTION</span>
+            <h2>ICS Calendar Feed</h2>
+            <p class="section-subtitle">
+              Keep this URL private. Anyone with the URL can read this calendar, but it cannot modify your settings or targets.
+            </p>
           </div>
 
-          <div id="sourceChecks" class="event-chip-grid"></div>
-
-          <div class="calendar-help">
-            <span aria-hidden="true">▦</span>
-            <div>
-              <strong>Your subscription remains private.</strong>
-              <p>
-                These filters change what your personal ICS feed contains. Apple Calendar refreshes subscribed calendars on its own schedule.
-              </p>
+          <div class="feed-link-actions">
+            <div class="feed-input-wrap">
+              <input
+                id="icsFeedLink"
+                type="text"
+                readonly
+                value="Open this tab to prepare your feed link…"
+                aria-label="Private ICS feed URL"
+              >
             </div>
-          </div>
 
-          <div class="save-row">
-            <button id="saveCalendar" type="button">Save calendar filters</button>
-            <span id="calendarStatus" class="save-status"></span>
+            <button id="copyFeedLink" type="button" class="secondary" disabled>
+              Copy
+            </button>
+
+            <button id="openFeedLink" type="button" disabled>
+              Open feed
+            </button>
+
+            <div id="feedLinkStatus" class="feed-security-note">
+              <span aria-hidden="true">🔒</span>
+              <span>
+                This is a read-only recoverable subscription URL. Your existing ICS subscription URL remains valid too.
+              </span>
+            </div>
           </div>
         </section>
+
+        <section class="dashboard-card month-calendar-card">
+          <div class="calendar-toolbar">
+            <div>
+              <span class="section-eyebrow">MONTH VIEW</span>
+              <h2 id="calendarMonthTitle">Calendar</h2>
+              <p class="section-subtitle">
+                This preview uses the same selected event categories and personalized titles as your subscribed feed.
+              </p>
+            </div>
+
+            <div class="month-controls">
+              <button id="calendarPrevMonth" type="button" class="secondary icon-month-button" aria-label="Previous month">‹</button>
+              <button id="calendarToday" type="button" class="secondary">Today</button>
+              <button id="calendarNextMonth" type="button" class="secondary icon-month-button" aria-label="Next month">›</button>
+            </div>
+          </div>
+
+          <div class="calendar-view-layout">
+            <div class="calendar-month-wrap">
+              <div class="calendar-weekdays" aria-hidden="true">
+                <span>Mon</span>
+                <span>Tue</span>
+                <span>Wed</span>
+                <span>Thu</span>
+                <span>Fri</span>
+                <span>Sat</span>
+                <span>Sun</span>
+              </div>
+
+              <div id="calendarMonthGrid" class="calendar-month-grid">
+                <div class="calendar-loading">Loading calendar…</div>
+              </div>
+            </div>
+
+            <aside id="calendarDayDetails" class="calendar-day-details">
+              <div class="calendar-day-empty">
+                <span aria-hidden="true">▦</span>
+                <strong>Select a day</strong>
+                <p>Tap a date to inspect all Pokémon GO events scheduled for it.</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <details class="dashboard-card calendar-filter-card">
+          <summary>
+            <span>
+              <span class="section-eyebrow">SUBSCRIPTION FILTERS</span>
+              <strong>Choose which event categories appear</strong>
+            </span>
+            <span id="calendarFilterSummary" class="status-badge badge-blue">0 enabled</span>
+          </summary>
+
+          <div class="calendar-filter-content">
+            <p class="section-subtitle">
+              These filters affect both the month preview above and your private ICS calendar.
+            </p>
+
+            <div id="sourceChecks" class="event-chip-grid"></div>
+
+            <div class="calendar-help">
+              <span aria-hidden="true">▦</span>
+              <div>
+                <strong>Apple Calendar controls subscription refresh timing.</strong>
+                <p>
+                  The dashboard preview updates immediately after saving. Calendar apps poll the ICS feed on their own schedule.
+                </p>
+              </div>
+            </div>
+
+            <div class="save-row">
+              <button id="saveCalendar" type="button">Save calendar filters</button>
+              <span id="calendarStatus" class="save-status"></span>
+            </div>
+          </div>
+        </details>
+
       </section>
 
     </section>
@@ -518,6 +605,12 @@ const app = document.getElementById("app");
 const loadStatus = document.getElementById("loadStatus");
 let state = null;
 let targetById = new Map();
+
+let calendarMonthDate = null;
+let calendarMonthData = null;
+let selectedCalendarDate = null;
+let recoverableFeedUrl = "";
+const calendarMonthCache = new Map();
 
 const labels = {
   community_day: "Community Day",
@@ -631,6 +724,10 @@ function activateTab(name, scroll = true) {
   });
 
   sessionStorage.setItem("raid-planner-tab", name);
+
+  if (name === "calendar" && state) {
+    ensureCalendarTabLoaded();
+  }
 
   if (scroll) {
     document.querySelector(".tab-nav")?.scrollIntoView({
@@ -952,6 +1049,296 @@ function renderCalendar() {
       </span>
     </label>
   `).join("");
+
+  document.getElementById("calendarFilterSummary").textContent =
+    `${included.size} enabled`;
+}
+
+function parseIsoDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  return new Date(
+    Date.UTC(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      12
+    )
+  );
+}
+
+function isoDateFromUtc(date) {
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0")
+  ].join("-");
+}
+
+function monthKeyFromDate(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthTitleFromDate(date) {
+  return new Intl.DateTimeFormat(
+    "en",
+    {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC"
+    }
+  ).format(date);
+}
+
+function addMonthsUtc(date, amount) {
+  return new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth() + amount,
+      1,
+      12
+    )
+  );
+}
+
+function eventsForCalendarDate(dateIso) {
+  if (!calendarMonthData) return [];
+
+  return calendarMonthData.events.filter(event => {
+    const start = event.start_date;
+    const end = event.end_date || event.start_date;
+    return start <= dateIso && end >= dateIso;
+  });
+}
+
+function calendarSourceClass(source) {
+  return `calendar-source-${String(source || "event").replace(/[^a-z0-9_-]/gi, "")}`;
+}
+
+function renderCalendarDayDetails(dateIso) {
+  selectedCalendarDate = dateIso;
+
+  document.querySelectorAll(".calendar-day-cell").forEach(cell => {
+    cell.classList.toggle("selected", cell.dataset.date === dateIso);
+  });
+
+  const date = parseIsoDate(dateIso);
+  const events = eventsForCalendarDate(dateIso);
+  const panel = document.getElementById("calendarDayDetails");
+
+  const heading = new Intl.DateTimeFormat(
+    "en",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC"
+    }
+  ).format(date);
+
+  panel.innerHTML = `
+    <div class="calendar-detail-heading">
+      <span class="section-eyebrow">${events.length} EVENT${events.length === 1 ? "" : "S"}</span>
+      <h3>${esc(heading)}</h3>
+    </div>
+
+    ${
+      events.length
+        ? `
+          <div class="calendar-detail-events">
+            ${events.map(event => `
+              <article class="calendar-detail-event ${calendarSourceClass(event.source_type)}">
+                <span class="calendar-detail-source">${esc(labels[event.source_type] || event.source_type)}</span>
+                <strong>${esc(event.title)}</strong>
+                ${
+                  event.start_date !== event.end_date
+                    ? `<small>${esc(event.start_date)} → ${esc(event.end_date)}</small>`
+                    : ""
+                }
+
+                ${
+                  event.description
+                    ? `
+                      <details class="compact-details">
+                        <summary>Details</summary>
+                        <div class="calendar-event-description">${esc(event.description)}</div>
+                      </details>
+                    `
+                    : ""
+                }
+              </article>
+            `).join("")}
+          </div>
+        `
+        : `
+          <div class="calendar-day-empty compact">
+            <span aria-hidden="true">☀</span>
+            <strong>No selected events</strong>
+            <p>Nothing from your enabled categories is scheduled for this day.</p>
+          </div>
+        `
+    }
+  `;
+}
+
+function renderMonthCalendar() {
+  if (!calendarMonthDate || !calendarMonthData) return;
+
+  document.getElementById("calendarMonthTitle").textContent =
+    monthTitleFromDate(calendarMonthDate);
+
+  const year = calendarMonthDate.getUTCFullYear();
+  const month = calendarMonthDate.getUTCMonth();
+  const firstOfMonth = new Date(Date.UTC(year, month, 1, 12));
+
+  const mondayOffset = (firstOfMonth.getUTCDay() + 6) % 7;
+  const gridStart = new Date(
+    Date.UTC(year, month, 1 - mondayOffset, 12)
+  );
+
+  const todayIso = state.remote_raid_plan.local_date;
+  const cells = [];
+
+  for (let index = 0; index < 42; index++) {
+    const date = new Date(gridStart.getTime() + index * 86400000);
+    const dateIso = isoDateFromUtc(date);
+    const dayEvents = eventsForCalendarDate(dateIso);
+    const inMonth = date.getUTCMonth() === month;
+    const visibleEvents = dayEvents.slice(0, 3);
+    const extra = Math.max(0, dayEvents.length - visibleEvents.length);
+
+    cells.push(`
+      <button
+        type="button"
+        class="calendar-day-cell
+          ${inMonth ? "" : "outside-month"}
+          ${dateIso === todayIso ? "today" : ""}
+          ${dateIso === selectedCalendarDate ? "selected" : ""}"
+        data-date="${dateIso}"
+        aria-label="${esc(dateIso)} · ${dayEvents.length} event${dayEvents.length === 1 ? "" : "s"}"
+      >
+        <span class="calendar-day-number">${date.getUTCDate()}</span>
+
+        <span class="calendar-day-events">
+          ${visibleEvents.map(event => `
+            <span
+              class="calendar-event-pill ${calendarSourceClass(event.source_type)}"
+              title="${esc(event.title)}"
+            >
+              ${esc(event.title)}
+            </span>
+          `).join("")}
+
+          ${extra > 0 ? `<span class="calendar-more-events">+${extra} more</span>` : ""}
+        </span>
+      </button>
+    `);
+  }
+
+  document.getElementById("calendarMonthGrid").innerHTML = cells.join("");
+}
+
+async function loadCalendarMonth(force = false) {
+  if (!calendarMonthDate) {
+    const today = parseIsoDate(state.remote_raid_plan.local_date);
+
+    calendarMonthDate = new Date(
+      Date.UTC(
+        today.getUTCFullYear(),
+        today.getUTCMonth(),
+        1,
+        12
+      )
+    );
+  }
+
+  const month = monthKeyFromDate(calendarMonthDate);
+
+  if (!force && calendarMonthCache.has(month)) {
+    calendarMonthData = calendarMonthCache.get(month);
+    renderMonthCalendar();
+    return;
+  }
+
+  document.getElementById("calendarMonthGrid").innerHTML =
+    `<div class="calendar-loading">Loading ${esc(monthTitleFromDate(calendarMonthDate))}…</div>`;
+
+  try {
+    const data = await api(
+      `/api/calendar-events?token=${encodeURIComponent(token)}&month=${encodeURIComponent(month)}`
+    );
+
+    calendarMonthCache.set(month, data);
+    calendarMonthData = data;
+    renderMonthCalendar();
+
+    const today = state.remote_raid_plan.local_date;
+
+    if (!selectedCalendarDate && today.startsWith(month)) {
+      renderCalendarDayDetails(today);
+    }
+  } catch (error) {
+    document.getElementById("calendarMonthGrid").innerHTML = `
+      <div class="calendar-loading error">
+        ${esc(error.message)}
+      </div>
+    `;
+  }
+}
+
+async function loadRecoverableFeedLink() {
+  if (recoverableFeedUrl) return;
+
+  const input = document.getElementById("icsFeedLink");
+  const status = document.getElementById("feedLinkStatus");
+
+  input.value = "Preparing your private feed URL…";
+
+  try {
+    const data = await api(
+      `/api/feed-link?token=${encodeURIComponent(token)}`
+    );
+
+    recoverableFeedUrl = data.calendar_url;
+    input.value = recoverableFeedUrl;
+
+    document.getElementById("copyFeedLink").disabled = false;
+    document.getElementById("openFeedLink").disabled = false;
+
+    status.innerHTML = `
+      <span aria-hidden="true">🔒</span>
+      <span>
+        Read-only private feed. Existing ICS subscription URLs remain valid.
+        Keep this URL private because anyone with it can read your calendar.
+      </span>
+    `;
+  } catch (error) {
+    input.value = "Feed link unavailable";
+    status.innerHTML = `
+      <span aria-hidden="true">!</span>
+      <span>${esc(error.message)}</span>
+    `;
+  }
+}
+
+function ensureCalendarTabLoaded() {
+  if (!calendarMonthDate) {
+    const today = parseIsoDate(state.remote_raid_plan.local_date);
+
+    calendarMonthDate = new Date(
+      Date.UTC(
+        today.getUTCFullYear(),
+        today.getUTCMonth(),
+        1,
+        12
+      )
+    );
+  }
+
+  loadCalendarMonth();
+  loadRecoverableFeedLink();
 }
 
 function renderPreferences() {
@@ -1022,7 +1409,9 @@ async function saveCalendarFilters() {
     });
 
     status.textContent = "Saved ✓";
+    calendarMonthCache.clear();
     await load();
+    await loadCalendarMonth(true);
   } catch (error) {
     status.textContent = error.message;
   }
@@ -1189,6 +1578,67 @@ document.getElementById("targets").addEventListener("click", event => {
 
   if (event.target.closest("[data-empty-add-target]")) {
     openTargetModal();
+  }
+});
+
+document.getElementById("calendarMonthGrid").addEventListener("click", event => {
+  const cell = event.target.closest(".calendar-day-cell");
+  if (!cell) return;
+  renderCalendarDayDetails(cell.dataset.date);
+});
+
+document.getElementById("calendarPrevMonth").addEventListener("click", async () => {
+  calendarMonthDate = addMonthsUtc(calendarMonthDate, -1);
+  selectedCalendarDate = null;
+  await loadCalendarMonth();
+});
+
+document.getElementById("calendarNextMonth").addEventListener("click", async () => {
+  calendarMonthDate = addMonthsUtc(calendarMonthDate, 1);
+  selectedCalendarDate = null;
+  await loadCalendarMonth();
+});
+
+document.getElementById("calendarToday").addEventListener("click", async () => {
+  const today = parseIsoDate(state.remote_raid_plan.local_date);
+
+  calendarMonthDate = new Date(
+    Date.UTC(
+      today.getUTCFullYear(),
+      today.getUTCMonth(),
+      1,
+      12
+    )
+  );
+
+  selectedCalendarDate = state.remote_raid_plan.local_date;
+  await loadCalendarMonth();
+  renderCalendarDayDetails(selectedCalendarDate);
+});
+
+document.getElementById("copyFeedLink").addEventListener("click", async () => {
+  if (!recoverableFeedUrl) return;
+
+  const button = document.getElementById("copyFeedLink");
+
+  try {
+    await navigator.clipboard.writeText(recoverableFeedUrl);
+  } catch {
+    const input = document.getElementById("icsFeedLink");
+    input.focus();
+    input.select();
+    document.execCommand("copy");
+  }
+
+  button.textContent = "Copied ✓";
+  setTimeout(() => {
+    button.textContent = "Copy";
+  }, 1600);
+});
+
+document.getElementById("openFeedLink").addEventListener("click", () => {
+  if (recoverableFeedUrl) {
+    window.open(recoverableFeedUrl, "_blank", "noopener");
   }
 });
 
