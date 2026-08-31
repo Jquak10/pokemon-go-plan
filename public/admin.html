@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Pokémon GO Calendar Admin</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=5">
 </head>
 <body>
 <main>
@@ -113,7 +113,7 @@ document.getElementById("loadMeta").addEventListener("click", async () => {
           · Mega: ${meta.mega_score == null ? "—" : Number(meta.mega_score).toFixed(0)}
         </div>
         <div><strong>${esc(meta.verdict || "")}</strong></div>
-        <pre class="mono">${esc(meta.notes || "")}</pre>
+        <div class="assessment-notes mono">${esc(meta.notes || "")}</div>
       </div>
     `).join("");
   } catch (error) {
