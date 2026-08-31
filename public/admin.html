@@ -126,10 +126,9 @@
       <div class="section-heading-row">
         <div>
           <span class="section-eyebrow">OFFICIAL SOURCE SUPPLEMENTS</span>
-          <h2>Official raid entries</h2>
+          <h2>Official schedule supplements</h2>
           <p class="section-subtitle">
-            These entries are inserted only when the official Pokémon GO page explicitly
-            publishes a schedule that your normal event feed has not reliably exposed.
+            These entries are inserted when the official Pokémon GO page explicitly publishes an event or raid schedule that your normal event feed has not reliably exposed.
           </p>
         </div>
 
@@ -423,7 +422,7 @@ async function loadOfficialRaids() {
             <article class="admin-data-card">
               <div class="admin-data-card-head">
                 <div>
-                  <span class="section-eyebrow">OFFICIAL RAID</span>
+                  <span class="section-eyebrow">${event.source_type === "event" ? "OFFICIAL EVENT" : "OFFICIAL RAID"}</span>
                   <strong>${esc(event.summary)}</strong>
                 </div>
                 <span class="status-badge ${event.status === "active" ? "badge-green" : "badge-neutral"}">
