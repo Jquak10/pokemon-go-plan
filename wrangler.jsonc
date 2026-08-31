@@ -17,7 +17,7 @@
     {
       "binding": "DB",
       "database_name": "pokemon-go-calendar-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+      "database_id": "a164c5c3-abaf-4900-92fa-c3f2c6a95d1e"
     }
   ],
   "triggers": {
