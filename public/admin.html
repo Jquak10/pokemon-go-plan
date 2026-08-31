@@ -10,86 +10,67 @@
 <main>
   <section class="card">
     <h1>Calendar admin</h1>
-    <p class="muted">
-      The admin key is stored as a Cloudflare Worker secret. Use this page to run
-      an initial event sync and curate internet/meta value scores.
+    <p>
+      Event data and raid-value assessments are automatic. The six-hour Cron Trigger
+      performs both jobs. Use this page only for an immediate manual refresh or to
+      inspect the generated scores.
     </p>
 
     <label for="key">Admin key</label>
-    <input id="key" type="password">
+    <input id="key" type="password" autocomplete="current-password">
 
     <p class="row">
-      <button id="sync">Sync event data now</button>
-      <button id="loadMeta" class="secondary">Load meta entries</button>
+      <button id="sync">Sync everything now</button>
+      <button id="loadMeta" class="secondary">Show automatic assessments</button>
     </p>
     <pre id="syncResult" class="mono"></pre>
   </section>
 
   <section class="card">
-    <h2>Add/update internet assessment</h2>
-    <p class="muted">
-      Use current reputable sources to set the general value. PvP score can be
-      refreshed automatically from PvPoke for matching entries during syncs.
+    <h2>How automatic scoring works</h2>
+    <p>
+      <strong>PvE:</strong> current Pokémon GO stats and move-cycle data from the public
+      Pokémon GO API are converted into a relative raid-attacker score.
     </p>
-
-    <div class="grid">
-      <div>
-        <label for="pokemonName">Pokémon name</label>
-        <input id="pokemonName" placeholder="Groudon">
-      </div>
-      <div>
-        <label for="pve">PvE score (0–100)</label>
-        <input id="pve" type="number" min="0" max="100">
-      </div>
-      <div>
-        <label for="pvp">PvP score (0–100, optional)</label>
-        <input id="pvp" type="number" min="0" max="100">
-      </div>
-      <div>
-        <label for="rarity">Rarity/availability (0–100)</label>
-        <input id="rarity" type="number" min="0" max="100">
-      </div>
-      <div>
-        <label for="mega">Mega utility (0–100)</label>
-        <input id="mega" type="number" min="0" max="100">
-      </div>
-      <div>
-        <label for="overall">Overall fallback (0–100)</label>
-        <input id="overall" type="number" min="0" max="100">
-      </div>
-    </div>
-
-    <label for="verdict">Verdict</label>
-    <input id="verdict" placeholder="Excellent PvE investment; high raid priority">
-
-    <label for="notes">Assessment notes</label>
-    <textarea id="notes"></textarea>
-
-    <h3>Evidence/source</h3>
-    <div class="grid">
-      <div>
-        <label for="sourceName">Source name</label>
-        <input id="sourceName" placeholder="Pokebattler">
-      </div>
-      <div>
-        <label for="sourceUrl">Source URL</label>
-        <input id="sourceUrl" placeholder="https://...">
-      </div>
-    </div>
-    <label for="sourceNote">Source note</label>
-    <textarea id="sourceNote" placeholder="Current raid attacker/meta assessment checked on 31 Aug 2026."></textarea>
-
-    <p><button id="saveMeta">Save assessment</button> <span id="metaStatus"></span></p>
+    <p>
+      <strong>PvP:</strong> matching Master League scores come from PvPoke's public
+      machine-readable ranking data.
+    </p>
+    <p>
+      <strong>Rarity / urgency:</strong> calculated from Pokémon class plus how short
+      the current raid window is.
+    </p>
+    <p>
+      <strong>Mega utility:</strong> automatically derived for Mega/Primal raid forms
+      from their PvE value plus the extra value of Mega/Primal raid support.
+    </p>
+    <p class="muted">
+      The PvE score is a deterministic proxy, not a boss-by-boss Pokebattler-style
+      simulation. It is designed to automate recommendations without scraping
+      editorial websites or requiring a paid API.
+    </p>
   </section>
 
   <section class="card">
-    <h2>Current meta entries</h2>
-    <div id="entries" class="mono muted">Not loaded.</div>
+    <h2>Current automatic assessments</h2>
+    <div id="entries" class="muted">Enter the admin key, then click “Show automatic assessments”.</div>
   </section>
 </main>
 
 <script>
-function key() { return document.getElementById("key").value; }
+function key() {
+  return document.getElementById("key").value;
+}
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[c]));
+}
 
 async function requestJson(path, options = {}) {
   const response = await fetch(path, options);
@@ -100,7 +81,7 @@ async function requestJson(path, options = {}) {
 
 document.getElementById("sync").addEventListener("click", async () => {
   const out = document.getElementById("syncResult");
-  out.textContent = "Syncing…";
+  out.textContent = "Syncing event feeds, Pokémon GO data and PvPoke…";
   try {
     const data = await requestJson("/api/admin/sync", {
       method: "POST",
@@ -113,40 +94,28 @@ document.getElementById("sync").addEventListener("click", async () => {
   }
 });
 
-document.getElementById("saveMeta").addEventListener("click", async () => {
-  const status = document.getElementById("metaStatus");
-  status.textContent = "Saving…";
-  try {
-    await requestJson("/api/admin/meta", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        key: key(),
-        pokemon_name: document.getElementById("pokemonName").value.trim(),
-        pve_score: document.getElementById("pve").value,
-        pvp_score: document.getElementById("pvp").value,
-        rarity_score: document.getElementById("rarity").value,
-        mega_score: document.getElementById("mega").value,
-        overall_score: document.getElementById("overall").value,
-        verdict: document.getElementById("verdict").value,
-        notes: document.getElementById("notes").value,
-        source_name: document.getElementById("sourceName").value,
-        source_url: document.getElementById("sourceUrl").value,
-        source_note: document.getElementById("sourceNote").value
-      })
-    });
-    status.textContent = "Saved ✓";
-  } catch (error) {
-    status.textContent = error.message;
-  }
-});
-
 document.getElementById("loadMeta").addEventListener("click", async () => {
   const entries = document.getElementById("entries");
   entries.textContent = "Loading…";
   try {
     const data = await requestJson(`/api/admin/meta?key=${encodeURIComponent(key())}`);
-    entries.textContent = JSON.stringify(data, null, 2);
+    if (!data.metas.length) {
+      entries.innerHTML = "<p>No automatic assessments yet. Run “Sync everything now” first.</p>";
+      return;
+    }
+
+    entries.innerHTML = data.metas.map(meta => `
+      <div class="recommendation">
+        <div class="score">${esc(meta.pokemon_name)} — ${Number(meta.overall_score ?? 0).toFixed(0)}/100</div>
+        <div>PvE: ${meta.pve_score == null ? "—" : Number(meta.pve_score).toFixed(0)}
+          · PvP: ${meta.pvp_score == null ? "—" : Number(meta.pvp_score).toFixed(0)}
+          · Rarity: ${meta.rarity_score == null ? "—" : Number(meta.rarity_score).toFixed(0)}
+          · Mega: ${meta.mega_score == null ? "—" : Number(meta.mega_score).toFixed(0)}
+        </div>
+        <div><strong>${esc(meta.verdict || "")}</strong></div>
+        <pre class="mono">${esc(meta.notes || "")}</pre>
+      </div>
+    `).join("");
   } catch (error) {
     entries.textContent = error.message;
   }
