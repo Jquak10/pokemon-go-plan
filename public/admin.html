@@ -2,73 +2,187 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Pokémon GO Calendar Admin</title>
-  <link rel="stylesheet" href="/styles.css?v=5">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1f6feb">
+  <title>Pokémon GO Planner Admin</title>
+  <link rel="stylesheet" href="/styles.css?v=11">
 </head>
-<body>
-<main>
-  <section class="card">
-    <h1>Calendar admin</h1>
-    <p>
-      Event data, official Remote Raid limits and raid-value assessments are automatic.
-      The Free-plan-safe scheduler runs them as three separate Cron invocations every six
-      hours. This button also runs three separate requests so no single Worker invocation
-      has to perform the entire sync.
-    </p>
 
-    <label for="key">Admin key</label>
-    <input id="key" type="password" autocomplete="current-password">
+<body class="manage-page portal-page admin-page">
+  <div class="ambient-orb ambient-orb-one" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb-two" aria-hidden="true"></div>
 
-    <p class="row">
-      <button id="sync">Sync everything now</button>
-      <button id="loadMeta" class="secondary">Show automatic assessments</button>
-      <button id="loadRemoteLimits" class="secondary">Show detected Remote Raid limits</button>
-    </p>
-    <pre id="syncResult" class="mono"></pre>
-  </section>
+  <main class="portal-shell admin-shell">
+    <header class="dashboard-hero portal-hero">
+      <div class="hero-copy">
+        <div class="brand-kicker">
+          <span class="brand-mark" aria-hidden="true">⚙</span>
+          SYSTEM CONTROL
+        </div>
 
-  <section class="card">
-    <h2>How automatic scoring works</h2>
-    <p>
-      <strong>PvE:</strong> current Pokémon GO stats and move-cycle data from the public
-      Pokémon GO API are converted into a relative raid-attacker score.
-    </p>
-    <p>
-      <strong>PvP:</strong> matching Master League scores come from PvPoke's public
-      machine-readable ranking data.
-    </p>
-    <p>
-      <strong>Rarity / urgency:</strong> calculated from Pokémon class plus how short
-      the current raid window is.
-    </p>
-    <p>
-      <strong>Mega utility:</strong> automatically derived for Mega/Primal raid forms
-      from their PvE value plus the extra value of Mega/Primal raid support.
-    </p>
-    <p class="muted">
-      The PvE score is a deterministic proxy, not a boss-by-boss Pokebattler-style
-      simulation. It is designed to automate recommendations without scraping
-      editorial websites or requiring a paid API.
-    </p>
-  </section>
+        <h1>Planner Admin</h1>
 
-  <section class="card">
-    <h2>Detected Remote Raid limits</h2>
-    <p class="muted">
-      The sync checks official Pokémon GO event/news pages for temporary numeric
-      Remote Raid limits and “no limit” announcements.
-    </p>
-    <div id="remoteLimits" class="muted">
-      Enter the admin key, then click “Show detected Remote Raid limits”.
-    </div>
-  </section>
+        <p>
+          Inspect event synchronization, official raid supplements,
+          temporary Remote Raid rules, and automatic raid assessments.
+        </p>
+      </div>
 
-  <section class="card">
-    <h2>Current automatic assessments</h2>
-    <div id="entries" class="muted">Enter the admin key, then click “Show automatic assessments”.</div>
-  </section>
-</main>
+      <div class="hero-status">
+        <span class="live-dot" aria-hidden="true"></span>
+        Free-plan-safe sync
+      </div>
+    </header>
+
+    <section class="admin-status-grid">
+      <article class="portal-feature">
+        <span class="metric-icon metric-icon-blue" aria-hidden="true">▦</span>
+        <div>
+          <strong>Event feeds</strong>
+          <small>GO Calendar and normalized D1 events.</small>
+        </div>
+      </article>
+
+      <article class="portal-feature">
+        <span class="metric-icon metric-icon-gold" aria-hidden="true">★</span>
+        <div>
+          <strong>Official supplements</strong>
+          <small>Fills gaps from official Pokémon GO schedules.</small>
+        </div>
+      </article>
+
+      <article class="portal-feature">
+        <span class="metric-icon metric-icon-green" aria-hidden="true">⚡</span>
+        <div>
+          <strong>Raid intelligence</strong>
+          <small>Temporary limits and automatic meta scoring.</small>
+        </div>
+      </article>
+    </section>
+
+    <section class="dashboard-card admin-control-card">
+      <div class="section-heading-row">
+        <div>
+          <span class="section-eyebrow">AUTHENTICATION</span>
+          <h2>Synchronization controls</h2>
+          <p class="section-subtitle">
+            One click still runs three separate Worker requests so the synchronization
+            remains within the Free-plan per-invocation limits.
+          </p>
+        </div>
+        <span id="adminAuthBadge" class="status-badge badge-neutral">Key required</span>
+      </div>
+
+      <div class="admin-key-row">
+        <div>
+          <label for="key">Admin key</label>
+          <input id="key" type="password" autocomplete="current-password">
+        </div>
+
+        <button id="sync" type="button">
+          Sync everything now
+        </button>
+      </div>
+
+      <div id="syncStages" class="sync-stage-grid">
+        <article class="sync-stage" data-stage="events">
+          <span>1</span>
+          <div>
+            <strong>Event feeds</strong>
+            <small>Waiting</small>
+          </div>
+        </article>
+
+        <article class="sync-stage" data-stage="official">
+          <span>2</span>
+          <div>
+            <strong>Official schedules</strong>
+            <small>Waiting</small>
+          </div>
+        </article>
+
+        <article class="sync-stage" data-stage="meta">
+          <span>3</span>
+          <div>
+            <strong>Raid assessments</strong>
+            <small>Waiting</small>
+          </div>
+        </article>
+      </div>
+
+      <details class="admin-log-details">
+        <summary>Technical sync output</summary>
+        <pre id="syncResult" class="mono admin-log"></pre>
+      </details>
+    </section>
+
+    <nav class="admin-section-nav">
+      <button type="button" data-admin-section="official">Official raids</button>
+      <button type="button" data-admin-section="limits">Remote limits</button>
+      <button type="button" data-admin-section="meta">Assessments</button>
+    </nav>
+
+    <section id="adminOfficial" class="dashboard-card admin-data-section">
+      <div class="section-heading-row">
+        <div>
+          <span class="section-eyebrow">OFFICIAL SOURCE SUPPLEMENTS</span>
+          <h2>Official raid entries</h2>
+          <p class="section-subtitle">
+            These entries are inserted only when the official Pokémon GO page explicitly
+            publishes a schedule that your normal event feed has not reliably exposed.
+          </p>
+        </div>
+
+        <button id="loadOfficialRaids" type="button" class="secondary">
+          Refresh
+        </button>
+      </div>
+
+      <div id="officialRaids" class="admin-card-list muted">
+        Enter the admin key, then refresh.
+      </div>
+    </section>
+
+    <section id="adminLimits" class="dashboard-card admin-data-section hidden">
+      <div class="section-heading-row">
+        <div>
+          <span class="section-eyebrow">OFFICIAL TEMPORARY RULES</span>
+          <h2>Remote Raid limits</h2>
+          <p class="section-subtitle">
+            Numeric increases and no-limit periods detected from official announcements.
+          </p>
+        </div>
+
+        <button id="loadRemoteLimits" type="button" class="secondary">
+          Refresh
+        </button>
+      </div>
+
+      <div id="remoteLimits" class="admin-card-list muted">
+        Enter the admin key, then refresh.
+      </div>
+    </section>
+
+    <section id="adminMeta" class="dashboard-card admin-data-section hidden">
+      <div class="section-heading-row">
+        <div>
+          <span class="section-eyebrow">AUTOMATIC META</span>
+          <h2>Raid assessments</h2>
+          <p class="section-subtitle">
+            Transparent PvE, PvP, rarity, and Mega utility inputs used by personal recommendations.
+          </p>
+        </div>
+
+        <button id="loadMeta" type="button" class="secondary">
+          Refresh
+        </button>
+      </div>
+
+      <div id="entries" class="admin-card-list muted">
+        Enter the admin key, then refresh.
+      </div>
+    </section>
+  </main>
 
 <script>
 function key() {
@@ -76,137 +190,414 @@ function key() {
 }
 
 function esc(value) {
-  return String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  }[c]));
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    character => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[character])
+  );
 }
 
 async function requestJson(path, options = {}) {
   const response = await fetch(path, options);
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Request failed");
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+      "Request failed"
+    );
+  }
+
   return data;
 }
 
-document.getElementById("sync").addEventListener("click", async () => {
-  const out = document.getElementById("syncResult");
-  const results = {};
+function setStage(name, state, message) {
+  const card =
+    document.querySelector(
+      `[data-stage="${name}"]`
+    );
 
-  const runPhase = async (name, path, message) => {
-    out.textContent =
-      `${message}\n\nCompleted phases:\n` +
-      JSON.stringify(results, null, 2);
+  if (!card) return;
 
-    const data = await requestJson(path, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ key: key() })
-    });
+  card.classList.remove(
+    "running",
+    "complete",
+    "failed"
+  );
 
-    results[name] = data;
+  if (state) {
+    card.classList.add(state);
+  }
+
+  card
+    .querySelector("small")
+    .textContent =
+      message;
+}
+
+function showAdminSection(name) {
+  const map = {
+    official:
+      document.getElementById("adminOfficial"),
+
+    limits:
+      document.getElementById("adminLimits"),
+
+    meta:
+      document.getElementById("adminMeta")
   };
 
+  for (const [keyName, section] of Object.entries(map)) {
+    section.classList.toggle(
+      "hidden",
+      keyName !== name
+    );
+  }
+
+  document
+    .querySelectorAll("[data-admin-section]")
+    .forEach(button => {
+      button.classList.toggle(
+        "active",
+        button.dataset.adminSection === name
+      );
+    });
+}
+
+document
+  .querySelectorAll("[data-admin-section]")
+  .forEach(button => {
+    button.addEventListener(
+      "click",
+      () => showAdminSection(
+        button.dataset.adminSection
+      )
+    );
+  });
+
+document
+  .getElementById("key")
+  .addEventListener(
+    "input",
+    () => {
+      const badge =
+        document.getElementById("adminAuthBadge");
+
+      if (key()) {
+        badge.textContent =
+          "Key entered";
+
+        badge.className =
+          "status-badge badge-green";
+      } else {
+        badge.textContent =
+          "Key required";
+
+        badge.className =
+          "status-badge badge-neutral";
+      }
+    }
+  );
+
+document
+  .getElementById("sync")
+  .addEventListener(
+    "click",
+    async () => {
+      const out =
+        document.getElementById("syncResult");
+
+      const results = {};
+
+      const runPhase =
+        async (
+          stage,
+          name,
+          path,
+          message
+        ) => {
+          setStage(
+            stage,
+            "running",
+            message
+          );
+
+          const data =
+            await requestJson(
+              path,
+              {
+                method: "POST",
+                headers: {
+                  "content-type":
+                    "application/json"
+                },
+                body:
+                  JSON.stringify({
+                    key: key()
+                  })
+              }
+            );
+
+          results[name] = data;
+
+          setStage(
+            stage,
+            "complete",
+            "Complete ✓"
+          );
+
+          out.textContent =
+            JSON.stringify(
+              results,
+              null,
+              2
+            );
+        };
+
+      try {
+        await runPhase(
+          "events",
+          "events",
+          "/api/admin/sync/events",
+          "Syncing feeds…"
+        );
+
+        await runPhase(
+          "official",
+          "official",
+          "/api/admin/sync/remote-limits",
+          "Reading official pages…"
+        );
+
+        await runPhase(
+          "meta",
+          "automatic_meta",
+          "/api/admin/sync/meta",
+          "Updating scores…"
+        );
+
+        await Promise.all([
+          loadOfficialRaids(),
+          loadRemoteLimits(),
+          loadMeta()
+        ]);
+      } catch (error) {
+        out.textContent +=
+          `\n\nError:\n${error.message}`;
+
+        document
+          .querySelectorAll(
+            ".sync-stage.running"
+          )
+          .forEach(card => {
+            card.classList.remove("running");
+            card.classList.add("failed");
+            card.querySelector("small").textContent =
+              "Failed";
+          });
+      }
+    }
+  );
+
+async function loadOfficialRaids() {
+  const entries =
+    document.getElementById("officialRaids");
+
+  entries.textContent =
+    "Loading…";
+
   try {
-    await runPhase(
-      "events",
-      "/api/admin/sync/events",
-      "1/3 — Syncing Pokémon GO event feeds…"
-    );
+    const data =
+      await requestJson(
+        `/api/admin/official-raids?key=${encodeURIComponent(key())}`
+      );
 
-    await runPhase(
-      "remote_raid_limits",
-      "/api/admin/sync/remote-limits",
-      "2/3 — Checking official temporary Remote Raid limits…"
-    );
+    entries.innerHTML =
+      data.events.length
+        ? data.events.map(event => `
+            <article class="admin-data-card">
+              <div class="admin-data-card-head">
+                <div>
+                  <span class="section-eyebrow">OFFICIAL RAID</span>
+                  <strong>${esc(event.summary)}</strong>
+                </div>
+                <span class="status-badge ${event.status === "active" ? "badge-green" : "badge-neutral"}">
+                  ${esc(event.status)}
+                </span>
+              </div>
 
-    await runPhase(
-      "automatic_meta",
-      "/api/admin/sync/meta",
-      "3/3 — Updating automatic raid assessments…"
-    );
+              <p>
+                ${esc(event.start_date)}
+                ${event.end_date !== event.start_date ? ` → ${esc(event.end_date)}` : ""}
+              </p>
 
-    out.textContent =
-      "All three sync phases completed successfully.\n\n" +
-      JSON.stringify(results, null, 2);
+              <div class="assessment-notes">
+                ${esc(event.description || "")}
+              </div>
+
+              ${event.source_url
+                ? `<a class="admin-source-link" href="${esc(event.source_url)}" target="_blank" rel="noopener">Official source ↗</a>`
+                : ""
+              }
+            </article>
+          `).join("")
+        : `
+          <div class="empty-state">
+            <span>⌕</span>
+            <strong>No official supplemental raid entries stored yet.</strong>
+            <p>Run the official schedule sync.</p>
+          </div>
+        `;
   } catch (error) {
-    out.textContent =
-      "Sync stopped because one phase failed.\n\n" +
-      JSON.stringify(results, null, 2) +
-      "\n\nError:\n" +
+    entries.textContent =
       error.message;
   }
-});
+}
 
-document.getElementById("loadRemoteLimits").addEventListener("click", async () => {
-  const entries = document.getElementById("remoteLimits");
-  entries.textContent = "Loading…";
+async function loadRemoteLimits() {
+  const entries =
+    document.getElementById("remoteLimits");
+
+  entries.textContent =
+    "Loading…";
 
   try {
-    const data = await requestJson(
-      `/api/admin/remote-limits?key=${encodeURIComponent(key())}`
-    );
+    const data =
+      await requestJson(
+        `/api/admin/remote-limits?key=${encodeURIComponent(key())}`
+      );
 
-    if (!data.rules.length) {
-      entries.innerHTML =
-        "<p>No temporary Remote Raid limits are stored yet. Run “Sync everything now”.</p>";
-      return;
-    }
+    entries.innerHTML =
+      data.rules.length
+        ? data.rules.map(rule => `
+            <article class="admin-data-card">
+              <div class="admin-data-card-head">
+                <div>
+                  <span class="section-eyebrow">REMOTE RAID RULE</span>
+                  <strong>${esc(rule.event_name)}</strong>
+                </div>
 
-    entries.innerHTML = data.rules.map(rule => `
-      <div class="recommendation">
-        <div class="score">
-          ${esc(rule.event_name)}
-        </div>
-        <div>
-          ${esc(rule.start_date)} → ${esc(rule.end_date)}
-        </div>
-        <div>
-          Official limit:
-          <strong>${Number(rule.is_unlimited) ? "Unlimited" : esc(rule.remote_raid_limit)}</strong>
-        </div>
-        <div class="field-help">
-          ${Number(rule.detected_automatically) ? "Automatically detected" : "Seeded/manual rule"}
-          ${rule.detected_at ? " · " + esc(rule.detected_at) : ""}
-        </div>
-        ${rule.source_url ? `<div class="field-help"><a href="${esc(rule.source_url)}" target="_blank" rel="noopener">Official source</a></div>` : ""}
-        ${rule.source_excerpt ? `<div class="assessment-notes mono">${esc(rule.source_excerpt)}</div>` : ""}
-      </div>
-    `).join("");
+                <span class="status-badge badge-blue">
+                  ${Number(rule.is_unlimited)
+                    ? "Unlimited"
+                    : esc(rule.remote_raid_limit)
+                  }
+                </span>
+              </div>
+
+              <p>
+                ${esc(rule.start_date)}
+                →
+                ${esc(rule.end_date)}
+              </p>
+
+              <div class="field-help">
+                ${Number(rule.detected_automatically)
+                  ? "Automatically detected"
+                  : "Seeded/manual rule"
+                }
+              </div>
+
+              ${rule.source_url
+                ? `<a class="admin-source-link" href="${esc(rule.source_url)}" target="_blank" rel="noopener">Official source ↗</a>`
+                : ""
+              }
+            </article>
+          `).join("")
+        : `
+          <div class="empty-state">
+            <span>⚡</span>
+            <strong>No temporary rules stored.</strong>
+          </div>
+        `;
   } catch (error) {
-    entries.textContent = error.message;
+    entries.textContent =
+      error.message;
   }
-});
+}
 
-document.getElementById("loadMeta").addEventListener("click", async () => {
-  const entries = document.getElementById("entries");
-  entries.textContent = "Loading…";
+async function loadMeta() {
+  const entries =
+    document.getElementById("entries");
+
+  entries.textContent =
+    "Loading…";
+
   try {
-    const data = await requestJson(`/api/admin/meta?key=${encodeURIComponent(key())}`);
-    if (!data.metas.length) {
-      entries.innerHTML = "<p>No automatic assessments yet. Run “Sync everything now” first.</p>";
-      return;
-    }
+    const data =
+      await requestJson(
+        `/api/admin/meta?key=${encodeURIComponent(key())}`
+      );
 
-    entries.innerHTML = data.metas.map(meta => `
-      <div class="recommendation">
-        <div class="score">${esc(meta.pokemon_name)} — ${Number(meta.overall_score ?? 0).toFixed(0)}/100</div>
-        <div>PvE: ${meta.pve_score == null ? "—" : Number(meta.pve_score).toFixed(0)}
-          · PvP: ${meta.pvp_score == null ? "—" : Number(meta.pvp_score).toFixed(0)}
-          · Rarity: ${meta.rarity_score == null ? "—" : Number(meta.rarity_score).toFixed(0)}
-          · Mega: ${meta.mega_score == null ? "—" : Number(meta.mega_score).toFixed(0)}
-        </div>
-        <div><strong>${esc(meta.verdict || "")}</strong></div>
-        <div class="assessment-notes mono">${esc(meta.notes || "")}</div>
-      </div>
-    `).join("");
+    entries.innerHTML =
+      data.metas.length
+        ? data.metas.map(meta => `
+            <article class="admin-data-card">
+              <div class="admin-data-card-head">
+                <div>
+                  <span class="section-eyebrow">AUTOMATIC ASSESSMENT</span>
+                  <strong>${esc(meta.pokemon_name)}</strong>
+                </div>
+
+                <span class="score-pill">
+                  ${Number(meta.overall_score ?? 0).toFixed(0)}
+                </span>
+              </div>
+
+              <div class="admin-score-strip">
+                <span>PvE <strong>${meta.pve_score == null ? "—" : Number(meta.pve_score).toFixed(0)}</strong></span>
+                <span>PvP <strong>${meta.pvp_score == null ? "—" : Number(meta.pvp_score).toFixed(0)}</strong></span>
+                <span>Rarity <strong>${meta.rarity_score == null ? "—" : Number(meta.rarity_score).toFixed(0)}</strong></span>
+                <span>Mega <strong>${meta.mega_score == null ? "—" : Number(meta.mega_score).toFixed(0)}</strong></span>
+              </div>
+
+              <p><strong>${esc(meta.verdict || "")}</strong></p>
+
+              <details class="compact-details">
+                <summary>Method details</summary>
+                <div class="assessment-notes mono">${esc(meta.notes || "")}</div>
+              </details>
+            </article>
+          `).join("")
+        : `
+          <div class="empty-state">
+            <span>★</span>
+            <strong>No automatic assessments yet.</strong>
+          </div>
+        `;
   } catch (error) {
-    entries.textContent = error.message;
+    entries.textContent =
+      error.message;
   }
-});
+}
+
+document
+  .getElementById("loadOfficialRaids")
+  .addEventListener(
+    "click",
+    loadOfficialRaids
+  );
+
+document
+  .getElementById("loadRemoteLimits")
+  .addEventListener(
+    "click",
+    loadRemoteLimits
+  );
+
+document
+  .getElementById("loadMeta")
+  .addEventListener(
+    "click",
+    loadMeta
+  );
+
+showAdminSection("official");
 </script>
 </body>
 </html>
