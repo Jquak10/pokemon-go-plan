@@ -11,9 +11,10 @@
   <section class="card">
     <h1>Calendar admin</h1>
     <p>
-      Event data and raid-value assessments are automatic. The six-hour Cron Trigger
-      performs both jobs. Use this page only for an immediate manual refresh or to
-      inspect the generated scores.
+      Event data, official Remote Raid limits and raid-value assessments are automatic.
+      The Free-plan-safe scheduler runs them as three separate Cron invocations every six
+      hours. This button also runs three separate requests so no single Worker invocation
+      has to perform the entire sync.
     </p>
 
     <label for="key">Admin key</label>
@@ -93,16 +94,50 @@ async function requestJson(path, options = {}) {
 
 document.getElementById("sync").addEventListener("click", async () => {
   const out = document.getElementById("syncResult");
-  out.textContent = "Syncing event feeds, Pokémon GO data and PvPoke…";
-  try {
-    const data = await requestJson("/api/admin/sync", {
+  const results = {};
+
+  const runPhase = async (name, path, message) => {
+    out.textContent =
+      `${message}\n\nCompleted phases:\n` +
+      JSON.stringify(results, null, 2);
+
+    const data = await requestJson(path, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ key: key() })
     });
-    out.textContent = JSON.stringify(data, null, 2);
+
+    results[name] = data;
+  };
+
+  try {
+    await runPhase(
+      "events",
+      "/api/admin/sync/events",
+      "1/3 — Syncing Pokémon GO event feeds…"
+    );
+
+    await runPhase(
+      "remote_raid_limits",
+      "/api/admin/sync/remote-limits",
+      "2/3 — Checking official temporary Remote Raid limits…"
+    );
+
+    await runPhase(
+      "automatic_meta",
+      "/api/admin/sync/meta",
+      "3/3 — Updating automatic raid assessments…"
+    );
+
+    out.textContent =
+      "All three sync phases completed successfully.\n\n" +
+      JSON.stringify(results, null, 2);
   } catch (error) {
-    out.textContent = error.message;
+    out.textContent =
+      "Sync stopped because one phase failed.\n\n" +
+      JSON.stringify(results, null, 2) +
+      "\n\nError:\n" +
+      error.message;
   }
 });
 
