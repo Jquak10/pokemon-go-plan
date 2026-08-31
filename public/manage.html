@@ -3,1410 +3,379 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-
   <title>My Pokémon GO Raid Planner</title>
-
-  <link rel="stylesheet" href="/styles.css?v=3">
+  <link rel="stylesheet" href="/styles.css?v=5">
 </head>
-
 <body>
-
 <main>
-
-  <!-- =========================================================
-       PAGE HEADER / LOADING
-       ========================================================= -->
-
   <section class="card">
-
     <h1>My Pokémon GO Raid Planner</h1>
-
-    <p class="muted">
-      Your recommendations combine general raid value with your own
-      targets, progress and preferences.
-    </p>
-
-    <p class="muted">
-      Progress changes save to the database immediately.
-      Your personalized ICS feed is updated immediately on the server,
-      while Apple Calendar refreshes subscribed calendars on its own schedule.
-    </p>
-
-    <p id="loadStatus">
-      Loading…
-    </p>
-
+    <p class="muted">Your recommendations combine general internet/meta value with your own targets, progress and preferences.</p>
+    <p class="muted">Progress saves immediately. Apple Calendar refreshes your ICS subscription on its own schedule, so use this dashboard for the live raid plan.</p>
+    <p id="loadStatus">Loading…</p>
   </section>
-
-
-  <!-- =========================================================
-       MAIN APPLICATION
-       ========================================================= -->
 
   <section id="app" class="hidden">
-
-
-    <!-- =======================================================
-         EVENT FILTERS + RECOMMENDATION PREFERENCES
-         ======================================================= -->
-
     <section class="card">
-
       <h2>Event filters</h2>
-
-      <p class="muted">
-        Choose which types of Pokémon GO events should appear in your
-        personal calendar.
-      </p>
-
-      <div
-        id="sourceChecks"
-        class="checks"
-      ></div>
-
+      <p class="muted">Choose which Pokémon GO event categories should appear in your personal calendar.</p>
+      <div id="sourceChecks" class="checks"></div>
 
       <h3>Recommendation preferences</h3>
-
-      <p class="muted">
-        These settings control how strongly different factors influence
-        your raid recommendations.
-      </p>
-
-      <p class="muted">
-        Higher values make that factor more important.
-        A value of <strong>0</strong> means the factor is ignored.
-      </p>
-
-
+      <p class="muted">Higher values make a factor more important. A value of 0 means that factor is ignored.</p>
       <div class="preference-guide">
-
-        <strong>Suggested values</strong>
-
-        <p>
-          <strong>0</strong> — Ignore this factor<br>
-          <strong>0.5</strong> — Slight importance<br>
-          <strong>1.0</strong> — Normal importance<br>
-          <strong>1.5</strong> — High importance<br>
-          <strong>2.0</strong> — Very high importance
-        </p>
-
+        <strong>Suggested scale</strong>
+        <p><strong>0</strong> — Ignore · <strong>0.5</strong> — Slight · <strong>1.0</strong> — Normal · <strong>1.5</strong> — High · <strong>2.0</strong> — Very high</p>
       </div>
 
-
       <div class="grid">
-
-
-        <!-- PvE -->
-
         <div>
-
-          <label for="pveWeight">
-            PvE importance (0–2)
-          </label>
-
-          <input
-            id="pveWeight"
-            type="number"
-            min="0"
-            max="2"
-            step="0.1"
-          >
-
-          <p class="field-help">
-            Controls how much a Pokémon's usefulness in raids and other
-            PvE content affects your recommendation.
-          </p>
-
-          <p class="field-help">
-            Increase this if your main goal is building strong raid attackers.
-          </p>
-
+          <label for="pveWeight">PvE importance (0–2)</label>
+          <input id="pveWeight" type="number" min="0" max="2" step="0.1">
+          <p class="field-help">How strongly raid/PvE usefulness should affect recommendations.</p>
         </div>
-
-
-        <!-- PvP -->
-
         <div>
-
-          <label for="pvpWeight">
-            PvP importance (0–2)
-          </label>
-
-          <input
-            id="pvpWeight"
-            type="number"
-            min="0"
-            max="2"
-            step="0.1"
-          >
-
-          <p class="field-help">
-            Controls how much PvP performance influences recommendations.
-          </p>
-
-          <p class="field-help">
-            Set this to <strong>0</strong> if you do not care about
-            GO Battle League or PvP.
-          </p>
-
+          <label for="pvpWeight">PvP importance (0–2)</label>
+          <input id="pvpWeight" type="number" min="0" max="2" step="0.1">
+          <p class="field-help">Set to 0 if GO Battle League and PvP do not matter to you.</p>
         </div>
-
-
-        <!-- Collection -->
-
         <div>
-
-          <label for="collectorWeight">
-            Rarity / collection importance (0–2)
-          </label>
-
-          <input
-            id="collectorWeight"
-            type="number"
-            min="0"
-            max="2"
-            step="0.1"
-          >
-
-          <p class="field-help">
-            Gives more weight to Pokémon that are rare, limited-time,
-            Legendary, Mythical, Mega or otherwise difficult to obtain.
-          </p>
-
-          <p class="field-help">
-            Increase this if collection value matters to you even when
-            a Pokémon is not a top raid attacker.
-          </p>
-
+          <label for="collectorWeight">Rarity / collection importance (0–2)</label>
+          <input id="collectorWeight" type="number" min="0" max="2" step="0.1">
+          <p class="field-help">Adds weight for rare, limited-time and collection-relevant Pokémon.</p>
         </div>
-
-
-        <!-- Timezone -->
-
         <div>
-
-          <label for="timezone">
-            Timezone
-          </label>
-
+          <label for="timezone">Timezone</label>
           <input id="timezone">
-
-          <p class="field-help">
-            Used when interpreting event dates and times for your calendar.
-          </p>
-
-          <p class="field-help">
-            Example:
-            <code>Asia/Singapore</code>
-          </p>
-
+          <p class="field-help">Used for event dates and the daily Remote Raid usage counter. Example: <code>Asia/Singapore</code>.</p>
         </div>
-
-
+        <div>
+          <label for="remoteRaidBudget">Remote Raid daily budget</label>
+          <input id="remoteRaidBudget" type="number" min="0" step="1" placeholder="Auto — use official cap">
+          <p class="field-help">Optional personal ceiling. Leave blank for Auto. This never increases the official game limit.</p>
+        </div>
+        <div>
+          <label for="remoteRaidMinScore">Minimum score for a Remote Raid (0–100)</label>
+          <input id="remoteRaidMinScore" type="number" min="0" max="100" step="1">
+          <p class="field-help">Default 60. The planner stops allocating paid Remote Raids when marginal value falls below this threshold.</p>
+        </div>
       </div>
-
-
-      <p>
-
-        <button id="saveSettings">
-          Save settings
-        </button>
-
-        <span id="settingsStatus"></span>
-
-      </p>
-
+      <p><button id="saveSettings">Save settings</button> <span id="settingsStatus"></span></p>
     </section>
 
-
-    <!-- =======================================================
-         CURRENT RECOMMENDATIONS
-         ======================================================= -->
-
     <section class="card">
-
       <h2>Current raid recommendations</h2>
-
-      <p class="muted">
-        These recommendations combine the Pokémon's general
-        internet/meta value with your own targets, progress,
-        completion status and preferences.
-      </p>
-
-
-      <div class="preference-guide">
-
-        <strong>How recommendations work</strong>
-
-        <p>
-          <strong>Internet value</strong>
-          = Is this Pokémon generally worth raiding?
-        </p>
-
-        <p>
-          <strong>Personal value</strong>
-          = Do you personally still need it?
-        </p>
-
-        <p>
-          <strong>Your recommendation</strong>
-          = A combination of both.
-        </p>
-
-      </div>
-
-
+      <p class="muted">Internet value answers “is this generally worth raiding?” Personal value answers “do I still need it?” Your score combines both.</p>
       <div id="recommendations"></div>
-
     </section>
 
+    <section class="card">
+      <h2>Remote Raid Plan — Today</h2>
+      <p class="muted">The official daily limit is a ceiling, not a target. The planner is allowed to recommend fewer raids and leave capacity unused.</p>
 
-    <!-- =======================================================
-         ADD / UPDATE TARGET
-         ======================================================= -->
+      <div id="remoteRaidSummary" class="summary-grid"></div>
+
+      <div class="grid compact-grid">
+        <div>
+          <label for="raidsUsedToday">Remote Raids used today</label>
+          <input id="raidsUsedToday" type="number" min="0" step="1">
+          <p class="field-help">Update this after you use Remote Raid Passes. It resets naturally because usage is stored by your local date.</p>
+        </div>
+        <div class="button-align">
+          <button id="saveRaidUsage">Save today's usage</button>
+          <span id="raidUsageStatus"></span>
+        </div>
+      </div>
+
+      <div class="preference-guide">
+        <strong>How allocation stays conservative</strong>
+        <p>Every remotely eligible raid boss uses the same formula. Explicit Skip and Completed targets receive 0 Remote Raids. Each additional raid has diminishing marginal value, and allocation stops below your threshold rather than filling the quota artificially.</p>
+      </div>
+
+      <div id="remoteRaidAllocations"></div>
+      <details>
+        <summary>Show bosses receiving 0 Remote Raids</summary>
+        <div id="remoteRaidZero"></div>
+      </details>
+    </section>
 
     <section class="card">
-
       <h2>Add or update a target</h2>
-
-      <p class="muted">
-        Targets tell the recommendation engine what you personally
-        want to achieve for a Pokémon.
-      </p>
-
-      <p class="muted">
-        Your target does not replace the general raid-value assessment.
-        Instead, the two are combined to decide how strongly the raid
-        should be recommended to you.
-      </p>
-
-
-      <div class="preference-guide">
-
-        <strong>Example</strong>
-
-        <p>
-          A very strong raid Pokémon may still be recommended even if
-          you have completed your personal target.
-        </p>
-
-        <p>
-          A weaker Pokémon may become more important to you if you have
-          a large unfinished Mega Energy, Candy XL or raid target.
-        </p>
-
-      </div>
-
-
+      <p class="muted">Targets describe what you personally want. They modify—but do not replace—the internet/meta assessment.</p>
       <div class="grid">
-
-
-        <!-- Pokémon name -->
-
         <div>
-
-          <label for="pokemonName">
-            Pokémon name
-          </label>
-
-          <input
-            id="pokemonName"
-            placeholder="Mega Skarmory"
-          >
-
-          <p class="field-help">
-            Enter the Pokémon as it appears in raid events.
-          </p>
-
-          <p class="field-help">
-            For Mega raids, include <strong>Mega</strong>.
-            For example:
-            <strong>Mega Skarmory</strong>.
-          </p>
-
+          <label for="pokemonName">Pokémon name</label>
+          <input id="pokemonName" placeholder="Mega Skarmory">
+          <p class="field-help">Use the raid-form name when appropriate, e.g. <strong>Mega Skarmory</strong>.</p>
         </div>
-
-
-        <!-- Target type -->
-
         <div>
-
-          <label for="targetType">
-            Target type
-          </label>
-
+          <label for="targetType">Target type</label>
           <select id="targetType">
-
-            <option value="mega_energy">
-              Mega Energy
-            </option>
-
-            <option value="raids">
-              Number of raids
-            </option>
-
-            <option value="candy_xl">
-              Candy XL
-            </option>
-
-            <option value="candy">
-              Candy
-            </option>
-
-            <option value="custom">
-              Custom progress
-            </option>
-
+            <option value="mega_energy">Mega Energy</option>
+            <option value="raids">Number of raids</option>
+            <option value="candy_xl">Candy XL</option>
+            <option value="candy">Candy</option>
+            <option value="custom">Custom progress</option>
           </select>
-
-          <p class="field-help">
-            Choose what you are trying to accumulate or complete for
-            this Pokémon.
-          </p>
-
+          <p class="field-help">Choose what you are trying to accumulate or complete.</p>
         </div>
-
-
-        <!-- Current progress -->
-
         <div>
-
-          <label for="currentValue">
-            Current progress
-          </label>
-
-          <input
-            id="currentValue"
-            type="number"
-            step="1"
-            value="0"
-          >
-
-          <p class="field-help">
-            Enter how much progress you currently have.
-          </p>
-
-          <p class="field-help">
-            Example: if you currently have
-            <strong>1,400 Mega Energy</strong>,
-            enter <strong>1400</strong>.
-          </p>
-
+          <label for="currentValue">Current progress</label>
+          <input id="currentValue" type="number" step="1" value="0">
+          <p class="field-help">Example: if you have 1,400 Mega Energy, enter <strong>1400</strong>.</p>
         </div>
-
-
-        <!-- Desired target -->
-
         <div>
-
-          <label for="targetValue">
-            Desired target
-          </label>
-
-          <input
-            id="targetValue"
-            type="number"
-            step="1"
-            placeholder="3000"
-          >
-
-          <p class="field-help">
-            The amount you ultimately want to reach.
-          </p>
-
-          <p class="field-help">
-            The amount remaining influences how strongly the raid is
-            recommended to you.
-          </p>
-
+          <label for="targetValue">Desired target</label>
+          <input id="targetValue" type="number" step="1" placeholder="3000">
+          <p class="field-help">The amount you ultimately want to reach.</p>
         </div>
-
-
-        <!-- Priority -->
-
         <div>
-
-          <label for="priority">
-            Personal priority
-          </label>
-
+          <label for="expectedProgressPerRaid">Expected progress per raid (optional)</label>
+          <input id="expectedProgressPerRaid" type="number" min="0" step="1" placeholder="e.g. 200">
+          <p class="field-help">Used to estimate how many raids remain to your target. For Mega Energy, use a conservative typical amount you actually earn. Leave blank if uncertain.</p>
+        </div>
+        <div>
+          <label for="priority">Personal priority</label>
           <select id="priority">
-
-            <option value="high">
-              High
-            </option>
-
-            <option
-              value="medium"
-              selected
-            >
-              Medium
-            </option>
-
-            <option value="low">
-              Low
-            </option>
-
-            <option value="skip">
-              Skip
-            </option>
-
+            <option value="high">High</option>
+            <option value="medium" selected>Medium</option>
+            <option value="low">Low</option>
+            <option value="skip">Skip</option>
           </select>
-
-          <p class="field-help">
-            Tells the recommendation engine how strongly you personally
-            care about this Pokémon.
-          </p>
-
+          <p class="field-help">High = actively pursue; Medium = convenient; Low = only if better options are absent; Skip = recommend 0 paid Remote Raids.</p>
         </div>
-
-
-        <!-- Completed -->
-
         <div>
-
-          <label for="completed">
-            Completed?
-          </label>
-
-          <select id="completed">
-
-            <option value="0">
-              No
-            </option>
-
-            <option value="1">
-              Yes
-            </option>
-
-          </select>
-
-          <p class="field-help">
-            Mark this as complete when you have reached your personal goal.
-          </p>
-
-          <p class="field-help">
-            A completed Pokémon may still be recommended if its general
-            raid value is exceptionally high.
-          </p>
-
+          <label for="completed">Completed?</label>
+          <select id="completed"><option value="0">No</option><option value="1">Yes</option></select>
+          <p class="field-help">Completed targets receive 0 paid Remote Raids, even if the Pokémon remains generally valuable.</p>
         </div>
-
-
       </div>
 
-
-      <!-- Priority guide -->
-
-      <div class="preference-guide">
-
-        <strong>Personal priority guide</strong>
-
-        <p>
-          <strong>High</strong>
-          — You actively want to work on this Pokémon.
-        </p>
-
-        <p>
-          <strong>Medium</strong>
-          — Worth doing when convenient.
-        </p>
-
-        <p>
-          <strong>Low</strong>
-          — Only consider it when there are no better options.
-        </p>
-
-        <p>
-          <strong>Skip</strong>
-          — You normally do not want to spend raid passes on it.
-        </p>
-
-      </div>
-
-
-      <!-- Notes -->
-
-      <label for="notes">
-        Notes
-      </label>
-
-      <textarea
-        id="notes"
-        placeholder="Use free passes first."
-      ></textarea>
-
-      <p class="field-help">
-        Optional personal reminders such as shiny goals,
-        Candy XL needs, raid-pass limits or anything else
-        relevant to your decision.
-      </p>
-
-
-      <p>
-
-        <button id="saveTarget">
-          Save target
-        </button>
-
-        <span id="targetStatus"></span>
-
-      </p>
-
+      <label for="notes">Notes</label>
+      <textarea id="notes" placeholder="Use free passes first."></textarea>
+      <p class="field-help">Optional reminders such as shiny goals, XL needs or pass limits.</p>
+      <p><button id="saveTarget">Save target</button> <span id="targetStatus"></span></p>
     </section>
-
-
-    <!-- =======================================================
-         EXISTING TARGETS
-         ======================================================= -->
 
     <section class="card">
-
       <h2>My targets</h2>
-
-      <p class="muted">
-        Edit these whenever your progress changes.
-        Your recommendation is recalculated using the latest saved values.
-      </p>
-
+      <p class="muted">Edit these whenever progress changes. The live recommendation and Remote Raid allocation recalculate immediately.</p>
       <div id="targets"></div>
-
     </section>
-
-
   </section>
-
 </main>
 
-
 <script>
-
-const token =
-  location.pathname
-    .split("/")
-    .filter(Boolean)[1];
-
-
-const app =
-  document.getElementById("app");
-
-
-const loadStatus =
-  document.getElementById("loadStatus");
-
-
+const token = location.pathname.split("/").filter(Boolean)[1];
+const app = document.getElementById("app");
+const loadStatus = document.getElementById("loadStatus");
 let state = null;
 
-
-/* ============================================================
-   EVENT TYPE LABELS
-   ============================================================ */
-
 const labels = {
-
-  community_day:
-    "Community Day",
-
-  event:
-    "General Events",
-
-  go_battle_league:
-    "GO Battle League",
-
-  go_pass:
-    "GO Pass",
-
-  max_battles:
-    "Max Battles",
-
-  max_mondays:
-    "Max Mondays",
-
-  pokemon_go_fest:
-    "Pokémon GO Fest",
-
-  pokemon_spotlight_hour:
-    "Spotlight Hour",
-
-  raid_battles:
-    "Raid Battles",
-
-  raid_day:
-    "Raid Day",
-
-  raid_hour:
-    "Raid Hour",
-
-  research:
-    "Research",
-
-  season:
-    "Season"
-
+  community_day: "Community Day", event: "General Events", go_battle_league: "GO Battle League",
+  go_pass: "GO Pass", max_battles: "Max Battles", max_mondays: "Max Mondays",
+  pokemon_go_fest: "Pokémon GO Fest", pokemon_spotlight_hour: "Spotlight Hour",
+  raid_battles: "Raid Battles", raid_day: "Raid Day", raid_hour: "Raid Hour",
+  research: "Research", season: "Season"
 };
 
-
-/* ============================================================
-   HTML ESCAPING
-   ============================================================ */
-
 function esc(value) {
-
-  return String(value ?? "")
-    .replace(
-      /[&<>"']/g,
-      c => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-      }[c])
-    );
-
+  return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
-
-/* ============================================================
-   API HELPER
-   ============================================================ */
-
-async function api(
-  path,
-  options = {}
-) {
-
-  const response =
-    await fetch(
-      path,
-      options
-    );
-
-
-  const data =
-    await response.json();
-
-
-  if (!response.ok) {
-
-    throw new Error(
-      data.error
-      || "Request failed."
-    );
-
-  }
-
-
+async function api(path, options = {}) {
+  const response = await fetch(path, options);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Request failed.");
   return data;
-
 }
-
-
-/* ============================================================
-   LOAD PROFILE
-   ============================================================ */
 
 async function load() {
-
   try {
-
-    state =
-      await api(
-        `/api/me?token=${encodeURIComponent(token)}`
-      );
-
-
+    state = await api(`/api/me?token=${encodeURIComponent(token)}`);
     render();
-
-
-    loadStatus.textContent =
-      "";
-
-
-    app.classList.remove(
-      "hidden"
-    );
-
+    loadStatus.textContent = "";
+    app.classList.remove("hidden");
+  } catch (error) {
+    loadStatus.textContent = error.message;
+    loadStatus.className = "error";
   }
-
-  catch (error) {
-
-    loadStatus.textContent =
-      error.message;
-
-
-    loadStatus.className =
-      "error";
-
-  }
-
 }
 
+function renderRemoteRaidPlan() {
+  const plan = state.remote_raid_plan;
+  const rule = plan.official_rule;
+  const budgetText = plan.user_budget == null ? "Auto (official cap)" : String(plan.user_budget);
 
-/* ============================================================
-   RENDER DASHBOARD
-   ============================================================ */
+  document.getElementById("raidsUsedToday").value = plan.raids_used;
+
+  document.getElementById("remoteRaidSummary").innerHTML = `
+    <div class="metric"><span>Official daily limit</span><strong>${plan.official_limit}</strong><small>${esc(rule.label)}</small></div>
+    <div class="metric"><span>Your daily budget</span><strong>${esc(budgetText)}</strong><small>Never exceeds the official cap</small></div>
+    <div class="metric"><span>Already used</span><strong>${plan.raids_used}</strong><small>${esc(plan.local_date)}</small></div>
+    <div class="metric"><span>Recommended additional</span><strong>${plan.recommended_total}</strong><small>Based on marginal value</small></div>
+    <div class="metric"><span>Official capacity remaining</span><strong>${plan.official_remaining}</strong><small>Before new recommendations</small></div>
+    <div class="metric"><span>Unused planning capacity</span><strong>${plan.unused_planning_capacity}</strong><small>Intentionally left unused if value is too low</small></div>
+  `;
+
+  const oldSource = document.querySelector(".remote-rule-source");
+  if (oldSource) oldSource.remove();
+
+  if (rule.source_url) {
+    document.getElementById("remoteRaidSummary").insertAdjacentHTML(
+      "afterend",
+      `<p class="field-help remote-rule-source">Limit source: <a href="${esc(rule.source_url)}" target="_blank" rel="noopener">${esc(rule.label)}</a></p>`
+    );
+  }
+
+  document.getElementById("remoteRaidAllocations").innerHTML = plan.allocations.length
+    ? plan.allocations.map(item => `
+      <div class="raid-allocation">
+        <div class="allocation-count">${item.allocated}</div>
+        <div>
+          <div class="score">${esc(item.emoji)} ${esc(item.pokemon_name)} — ${item.allocated} Remote Raid${item.allocated === 1 ? "" : "s"}</div>
+          <div>${esc(item.label)} · ${item.score}/100</div>
+          ${item.target_cap == null ? "" : `<div class="field-help">Personal target estimate caps useful raids at about ${item.target_cap}.</div>`}
+          <ul>${item.reasons.slice(0, 5).map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>
+        </div>
+      </div>
+    `).join("")
+    : `<p class="muted">No additional Remote Raids are recommended right now. The planner will not spend quota just because it is available.</p>`;
+
+  document.getElementById("remoteRaidZero").innerHTML = plan.not_allocated.length
+    ? plan.not_allocated.map(item => `
+      <div class="recommendation">
+        <strong>${esc(item.pokemon_name)} — 0</strong>
+        <div class="field-help">${esc(item.exclusion_reason || "Marginal value fell below the allocation threshold.")}</div>
+      </div>
+    `).join("")
+    : `<p class="muted">Every remotely eligible boss received at least one recommended raid.</p>`;
+}
 
 function render() {
-
-  const included =
-    new Set(
-      state.user.included_sources
-    );
-
-
-  /* ----------------------------------------------------------
-     EVENT FILTERS
-     ---------------------------------------------------------- */
-
-  document
-    .getElementById(
-      "sourceChecks"
-    )
-    .innerHTML =
-
-      state.available_sources
-        .map(
-          source => `
-
-            <label>
-
-              <input
-                type="checkbox"
-                data-source="${esc(source)}"
-                ${included.has(source) ? "checked" : ""}
-              >
-
-              ${esc(labels[source] || source)}
-
-            </label>
-
-          `
-        )
-        .join("");
-
-
-  /* ----------------------------------------------------------
-     PREFERENCES
-     ---------------------------------------------------------- */
-
-  document
-    .getElementById(
-      "pveWeight"
-    )
-    .value =
-      state.user.pve_weight;
-
-
-  document
-    .getElementById(
-      "pvpWeight"
-    )
-    .value =
-      state.user.pvp_weight;
-
-
-  document
-    .getElementById(
-      "collectorWeight"
-    )
-    .value =
-      state.user.collector_weight;
-
-
-  document
-    .getElementById(
-      "timezone"
-    )
-    .value =
-      state.user.timezone;
-
-
-  /* ----------------------------------------------------------
-     RECOMMENDATIONS
-     ---------------------------------------------------------- */
-
-  document
-    .getElementById(
-      "recommendations"
-    )
-    .innerHTML =
-
-      state.recommendations.length
-
-        ?
-
-        state.recommendations
-          .map(
-            rec => `
-
-              <div class="recommendation">
-
-                <div class="score">
-
-                  ${esc(rec.emoji)}
-                  ${esc(rec.pokemon_name)}
-                  —
-                  ${esc(rec.label)}
-                  (${rec.score}/100)
-
-                </div>
-
-
-                <div class="muted">
-
-                  ${esc(
-                    rec.event_title
-                    || ""
-                  )}
-
-                </div>
-
-
-                <ul>
-
-                  ${rec.reasons
-                    .map(
-                      reason =>
-                        `<li>${esc(reason)}</li>`
-                    )
-                    .join("")
-                  }
-
-                </ul>
-
-              </div>
-
-            `
-          )
-          .join("")
-
-        :
-
-        `
-
-          <p class="muted">
-
-            No matching active raid recommendations yet.
-
-            This is normal until event data has synced
-            and automatic meta assessments are available.
-
-          </p>
-
-        `;
-
-
-  /* ----------------------------------------------------------
-     TARGETS
-     ---------------------------------------------------------- */
-
-  document
-    .getElementById(
-      "targets"
-    )
-    .innerHTML =
-
-      state.targets.length
-
-        ?
-
-        state.targets
-          .map(
-            target => `
-
-              <div class="target">
-
-                <strong>
-
-                  ${esc(
-                    target.pokemon_name
-                  )}
-
-                </strong>
-
-
-                <div>
-
-                  ${esc(
-                    target.target_type
-                  )}:
-
-                  ${Number(
-                    target.current_value
-                    || 0
-                  ).toLocaleString()}
-
-                  ${
-                    target.target_value
-                    == null
-
-                      ? ""
-
-                      : " / "
-                        + Number(
-                          target.target_value
-                        ).toLocaleString()
-                  }
-
-                </div>
-
-
-                <div>
-
-                  Priority:
-                  ${esc(
-                    target.priority
-                  )}
-
-                  ${
-                    Number(
-                      target.completed
-                    )
-
-                      ? " • COMPLETE"
-
-                      : ""
-                  }
-
-                </div>
-
-
-                ${
-                  target.notes
-
-                    ? `
-
-                      <div class="field-help">
-
-                        ${esc(
-                          target.notes
-                        )}
-
-                      </div>
-
-                    `
-
-                    : ""
-                }
-
-
-                <div
-                  class="row"
-                  style="margin-top:8px"
-                >
-
-                  <button
-                    class="secondary"
-                    onclick='editTarget(
-                      ${JSON.stringify(target)}
-                    )'
-                  >
-
-                    Edit
-
-                  </button>
-
-
-                  <button
-                    class="danger"
-                    onclick='removeTarget(
-                      ${JSON.stringify(target.id)}
-                    )'
-                  >
-
-                    Delete
-
-                  </button>
-
-                </div>
-
-              </div>
-
-            `
-          )
-          .join("")
-
-        :
-
-        `
-
-          <p class="muted">
-
-            No personal targets yet.
-
-          </p>
-
-        `;
-
+  const included = new Set(state.user.included_sources);
+
+  document.getElementById("sourceChecks").innerHTML = state.available_sources.map(source => `
+    <label><input type="checkbox" data-source="${esc(source)}" ${included.has(source) ? "checked" : ""}>${esc(labels[source] || source)}</label>
+  `).join("");
+
+  document.getElementById("pveWeight").value = state.user.pve_weight;
+  document.getElementById("pvpWeight").value = state.user.pvp_weight;
+  document.getElementById("collectorWeight").value = state.user.collector_weight;
+  document.getElementById("timezone").value = state.user.timezone;
+  document.getElementById("remoteRaidBudget").value = state.user.remote_raid_budget ?? "";
+  document.getElementById("remoteRaidMinScore").value = state.user.remote_raid_min_score ?? 60;
+
+  document.getElementById("recommendations").innerHTML = state.recommendations.length
+    ? state.recommendations.map(rec => `
+      <div class="recommendation">
+        <div class="score">${esc(rec.emoji)} ${esc(rec.pokemon_name)} — ${esc(rec.label)} (${rec.score}/100)</div>
+        <div class="muted">${esc(rec.event_title || "")}</div>
+        <ul>${rec.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>
+      </div>
+    `).join("")
+    : `<p class="muted">No matching active raid recommendations yet.</p>`;
+
+  renderRemoteRaidPlan();
+
+  document.getElementById("targets").innerHTML = state.targets.length
+    ? state.targets.map(target => `
+      <div class="target">
+        <strong>${esc(target.pokemon_name)}</strong>
+        <div>${esc(target.target_type)}: ${Number(target.current_value || 0).toLocaleString()}${target.target_value == null ? "" : " / " + Number(target.target_value).toLocaleString()}</div>
+        ${target.expected_progress_per_raid == null ? "" : `<div>Expected progress/raid: ${Number(target.expected_progress_per_raid).toLocaleString()}</div>`}
+        <div>Priority: ${esc(target.priority)} ${Number(target.completed) ? "• COMPLETE" : ""}</div>
+        ${target.notes ? `<div class="field-help">${esc(target.notes)}</div>` : ""}
+        <div class="row" style="margin-top:8px">
+          <button class="secondary" onclick='editTarget(${JSON.stringify(target)})'>Edit</button>
+          <button class="danger" onclick='removeTarget(${JSON.stringify(target.id)})'>Delete</button>
+        </div>
+      </div>
+    `).join("")
+    : `<p class="muted">No personal targets yet.</p>`;
 }
 
-
-/* ============================================================
-   SAVE SETTINGS
-   ============================================================ */
-
-document
-  .getElementById(
-    "saveSettings"
-  )
-  .addEventListener(
-    "click",
-    async () => {
-
-      const included_sources =
-        [
-          ...document.querySelectorAll(
-            "[data-source]:checked"
-          )
-        ]
-        .map(
-          el =>
-            el.dataset.source
-        );
-
-
-      const status =
-        document.getElementById(
-          "settingsStatus"
-        );
-
-
-      status.textContent =
-        "Saving…";
-
-
-      try {
-
-        await api(
-          "/api/settings",
-          {
-
-            method:
-              "POST",
-
-            headers: {
-              "content-type":
-                "application/json"
-            },
-
-            body:
-              JSON.stringify({
-
-                token,
-
-                included_sources,
-
-                pve_weight:
-                  Number(
-                    document
-                      .getElementById(
-                        "pveWeight"
-                      )
-                      .value
-                  ),
-
-                pvp_weight:
-                  Number(
-                    document
-                      .getElementById(
-                        "pvpWeight"
-                      )
-                      .value
-                  ),
-
-                collector_weight:
-                  Number(
-                    document
-                      .getElementById(
-                        "collectorWeight"
-                      )
-                      .value
-                  ),
-
-                timezone:
-                  document
-                    .getElementById(
-                      "timezone"
-                    )
-                    .value
-
-              })
-
-          }
-        );
-
-
-        status.textContent =
-          "Saved ✓";
-
-
-        await load();
-
-      }
-
-      catch (error) {
-
-        status.textContent =
-          error.message;
-
-      }
-
-    }
-  );
-
-
-/* ============================================================
-   SAVE TARGET
-   ============================================================ */
-
-document
-  .getElementById(
-    "saveTarget"
-  )
-  .addEventListener(
-    "click",
-    async () => {
-
-      const status =
-        document.getElementById(
-          "targetStatus"
-        );
-
-
-      status.textContent =
-        "Saving…";
-
-
-      try {
-
-        await api(
-          "/api/targets",
-          {
-
-            method:
-              "POST",
-
-            headers: {
-              "content-type":
-                "application/json"
-            },
-
-            body:
-              JSON.stringify({
-
-                token,
-
-                pokemon_name:
-                  document
-                    .getElementById(
-                      "pokemonName"
-                    )
-                    .value
-                    .trim(),
-
-                target_type:
-                  document
-                    .getElementById(
-                      "targetType"
-                    )
-                    .value,
-
-                current_value:
-                  document
-                    .getElementById(
-                      "currentValue"
-                    )
-                    .value,
-
-                target_value:
-                  document
-                    .getElementById(
-                      "targetValue"
-                    )
-                    .value,
-
-                priority:
-                  document
-                    .getElementById(
-                      "priority"
-                    )
-                    .value,
-
-                completed:
-                  document
-                    .getElementById(
-                      "completed"
-                    )
-                    .value
-                  === "1",
-
-                notes:
-                  document
-                    .getElementById(
-                      "notes"
-                    )
-                    .value
-
-              })
-
-          }
-        );
-
-
-        status.textContent =
-          "Saved ✓";
-
-
-        await load();
-
-      }
-
-      catch (error) {
-
-        status.textContent =
-          error.message;
-
-      }
-
-    }
-  );
-
-
-/* ============================================================
-   EDIT TARGET
-   ============================================================ */
-
-window.editTarget =
-  target => {
-
-    document
-      .getElementById(
-        "pokemonName"
-      )
-      .value =
-        target.pokemon_name;
-
-
-    document
-      .getElementById(
-        "targetType"
-      )
-      .value =
-        target.target_type;
-
-
-    document
-      .getElementById(
-        "currentValue"
-      )
-      .value =
-        target.current_value
-        ?? 0;
-
-
-    document
-      .getElementById(
-        "targetValue"
-      )
-      .value =
-        target.target_value
-        ?? "";
-
-
-    document
-      .getElementById(
-        "priority"
-      )
-      .value =
-        target.priority;
-
-
-    document
-      .getElementById(
-        "completed"
-      )
-      .value =
-        Number(
-          target.completed
-        )
-          ? "1"
-          : "0";
-
-
-    document
-      .getElementById(
-        "notes"
-      )
-      .value =
-        target.notes
-        || "";
-
-
-    window.scrollTo({
-
-      top:
-        document
-          .getElementById(
-            "pokemonName"
-          )
-          .offsetTop
-        - 80,
-
-      behavior:
-        "smooth"
-
+document.getElementById("saveSettings").addEventListener("click", async () => {
+  const included_sources = [...document.querySelectorAll("[data-source]:checked")].map(el => el.dataset.source);
+  const status = document.getElementById("settingsStatus");
+  status.textContent = "Saving…";
+  try {
+    await api("/api/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token,
+        included_sources,
+        pve_weight: Number(document.getElementById("pveWeight").value),
+        pvp_weight: Number(document.getElementById("pvpWeight").value),
+        collector_weight: Number(document.getElementById("collectorWeight").value),
+        timezone: document.getElementById("timezone").value,
+        remote_raid_budget: document.getElementById("remoteRaidBudget").value,
+        remote_raid_min_score: Number(document.getElementById("remoteRaidMinScore").value)
+      })
     });
-
-  };
-
-
-/* ============================================================
-   DELETE TARGET
-   ============================================================ */
-
-window.removeTarget =
-  async id => {
-
-    if (
-      !confirm(
-        "Delete this target?"
-      )
-    ) {
-
-      return;
-
-    }
-
-
-    await api(
-
-      `/api/targets?token=${
-        encodeURIComponent(token)
-      }&id=${
-        encodeURIComponent(id)
-      }`,
-
-      {
-        method:
-          "DELETE"
-      }
-
-    );
-
-
+    status.textContent = "Saved ✓";
     await load();
+  } catch (error) { status.textContent = error.message; }
+});
 
-  };
+document.getElementById("saveRaidUsage").addEventListener("click", async () => {
+  const status = document.getElementById("raidUsageStatus");
+  status.textContent = "Saving…";
+  try {
+    await api("/api/remote-raid-usage", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, raids_used: Number(document.getElementById("raidsUsedToday").value) })
+    });
+    status.textContent = "Saved ✓";
+    await load();
+  } catch (error) { status.textContent = error.message; }
+});
 
+document.getElementById("saveTarget").addEventListener("click", async () => {
+  const status = document.getElementById("targetStatus");
+  status.textContent = "Saving…";
+  try {
+    await api("/api/targets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token,
+        pokemon_name: document.getElementById("pokemonName").value.trim(),
+        target_type: document.getElementById("targetType").value,
+        current_value: document.getElementById("currentValue").value,
+        target_value: document.getElementById("targetValue").value,
+        expected_progress_per_raid: document.getElementById("expectedProgressPerRaid").value,
+        priority: document.getElementById("priority").value,
+        completed: document.getElementById("completed").value === "1",
+        notes: document.getElementById("notes").value
+      })
+    });
+    status.textContent = "Saved ✓";
+    await load();
+  } catch (error) { status.textContent = error.message; }
+});
 
-/* ============================================================
-   INITIAL LOAD
-   ============================================================ */
+window.editTarget = target => {
+  document.getElementById("pokemonName").value = target.pokemon_name;
+  document.getElementById("targetType").value = target.target_type;
+  document.getElementById("currentValue").value = target.current_value ?? 0;
+  document.getElementById("targetValue").value = target.target_value ?? "";
+  document.getElementById("expectedProgressPerRaid").value = target.expected_progress_per_raid ?? "";
+  document.getElementById("priority").value = target.priority;
+  document.getElementById("completed").value = Number(target.completed) ? "1" : "0";
+  document.getElementById("notes").value = target.notes || "";
+  document.getElementById("pokemonName").scrollIntoView({ behavior: "smooth", block: "center" });
+};
+
+window.removeTarget = async id => {
+  if (!confirm("Delete this target?")) return;
+  await api(`/api/targets?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  await load();
+};
 
 load();
-
 </script>
-
 </body>
 </html>
