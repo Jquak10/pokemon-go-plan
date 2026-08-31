@@ -59,7 +59,7 @@ const PINNED_OFFICIAL_EVENT_PAGES = [
   "https://pokemongo.com/gofest/megafinale"
 ];
 
-const MAX_OFFICIAL_EVENT_PAGES_PER_SYNC = 18;
+const MAX_OFFICIAL_EVENT_PAGES_PER_SYNC = 8;
 
 const PVPOKE_MASTER_LEAGUE =
   "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-10000.json";
@@ -68,6 +68,7 @@ const POGO_API_POKEDEX =
   "https://pokemon-go-api.github.io/pokemon-go-api/api/pokedex.json";
 
 const AUTO_META_METHOD_VERSION = "auto-meta-v1";
+const MAX_META_POKEMON_PER_SYNC = 20;
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -645,11 +646,14 @@ async function syncAutomaticMeta(env) {
     }
   }
 
+  const candidates = [...bestByDisplayName.values()]
+    .sort((a, b) => b.overall - a.overall)
+    .slice(0, MAX_META_POKEMON_PER_SYNC);
+
   const timestamp = nowIso();
   const statements = [];
-  let updated = 0;
 
-  for (const candidate of bestByDisplayName.values()) {
+  for (const candidate of candidates) {
     const verdict = automaticVerdict(
       candidate.pve,
       candidate.pvp,
@@ -697,65 +701,54 @@ async function syncAutomaticMeta(env) {
       )
     );
 
-    const sourceRows = [
-      {
-        name: "Pokémon GO API",
-        url: POGO_API_POKEDEX,
-        note: "Machine-readable current Pokémon GO stats, types and moves."
-      },
-      {
-        name: "GO Calendar availability",
-        url: candidate.event.source_url || "https://gocalendar.info/",
-        note: `Raid availability window used for rarity/urgency: ${candidate.event.start_date || "?"} to ${candidate.event.end_date || "?"}.`
-      }
-    ];
+    const sourceId = await sha256Hex(
+      `${normalizeName(candidate.displayName)}|automatic-meta-sources`
+    );
 
-    if (candidate.pvp != null) {
-      sourceRows.push({
-        name: "PvPoke",
-        url: PVPOKE_MASTER_LEAGUE,
-        note: "Machine-readable Master League overall ranking score."
-      });
-    }
+    const sourceNote = [
+      `Pokémon GO API: ${POGO_API_POKEDEX}`,
+      candidate.pvp == null
+        ? "PvPoke: not applied for this raid form."
+        : `PvPoke Master League rankings: ${PVPOKE_MASTER_LEAGUE}`,
+      `GO Calendar event source: ${candidate.event.source_url || "https://gocalendar.info/"}`,
+      `Availability window: ${candidate.event.start_date || "?"} to ${candidate.event.end_date || "?"}.`
+    ].join("\n");
 
-    for (const source of sourceRows) {
-      const sourceId = await sha256Hex(
-        `${normalizeName(candidate.displayName)}|${source.name}|${source.url}`
-      );
-
-      statements.push(
-        env.DB.prepare(`
-          INSERT INTO meta_sources (
-            id, pokemon_name, source_name, source_url, note, updated_at
-          )
-          VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET
-            note = excluded.note,
-            updated_at = excluded.updated_at
-        `).bind(
-          sourceId,
-          candidate.displayName,
-          source.name,
-          source.url,
-          source.note,
-          timestamp
+    statements.push(
+      env.DB.prepare(`
+        INSERT INTO meta_sources (
+          id, pokemon_name, source_name, source_url, note, updated_at
         )
-      );
-    }
-
-    updated++;
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          source_url = excluded.source_url,
+          note = excluded.note,
+          updated_at = excluded.updated_at
+      `).bind(
+        sourceId,
+        candidate.displayName,
+        "Automatic meta sources",
+        POGO_API_POKEDEX,
+        sourceNote,
+        timestamp
+      )
+    );
   }
 
   if (statements.length) {
-    // D1 batch can handle this small active/upcoming raid set comfortably.
     await env.DB.batch(statements);
   }
 
   return {
-    updated,
+    updated: candidates.length,
     raid_events_considered: raidEvents.length,
     pokedex_entries: pokedex.length,
-    method: AUTO_META_METHOD_VERSION
+    method: AUTO_META_METHOD_VERSION,
+    write_statements: statements.length,
+    truncated:
+      bestByDisplayName.size > MAX_META_POKEMON_PER_SYNC
+        ? bestByDisplayName.size - MAX_META_POKEMON_PER_SYNC
+        : 0
   };
 }
 
@@ -2146,39 +2139,67 @@ async function adminRemoteRaidLimits(request, env) {
   return json({ rules: results });
 }
 
-async function adminSync(request, env) {
-  const body = await request.json();
+async function readAdminKey(request, env) {
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {}
 
   if (!env.ADMIN_KEY || body.key !== env.ADMIN_KEY) {
-    return bad("Invalid admin key.", 401);
+    return { ok: false, response: bad("Invalid admin key.", 401) };
   }
 
-  const eventResults = await syncAllEvents(env);
+  return { ok: true };
+}
 
-  let remoteRaidLimits;
-  try {
-    remoteRaidLimits = await syncOfficialRemoteRaidLimits(env);
-  } catch (error) {
-    remoteRaidLimits = {
-      error: String(error.message || error)
-    };
-  }
+async function adminSyncEvents(request, env) {
+  const auth = await readAdminKey(request, env);
+  if (!auth.ok) return auth.response;
 
-  let automaticMeta;
-  try {
-    automaticMeta = await syncAutomaticMeta(env);
-  } catch (error) {
-    automaticMeta = {
-      error: String(error.message || error)
-    };
-  }
+  const events = await syncAllEvents(env);
 
   return json({
     ok: true,
-    events: eventResults,
-    remote_raid_limits: remoteRaidLimits,
+    phase: "events",
+    events
+  });
+}
+
+async function adminSyncRemoteLimits(request, env) {
+  const auth = await readAdminKey(request, env);
+  if (!auth.ok) return auth.response;
+
+  const remoteRaidLimits = await syncOfficialRemoteRaidLimits(env);
+
+  return json({
+    ok: true,
+    phase: "remote_raid_limits",
+    remote_raid_limits: remoteRaidLimits
+  });
+}
+
+async function adminSyncMeta(request, env) {
+  const auth = await readAdminKey(request, env);
+  if (!auth.ok) return auth.response;
+
+  const automaticMeta = await syncAutomaticMeta(env);
+
+  return json({
+    ok: true,
+    phase: "automatic_meta",
     automatic_meta: automaticMeta
   });
+}
+
+async function adminSyncLegacy(request, env) {
+  const auth = await readAdminKey(request, env);
+  if (!auth.ok) return auth.response;
+
+  return json({
+    ok: false,
+    error:
+      "The old all-in-one sync endpoint is disabled on the Free plan. Use the three phase-specific sync endpoints."
+  }, 409);
 }
 
 async function asset(request, env, pathname) {
@@ -2225,8 +2246,20 @@ async function handleFetch(request, env) {
     }
 
 
+    if (request.method === "POST" && path === "/api/admin/sync/events") {
+      return adminSyncEvents(request, env);
+    }
+
+    if (request.method === "POST" && path === "/api/admin/sync/remote-limits") {
+      return adminSyncRemoteLimits(request, env);
+    }
+
+    if (request.method === "POST" && path === "/api/admin/sync/meta") {
+      return adminSyncMeta(request, env);
+    }
+
     if (request.method === "POST" && path === "/api/admin/sync") {
-      return adminSync(request, env);
+      return adminSyncLegacy(request, env);
     }
 
     const calendarMatch = path.match(/^\/calendar\/([A-Za-z0-9_-]+)\.ics$/);
@@ -2258,29 +2291,42 @@ async function handleFetch(request, env) {
 export default {
   fetch: handleFetch,
 
-  async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(
-      (async () => {
-        const eventResults = await syncAllEvents(env);
-        console.log("Event sync:", JSON.stringify(eventResults));
+  async scheduled(controller, env, ctx) {
+    const cron = controller.cron;
 
-        try {
-          const remoteRaidLimits = await syncOfficialRemoteRaidLimits(env);
+    if (cron === "23 */6 * * *") {
+      ctx.waitUntil(
+        (async () => {
+          const result = await syncAllEvents(env);
+          console.log("Scheduled event sync:", JSON.stringify(result));
+        })()
+      );
+      return;
+    }
+
+    if (cron === "33 */6 * * *") {
+      ctx.waitUntil(
+        (async () => {
+          const result = await syncOfficialRemoteRaidLimits(env);
           console.log(
-            "Official Remote Raid limit sync:",
-            JSON.stringify(remoteRaidLimits)
+            "Scheduled official Remote Raid limit sync:",
+            JSON.stringify(result)
           );
-        } catch (error) {
-          console.error("Official Remote Raid limit sync failed:", error);
-        }
+        })()
+      );
+      return;
+    }
 
-        try {
-          const automaticMeta = await syncAutomaticMeta(env);
-          console.log("Automatic meta sync:", JSON.stringify(automaticMeta));
-        } catch (error) {
-          console.error("Automatic meta sync failed:", error);
-        }
-      })()
-    );
+    if (cron === "43 */6 * * *") {
+      ctx.waitUntil(
+        (async () => {
+          const result = await syncAutomaticMeta(env);
+          console.log("Scheduled automatic meta sync:", JSON.stringify(result));
+        })()
+      );
+      return;
+    }
+
+    console.warn("Unknown Cron Trigger:", cron);
   }
 };
