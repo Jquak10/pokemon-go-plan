@@ -205,16 +205,34 @@ async function load() {
 function renderRemoteRaidPlan() {
   const plan = state.remote_raid_plan;
   const rule = plan.official_rule;
-  const budgetText = plan.user_budget == null ? "Auto (official cap)" : String(plan.user_budget);
+
+  const officialLimitText =
+    plan.official_is_unlimited
+      ? "Unlimited"
+      : String(plan.official_limit);
+
+  const budgetText =
+    plan.user_budget == null
+      ? (
+          plan.official_is_unlimited
+            ? "Auto (value-based)"
+            : "Auto (official cap)"
+        )
+      : String(plan.user_budget);
+
+  const officialRemainingText =
+    plan.official_is_unlimited
+      ? "No game cap"
+      : String(plan.official_remaining);
 
   document.getElementById("raidsUsedToday").value = plan.raids_used;
 
   document.getElementById("remoteRaidSummary").innerHTML = `
-    <div class="metric"><span>Official daily limit</span><strong>${plan.official_limit}</strong><small>${esc(rule.label)}</small></div>
-    <div class="metric"><span>Your daily budget</span><strong>${esc(budgetText)}</strong><small>Never exceeds the official cap</small></div>
+    <div class="metric"><span>Official daily limit</span><strong>${esc(officialLimitText)}</strong><small>${esc(rule.label)}</small></div>
+    <div class="metric"><span>Your daily budget</span><strong>${esc(budgetText)}</strong><small>${plan.official_is_unlimited ? "Auto stops when marginal value is too low" : "Never exceeds the official cap"}</small></div>
     <div class="metric"><span>Already used</span><strong>${plan.raids_used}</strong><small>${esc(plan.local_date)}</small></div>
     <div class="metric"><span>Recommended additional</span><strong>${plan.recommended_total}</strong><small>Based on marginal value</small></div>
-    <div class="metric"><span>Official capacity remaining</span><strong>${plan.official_remaining}</strong><small>Before new recommendations</small></div>
+    <div class="metric"><span>Official capacity remaining</span><strong>${esc(officialRemainingText)}</strong><small>${plan.official_is_unlimited ? "No official daily ceiling during this period" : "Before new recommendations"}</small></div>
     <div class="metric"><span>Unused planning capacity</span><strong>${plan.unused_planning_capacity}</strong><small>Intentionally left unused if value is too low</small></div>
   `;
 
@@ -224,7 +242,7 @@ function renderRemoteRaidPlan() {
   if (rule.source_url) {
     document.getElementById("remoteRaidSummary").insertAdjacentHTML(
       "afterend",
-      `<p class="field-help remote-rule-source">Limit source: <a href="${esc(rule.source_url)}" target="_blank" rel="noopener">${esc(rule.label)}</a></p>`
+      `<p class="field-help remote-rule-source">Limit source: <a href="${esc(rule.source_url)}" target="_blank" rel="noopener">${esc(rule.label)}</a>${rule.detected_automatically ? " · detected automatically from an official Pokémon GO page" : ""}</p>`
     );
   }
 
