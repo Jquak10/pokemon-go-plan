@@ -102,7 +102,11 @@ CREATE TABLE IF NOT EXISTS remote_raid_limit_overrides (
   remote_raid_limit INTEGER NOT NULL,
   source_url TEXT,
   active INTEGER NOT NULL DEFAULT 1,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  is_unlimited INTEGER NOT NULL DEFAULT 0,
+  detected_automatically INTEGER NOT NULL DEFAULT 0,
+  source_excerpt TEXT,
+  detected_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_remote_raid_limit_dates
