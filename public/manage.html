@@ -2,185 +2,595 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=5">
+  <link rel="stylesheet" href="/styles.css?v=7">
 </head>
-<body>
-<main>
-  <section class="card">
-    <h1>My Pokémon GO Raid Planner</h1>
-    <p class="muted">Your recommendations combine general internet/meta value with your own targets, progress and preferences.</p>
-    <p class="muted">Progress saves immediately. Apple Calendar refreshes your ICS subscription on its own schedule, so use this dashboard for the live raid plan.</p>
-    <p id="loadStatus">Loading…</p>
-  </section>
 
-  <section id="app" class="hidden">
-    <section class="card">
-      <h2>Event filters</h2>
-      <p class="muted">Choose which Pokémon GO event categories should appear in your personal calendar.</p>
-      <div id="sourceChecks" class="checks"></div>
+<body class="manage-page">
+  <div class="ambient-orb ambient-orb-one" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb-two" aria-hidden="true"></div>
 
-      <h3>Recommendation preferences</h3>
-      <p class="muted">Higher values make a factor more important. A value of 0 means that factor is ignored.</p>
-      <div class="preference-guide">
-        <strong>Suggested scale</strong>
-        <p><strong>0</strong> — Ignore · <strong>0.5</strong> — Slight · <strong>1.0</strong> — Normal · <strong>1.5</strong> — High · <strong>2.0</strong> — Very high</p>
+  <main class="dashboard-shell">
+
+    <!-- =========================================================
+         HERO / LIVE SUMMARY
+         ========================================================= -->
+    <header class="dashboard-hero">
+      <div class="hero-copy">
+        <div class="brand-kicker">
+          <span class="brand-mark" aria-hidden="true">⚡</span>
+          PERSONAL RAID STRATEGY
+        </div>
+        <h1>Pokémon GO Raid Planner</h1>
+        <p>
+          A live, personalized raid plan using current raid value,
+          your goals, and your Remote Raid preferences.
+        </p>
       </div>
 
-      <div class="grid">
-        <div>
-          <label for="pveWeight">PvE importance (0–2)</label>
-          <input id="pveWeight" type="number" min="0" max="2" step="0.1">
-          <p class="field-help">How strongly raid/PvE usefulness should affect recommendations.</p>
+      <div class="hero-status">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span id="loadStatus">Loading your plan…</span>
+      </div>
+    </header>
+
+    <section id="app" class="hidden">
+
+      <!-- =======================================================
+           AT-A-GLANCE METRICS
+           ======================================================= -->
+      <section class="hero-metrics" aria-label="Today's summary">
+        <article class="hero-metric metric-blue">
+          <span class="metric-icon" aria-hidden="true">⚡</span>
+          <div>
+            <span class="hero-metric-label">Remote limit</span>
+            <strong id="heroRemoteLimit">—</strong>
+            <small id="heroRemoteEvent">Official daily limit</small>
+          </div>
+        </article>
+
+        <article class="hero-metric metric-violet">
+          <span class="metric-icon" aria-hidden="true">◎</span>
+          <div>
+            <span class="hero-metric-label">Used today</span>
+            <strong id="heroUsed">—</strong>
+            <small>Remote Raids logged</small>
+          </div>
+        </article>
+
+        <article class="hero-metric metric-green">
+          <span class="metric-icon" aria-hidden="true">✓</span>
+          <div>
+            <span class="hero-metric-label">Recommended</span>
+            <strong id="heroRecommended">—</strong>
+            <small>Additional Remote Raids</small>
+          </div>
+        </article>
+
+        <article class="hero-metric metric-gold">
+          <span class="metric-icon" aria-hidden="true">★</span>
+          <div>
+            <span class="hero-metric-label">Active targets</span>
+            <strong id="heroTargets">—</strong>
+            <small>Goals still in progress</small>
+          </div>
+        </article>
+      </section>
+
+      <!-- =======================================================
+           TAB NAVIGATION
+           ======================================================= -->
+      <nav class="tab-nav" aria-label="Planner sections">
+        <button class="tab-button active" type="button" data-tab="plan" aria-selected="true">
+          <span aria-hidden="true">⚔</span>
+          <span>Raid Plan</span>
+        </button>
+
+        <button class="tab-button" type="button" data-tab="targets" aria-selected="false">
+          <span aria-hidden="true">◎</span>
+          <span>Targets</span>
+          <span id="targetTabCount" class="tab-count">0</span>
+        </button>
+
+        <button class="tab-button" type="button" data-tab="preferences" aria-selected="false">
+          <span aria-hidden="true">⚙</span>
+          <span>Preferences</span>
+        </button>
+
+        <button class="tab-button" type="button" data-tab="calendar" aria-selected="false">
+          <span aria-hidden="true">▦</span>
+          <span>Calendar</span>
+          <span id="calendarTabCount" class="tab-count">0</span>
+        </button>
+      </nav>
+
+      <!-- =======================================================
+           TAB: RAID PLAN
+           ======================================================= -->
+      <section class="tab-panel active" data-panel="plan">
+
+        <div class="plan-layout">
+
+          <div class="plan-main">
+
+            <!-- Remote Raid plan -->
+            <section class="dashboard-card remote-plan-card">
+              <div class="section-heading-row">
+                <div>
+                  <span class="section-eyebrow">TODAY</span>
+                  <h2>Remote Raid Plan</h2>
+                  <p class="section-subtitle">
+                    Your limit is a ceiling—not a target. Unused capacity is intentionally left unused when raids are not valuable enough.
+                  </p>
+                </div>
+                <span id="remoteRuleBadge" class="status-badge badge-blue">Official rule</span>
+              </div>
+
+              <div id="specialEventBanner" class="event-banner hidden"></div>
+
+              <div id="remoteRaidSummary" class="remote-summary-grid"></div>
+
+              <div class="raid-capacity-wrap">
+                <div class="capacity-labels">
+                  <span>Today's planning capacity</span>
+                  <strong id="capacityText">—</strong>
+                </div>
+
+                <div
+                  class="capacity-bar"
+                  role="progressbar"
+                  aria-label="Remote Raid daily allocation"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow="0"
+                  id="capacityBar"
+                >
+                  <span id="capacityUsed" class="capacity-used"></span>
+                  <span id="capacityRecommended" class="capacity-recommended"></span>
+                </div>
+
+                <div class="capacity-legend">
+                  <span><i class="legend-dot legend-used"></i>Used</span>
+                  <span><i class="legend-dot legend-recommended"></i>Recommended</span>
+                  <span><i class="legend-dot legend-open"></i>Left unused</span>
+                </div>
+              </div>
+
+              <div class="usage-inline">
+                <div>
+                  <label for="raidsUsedToday">Remote Raids used today</label>
+                  <p class="field-help">
+                    Update this after using Remote Raid Passes. It is stored by your local date.
+                  </p>
+                </div>
+
+                <div class="usage-control">
+                  <input id="raidsUsedToday" type="number" min="0" step="1" inputmode="numeric">
+                  <button id="saveRaidUsage" type="button">Save usage</button>
+                </div>
+
+                <span id="raidUsageStatus" class="save-status"></span>
+              </div>
+
+              <div id="remoteRuleSource" class="source-note"></div>
+            </section>
+
+            <!-- Allocations -->
+            <section class="dashboard-card">
+              <div class="section-heading-row">
+                <div>
+                  <span class="section-eyebrow">ALLOCATION</span>
+                  <h2>Recommended Remote Raids</h2>
+                  <p class="section-subtitle">
+                    Each additional raid has diminishing marginal value, so one boss cannot absorb the whole quota just because it starts with the highest score.
+                  </p>
+                </div>
+                <span id="allocationTotalBadge" class="status-badge badge-green">0 raids</span>
+              </div>
+
+              <div id="remoteRaidAllocations" class="allocation-grid"></div>
+
+              <details class="compact-details zero-raid-details">
+                <summary>Bosses receiving 0 Remote Raids</summary>
+                <div id="remoteRaidZero" class="zero-raid-list"></div>
+              </details>
+            </section>
+
+            <!-- General recommendations -->
+            <section class="dashboard-card">
+              <div class="section-heading-row">
+                <div>
+                  <span class="section-eyebrow">META + PERSONAL</span>
+                  <h2>Current Raid Recommendations</h2>
+                  <p class="section-subtitle">
+                    General raid value answers “is it good?” Personal value answers “do I still need it?”
+                  </p>
+                </div>
+              </div>
+
+              <div id="recommendations" class="recommendation-grid"></div>
+            </section>
+
+          </div>
+
+          <!-- Sticky sidebar -->
+          <aside class="plan-sidebar">
+            <section class="dashboard-card sticky-card">
+              <span class="section-eyebrow">QUICK GUIDE</span>
+              <h3>How to read the plan</h3>
+
+              <div class="guide-list">
+                <div class="guide-item">
+                  <span class="guide-number">1</span>
+                  <div>
+                    <strong>Check the official cap</strong>
+                    <small>Temporary event limits are detected separately from your personal budget.</small>
+                  </div>
+                </div>
+
+                <div class="guide-item">
+                  <span class="guide-number">2</span>
+                  <div>
+                    <strong>Use the recommended count</strong>
+                    <small>The planner stops when marginal value falls below your threshold.</small>
+                  </div>
+                </div>
+
+                <div class="guide-item">
+                  <span class="guide-number">3</span>
+                  <div>
+                    <strong>Update your progress</strong>
+                    <small>Target progress changes your next recommendation immediately.</small>
+                  </div>
+                </div>
+              </div>
+
+              <button type="button" class="button secondary full-width" data-open-tab="targets">
+                Update my targets
+              </button>
+            </section>
+          </aside>
+
         </div>
-        <div>
-          <label for="pvpWeight">PvP importance (0–2)</label>
-          <input id="pvpWeight" type="number" min="0" max="2" step="0.1">
-          <p class="field-help">Set to 0 if GO Battle League and PvP do not matter to you.</p>
+      </section>
+
+      <!-- =======================================================
+           TAB: TARGETS
+           ======================================================= -->
+      <section class="tab-panel" data-panel="targets">
+        <section class="dashboard-card">
+          <div class="section-heading-row target-heading">
+            <div>
+              <span class="section-eyebrow">YOUR GOALS</span>
+              <h2>Targets</h2>
+              <p class="section-subtitle">
+                Track Mega Energy, raids, Candy XL, Candy, or any custom goal without keeping the full editor open all the time.
+              </p>
+            </div>
+
+            <button id="openAddTarget" type="button" class="button add-target-button">
+              + Add target
+            </button>
+          </div>
+
+          <div id="targets" class="target-grid"></div>
+        </section>
+      </section>
+
+      <!-- =======================================================
+           TAB: PREFERENCES
+           ======================================================= -->
+      <section class="tab-panel" data-panel="preferences">
+        <div class="settings-layout">
+
+          <section class="dashboard-card">
+            <div class="section-heading-row">
+              <div>
+                <span class="section-eyebrow">PERSONAL WEIGHTS</span>
+                <h2>Recommendation Preferences</h2>
+                <p class="section-subtitle">
+                  Move the sliders to tell the planner what matters to you. A value of 0 ignores that factor.
+                </p>
+              </div>
+            </div>
+
+            <div class="slider-stack">
+
+              <div class="slider-setting">
+                <div class="setting-label-row">
+                  <label for="pveWeight">Raid / PvE importance</label>
+                  <output id="pveWeightOutput" for="pveWeight">1.0</output>
+                </div>
+                <input id="pveWeight" type="range" min="0" max="2" step="0.1">
+                <div class="range-labels"><span>Ignore</span><span>Normal</span><span>Very high</span></div>
+                <details class="info-details">
+                  <summary>What does this change?</summary>
+                  <p>Higher values favor Pokémon that are strong attackers in raids and other PvE content.</p>
+                </details>
+              </div>
+
+              <div class="slider-setting">
+                <div class="setting-label-row">
+                  <label for="pvpWeight">PvP importance</label>
+                  <output id="pvpWeightOutput" for="pvpWeight">0.0</output>
+                </div>
+                <input id="pvpWeight" type="range" min="0" max="2" step="0.1">
+                <div class="range-labels"><span>Ignore</span><span>Normal</span><span>Very high</span></div>
+                <details class="info-details">
+                  <summary>What does this change?</summary>
+                  <p>Higher values give more influence to PvPoke-derived PvP performance. Leave at 0 if PvP does not matter to you.</p>
+                </details>
+              </div>
+
+              <div class="slider-setting">
+                <div class="setting-label-row">
+                  <label for="collectorWeight">Rarity / collection importance</label>
+                  <output id="collectorWeightOutput" for="collectorWeight">0.4</output>
+                </div>
+                <input id="collectorWeight" type="range" min="0" max="2" step="0.1">
+                <div class="range-labels"><span>Ignore</span><span>Normal</span><span>Very high</span></div>
+                <details class="info-details">
+                  <summary>What does this change?</summary>
+                  <p>Higher values favor rare, short-window, Legendary, Mythical, Mega, and other collection-relevant opportunities.</p>
+                </details>
+              </div>
+
+            </div>
+          </section>
+
+          <section class="dashboard-card">
+            <span class="section-eyebrow">REMOTE RAID RULES</span>
+            <h2>Pass Spending Preferences</h2>
+            <p class="section-subtitle">
+              These settings are intentionally conservative. They can reduce your plan but never raise the official game limit.
+            </p>
+
+            <div class="form-grid">
+              <div>
+                <label for="remoteRaidBudget">Personal daily budget</label>
+                <input id="remoteRaidBudget" type="number" min="0" step="1" placeholder="Auto — use official cap">
+                <p class="field-help">
+                  Leave blank for Auto. During an unlimited event, Auto still stops when raid value falls below your threshold.
+                </p>
+              </div>
+
+              <div>
+                <div class="setting-label-row">
+                  <label for="remoteRaidMinScore">Minimum Remote Raid score</label>
+                  <output id="remoteRaidMinScoreOutput" for="remoteRaidMinScore">60</output>
+                </div>
+                <input id="remoteRaidMinScore" type="range" min="0" max="100" step="1">
+                <div class="range-labels"><span>Permissive</span><span>60 default</span><span>Strict</span></div>
+                <p class="field-help">
+                  Once a boss's marginal value falls below this score, the planner stops allocating paid Remote Raids to it.
+                </p>
+              </div>
+
+              <div class="full-span">
+                <label for="timezone">Timezone</label>
+                <input id="timezone" autocomplete="off" placeholder="Asia/Singapore">
+                <p class="field-help">
+                  Controls local event dates and when the daily Remote Raid usage counter rolls over.
+                </p>
+              </div>
+            </div>
+
+            <div class="save-row">
+              <button id="saveSettings" type="button">Save preferences</button>
+              <span id="settingsStatus" class="save-status"></span>
+            </div>
+          </section>
+
         </div>
+      </section>
+
+      <!-- =======================================================
+           TAB: CALENDAR
+           ======================================================= -->
+      <section class="tab-panel" data-panel="calendar">
+        <section class="dashboard-card">
+          <div class="section-heading-row">
+            <div>
+              <span class="section-eyebrow">SUBSCRIPTION FILTER</span>
+              <h2>Calendar Events</h2>
+              <p class="section-subtitle">
+                Tap a category to include or exclude it from your private subscribed calendar.
+              </p>
+            </div>
+          </div>
+
+          <div id="sourceChecks" class="event-chip-grid"></div>
+
+          <div class="calendar-help">
+            <span aria-hidden="true">▦</span>
+            <div>
+              <strong>Your subscription remains private.</strong>
+              <p>
+                These filters change what your personal ICS feed contains. Apple Calendar refreshes subscribed calendars on its own schedule.
+              </p>
+            </div>
+          </div>
+
+          <div class="save-row">
+            <button id="saveCalendar" type="button">Save calendar filters</button>
+            <span id="calendarStatus" class="save-status"></span>
+          </div>
+        </section>
+      </section>
+
+    </section>
+  </main>
+
+  <!-- =========================================================
+       TARGET EDITOR MODAL
+       ========================================================= -->
+  <div id="targetModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="targetModalTitle">
+    <section class="target-modal">
+      <div class="modal-header">
         <div>
-          <label for="collectorWeight">Rarity / collection importance (0–2)</label>
-          <input id="collectorWeight" type="number" min="0" max="2" step="0.1">
-          <p class="field-help">Adds weight for rare, limited-time and collection-relevant Pokémon.</p>
+          <span class="section-eyebrow">PERSONAL GOAL</span>
+          <h2 id="targetModalTitle">Add target</h2>
         </div>
-        <div>
-          <label for="timezone">Timezone</label>
-          <input id="timezone">
-          <p class="field-help">Used for event dates and the daily Remote Raid usage counter. Example: <code>Asia/Singapore</code>.</p>
-        </div>
-        <div>
-          <label for="remoteRaidBudget">Remote Raid daily budget</label>
-          <input id="remoteRaidBudget" type="number" min="0" step="1" placeholder="Auto — use official cap">
-          <p class="field-help">Optional personal ceiling. Leave blank for Auto. This never increases the official game limit.</p>
-        </div>
-        <div>
-          <label for="remoteRaidMinScore">Minimum score for a Remote Raid (0–100)</label>
-          <input id="remoteRaidMinScore" type="number" min="0" max="100" step="1">
-          <p class="field-help">Default 60. The planner stops allocating paid Remote Raids when marginal value falls below this threshold.</p>
+        <button id="closeTargetModal" type="button" class="icon-button" aria-label="Close target editor">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-grid">
+          <div>
+            <label for="pokemonName">Pokémon name</label>
+            <input id="pokemonName" placeholder="Mega Skarmory" autocomplete="off">
+            <p class="field-help">Use the raid-form name when appropriate, such as <strong>Mega Skarmory</strong>.</p>
+          </div>
+
+          <div>
+            <label for="targetType">Target type</label>
+            <select id="targetType">
+              <option value="mega_energy">Mega Energy</option>
+              <option value="raids">Number of raids</option>
+              <option value="candy_xl">Candy XL</option>
+              <option value="candy">Candy</option>
+              <option value="custom">Custom progress</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="currentValue">Current progress</label>
+            <input id="currentValue" type="number" step="1" value="0">
+          </div>
+
+          <div>
+            <label for="targetValue">Desired target</label>
+            <input id="targetValue" type="number" step="1" placeholder="3000">
+          </div>
+
+          <div>
+            <label for="expectedProgressPerRaid">Expected progress per raid</label>
+            <input id="expectedProgressPerRaid" type="number" min="0" step="1" placeholder="Optional">
+            <p class="field-help">
+              Useful for estimating raids remaining. Leave blank if the reward varies too much.
+            </p>
+          </div>
+
+          <div>
+            <label for="priority">Personal priority</label>
+            <select id="priority">
+              <option value="high">High</option>
+              <option value="medium" selected>Medium</option>
+              <option value="low">Low</option>
+              <option value="skip">Skip</option>
+            </select>
+            <p class="field-help">
+              Skip means the paid Remote Raid planner recommends 0 for this target.
+            </p>
+          </div>
+
+          <div>
+            <label for="completed">Completed?</label>
+            <select id="completed">
+              <option value="0">No</option>
+              <option value="1">Yes</option>
+            </select>
+            <p class="field-help">
+              Completed targets receive 0 paid Remote Raid allocations.
+            </p>
+          </div>
+
+          <div class="full-span">
+            <label for="notes">Notes</label>
+            <textarea id="notes" placeholder="Use free passes first."></textarea>
+          </div>
         </div>
       </div>
-      <p><button id="saveSettings">Save settings</button> <span id="settingsStatus"></span></p>
-    </section>
 
-    <section class="card">
-      <h2>Current raid recommendations</h2>
-      <p class="muted">Internet value answers “is this generally worth raiding?” Personal value answers “do I still need it?” Your score combines both.</p>
-      <div id="recommendations"></div>
-    </section>
-
-    <section class="card">
-      <h2>Remote Raid Plan — Today</h2>
-      <p class="muted">The official daily limit is a ceiling, not a target. The planner is allowed to recommend fewer raids and leave capacity unused.</p>
-
-      <div id="remoteRaidSummary" class="summary-grid"></div>
-
-      <div class="grid compact-grid">
-        <div>
-          <label for="raidsUsedToday">Remote Raids used today</label>
-          <input id="raidsUsedToday" type="number" min="0" step="1">
-          <p class="field-help">Update this after you use Remote Raid Passes. It resets naturally because usage is stored by your local date.</p>
-        </div>
-        <div class="button-align">
-          <button id="saveRaidUsage">Save today's usage</button>
-          <span id="raidUsageStatus"></span>
-        </div>
+      <div class="modal-footer">
+        <span id="targetStatus" class="save-status"></span>
+        <button id="cancelTarget" type="button" class="secondary">Cancel</button>
+        <button id="saveTarget" type="button">Save target</button>
       </div>
-
-      <div class="preference-guide">
-        <strong>How allocation stays conservative</strong>
-        <p>Every remotely eligible raid boss uses the same formula. Explicit Skip and Completed targets receive 0 Remote Raids. Each additional raid has diminishing marginal value, and allocation stops below your threshold rather than filling the quota artificially.</p>
-      </div>
-
-      <div id="remoteRaidAllocations"></div>
-      <details>
-        <summary>Show bosses receiving 0 Remote Raids</summary>
-        <div id="remoteRaidZero"></div>
-      </details>
     </section>
-
-    <section class="card">
-      <h2>Add or update a target</h2>
-      <p class="muted">Targets describe what you personally want. They modify—but do not replace—the internet/meta assessment.</p>
-      <div class="grid">
-        <div>
-          <label for="pokemonName">Pokémon name</label>
-          <input id="pokemonName" placeholder="Mega Skarmory">
-          <p class="field-help">Use the raid-form name when appropriate, e.g. <strong>Mega Skarmory</strong>.</p>
-        </div>
-        <div>
-          <label for="targetType">Target type</label>
-          <select id="targetType">
-            <option value="mega_energy">Mega Energy</option>
-            <option value="raids">Number of raids</option>
-            <option value="candy_xl">Candy XL</option>
-            <option value="candy">Candy</option>
-            <option value="custom">Custom progress</option>
-          </select>
-          <p class="field-help">Choose what you are trying to accumulate or complete.</p>
-        </div>
-        <div>
-          <label for="currentValue">Current progress</label>
-          <input id="currentValue" type="number" step="1" value="0">
-          <p class="field-help">Example: if you have 1,400 Mega Energy, enter <strong>1400</strong>.</p>
-        </div>
-        <div>
-          <label for="targetValue">Desired target</label>
-          <input id="targetValue" type="number" step="1" placeholder="3000">
-          <p class="field-help">The amount you ultimately want to reach.</p>
-        </div>
-        <div>
-          <label for="expectedProgressPerRaid">Expected progress per raid (optional)</label>
-          <input id="expectedProgressPerRaid" type="number" min="0" step="1" placeholder="e.g. 200">
-          <p class="field-help">Used to estimate how many raids remain to your target. For Mega Energy, use a conservative typical amount you actually earn. Leave blank if uncertain.</p>
-        </div>
-        <div>
-          <label for="priority">Personal priority</label>
-          <select id="priority">
-            <option value="high">High</option>
-            <option value="medium" selected>Medium</option>
-            <option value="low">Low</option>
-            <option value="skip">Skip</option>
-          </select>
-          <p class="field-help">High = actively pursue; Medium = convenient; Low = only if better options are absent; Skip = recommend 0 paid Remote Raids.</p>
-        </div>
-        <div>
-          <label for="completed">Completed?</label>
-          <select id="completed"><option value="0">No</option><option value="1">Yes</option></select>
-          <p class="field-help">Completed targets receive 0 paid Remote Raids, even if the Pokémon remains generally valuable.</p>
-        </div>
-      </div>
-
-      <label for="notes">Notes</label>
-      <textarea id="notes" placeholder="Use free passes first."></textarea>
-      <p class="field-help">Optional reminders such as shiny goals, XL needs or pass limits.</p>
-      <p><button id="saveTarget">Save target</button> <span id="targetStatus"></span></p>
-    </section>
-
-    <section class="card">
-      <h2>My targets</h2>
-      <p class="muted">Edit these whenever progress changes. The live recommendation and Remote Raid allocation recalculate immediately.</p>
-      <div id="targets"></div>
-    </section>
-  </section>
-</main>
+  </div>
 
 <script>
 const token = location.pathname.split("/").filter(Boolean)[1];
 const app = document.getElementById("app");
 const loadStatus = document.getElementById("loadStatus");
 let state = null;
+let targetById = new Map();
 
 const labels = {
-  community_day: "Community Day", event: "General Events", go_battle_league: "GO Battle League",
-  go_pass: "GO Pass", max_battles: "Max Battles", max_mondays: "Max Mondays",
-  pokemon_go_fest: "Pokémon GO Fest", pokemon_spotlight_hour: "Spotlight Hour",
-  raid_battles: "Raid Battles", raid_day: "Raid Day", raid_hour: "Raid Hour",
-  research: "Research", season: "Season"
+  community_day: "Community Day",
+  event: "General Events",
+  go_battle_league: "GO Battle League",
+  go_pass: "GO Pass",
+  max_battles: "Max Battles",
+  max_mondays: "Max Mondays",
+  pokemon_go_fest: "Pokémon GO Fest",
+  pokemon_spotlight_hour: "Spotlight Hour",
+  raid_battles: "Raid Battles",
+  raid_day: "Raid Day",
+  raid_hour: "Raid Hour",
+  research: "Research",
+  season: "Season"
+};
+
+const sourceIcons = {
+  community_day: "☀",
+  event: "✦",
+  go_battle_league: "⚔",
+  go_pass: "◆",
+  max_battles: "⬢",
+  max_mondays: "⬡",
+  pokemon_go_fest: "★",
+  pokemon_spotlight_hour: "◉",
+  raid_battles: "⚡",
+  raid_day: "☄",
+  raid_hour: "⏱",
+  research: "⌕",
+  season: "❖"
+};
+
+const targetTypeLabels = {
+  mega_energy: "Mega Energy",
+  raids: "Raids",
+  candy_xl: "Candy XL",
+  candy: "Candy",
+  custom: "Custom"
 };
 
 function esc(value) {
-  return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[c])
+  );
+}
+
+function formatNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toLocaleString() : "—";
+}
+
+function scoreTone(score) {
+  const value = Number(score || 0);
+  if (value >= 85) return "tone-fire";
+  if (value >= 75) return "tone-high";
+  if (value >= 60) return "tone-good";
+  return "tone-low";
+}
+
+function targetPriorityTone(priority, completed) {
+  if (Number(completed)) return "badge-complete";
+  if (priority === "high") return "badge-high";
+  if (priority === "medium") return "badge-blue";
+  if (priority === "low") return "badge-neutral";
+  return "badge-skip";
 }
 
 async function api(path, options = {}) {
@@ -194,12 +604,72 @@ async function load() {
   try {
     state = await api(`/api/me?token=${encodeURIComponent(token)}`);
     render();
-    loadStatus.textContent = "";
+
+    loadStatus.innerHTML = '<span class="live-copy">Live plan loaded</span>';
     app.classList.remove("hidden");
+
+    const savedTab = sessionStorage.getItem("raid-planner-tab");
+    if (savedTab) activateTab(savedTab, false);
   } catch (error) {
     loadStatus.textContent = error.message;
-    loadStatus.className = "error";
+    document.querySelector(".hero-status")?.classList.add("error-state");
   }
+}
+
+function activateTab(name, scroll = true) {
+  const valid = ["plan", "targets", "preferences", "calendar"];
+  if (!valid.includes(name)) name = "plan";
+
+  document.querySelectorAll(".tab-button").forEach(button => {
+    const active = button.dataset.tab === name;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  });
+
+  document.querySelectorAll(".tab-panel").forEach(panel => {
+    panel.classList.toggle("active", panel.dataset.panel === name);
+  });
+
+  sessionStorage.setItem("raid-planner-tab", name);
+
+  if (scroll) {
+    document.querySelector(".tab-nav")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }
+}
+
+function updateSliderOutput(inputId, outputId, decimals = 1) {
+  const input = document.getElementById(inputId);
+  const output = document.getElementById(outputId);
+
+  const sync = () => {
+    output.value = Number(input.value).toFixed(decimals);
+    output.textContent = output.value;
+  };
+
+  input.addEventListener("input", sync);
+  sync();
+}
+
+function renderHero() {
+  const plan = state.remote_raid_plan;
+  const rule = plan.official_rule;
+  const activeTargets = state.targets.filter(target => !Number(target.completed)).length;
+
+  document.getElementById("heroRemoteLimit").textContent =
+    plan.official_is_unlimited ? "∞" : formatNumber(plan.official_limit);
+
+  document.getElementById("heroRemoteEvent").textContent =
+    rule?.label || "Official daily limit";
+
+  document.getElementById("heroUsed").textContent = formatNumber(plan.raids_used);
+  document.getElementById("heroRecommended").textContent = formatNumber(plan.recommended_total);
+  document.getElementById("heroTargets").textContent = formatNumber(activeTargets);
+
+  document.getElementById("targetTabCount").textContent = state.targets.length;
+  document.getElementById("calendarTabCount").textContent = state.user.included_sources.length;
 }
 
 function renderRemoteRaidPlan() {
@@ -209,74 +679,282 @@ function renderRemoteRaidPlan() {
   const officialLimitText =
     plan.official_is_unlimited
       ? "Unlimited"
-      : String(plan.official_limit);
+      : formatNumber(plan.official_limit);
 
   const budgetText =
     plan.user_budget == null
       ? (
           plan.official_is_unlimited
-            ? "Auto (value-based)"
-            : "Auto (official cap)"
+            ? "Auto · value-based"
+            : "Auto · official cap"
         )
-      : String(plan.user_budget);
+      : formatNumber(plan.user_budget);
 
   const officialRemainingText =
     plan.official_is_unlimited
       ? "No game cap"
-      : String(plan.official_remaining);
+      : formatNumber(plan.official_remaining);
 
   document.getElementById("raidsUsedToday").value = plan.raids_used;
 
   document.getElementById("remoteRaidSummary").innerHTML = `
-    <div class="metric"><span>Official daily limit</span><strong>${esc(officialLimitText)}</strong><small>${esc(rule.label)}</small></div>
-    <div class="metric"><span>Your daily budget</span><strong>${esc(budgetText)}</strong><small>${plan.official_is_unlimited ? "Auto stops when marginal value is too low" : "Never exceeds the official cap"}</small></div>
-    <div class="metric"><span>Already used</span><strong>${plan.raids_used}</strong><small>${esc(plan.local_date)}</small></div>
-    <div class="metric"><span>Recommended additional</span><strong>${plan.recommended_total}</strong><small>Based on marginal value</small></div>
-    <div class="metric"><span>Official capacity remaining</span><strong>${esc(officialRemainingText)}</strong><small>${plan.official_is_unlimited ? "No official daily ceiling during this period" : "Before new recommendations"}</small></div>
-    <div class="metric"><span>Unused planning capacity</span><strong>${plan.unused_planning_capacity}</strong><small>Intentionally left unused if value is too low</small></div>
+    <article class="remote-summary-item">
+      <span>Official limit</span>
+      <strong>${esc(officialLimitText)}</strong>
+      <small>${esc(rule.label || "Official rule")}</small>
+    </article>
+
+    <article class="remote-summary-item">
+      <span>Your budget</span>
+      <strong>${esc(budgetText)}</strong>
+      <small>${plan.official_is_unlimited ? "Auto still applies your value threshold" : "Never exceeds official limit"}</small>
+    </article>
+
+    <article class="remote-summary-item highlight">
+      <span>Recommended now</span>
+      <strong>${formatNumber(plan.recommended_total)}</strong>
+      <small>Additional Remote Raids</small>
+    </article>
+
+    <article class="remote-summary-item">
+      <span>Official remaining</span>
+      <strong>${esc(officialRemainingText)}</strong>
+      <small>${formatNumber(plan.raids_used)} already logged</small>
+    </article>
   `;
 
-  const oldSource = document.querySelector(".remote-rule-source");
-  if (oldSource) oldSource.remove();
+  document.getElementById("remoteRuleBadge").textContent =
+    rule.detected_automatically ? "Auto-detected rule" : "Official rule";
 
-  if (rule.source_url) {
-    document.getElementById("remoteRaidSummary").insertAdjacentHTML(
-      "afterend",
-      `<p class="field-help remote-rule-source">Limit source: <a href="${esc(rule.source_url)}" target="_blank" rel="noopener">${esc(rule.label)}</a>${rule.detected_automatically ? " · detected automatically from an official Pokémon GO page" : ""}</p>`
-    );
+  const banner = document.getElementById("specialEventBanner");
+  if (rule?.is_override) {
+    banner.classList.remove("hidden");
+    banner.innerHTML = `
+      <span class="event-banner-icon" aria-hidden="true">⚡</span>
+      <div>
+        <strong>${esc(rule.label)}</strong>
+        <span>${esc(rule.start_date || "")}${rule.end_date ? " → " + esc(rule.end_date) : ""}</span>
+      </div>
+    `;
+  } else {
+    banner.classList.add("hidden");
+    banner.innerHTML = "";
   }
+
+  const source = document.getElementById("remoteRuleSource");
+  source.innerHTML = rule?.source_url
+    ? `Source: <a href="${esc(rule.source_url)}" target="_blank" rel="noopener">official Pokémon GO announcement</a>${rule.detected_automatically ? " · detected automatically" : ""}`
+    : "";
+
+  const cap = Math.max(
+    1,
+    Number(plan.daily_planning_cap || 0),
+    Number(plan.raids_used || 0) + Number(plan.recommended_total || 0)
+  );
+
+  const usedPct = Math.min(100, (Number(plan.raids_used || 0) / cap) * 100);
+  const recPct = Math.min(100 - usedPct, (Number(plan.recommended_total || 0) / cap) * 100);
+
+  document.getElementById("capacityUsed").style.width = `${usedPct}%`;
+  document.getElementById("capacityRecommended").style.left = `${usedPct}%`;
+  document.getElementById("capacityRecommended").style.width = `${recPct}%`;
+
+  document.getElementById("capacityBar").setAttribute(
+    "aria-valuenow",
+    String(Math.round(Math.min(100, usedPct + recPct)))
+  );
+
+  document.getElementById("capacityText").textContent =
+    plan.official_is_unlimited && plan.user_budget == null
+      ? `${formatNumber(plan.recommended_total)} worthwhile now`
+      : `${formatNumber(plan.raids_used + plan.recommended_total)} / ${formatNumber(plan.daily_planning_cap)}`;
+
+  document.getElementById("allocationTotalBadge").textContent =
+    `${formatNumber(plan.recommended_total)} raid${Number(plan.recommended_total) === 1 ? "" : "s"}`;
 
   document.getElementById("remoteRaidAllocations").innerHTML = plan.allocations.length
     ? plan.allocations.map(item => `
-      <div class="raid-allocation">
-        <div class="allocation-count">${item.allocated}</div>
-        <div>
-          <div class="score">${esc(item.emoji)} ${esc(item.pokemon_name)} — ${item.allocated} Remote Raid${item.allocated === 1 ? "" : "s"}</div>
-          <div>${esc(item.label)} · ${item.score}/100</div>
-          ${item.target_cap == null ? "" : `<div class="field-help">Personal target estimate caps useful raids at about ${item.target_cap}.</div>`}
-          <ul>${item.reasons.slice(0, 5).map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>
+      <article class="allocation-card ${scoreTone(item.score)}">
+        <div class="allocation-card-top">
+          <div class="allocation-count">${item.allocated}</div>
+
+          <div class="allocation-title">
+            <span class="allocation-kicker">REMOTE RAID${item.allocated === 1 ? "" : "S"}</span>
+            <h3>${esc(item.emoji)} ${esc(item.pokemon_name)}</h3>
+          </div>
+
+          <div class="score-pill">${formatNumber(item.score)}</div>
         </div>
-      </div>
+
+        <div class="allocation-meta">
+          <span class="status-badge ${scoreTone(item.score)}">${esc(item.label)}</span>
+          ${item.target_cap == null ? "" : `<span>Target cap ≈ ${formatNumber(item.target_cap)}</span>`}
+        </div>
+
+        <details class="compact-details">
+          <summary>Why ${item.allocated} raid${item.allocated === 1 ? "" : "s"}?</summary>
+          <ul>
+            ${item.reasons.slice(0, 6).map(reason => `<li>${esc(reason)}</li>`).join("")}
+          </ul>
+        </details>
+      </article>
     `).join("")
-    : `<p class="muted">No additional Remote Raids are recommended right now. The planner will not spend quota just because it is available.</p>`;
+    : `
+      <div class="empty-state">
+        <span aria-hidden="true">✓</span>
+        <strong>No additional Remote Raids are justified right now.</strong>
+        <p>The planner will not spend quota just because it is available.</p>
+      </div>
+    `;
 
   document.getElementById("remoteRaidZero").innerHTML = plan.not_allocated.length
     ? plan.not_allocated.map(item => `
-      <div class="recommendation">
-        <strong>${esc(item.pokemon_name)} — 0</strong>
-        <div class="field-help">${esc(item.exclusion_reason || "Marginal value fell below the allocation threshold.")}</div>
+      <div class="zero-raid-row">
+        <div>
+          <strong>${esc(item.pokemon_name)}</strong>
+          <small>${esc(item.exclusion_reason || "Marginal value fell below the allocation threshold.")}</small>
+        </div>
+        <span class="zero-badge">0</span>
       </div>
     `).join("")
     : `<p class="muted">Every remotely eligible boss received at least one recommended raid.</p>`;
 }
 
-function render() {
+function renderRecommendations() {
+  const container = document.getElementById("recommendations");
+
+  container.innerHTML = state.recommendations.length
+    ? state.recommendations.map(rec => `
+      <article class="recommendation-card ${scoreTone(rec.score)}">
+        <div class="recommendation-card-head">
+          <div>
+            <span class="section-eyebrow">${esc(rec.event_title || "ACTIVE RAID")}</span>
+            <h3>${esc(rec.emoji)} ${esc(rec.pokemon_name)}</h3>
+          </div>
+          <div class="score-ring">${formatNumber(rec.score)}</div>
+        </div>
+
+        <div class="recommendation-card-meta">
+          <span class="status-badge ${scoreTone(rec.score)}">${esc(rec.label)}</span>
+        </div>
+
+        <details class="compact-details">
+          <summary>Why?</summary>
+          <ul>
+            ${rec.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}
+          </ul>
+        </details>
+      </article>
+    `).join("")
+    : `
+      <div class="empty-state">
+        <span aria-hidden="true">⌕</span>
+        <strong>No matching active raid recommendations yet.</strong>
+        <p>Recommendations appear after current raid data and automatic assessments are available.</p>
+      </div>
+    `;
+}
+
+function targetProgress(target) {
+  const current = Number(target.current_value || 0);
+  const desired = Number(target.target_value);
+
+  if (!Number.isFinite(desired) || desired <= 0) {
+    return {
+      percent: 0,
+      label: `${formatNumber(current)} tracked`,
+      known: false
+    };
+  }
+
+  const percent = Math.max(0, Math.min(100, (current / desired) * 100));
+
+  return {
+    percent,
+    label: `${formatNumber(current)} / ${formatNumber(desired)}`,
+    known: true
+  };
+}
+
+function renderTargets() {
+  targetById = new Map(state.targets.map(target => [String(target.id), target]));
+
+  const container = document.getElementById("targets");
+
+  container.innerHTML = state.targets.length
+    ? state.targets.map(target => {
+        const progress = targetProgress(target);
+        const completed = Number(target.completed);
+        const priorityText = completed ? "Complete" : String(target.priority || "medium");
+
+        return `
+          <article class="target-card ${completed ? "target-complete" : ""}" data-target-id="${esc(target.id)}">
+            <div class="target-card-head">
+              <div>
+                <span class="target-type-label">${esc(targetTypeLabels[target.target_type] || target.target_type)}</span>
+                <h3>${esc(target.pokemon_name)}</h3>
+              </div>
+
+              <span class="status-badge ${targetPriorityTone(target.priority, target.completed)}">
+                ${esc(priorityText)}
+              </span>
+            </div>
+
+            <div class="target-progress-row">
+              <strong>${esc(progress.label)}</strong>
+              ${progress.known ? `<span>${Math.round(progress.percent)}%</span>` : ""}
+            </div>
+
+            ${progress.known ? `
+              <div class="target-progress-track">
+                <span style="width:${progress.percent}%"></span>
+              </div>
+            ` : ""}
+
+            <div class="target-extra">
+              ${target.expected_progress_per_raid == null
+                ? ""
+                : `<span>≈ ${formatNumber(target.expected_progress_per_raid)} progress / raid</span>`
+              }
+              ${target.notes ? `<span>${esc(target.notes)}</span>` : ""}
+            </div>
+
+            <div class="target-actions">
+              <button type="button" class="secondary small-button" data-edit-target="${esc(target.id)}">Edit</button>
+              <button type="button" class="ghost-danger small-button" data-delete-target="${esc(target.id)}">Delete</button>
+            </div>
+          </article>
+        `;
+      }).join("")
+    : `
+      <div class="empty-state target-empty">
+        <span aria-hidden="true">◎</span>
+        <strong>No targets yet.</strong>
+        <p>Add a goal to make the raid plan respond to your personal progress.</p>
+        <button type="button" class="button" data-empty-add-target>+ Add your first target</button>
+      </div>
+    `;
+}
+
+function renderCalendar() {
   const included = new Set(state.user.included_sources);
 
   document.getElementById("sourceChecks").innerHTML = state.available_sources.map(source => `
-    <label><input type="checkbox" data-source="${esc(source)}" ${included.has(source) ? "checked" : ""}>${esc(labels[source] || source)}</label>
+    <label class="event-chip">
+      <input
+        type="checkbox"
+        data-source="${esc(source)}"
+        ${included.has(source) ? "checked" : ""}
+      >
+      <span>
+        <i aria-hidden="true">${esc(sourceIcons[source] || "•")}</i>
+        ${esc(labels[source] || source)}
+      </span>
+    </label>
   `).join("");
+}
 
+function renderPreferences() {
   document.getElementById("pveWeight").value = state.user.pve_weight;
   document.getElementById("pvpWeight").value = state.user.pvp_weight;
   document.getElementById("collectorWeight").value = state.user.collector_weight;
@@ -284,46 +962,31 @@ function render() {
   document.getElementById("remoteRaidBudget").value = state.user.remote_raid_budget ?? "";
   document.getElementById("remoteRaidMinScore").value = state.user.remote_raid_min_score ?? 60;
 
-  document.getElementById("recommendations").innerHTML = state.recommendations.length
-    ? state.recommendations.map(rec => `
-      <div class="recommendation">
-        <div class="score">${esc(rec.emoji)} ${esc(rec.pokemon_name)} — ${esc(rec.label)} (${rec.score}/100)</div>
-        <div class="muted">${esc(rec.event_title || "")}</div>
-        <ul>${rec.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}</ul>
-      </div>
-    `).join("")
-    : `<p class="muted">No matching active raid recommendations yet.</p>`;
-
-  renderRemoteRaidPlan();
-
-  document.getElementById("targets").innerHTML = state.targets.length
-    ? state.targets.map(target => `
-      <div class="target">
-        <strong>${esc(target.pokemon_name)}</strong>
-        <div>${esc(target.target_type)}: ${Number(target.current_value || 0).toLocaleString()}${target.target_value == null ? "" : " / " + Number(target.target_value).toLocaleString()}</div>
-        ${target.expected_progress_per_raid == null ? "" : `<div>Expected progress/raid: ${Number(target.expected_progress_per_raid).toLocaleString()}</div>`}
-        <div>Priority: ${esc(target.priority)} ${Number(target.completed) ? "• COMPLETE" : ""}</div>
-        ${target.notes ? `<div class="field-help">${esc(target.notes)}</div>` : ""}
-        <div class="row" style="margin-top:8px">
-          <button class="secondary" onclick='editTarget(${JSON.stringify(target)})'>Edit</button>
-          <button class="danger" onclick='removeTarget(${JSON.stringify(target.id)})'>Delete</button>
-        </div>
-      </div>
-    `).join("")
-    : `<p class="muted">No personal targets yet.</p>`;
+  document.getElementById("pveWeight").dispatchEvent(new Event("input"));
+  document.getElementById("pvpWeight").dispatchEvent(new Event("input"));
+  document.getElementById("collectorWeight").dispatchEvent(new Event("input"));
+  document.getElementById("remoteRaidMinScore").dispatchEvent(new Event("input"));
 }
 
-document.getElementById("saveSettings").addEventListener("click", async () => {
-  const included_sources = [...document.querySelectorAll("[data-source]:checked")].map(el => el.dataset.source);
+function render() {
+  renderHero();
+  renderRemoteRaidPlan();
+  renderRecommendations();
+  renderTargets();
+  renderCalendar();
+  renderPreferences();
+}
+
+async function savePreferences() {
   const status = document.getElementById("settingsStatus");
   status.textContent = "Saving…";
+
   try {
     await api("/api/settings", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         token,
-        included_sources,
         pve_weight: Number(document.getElementById("pveWeight").value),
         pvp_weight: Number(document.getElementById("pvpWeight").value),
         collector_weight: Number(document.getElementById("collectorWeight").value),
@@ -332,35 +995,119 @@ document.getElementById("saveSettings").addEventListener("click", async () => {
         remote_raid_min_score: Number(document.getElementById("remoteRaidMinScore").value)
       })
     });
+
     status.textContent = "Saved ✓";
     await load();
-  } catch (error) { status.textContent = error.message; }
-});
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
 
-document.getElementById("saveRaidUsage").addEventListener("click", async () => {
+async function saveCalendarFilters() {
+  const status = document.getElementById("calendarStatus");
+  const included_sources = [
+    ...document.querySelectorAll("[data-source]:checked")
+  ].map(element => element.dataset.source);
+
+  status.textContent = "Saving…";
+
+  try {
+    await api("/api/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token,
+        included_sources
+      })
+    });
+
+    status.textContent = "Saved ✓";
+    await load();
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
+
+async function saveRaidUsage() {
   const status = document.getElementById("raidUsageStatus");
   status.textContent = "Saving…";
+
   try {
     await api("/api/remote-raid-usage", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token, raids_used: Number(document.getElementById("raidsUsedToday").value) })
+      body: JSON.stringify({
+        token,
+        raids_used: Number(document.getElementById("raidsUsedToday").value)
+      })
     });
+
     status.textContent = "Saved ✓";
     await load();
-  } catch (error) { status.textContent = error.message; }
-});
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
 
-document.getElementById("saveTarget").addEventListener("click", async () => {
+function clearTargetForm() {
+  document.getElementById("pokemonName").value = "";
+  document.getElementById("targetType").value = "mega_energy";
+  document.getElementById("currentValue").value = "0";
+  document.getElementById("targetValue").value = "";
+  document.getElementById("expectedProgressPerRaid").value = "";
+  document.getElementById("priority").value = "medium";
+  document.getElementById("completed").value = "0";
+  document.getElementById("notes").value = "";
+  document.getElementById("targetStatus").textContent = "";
+}
+
+function openTargetModal(target = null) {
+  clearTargetForm();
+
+  if (target) {
+    document.getElementById("targetModalTitle").textContent = `Edit ${target.pokemon_name}`;
+    document.getElementById("pokemonName").value = target.pokemon_name;
+    document.getElementById("targetType").value = target.target_type;
+    document.getElementById("currentValue").value = target.current_value ?? 0;
+    document.getElementById("targetValue").value = target.target_value ?? "";
+    document.getElementById("expectedProgressPerRaid").value = target.expected_progress_per_raid ?? "";
+    document.getElementById("priority").value = target.priority;
+    document.getElementById("completed").value = Number(target.completed) ? "1" : "0";
+    document.getElementById("notes").value = target.notes || "";
+  } else {
+    document.getElementById("targetModalTitle").textContent = "Add target";
+  }
+
+  const modal = document.getElementById("targetModal");
+  modal.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+
+  setTimeout(() => document.getElementById("pokemonName").focus(), 30);
+}
+
+function closeTargetModal() {
+  document.getElementById("targetModal").classList.add("hidden");
+  document.body.classList.remove("modal-open");
+}
+
+async function saveTarget() {
   const status = document.getElementById("targetStatus");
+  const pokemonName = document.getElementById("pokemonName").value.trim();
+
+  if (!pokemonName) {
+    status.textContent = "Enter a Pokémon name.";
+    return;
+  }
+
   status.textContent = "Saving…";
+
   try {
     await api("/api/targets", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         token,
-        pokemon_name: document.getElementById("pokemonName").value.trim(),
+        pokemon_name: pokemonName,
         target_type: document.getElementById("targetType").value,
         current_value: document.getElementById("currentValue").value,
         target_value: document.getElementById("targetValue").value,
@@ -370,28 +1117,80 @@ document.getElementById("saveTarget").addEventListener("click", async () => {
         notes: document.getElementById("notes").value
       })
     });
+
     status.textContent = "Saved ✓";
     await load();
-  } catch (error) { status.textContent = error.message; }
+    closeTargetModal();
+    activateTab("targets", false);
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
+
+async function removeTarget(id) {
+  const target = targetById.get(String(id));
+  if (!target) return;
+
+  if (!confirm(`Delete the target for ${target.pokemon_name}?`)) return;
+
+  await api(
+    `/api/targets?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`,
+    { method: "DELETE" }
+  );
+
+  await load();
+}
+
+document.querySelectorAll(".tab-button").forEach(button => {
+  button.addEventListener("click", () => activateTab(button.dataset.tab));
 });
 
-window.editTarget = target => {
-  document.getElementById("pokemonName").value = target.pokemon_name;
-  document.getElementById("targetType").value = target.target_type;
-  document.getElementById("currentValue").value = target.current_value ?? 0;
-  document.getElementById("targetValue").value = target.target_value ?? "";
-  document.getElementById("expectedProgressPerRaid").value = target.expected_progress_per_raid ?? "";
-  document.getElementById("priority").value = target.priority;
-  document.getElementById("completed").value = Number(target.completed) ? "1" : "0";
-  document.getElementById("notes").value = target.notes || "";
-  document.getElementById("pokemonName").scrollIntoView({ behavior: "smooth", block: "center" });
-};
+document.querySelectorAll("[data-open-tab]").forEach(button => {
+  button.addEventListener("click", () => activateTab(button.dataset.openTab));
+});
 
-window.removeTarget = async id => {
-  if (!confirm("Delete this target?")) return;
-  await api(`/api/targets?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
-  await load();
-};
+updateSliderOutput("pveWeight", "pveWeightOutput", 1);
+updateSliderOutput("pvpWeight", "pvpWeightOutput", 1);
+updateSliderOutput("collectorWeight", "collectorWeightOutput", 1);
+updateSliderOutput("remoteRaidMinScore", "remoteRaidMinScoreOutput", 0);
+
+document.getElementById("saveSettings").addEventListener("click", savePreferences);
+document.getElementById("saveCalendar").addEventListener("click", saveCalendarFilters);
+document.getElementById("saveRaidUsage").addEventListener("click", saveRaidUsage);
+
+document.getElementById("openAddTarget").addEventListener("click", () => openTargetModal());
+document.getElementById("closeTargetModal").addEventListener("click", closeTargetModal);
+document.getElementById("cancelTarget").addEventListener("click", closeTargetModal);
+document.getElementById("saveTarget").addEventListener("click", saveTarget);
+
+document.getElementById("targetModal").addEventListener("click", event => {
+  if (event.target.id === "targetModal") closeTargetModal();
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !document.getElementById("targetModal").classList.contains("hidden")) {
+    closeTargetModal();
+  }
+});
+
+document.getElementById("targets").addEventListener("click", event => {
+  const edit = event.target.closest("[data-edit-target]");
+  if (edit) {
+    const target = targetById.get(String(edit.dataset.editTarget));
+    if (target) openTargetModal(target);
+    return;
+  }
+
+  const remove = event.target.closest("[data-delete-target]");
+  if (remove) {
+    removeTarget(remove.dataset.deleteTarget);
+    return;
+  }
+
+  if (event.target.closest("[data-empty-add-target]")) {
+    openTargetModal();
+  }
+});
 
 load();
 </script>
