@@ -1148,10 +1148,22 @@ async function recommendationsForDate(
           event.source_type
         );
 
+      const officialSource =
+        isOfficialSupplementEvent(event);
+
       const occurrence = {
         ...rec,
         event_title: event.summary,
         source_type: event.source_type,
+        source_url: event.source_url || null,
+        source_kind:
+          officialSource
+            ? "official"
+            : "calendar",
+        source_label:
+          officialSource
+            ? "Official Pokémon GO"
+            : "GO Calendar",
         start_date: event.start_date,
         end_date: event.end_date,
         remote_eligible: remoteEligible
@@ -3485,6 +3497,31 @@ async function buildRemoteRaidBudgetForecast(
         );
       }
 
+      const topRecommendations =
+        day.recommendations
+          .filter(
+            rec =>
+              !Number(
+                rec.target?.completed
+              ) &&
+              String(
+                rec.target?.priority || ""
+              ).toLowerCase() !== "skip"
+          )
+          .slice(0, 3)
+          .map(rec => ({
+            pokemon_name:
+              rec.pokemon_name,
+            score:
+              rec.score,
+            label:
+              rec.label,
+            source_kind:
+              rec.source_kind,
+            source_label:
+              rec.source_label
+          }));
+
       return {
         date: day.date,
         label: day.label,
@@ -3501,6 +3538,8 @@ async function buildRemoteRaidBudgetForecast(
             day.value_index
           ),
         allocations,
+        top_recommendations:
+          topRecommendations,
         completed_targets:
           day.completed_targets,
         skipped_targets:
@@ -4360,6 +4399,158 @@ async function targetOptionsForUser(
 }
 
 
+
+function normalizedRecommendationNames(day) {
+  return (day?.top_recommendations || [])
+    .map(item =>
+      normalizeName(item.pokemon_name)
+    )
+    .filter(Boolean)
+    .join("|");
+}
+
+function dashboardOverview(
+  recommendations,
+  remoteRaidPlan
+) {
+  const topPick =
+    recommendations
+      .filter(
+        rec =>
+          !Number(
+            rec.target?.completed
+          ) &&
+          String(
+            rec.target?.priority || ""
+          ).toLowerCase() !== "skip"
+      )[0] || null;
+
+  const forecast =
+    remoteRaidPlan.budget_forecast || [];
+
+  const today =
+    forecast[0] || null;
+
+  const todayNames =
+    normalizedRecommendationNames(today);
+
+  let nextChange = null;
+
+  for (const day of forecast.slice(1)) {
+    const names =
+      normalizedRecommendationNames(day);
+
+    if (names && names !== todayNames) {
+      nextChange = {
+        date: day.date,
+        label: day.label,
+        top_recommendations:
+          day.top_recommendations || [],
+        recommended_budget:
+          day.recommended_budget
+      };
+      break;
+    }
+  }
+
+  if (!nextChange && forecast.length > 1) {
+    const day = forecast[1];
+    nextChange = {
+      date: day.date,
+      label: day.label,
+      top_recommendations:
+        day.top_recommendations || [],
+      recommended_budget:
+        day.recommended_budget
+    };
+  }
+
+  return {
+    local_date:
+      remoteRaidPlan.local_date,
+    top_pick:
+      topPick
+        ? {
+            pokemon_name:
+              topPick.pokemon_name,
+            score:
+              topPick.score,
+            label:
+              topPick.label,
+            emoji:
+              topPick.emoji,
+            source_kind:
+              topPick.source_kind,
+            source_label:
+              topPick.source_label
+          }
+        : null,
+    paid_raid_guidance:
+      remoteRaidPlan.purchase_advice,
+    planner_budget:
+      remoteRaidPlan.system_recommended_budget,
+    effective_budget:
+      remoteRaidPlan.effective_budget_cap,
+    next_change:
+      nextChange
+  };
+}
+
+async function dataFreshnessForDashboard(env) {
+  const row =
+    await env.DB.prepare(`
+      SELECT
+        (
+          SELECT MAX(updated_at)
+          FROM events
+          WHERE source_uid NOT LIKE 'official-supplement:%'
+        ) AS event_feeds_updated_at,
+
+        (
+          SELECT MAX(updated_at)
+          FROM events
+          WHERE source_uid LIKE 'official-supplement:%'
+        ) AS official_events_updated_at,
+
+        (
+          SELECT MAX(updated_at)
+          FROM remote_raid_limit_overrides
+          WHERE active = 1
+        ) AS remote_rules_updated_at,
+
+        (
+          SELECT MAX(updated_at)
+          FROM event_suppression_rules
+          WHERE active = 1
+        ) AS suppressions_updated_at,
+
+        (
+          SELECT MAX(updated_at)
+          FROM pokemon_meta
+        ) AS meta_updated_at
+    `).first();
+
+  const officialCandidates = [
+    row?.official_events_updated_at,
+    row?.remote_rules_updated_at,
+    row?.suppressions_updated_at
+  ]
+    .filter(Boolean)
+    .sort();
+
+  return {
+    event_feeds:
+      row?.event_feeds_updated_at || null,
+    official_schedules:
+      officialCandidates.length
+        ? officialCandidates[officialCandidates.length - 1]
+        : null,
+    raid_assessments:
+      row?.meta_updated_at || null
+  };
+}
+
+
 async function getMe(request, env) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
@@ -4384,6 +4575,15 @@ async function getMe(request, env) {
     recommendations
   );
 
+  const dataFreshness =
+    await dataFreshnessForDashboard(env);
+
+  const dashboard =
+    dashboardOverview(
+      recommendations,
+      remoteRaidPlan
+    );
+
   return json({
     user: {
       timezone: user.timezone,
@@ -4401,6 +4601,8 @@ async function getMe(request, env) {
     recommendations,
     remote_raid_plan: remoteRaidPlan,
     target_options: targetOptions,
+    dashboard,
+    data_freshness: dataFreshness,
     available_sources: Object.keys(SOURCES)
   });
 }
@@ -5381,6 +5583,10 @@ async function handleFetch(request, env) {
 
     if (request.method === "GET" && path === "/admin") {
       return asset(request, env, "/admin");
+    }
+
+    if (request.method === "GET" && path === "/sources") {
+      return asset(request, env, "/sources");
     }
 
     return env.ASSETS.fetch(request);
