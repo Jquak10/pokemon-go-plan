@@ -1485,6 +1485,476 @@ function megaAscensionRaidSupplementsFromOfficialText(text, sourceUrl) {
   return [...dedupe.values()];
 }
 
+
+function parseClockTimeTo24Hour(hourText, minuteText, meridiem) {
+  let hour = Number(hourText);
+  const minute = Number(minuteText || 0);
+  const suffix = String(meridiem || "").toLowerCase();
+
+  if (suffix.startsWith("p") && hour !== 12) hour += 12;
+  if (suffix.startsWith("a") && hour === 12) hour = 0;
+
+  return {
+    hour,
+    minute,
+    hhmmss:
+      `${String(hour).padStart(2, "0")}` +
+      `${String(minute).padStart(2, "0")}` +
+      "00"
+  };
+}
+
+function habitatTimeSlotsFromLine(line) {
+  const value = String(line || "").trim();
+
+  const regex =
+    /(\d{1,2}):(\d{2})\s*([ap])\.?m\.?\s*(?:to|-)\s*(\d{1,2}):(\d{2})\s*([ap])\.?m\.?\s*and\s*(\d{1,2}):(\d{2})\s*([ap])\.?m\.?\s*(?:to|-)\s*(\d{1,2}):(\d{2})\s*([ap])\.?m\.?/i;
+
+  const match = value.match(regex);
+  if (!match) return [];
+
+  const firstStart = parseClockTimeTo24Hour(match[1], match[2], match[3]);
+  const firstEnd = parseClockTimeTo24Hour(match[4], match[5], match[6]);
+  const secondStart = parseClockTimeTo24Hour(match[7], match[8], match[9]);
+  const secondEnd = parseClockTimeTo24Hour(match[10], match[11], match[12]);
+
+  return [
+    {
+      start: firstStart.hhmmss,
+      end: firstEnd.hhmmss
+    },
+    {
+      start: secondStart.hhmmss,
+      end: secondEnd.hhmmss
+    }
+  ];
+}
+
+function isHabitatTimeLine(line) {
+  return habitatTimeSlotsFromLine(line).length === 2;
+}
+
+function megaFinaleRaidSupplementsFromOfficialText(text, sourceUrl) {
+  const fullText = String(text || "");
+  const lines = fullText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const yearMatch =
+    fullText.match(
+      /Mega Finale[\s\S]{0,400}?September\s+5\s+and\s+6\s*,\s*(20\d{2})/i
+    ) ||
+    fullText.match(/\b(20\d{2})\b/);
+
+  const defaultYear =
+    yearMatch
+      ? Number(yearMatch[1])
+      : new Date().getUTCFullYear();
+
+  const finaleSectionIndex =
+    lines.findIndex((line) =>
+      /^Habitats and Raid Schedule$/i.test(line)
+    );
+
+  if (finaleSectionIndex < 0) {
+    return {
+      main_event: null,
+      raid_events: []
+    };
+  }
+
+  const saturdayIndex =
+    lines.findIndex(
+      (line, index) =>
+        index > finaleSectionIndex &&
+        /^Saturday,\s*September\s+5$/i.test(line)
+    );
+
+  const sundayIndex =
+    lines.findIndex(
+      (line, index) =>
+        index > finaleSectionIndex &&
+        /^Sunday,\s*September\s+6$/i.test(line)
+    );
+
+  if (saturdayIndex < 0 || sundayIndex < 0) {
+    return {
+      main_event: null,
+      raid_events: []
+    };
+  }
+
+  const endIndex =
+    lines.findIndex(
+      (line, index) =>
+        index > sundayIndex &&
+        /A special note to Trainers:/i.test(line)
+    );
+
+  const sectionEnd =
+    endIndex > sundayIndex
+      ? endIndex
+      : Math.min(lines.length, sundayIndex + 180);
+
+  const mainEvent = {
+    kind: "main_event",
+    event_name: "Pokémon GO Fest 2026: Mega Finale",
+    summary: "Pokémon GO Fest 2026: Mega Finale",
+    source_type: "event",
+    start_date: isoDate(defaultYear, 9, 5),
+    end_date: isoDate(defaultYear, 9, 6),
+    source_url: sourceUrl,
+    description:
+      "Pokémon GO Fest 2026: Mega Finale runs from 10:00 a.m. to 6:00 p.m. local time on September 5 and 6, 2026. Rotating habitats and Mega Raid Bosses appear during event hours."
+  };
+
+  const raidEvents = [];
+
+  const parseDay = ({
+    dayStart,
+    dayEnd,
+    dateValue,
+    superMegaBoss
+  }) => {
+    const beforeFirstTime = [];
+
+    for (let index = dayStart + 1; index < dayEnd; index++) {
+      const line = lines[index];
+
+      if (isHabitatTimeLine(line)) break;
+
+      if (
+        !/^(?:Wild Encounters|Mega Raids|Super Mega Raids)$/i.test(line) &&
+        !looksLikeMegaPokemonLine(line) &&
+        line.length <= 40 &&
+        !/^\[?Input\]?$/i.test(line)
+      ) {
+        beforeFirstTime.push(line);
+      }
+    }
+
+    // The official page presents the four habitat names before the first
+    // expanded habitat schedule. The final four concise labels are the habitats.
+    const habitatNames = beforeFirstTime
+      .filter((line) =>
+        !/^Pokémon GO Fest/i.test(line) &&
+        !/^Featured Pokémon$/i.test(line)
+      )
+      .slice(-4);
+
+    const timeIndices = [];
+
+    for (let index = dayStart + 1; index < dayEnd; index++) {
+      if (isHabitatTimeLine(lines[index])) {
+        timeIndices.push(index);
+      }
+    }
+
+    for (
+      let segmentIndex = 0;
+      segmentIndex < Math.min(4, timeIndices.length);
+      segmentIndex++
+    ) {
+      const startIndex = timeIndices[segmentIndex];
+      const stopIndex =
+        segmentIndex + 1 < timeIndices.length
+          ? timeIndices[segmentIndex + 1]
+          : dayEnd;
+
+      const segmentLines =
+        lines.slice(startIndex, stopIndex);
+
+      const megaRaidsIndex =
+        segmentLines.findIndex((line) =>
+          /^Mega Raids$/i.test(line)
+        );
+
+      const superMegaIndex =
+        segmentLines.findIndex((line) =>
+          /^Super Mega Raids$/i.test(line)
+        );
+
+      if (megaRaidsIndex < 0) continue;
+
+      const megaBosses = [];
+
+      const bossStop =
+        superMegaIndex > megaRaidsIndex
+          ? superMegaIndex
+          : segmentLines.length;
+
+      for (
+        let index = megaRaidsIndex + 1;
+        index < bossStop;
+        index++
+      ) {
+        const line = segmentLines[index];
+
+        if (looksLikeMegaPokemonLine(line)) {
+          megaBosses.push(line);
+        }
+      }
+
+      const uniqueMegaBosses =
+        [...new Set(megaBosses)];
+
+      if (!uniqueMegaBosses.length) continue;
+
+      const habitatName =
+        habitatNames[segmentIndex] ||
+        `Habitat ${segmentIndex + 1}`;
+
+      const slots =
+        habitatTimeSlotsFromLine(
+          segmentLines[0]
+        );
+
+      for (const slot of slots) {
+        raidEvents.push({
+          kind: "habitat_raid_window",
+          event_name: "Pokémon GO Fest 2026: Mega Finale",
+          habitat_name: habitatName,
+          date: dateValue,
+          start_time: slot.start,
+          end_time: slot.end,
+          mega_bosses: uniqueMegaBosses,
+          super_mega_boss: superMegaBoss,
+          source_url: sourceUrl
+        });
+      }
+    }
+  };
+
+  parseDay({
+    dayStart: saturdayIndex,
+    dayEnd: sundayIndex,
+    dateValue: isoDate(defaultYear, 9, 5),
+    superMegaBoss: "Mega Mewtwo X"
+  });
+
+  parseDay({
+    dayStart: sundayIndex,
+    dayEnd: sectionEnd,
+    dateValue: isoDate(defaultYear, 9, 6),
+    superMegaBoss: "Mega Mewtwo Y"
+  });
+
+  return {
+    main_event: mainEvent,
+    raid_events: raidEvents
+  };
+}
+
+async function officialMegaFinaleSupplementStatements(
+  env,
+  finaleData,
+  timestamp
+) {
+  const statements = [];
+
+  if (!finaleData) return statements;
+
+  if (finaleData.main_event) {
+    const item = finaleData.main_event;
+    const sourceUid = "official-supplement:mega-finale:main-event";
+    const id = await sha256Hex(`event|${sourceUid}`);
+
+    const eventObject = {
+      source_uid: sourceUid,
+      summary: item.summary,
+      description: [
+        item.description,
+        `Official source: ${item.source_url}`
+      ].join("\n"),
+      dtstart_line:
+        `DTSTART;VALUE=DATE:${compactIcsDate(item.start_date)}`,
+      dtend_line:
+        `DTEND;VALUE=DATE:${compactIcsDate(addDaysIso(item.end_date, 1))}`,
+      other_lines: [
+        `UID:${sourceUid}`,
+        `URL:${item.source_url}`,
+        "CATEGORIES:event",
+        "X-POGO-SOURCE:official"
+      ].join("\n"),
+      start_date: item.start_date,
+      end_date: item.end_date,
+      source_url: item.source_url
+    };
+
+    const contentHash =
+      await sha256Hex(
+        JSON.stringify(eventObject)
+      );
+
+    statements.push(
+      env.DB.prepare(`
+        INSERT INTO events (
+          id,
+          source_type,
+          source_uid,
+          summary,
+          description,
+          dtstart_line,
+          dtend_line,
+          other_lines,
+          start_date,
+          end_date,
+          source_url,
+          content_hash,
+          sequence,
+          status,
+          updated_at
+        )
+        VALUES (?, 'event', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?)
+        ON CONFLICT(id) DO UPDATE SET
+          summary = excluded.summary,
+          description = excluded.description,
+          dtstart_line = excluded.dtstart_line,
+          dtend_line = excluded.dtend_line,
+          other_lines = excluded.other_lines,
+          start_date = excluded.start_date,
+          end_date = excluded.end_date,
+          source_url = excluded.source_url,
+          sequence = CASE
+            WHEN events.content_hash != excluded.content_hash
+              OR events.status != 'active'
+            THEN events.sequence + 1
+            ELSE events.sequence
+          END,
+          content_hash = excluded.content_hash,
+          status = 'active',
+          updated_at = excluded.updated_at
+      `).bind(
+        id,
+        sourceUid,
+        eventObject.summary,
+        eventObject.description,
+        eventObject.dtstart_line,
+        eventObject.dtend_line,
+        eventObject.other_lines,
+        eventObject.start_date,
+        eventObject.end_date,
+        eventObject.source_url,
+        contentHash,
+        timestamp
+      )
+    );
+  }
+
+  for (const item of finaleData.raid_events || []) {
+    const bossList =
+      item.mega_bosses.join(", ");
+
+    const sourceUid = [
+      "official-supplement",
+      "mega-finale",
+      item.date,
+      normalizeName(item.habitat_name).replace(/\s+/g, "-"),
+      item.start_time
+    ].join(":");
+
+    const id =
+      await sha256Hex(
+        `raid_battles|${sourceUid}`
+      );
+
+    const summary =
+      `${item.habitat_name} Mega Raids — ${bossList}` +
+      ` + ${item.super_mega_boss}`;
+
+    const description = [
+      `Official Pokémon GO Fest 2026: Mega Finale habitat raid window.`,
+      `Habitat: ${item.habitat_name}.`,
+      `Mega Raids: ${bossList}.`,
+      `${item.super_mega_boss} appears in Super Mega Raids at certain Gyms; at other Gyms, the habitat's Mega Raids appear.`,
+      `Official source: ${item.source_url}`
+    ].join("\n");
+
+    const eventObject = {
+      source_uid: sourceUid,
+      summary,
+      description,
+      dtstart_line:
+        `DTSTART:${compactIcsDate(item.date)}T${item.start_time}`,
+      dtend_line:
+        `DTEND:${compactIcsDate(item.date)}T${item.end_time}`,
+      other_lines: [
+        `UID:${sourceUid}`,
+        `URL:${item.source_url}`,
+        "CATEGORIES:raid_battles",
+        "X-POGO-SOURCE:official",
+        `X-POGO-HABITAT:${item.habitat_name}`
+      ].join("\n"),
+      start_date: item.date,
+      end_date: item.date,
+      source_url: item.source_url
+    };
+
+    const contentHash =
+      await sha256Hex(
+        JSON.stringify(eventObject)
+      );
+
+    statements.push(
+      env.DB.prepare(`
+        INSERT INTO events (
+          id,
+          source_type,
+          source_uid,
+          summary,
+          description,
+          dtstart_line,
+          dtend_line,
+          other_lines,
+          start_date,
+          end_date,
+          source_url,
+          content_hash,
+          sequence,
+          status,
+          updated_at
+        )
+        VALUES (?, 'raid_battles', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?)
+        ON CONFLICT(id) DO UPDATE SET
+          summary = excluded.summary,
+          description = excluded.description,
+          dtstart_line = excluded.dtstart_line,
+          dtend_line = excluded.dtend_line,
+          other_lines = excluded.other_lines,
+          start_date = excluded.start_date,
+          end_date = excluded.end_date,
+          source_url = excluded.source_url,
+          sequence = CASE
+            WHEN events.content_hash != excluded.content_hash
+              OR events.status != 'active'
+            THEN events.sequence + 1
+            ELSE events.sequence
+          END,
+          content_hash = excluded.content_hash,
+          status = 'active',
+          updated_at = excluded.updated_at
+      `).bind(
+        id,
+        sourceUid,
+        eventObject.summary,
+        eventObject.description,
+        eventObject.dtstart_line,
+        eventObject.dtend_line,
+        eventObject.other_lines,
+        eventObject.start_date,
+        eventObject.end_date,
+        eventObject.source_url,
+        contentHash,
+        timestamp
+      )
+    );
+  }
+
+  return statements;
+}
+
+
 async function officialRaidSupplementStatements(env, supplements, timestamp) {
   const statements = [];
 
@@ -1626,6 +2096,7 @@ async function fetchOfficialHtml(url) {
 async function syncOfficialRemoteRaidLimits(env) {
   const detected = [];
   const officialRaidSupplements = [];
+  let megaFinaleData = null;
   const errors = [];
 
   let indexHtml = "";
@@ -1730,6 +2201,19 @@ async function syncOfficialRemoteRaidLimits(env) {
           url
         );
 
+      const finaleCandidate =
+        megaFinaleRaidSupplementsFromOfficialText(
+          plainText,
+          url
+        );
+
+      if (
+        finaleCandidate.main_event &&
+        finaleCandidate.raid_events.length
+      ) {
+        megaFinaleData = finaleCandidate;
+      }
+
       for (const item of supplements) {
         const key = [
           normalizeName(item.pokemon_name),
@@ -1766,6 +2250,15 @@ async function syncOfficialRemoteRaidLimits(env) {
 
   dbStatements.push(...supplementStatements);
 
+  const megaFinaleStatements =
+    await officialMegaFinaleSupplementStatements(
+      env,
+      megaFinaleData,
+      timestamp
+    );
+
+  dbStatements.push(...megaFinaleStatements);
+
   if (dbStatements.length) {
     await env.DB.batch(dbStatements);
   }
@@ -1777,6 +2270,15 @@ async function syncOfficialRemoteRaidLimits(env) {
     official_raid_supplements: {
       count: officialRaidSupplements.length,
       events: officialRaidSupplements
+    },
+    mega_finale_supplements: {
+      main_event:
+        megaFinaleData?.main_event || null,
+      raid_windows:
+        megaFinaleData?.raid_events || [],
+      count:
+        (megaFinaleData?.main_event ? 1 : 0) +
+        (megaFinaleData?.raid_events?.length || 0)
     },
     errors
   };
@@ -2749,6 +3251,7 @@ async function adminOfficialRaidSupplements(request, env) {
   const { results } = await env.DB.prepare(`
     SELECT
       id,
+      source_type,
       summary,
       description,
       start_date,
