@@ -843,6 +843,25 @@ function parseSources(row) {
   }
 }
 
+
+function publicBaseUrl(request, env) {
+  const configured =
+    String(
+      env.PUBLIC_BASE_URL || ""
+    )
+      .trim()
+      .replace(/\/+$/, "");
+
+  if (
+    configured &&
+    /^https:\/\//i.test(configured)
+  ) {
+    return configured;
+  }
+
+  return new URL(request.url).origin;
+}
+
 async function createUser(request, env) {
   let body = {};
   try {
@@ -878,15 +897,43 @@ async function createUser(request, env) {
     timestamp
   ).run();
 
-  const origin = new URL(request.url).origin;
+  const baseUrl =
+    publicBaseUrl(
+      request,
+      env
+    );
+
+  let calendarUrl =
+    `${baseUrl}/calendar/${feedToken}.ics`;
+
+  let subscription_format =
+    "legacy";
+
+  if (env.FEED_LINK_KEY) {
+    const signature =
+      await recoverableFeedSignature(
+        env,
+        id
+      );
+
+    calendarUrl =
+      `${baseUrl}/calendar/recover/${id}.${signature}.ics`;
+
+    subscription_format =
+      "signed";
+  }
 
   return json({
     ok: true,
-    management_url: `${origin}/manage/${manageToken}`,
-    calendar_url: `${origin}/calendar/${feedToken}.ics`,
-    manage_token: manageToken,
-    feed_token: feedToken,
-    note: "Save the management URL. There is no account recovery in this starter version."
+    management_url:
+      `${baseUrl}/manage/${manageToken}`,
+    calendar_url:
+      calendarUrl,
+    subscription_format,
+    manage_token:
+      manageToken,
+    note:
+      "Save the management URL. The calendar URL is a private read-only subscription link."
   });
 }
 
@@ -4085,12 +4132,77 @@ async function feedLinkApi(request, env) {
 
   const signature = await recoverableFeedSignature(env, user.id);
 
+  const baseUrl =
+    publicBaseUrl(
+      request,
+      env
+    );
+
   return json({
     calendar_url:
-      `${url.origin}/calendar/recover/${user.id}.${signature}.ics`,
+      `${baseUrl}/calendar/recover/${user.id}.${signature}.ics`,
     read_only: true,
+    preferred: true,
+    format: "signed",
     note:
-      "This is a recoverable read-only feed URL. Existing subscription URLs continue to work."
+      "Private read-only calendar subscription URL."
+  });
+}
+
+
+async function revokeLegacyFeedApi(
+  request,
+  env
+) {
+  let body = {};
+
+  try {
+    body =
+      await request.json();
+  } catch {}
+
+  const user =
+    await userByManageToken(
+      env,
+      body.token
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  // Replace the legacy feed hash with a new random value whose
+  // plaintext token is deliberately discarded. This invalidates
+  // every previously-issued /calendar/<random-token>.ics URL for
+  // this user without affecting the signed recoverable URL.
+  const discardedToken =
+    randomToken(48);
+
+  const discardedHash =
+    await sha256Hex(
+      discardedToken
+    );
+
+  await env.DB.prepare(`
+    UPDATE users
+    SET
+      feed_hash = ?,
+      updated_at = ?
+    WHERE id = ?
+  `).bind(
+    discardedHash,
+    nowIso(),
+    user.id
+  ).run();
+
+  return json({
+    ok: true,
+    legacy_feed_revoked: true,
+    note:
+      "Previous legacy random-token calendar URLs for this user are now invalid."
   });
 }
 
@@ -5499,6 +5611,16 @@ async function handleFetch(request, env) {
 
     if (request.method === "GET" && path === "/api/feed-link") {
       return feedLinkApi(request, env);
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/feed-link/revoke-legacy"
+    ) {
+      return revokeLegacyFeedApi(
+        request,
+        env
+      );
     }
 
     if (request.method === "POST" && path === "/api/settings") {
