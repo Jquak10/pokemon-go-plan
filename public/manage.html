@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=14">
+  <link rel="stylesheet" href="/styles.css?v=15">
 </head>
 
 <body class="manage-page">
@@ -476,41 +476,159 @@
            ======================================================= -->
       <section class="tab-panel" data-panel="calendar">
 
-        <section class="dashboard-card feed-link-card">
-          <div class="feed-link-copy">
-            <span class="section-eyebrow">YOUR PRIVATE SUBSCRIPTION</span>
-            <h2>ICS Calendar Feed</h2>
-            <p class="section-subtitle">
-              Keep this URL private. Anyone with the URL can read this calendar, but it cannot modify your settings or targets.
-            </p>
+        <section class="dashboard-card calendar-subscription-card">
+          <div class="calendar-subscription-head">
+            <div>
+              <span class="section-eyebrow">YOUR PRIVATE SUBSCRIPTION</span>
+              <h2>Calendar Subscription</h2>
+              <p class="section-subtitle">
+                One private read-only calendar link for Apple Calendar, Google Calendar, Outlook, and compatible calendar services.
+              </p>
+            </div>
+
+            <span class="subscription-standard-badge">
+              iCalendar · .ics
+            </span>
           </div>
 
-          <div class="feed-link-actions">
-            <div class="feed-input-wrap">
+          <div class="preferred-feed-panel">
+            <div class="preferred-feed-heading">
+              <div>
+                <span class="mini-label">PREFERRED SUBSCRIPTION URL</span>
+                <strong>Use this link for new subscriptions</strong>
+              </div>
+
+              <span class="preferred-link-badge">SIGNED LINK</span>
+            </div>
+
+            <div class="subscription-url-row">
               <input
                 id="icsFeedLink"
                 type="text"
                 readonly
-                value="Open this tab to prepare your feed link…"
-                aria-label="Private ICS feed URL"
+                value="Open this tab to prepare your subscription link…"
+                aria-label="Private calendar subscription URL"
               >
+
+              <button id="copyFeedLink" type="button" class="secondary" disabled>
+                Copy link
+              </button>
             </div>
-
-            <button id="copyFeedLink" type="button" class="secondary" disabled>
-              Copy
-            </button>
-
-            <button id="openFeedLink" type="button" disabled>
-              Open feed
-            </button>
 
             <div id="feedLinkStatus" class="feed-security-note">
               <span aria-hidden="true">🔒</span>
               <span>
-                This is a read-only recoverable subscription URL. Your existing ICS subscription URL remains valid too.
+                Keep this link private. Anyone who has it can read this calendar.
               </span>
             </div>
           </div>
+
+          <div class="calendar-apps-section">
+            <div class="calendar-apps-heading">
+              <div>
+                <span class="section-eyebrow">ADD TO A CALENDAR APP</span>
+                <h3>Where do you want to subscribe?</h3>
+              </div>
+              <span class="field-help">The calendar remains read-only and updates from this planner.</span>
+            </div>
+
+            <div class="calendar-app-grid">
+              <button
+                type="button"
+                class="calendar-app-button"
+                data-calendar-app="apple"
+                disabled
+              >
+                <span class="calendar-app-icon"></span>
+                <span>
+                  <strong>Apple Calendar</strong>
+                  <small>Mac, iPhone, iPad</small>
+                </span>
+              </button>
+
+              <button
+                type="button"
+                class="calendar-app-button"
+                data-calendar-app="google"
+                disabled
+              >
+                <span class="calendar-app-icon">G</span>
+                <span>
+                  <strong>Google Calendar</strong>
+                  <small>Subscribe from web</small>
+                </span>
+              </button>
+
+              <button
+                type="button"
+                class="calendar-app-button"
+                data-calendar-app="outlook"
+                disabled
+              >
+                <span class="calendar-app-icon">O</span>
+                <span>
+                  <strong>Outlook</strong>
+                  <small>Subscribe from web</small>
+                </span>
+              </button>
+
+              <button
+                type="button"
+                class="calendar-app-button"
+                data-calendar-app="spark"
+                disabled
+              >
+                <span class="calendar-app-icon">S</span>
+                <span>
+                  <strong>Spark</strong>
+                  <small>Via Google, iCloud, or Exchange</small>
+                </span>
+              </button>
+            </div>
+
+            <div id="calendarAppGuide" class="calendar-app-guide">
+              <span class="mini-label">HOW TO SUBSCRIBE</span>
+              <p>Select a calendar app above for instructions.</p>
+            </div>
+          </div>
+
+          <details class="legacy-feed-migration">
+            <summary>Moving from an older calendar URL?</summary>
+
+            <div class="legacy-feed-migration-body">
+              <p>
+                Calendar apps do not let this site silently replace a URL that is already subscribed.
+                Add the preferred link above as a new subscription, confirm it is updating, then remove the old subscription from your calendar app.
+              </p>
+
+              <ol>
+                <li>Copy the preferred subscription URL above.</li>
+                <li>Add it to your calendar app.</li>
+                <li>Confirm the new calendar appears and contains your events.</li>
+                <li>Remove the old subscription from the calendar app.</li>
+              </ol>
+
+              <div class="legacy-revoke-box">
+                <div>
+                  <strong>Optional: invalidate old legacy token links</strong>
+                  <p>
+                    This disables old <code>/calendar/&lt;random-token&gt;.ics</code> links for this user.
+                    It does not change the signed subscription above.
+                  </p>
+                </div>
+
+                <button
+                  id="revokeLegacyFeed"
+                  type="button"
+                  class="danger-soft"
+                >
+                  Revoke legacy URL
+                </button>
+              </div>
+
+              <span id="legacyFeedStatus" class="save-status"></span>
+            </div>
+          </details>
         </section>
 
         <section class="dashboard-card month-calendar-card">
@@ -1695,37 +1813,269 @@ async function loadCalendarMonth(force = false) {
 async function loadRecoverableFeedLink() {
   if (recoverableFeedUrl) return;
 
-  const input = document.getElementById("icsFeedLink");
-  const status = document.getElementById("feedLinkStatus");
+  const input =
+    document.getElementById("icsFeedLink");
 
-  input.value = "Preparing your private feed URL…";
+  const status =
+    document.getElementById("feedLinkStatus");
+
+  input.value =
+    "Preparing your preferred subscription URL…";
 
   try {
-    const data = await api(
-      `/api/feed-link?token=${encodeURIComponent(token)}`
-    );
+    const data =
+      await api(
+        `/api/feed-link?token=${encodeURIComponent(token)}`
+      );
 
-    recoverableFeedUrl = data.calendar_url;
-    input.value = recoverableFeedUrl;
+    recoverableFeedUrl =
+      data.calendar_url;
 
-    document.getElementById("copyFeedLink").disabled = false;
-    document.getElementById("openFeedLink").disabled = false;
+    input.value =
+      recoverableFeedUrl;
+
+    document
+      .getElementById("copyFeedLink")
+      .disabled = false;
+
+    document
+      .querySelectorAll("[data-calendar-app]")
+      .forEach(
+        button =>
+          button.disabled = false
+      );
 
     status.innerHTML = `
       <span aria-hidden="true">🔒</span>
       <span>
-        Read-only private feed. Existing ICS subscription URLs remain valid.
-        Keep this URL private because anyone with it can read your calendar.
+        Private read-only subscription. Keep this link private because anyone with it can read your calendar.
       </span>
     `;
   } catch (error) {
-    input.value = "Feed link unavailable";
+    input.value =
+      "Subscription link unavailable";
+
     status.innerHTML = `
       <span aria-hidden="true">!</span>
       <span>${esc(error.message)}</span>
     `;
   }
 }
+
+
+async function copySubscriptionUrl() {
+  if (!recoverableFeedUrl) {
+    return false;
+  }
+
+  try {
+    await navigator.clipboard.writeText(
+      recoverableFeedUrl
+    );
+  } catch {
+    const input =
+      document.getElementById(
+        "icsFeedLink"
+      );
+
+    input.focus();
+    input.select();
+    document.execCommand("copy");
+  }
+
+  return true;
+}
+
+function appleWebcalUrl() {
+  if (!recoverableFeedUrl) {
+    return "";
+  }
+
+  return recoverableFeedUrl.replace(
+    /^https?:\/\//i,
+    "webcal://"
+  );
+}
+
+async function showCalendarAppGuide(app) {
+  const guide =
+    document.getElementById(
+      "calendarAppGuide"
+    );
+
+  if (!recoverableFeedUrl) {
+    return;
+  }
+
+  if (app === "apple") {
+    guide.innerHTML = `
+      <span class="mini-label">APPLE CALENDAR</span>
+      <h4>Subscribe directly</h4>
+      <ol>
+        <li>Click <strong>Open Apple Calendar</strong> below.</li>
+        <li>Calendar should open with the subscription address filled in.</li>
+        <li>Choose the account/location and refresh interval you want.</li>
+        <li>Confirm <strong>Subscribe</strong>.</li>
+      </ol>
+      <button id="launchAppleCalendar" type="button">
+        Open Apple Calendar
+      </button>
+    `;
+
+    document
+      .getElementById(
+        "launchAppleCalendar"
+      )
+      .addEventListener(
+        "click",
+        () => {
+          window.location.href =
+            appleWebcalUrl();
+        }
+      );
+
+    return;
+  }
+
+  if (app === "google") {
+    await copySubscriptionUrl();
+
+    guide.innerHTML = `
+      <span class="mini-label">GOOGLE CALENDAR</span>
+      <h4>The subscription link has been copied</h4>
+      <ol>
+        <li>On a computer, open Google Calendar.</li>
+        <li>Next to <strong>Other calendars</strong>, click <strong>+</strong>.</li>
+        <li>Choose <strong>From URL</strong>.</li>
+        <li>Paste the copied subscription URL.</li>
+        <li>Click <strong>Add calendar</strong>.</li>
+      </ol>
+      <button id="openGoogleCalendar" type="button">
+        Open Google Calendar
+      </button>
+    `;
+
+    document
+      .getElementById(
+        "openGoogleCalendar"
+      )
+      .addEventListener(
+        "click",
+        () =>
+          window.open(
+            "https://calendar.google.com/",
+            "_blank",
+            "noopener"
+          )
+      );
+
+    return;
+  }
+
+  if (app === "outlook") {
+    await copySubscriptionUrl();
+
+    guide.innerHTML = `
+      <span class="mini-label">OUTLOOK</span>
+      <h4>The subscription link has been copied</h4>
+      <ol>
+        <li>Open Outlook on the web and go to <strong>Calendar</strong>.</li>
+        <li>Choose <strong>Add calendar</strong>.</li>
+        <li>Select <strong>Subscribe from web</strong>.</li>
+        <li>Paste the copied subscription URL.</li>
+        <li>Choose a name/color and save/import the subscription.</li>
+      </ol>
+      <button id="openOutlookCalendar" type="button">
+        Open Outlook Calendar
+      </button>
+    `;
+
+    document
+      .getElementById(
+        "openOutlookCalendar"
+      )
+      .addEventListener(
+        "click",
+        () =>
+          window.open(
+            "https://outlook.live.com/calendar/",
+            "_blank",
+            "noopener"
+          )
+      );
+
+    return;
+  }
+
+  if (app === "spark") {
+    guide.innerHTML = `
+      <span class="mini-label">SPARK</span>
+      <h4>Subscribe through a supported calendar account</h4>
+      <p>
+        Spark displays supported Google, Exchange, and iCloud calendars rather than accepting this private URL directly.
+      </p>
+      <ol>
+        <li>Add this subscription to Google Calendar, Apple/iCloud Calendar, or Exchange/Outlook first.</li>
+        <li>Make sure that same account is connected in Spark.</li>
+        <li>In Spark's Calendar settings, enable that account/calendar.</li>
+      </ol>
+    `;
+  }
+}
+
+async function revokeLegacyFeed() {
+  const status =
+    document.getElementById(
+      "legacyFeedStatus"
+    );
+
+  const button =
+    document.getElementById(
+      "revokeLegacyFeed"
+    );
+
+  const confirmed =
+    window.confirm(
+      "Only continue after you have moved your calendar app to the preferred signed subscription URL. This will invalidate previous legacy /calendar/<random-token>.ics links for this user."
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  button.disabled = true;
+  status.textContent =
+    "Revoking legacy URL…";
+
+  try {
+    await api(
+      "/api/feed-link/revoke-legacy",
+      {
+        method: "POST",
+        headers: {
+          "content-type":
+            "application/json"
+        },
+        body:
+          JSON.stringify({
+            token
+          })
+      }
+    );
+
+    status.textContent =
+      "Legacy random-token URL revoked ✓";
+
+    button.textContent =
+      "Legacy URL revoked";
+  } catch (error) {
+    status.textContent =
+      error.message;
+
+    button.disabled = false;
+  }
+}
+
 
 function ensureCalendarTabLoaded() {
   if (!calendarMonthDate) {
@@ -2249,31 +2599,58 @@ document.getElementById("calendarToday").addEventListener("click", async () => {
   renderCalendarDayDetails(selectedCalendarDate);
 });
 
-document.getElementById("copyFeedLink").addEventListener("click", async () => {
-  if (!recoverableFeedUrl) return;
+document
+  .getElementById("copyFeedLink")
+  .addEventListener(
+    "click",
+    async () => {
+      const copied =
+        await copySubscriptionUrl();
 
-  const button = document.getElementById("copyFeedLink");
+      if (!copied) return;
 
-  try {
-    await navigator.clipboard.writeText(recoverableFeedUrl);
-  } catch {
-    const input = document.getElementById("icsFeedLink");
-    input.focus();
-    input.select();
-    document.execCommand("copy");
-  }
+      const button =
+        document.getElementById(
+          "copyFeedLink"
+        );
 
-  button.textContent = "Copied ✓";
-  setTimeout(() => {
-    button.textContent = "Copy";
-  }, 1600);
-});
+      button.textContent =
+        "Copied ✓";
 
-document.getElementById("openFeedLink").addEventListener("click", () => {
-  if (recoverableFeedUrl) {
-    window.open(recoverableFeedUrl, "_blank", "noopener");
-  }
-});
+      setTimeout(
+        () => {
+          button.textContent =
+            "Copy link";
+        },
+        1600
+      );
+    }
+  );
+
+document
+  .querySelectorAll(
+    "[data-calendar-app]"
+  )
+  .forEach(
+    button => {
+      button.addEventListener(
+        "click",
+        () =>
+          showCalendarAppGuide(
+            button.dataset.calendarApp
+          )
+      );
+    }
+  );
+
+document
+  .getElementById(
+    "revokeLegacyFeed"
+  )
+  .addEventListener(
+    "click",
+    revokeLegacyFeed
+  );
 
 load();
 </script>
