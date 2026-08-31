@@ -38,6 +38,20 @@ const RAID_SOURCE_TYPES = new Set([
   "max_mondays"
 ]);
 
+// Only these event classes can consume a Remote Raid Pass.
+// Max Battles / Max Mondays are deliberately excluded.
+const REMOTE_RAID_SOURCE_TYPES = new Set([
+  "raid_battles",
+  "raid_day",
+  "raid_hour"
+]);
+
+const DEFAULT_REMOTE_RAID_LIMIT = 10;
+const DEFAULT_REMOTE_RAID_MIN_SCORE = 60;
+const REMOTE_RAID_DECAY_PER_RAID = 3;
+const DEFAULT_REMOTE_RAID_LIMIT_SOURCE =
+  "https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/2487-joining-battles-remotely/";
+
 const PVPOKE_MASTER_LEAGUE =
   "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-10000.json";
 
@@ -998,7 +1012,7 @@ function recommendationFor(name, meta, target, user) {
 }
 
 async function currentRecommendations(env, user, targets, metas) {
-  const day = todayUtc();
+  const day = localDateForTimezone(user.timezone);
   const placeholders = [...RAID_SOURCE_TYPES].map(() => "?").join(",");
 
   const { results: events } = await env.DB.prepare(`
@@ -1021,19 +1035,283 @@ async function currentRecommendations(env, user, targets, metas) {
       const rec = recommendationFor(match.name, match.meta, match.target, user);
 
       const existing = map.get(key);
-      if (!existing || rec.score > existing.score) {
+      const remoteEligible = REMOTE_RAID_SOURCE_TYPES.has(event.source_type);
+
+      if (!existing) {
         map.set(key, {
           ...rec,
           event_title: event.summary,
           source_type: event.source_type,
           start_date: event.start_date,
-          end_date: event.end_date
+          end_date: event.end_date,
+          remote_eligible: remoteEligible
         });
+      } else {
+        // The same Pokémon can appear in more than one event feed. Preserve the
+        // fact that at least one active occurrence is remotely eligible.
+        existing.remote_eligible = Boolean(existing.remote_eligible || remoteEligible);
+
+        if (rec.score > existing.score) {
+          map.set(key, {
+            ...rec,
+            event_title: event.summary,
+            source_type: event.source_type,
+            start_date: event.start_date,
+            end_date: event.end_date,
+            remote_eligible: Boolean(existing.remote_eligible || remoteEligible)
+          });
+        }
       }
     }
   }
 
   return [...map.values()].sort((a, b) => b.score - a.score);
+}
+
+
+function localDateForTimezone(timezone) {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone || "UTC",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+
+    const parts = Object.fromEntries(
+      formatter
+        .formatToParts(new Date())
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value])
+    );
+
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  } catch {
+    return todayUtc();
+  }
+}
+
+async function remoteRaidLimitForDate(env, localDate) {
+  const override = await env.DB.prepare(`
+    SELECT event_name, start_date, end_date, remote_raid_limit, source_url
+    FROM remote_raid_limit_overrides
+    WHERE active = 1
+      AND start_date <= ?
+      AND end_date >= ?
+    ORDER BY remote_raid_limit DESC, updated_at DESC
+    LIMIT 1
+  `).bind(localDate, localDate).first();
+
+  if (override) {
+    return {
+      limit: Number(override.remote_raid_limit),
+      label: override.event_name,
+      start_date: override.start_date,
+      end_date: override.end_date,
+      source_url: override.source_url,
+      is_override: true
+    };
+  }
+
+  return {
+    limit: DEFAULT_REMOTE_RAID_LIMIT,
+    label: "Standard daily Remote Raid limit",
+    start_date: null,
+    end_date: null,
+    source_url: DEFAULT_REMOTE_RAID_LIMIT_SOURCE,
+    is_override: false
+  };
+}
+
+async function remoteRaidUsageForDate(env, userId, localDate) {
+  const row = await env.DB.prepare(`
+    SELECT raids_used
+    FROM remote_raid_usage
+    WHERE user_id = ? AND local_date = ?
+  `).bind(userId, localDate).first();
+
+  return row ? Math.max(0, Number(row.raids_used || 0)) : 0;
+}
+
+function remoteTargetCap(target) {
+  if (!target) return Infinity;
+
+  if (String(target.priority || "").toLowerCase() === "skip") return 0;
+  if (Number(target.completed)) return 0;
+
+  if (target.target_value == null) return Infinity;
+
+  const targetValue = Number(target.target_value);
+  const currentValue = Number(target.current_value || 0);
+  if (!Number.isFinite(targetValue) || targetValue <= 0) return Infinity;
+
+  const remaining = targetValue - currentValue;
+  if (remaining <= 0) {
+    // Reaching the numeric target is not the same as the user marking the goal
+    // complete. Do not force a zero allocation unless completed=true.
+    return Infinity;
+  }
+
+  if (target.target_type === "raids") {
+    return Math.max(0, Math.ceil(remaining));
+  }
+
+  const expected = Number(target.expected_progress_per_raid);
+  if (Number.isFinite(expected) && expected > 0) {
+    return Math.max(0, Math.ceil(remaining / expected));
+  }
+
+  return Infinity;
+}
+
+function buildRemoteRaidPlan({
+  recommendations,
+  officialRule,
+  userBudget,
+  raidsUsed,
+  minScore
+}) {
+  const officialLimit = Math.max(0, Number(officialRule.limit || 0));
+  const used = clamp(Math.floor(Number(raidsUsed || 0)), 0, 999);
+  const officialRemaining = Math.max(0, officialLimit - used);
+
+  const configuredBudget =
+    userBudget == null || userBudget === ""
+      ? null
+      : clamp(Math.floor(Number(userBudget)), 0, officialLimit);
+
+  const dailyPlanningCap =
+    configuredBudget == null
+      ? officialLimit
+      : Math.min(officialLimit, configuredBudget);
+
+  const planningCapacity = Math.max(0, dailyPlanningCap - used);
+  const threshold = clamp(Number(minScore || DEFAULT_REMOTE_RAID_MIN_SCORE), 0, 100);
+
+  const candidates = recommendations
+    .filter((rec) => rec.remote_eligible)
+    .map((rec) => {
+      const target = rec.target || null;
+      const explicitSkip = String(target?.priority || "").toLowerCase() === "skip";
+      const completed = Boolean(Number(target?.completed));
+      const cap = remoteTargetCap(target);
+
+      return {
+        ...rec,
+        allocated: 0,
+        target_cap: Number.isFinite(cap) ? cap : null,
+        eligible: !explicitSkip && !completed && rec.score >= threshold,
+        exclusion_reason:
+          explicitSkip
+            ? "Personal priority is set to Skip."
+            : completed
+              ? "Personal target is marked complete."
+              : rec.score < threshold
+                ? `Recommendation score is below your ${threshold}-point Remote Raid threshold.`
+                : null
+      };
+    });
+
+  for (let slot = 0; slot < planningCapacity; slot++) {
+    let best = null;
+
+    for (const candidate of candidates) {
+      if (!candidate.eligible) continue;
+      if (candidate.target_cap != null && candidate.allocated >= candidate.target_cap) continue;
+
+      const marginalScore = candidate.score - candidate.allocated * REMOTE_RAID_DECAY_PER_RAID;
+      if (marginalScore < threshold) continue;
+
+      if (
+        !best ||
+        marginalScore > best.marginal_score ||
+        (
+          marginalScore === best.marginal_score &&
+          candidate.pokemon_name.localeCompare(best.candidate.pokemon_name) < 0
+        )
+      ) {
+        best = { candidate, marginal_score: marginalScore };
+      }
+    }
+
+    if (!best) break;
+    best.candidate.allocated += 1;
+  }
+
+  const recommendedTotal = candidates.reduce(
+    (sum, candidate) => sum + candidate.allocated,
+    0
+  );
+
+  return {
+    official_rule: officialRule,
+    official_limit: officialLimit,
+    raids_used: used,
+    official_remaining: officialRemaining,
+    user_budget: configuredBudget,
+    daily_planning_cap: dailyPlanningCap,
+    planning_capacity: planningCapacity,
+    min_score: threshold,
+    decay_per_additional_raid: REMOTE_RAID_DECAY_PER_RAID,
+    recommended_total: recommendedTotal,
+    unused_planning_capacity: Math.max(0, planningCapacity - recommendedTotal),
+    unused_official_capacity: Math.max(0, officialRemaining - recommendedTotal),
+    allocations: candidates
+      .filter((candidate) => candidate.allocated > 0)
+      .sort((a, b) => b.allocated - a.allocated || b.score - a.score),
+    not_allocated: candidates
+      .filter((candidate) => candidate.allocated === 0)
+      .sort((a, b) => b.score - a.score)
+  };
+}
+
+async function remoteRaidPlanForUser(env, user, recommendations) {
+  const localDate = localDateForTimezone(user.timezone);
+  const [officialRule, raidsUsed] = await Promise.all([
+    remoteRaidLimitForDate(env, localDate),
+    remoteRaidUsageForDate(env, user.id, localDate)
+  ]);
+
+  const plan = buildRemoteRaidPlan({
+    recommendations,
+    officialRule,
+    userBudget: user.remote_raid_budget,
+    raidsUsed,
+    minScore: user.remote_raid_min_score
+  });
+
+  return { local_date: localDate, ...plan };
+}
+
+async function updateRemoteRaidUsage(request, env) {
+  const body = await request.json();
+  const user = await userByManageToken(env, body.token);
+  if (!user) return bad("Invalid management link.", 401);
+
+  const raidsUsed = Number(body.raids_used);
+  if (!Number.isFinite(raidsUsed) || raidsUsed < 0 || raidsUsed > 999) {
+    return bad("Remote Raids used must be a number between 0 and 999.");
+  }
+
+  const localDate = localDateForTimezone(user.timezone);
+  const timestamp = nowIso();
+
+  await env.DB.prepare(`
+    INSERT INTO remote_raid_usage (
+      user_id, local_date, raids_used, updated_at
+    )
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id, local_date) DO UPDATE SET
+      raids_used = excluded.raids_used,
+      updated_at = excluded.updated_at
+  `).bind(
+    user.id,
+    localDate,
+    Math.floor(raidsUsed),
+    timestamp
+  ).run();
+
+  return json({ ok: true, local_date: localDate, raids_used: Math.floor(raidsUsed) });
 }
 
 async function getMe(request, env) {
@@ -1045,6 +1323,7 @@ async function getMe(request, env) {
   const targets = await getTargets(env, user.id);
   const metas = await getMeta(env);
   const recommendations = await currentRecommendations(env, user, targets, metas);
+  const remoteRaidPlan = await remoteRaidPlanForUser(env, user, recommendations);
 
   return json({
     user: {
@@ -1052,10 +1331,16 @@ async function getMe(request, env) {
       included_sources: parseSources(user),
       pve_weight: user.pve_weight,
       pvp_weight: user.pvp_weight,
-      collector_weight: user.collector_weight
+      collector_weight: user.collector_weight,
+      remote_raid_budget: user.remote_raid_budget,
+      remote_raid_min_score:
+        user.remote_raid_min_score == null
+          ? DEFAULT_REMOTE_RAID_MIN_SCORE
+          : user.remote_raid_min_score
     },
     targets,
     recommendations,
+    remote_raid_plan: remoteRaidPlan,
     available_sources: Object.keys(SOURCES)
   });
 }
@@ -1074,6 +1359,21 @@ async function updateSettings(request, env) {
   const collector = clamp(Number(body.collector_weight ?? user.collector_weight), 0, 2);
   const timezone = String(body.timezone || user.timezone).slice(0, 80);
 
+  let remoteRaidBudget = null;
+  if (body.remote_raid_budget !== "" && body.remote_raid_budget != null) {
+    const value = Number(body.remote_raid_budget);
+    if (!Number.isFinite(value) || value < 0 || value > 999) {
+      return bad("Remote Raid budget must be blank (Auto) or a number between 0 and 999.");
+    }
+    remoteRaidBudget = Math.floor(value);
+  }
+
+  const remoteRaidMinScore = clamp(
+    Number(body.remote_raid_min_score ?? user.remote_raid_min_score ?? DEFAULT_REMOTE_RAID_MIN_SCORE),
+    0,
+    100
+  );
+
   await env.DB.prepare(`
     UPDATE users
     SET timezone = ?,
@@ -1081,6 +1381,8 @@ async function updateSettings(request, env) {
         pve_weight = ?,
         pvp_weight = ?,
         collector_weight = ?,
+        remote_raid_budget = ?,
+        remote_raid_min_score = ?,
         updated_at = ?
     WHERE id = ?
   `).bind(
@@ -1089,6 +1391,8 @@ async function updateSettings(request, env) {
     pve,
     pvp,
     collector,
+    remoteRaidBudget,
+    remoteRaidMinScore,
     nowIso(),
     user.id
   ).run();
@@ -1119,11 +1423,22 @@ async function upsertTarget(request, env) {
       ? 0
       : Number(body.current_value);
 
+  const expectedProgressPerRaid =
+    body.expected_progress_per_raid === "" || body.expected_progress_per_raid == null
+      ? null
+      : Number(body.expected_progress_per_raid);
+
   if (targetValue != null && !Number.isFinite(targetValue)) {
     return bad("Target value must be a number.");
   }
   if (!Number.isFinite(currentValue)) {
     return bad("Current value must be a number.");
+  }
+  if (
+    expectedProgressPerRaid != null &&
+    (!Number.isFinite(expectedProgressPerRaid) || expectedProgressPerRaid <= 0)
+  ) {
+    return bad("Expected progress per raid must be blank or a number greater than 0.");
   }
 
   const id = await sha256Hex(
@@ -1134,13 +1449,14 @@ async function upsertTarget(request, env) {
   await env.DB.prepare(`
     INSERT INTO targets (
       id, user_id, pokemon_name, target_type,
-      target_value, current_value, priority,
+      target_value, current_value, expected_progress_per_raid, priority,
       completed, notes, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id, pokemon_name, target_type) DO UPDATE SET
       target_value = excluded.target_value,
       current_value = excluded.current_value,
+      expected_progress_per_raid = excluded.expected_progress_per_raid,
       priority = excluded.priority,
       completed = excluded.completed,
       notes = excluded.notes,
@@ -1152,6 +1468,7 @@ async function upsertTarget(request, env) {
     targetType,
     targetValue,
     currentValue,
+    expectedProgressPerRaid,
     priority,
     body.completed ? 1 : 0,
     String(body.notes || "").slice(0, 2000),
@@ -1428,6 +1745,10 @@ async function handleFetch(request, env) {
 
     if (request.method === "POST" && path === "/api/settings") {
       return updateSettings(request, env);
+    }
+
+    if (request.method === "POST" && path === "/api/remote-raid-usage") {
+      return updateRemoteRaidUsage(request, env);
     }
 
     if (request.method === "POST" && path === "/api/targets") {
