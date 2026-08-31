@@ -52,6 +52,15 @@ const REMOTE_RAID_DECAY_PER_RAID = 3;
 const DEFAULT_REMOTE_RAID_LIMIT_SOURCE =
   "https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/2487-joining-battles-remotely/";
 
+const OFFICIAL_POKEMON_GO_NEWS_URL =
+  "https://pokemongo.com/news";
+
+const PINNED_OFFICIAL_EVENT_PAGES = [
+  "https://pokemongo.com/gofest/megafinale"
+];
+
+const MAX_OFFICIAL_EVENT_PAGES_PER_SYNC = 18;
+
 const PVPOKE_MASTER_LEAGUE =
   "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-10000.json";
 
@@ -1069,6 +1078,322 @@ async function currentRecommendations(env, user, targets, metas) {
 }
 
 
+
+const MONTH_INDEX = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12
+};
+
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&ndash;/gi, "–")
+    .replace(/&mdash;/gi, "—")
+    .replace(/&hellip;/gi, "…")
+    .replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(Number(n)));
+}
+
+function htmlToPlainText(html) {
+  return decodeHtmlEntities(
+    String(html || "")
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(?:p|div|section|article|li|h1|h2|h3|h4|h5|h6)>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+  )
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function officialEventLinksFromHtml(html, baseUrl) {
+  const links = new Set(PINNED_OFFICIAL_EVENT_PAGES);
+
+  const hrefRegex = /href\s*=\s*["']([^"'#]+)["']/gi;
+  let match;
+
+  while ((match = hrefRegex.exec(String(html || "")))) {
+    try {
+      const url = new URL(match[1], baseUrl);
+
+      if (!["pokemongo.com", "www.pokemongo.com", "pokemongolive.com", "www.pokemongolive.com"].includes(url.hostname)) {
+        continue;
+      }
+
+      const path = url.pathname.toLowerCase();
+
+      // Favor event/news detail pages; avoid account/store/legal/navigation pages.
+      const looksRelevant =
+        path.startsWith("/post/") ||
+        path.startsWith("/news/") ||
+        path.startsWith("/gofest/") ||
+        path.includes("/events/") ||
+        path.includes("/event/");
+
+      if (!looksRelevant) continue;
+
+      url.hash = "";
+      url.search = "";
+      links.add(url.toString().replace(/\/$/, ""));
+    } catch {}
+  }
+
+  return [...links].slice(0, MAX_OFFICIAL_EVENT_PAGES_PER_SYNC);
+}
+
+function isoDate(year, month, day) {
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function dateTokensFromText(value) {
+  const monthPattern =
+    "(January|February|March|April|May|June|July|August|September|October|November|December)";
+
+  const regex = new RegExp(
+    `(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)?\\\\s*,?\\\\s*${monthPattern}\\\\s+(\\\\d{1,2})(?:\\\\s*,\\\\s*(\\\\d{4}))?`,
+    "gi"
+  );
+
+  const tokens = [];
+  let match;
+
+  while ((match = regex.exec(String(value || "")))) {
+    tokens.push({
+      month: MONTH_INDEX[String(match[1]).toLowerCase()],
+      day: Number(match[2]),
+      year: match[3] ? Number(match[3]) : null,
+      index: match.index,
+      raw: match[0]
+    });
+  }
+
+  return tokens;
+}
+
+function inferDateRangeFromText(value) {
+  const tokens = dateTokensFromText(value);
+  if (tokens.length < 2) return null;
+
+  const first = { ...tokens[0] };
+  const second = { ...tokens[1] };
+
+  if (!second.year && first.year) second.year = first.year;
+  if (!first.year && second.year) first.year = second.year;
+
+  const currentYear = new Date().getUTCFullYear();
+  if (!first.year && !second.year) {
+    first.year = currentYear;
+    second.year = currentYear;
+  }
+
+  // Handle a Dec -> Jan range where only one year was stated.
+  if (first.year === second.year && first.month > second.month) {
+    second.year += 1;
+  }
+
+  return {
+    start_date: isoDate(first.year, first.month, first.day),
+    end_date: isoDate(second.year, second.month, second.day)
+  };
+}
+
+function nearbyDateWindow(text, startIndex, maxLength = 320) {
+  return String(text || "").slice(startIndex, startIndex + maxLength);
+}
+
+function remoteRaidRulesFromOfficialText(text, sourceUrl) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  const rules = [];
+
+  // Numeric increases, e.g.
+  // "The Remote Raid Pass limit will be increased to 30 from Monday..."
+  const numericRegex =
+    /(?:Remote Raid(?: Pass)? limit|Remote Raid Pass limit)[^.]{0,120}?(?:increased|raised|set)[^.]{0,60}?(?:to|at)\s+(\d{1,3})/gi;
+
+  let match;
+  while ((match = numericRegex.exec(normalized))) {
+    const limit = Number(match[1]);
+    if (!Number.isFinite(limit) || limit < 1 || limit > 500) continue;
+
+    const window = nearbyDateWindow(normalized, match.index, 420);
+    const range = inferDateRangeFromText(window);
+    if (!range) continue;
+
+    rules.push({
+      event_name: `Official temporary Remote Raid limit: ${limit}`,
+      start_date: range.start_date,
+      end_date: range.end_date,
+      remote_raid_limit: limit,
+      is_unlimited: 0,
+      source_url: sourceUrl,
+      source_excerpt: window.slice(0, 500)
+    });
+  }
+
+  // Unlimited periods, e.g.
+  // "There will be no limit on Remote Raids from Saturday..."
+  const unlimitedRegex =
+    /(?:there\s+(?:will|would)\s+be\s+no\s+limit\s+on\s+Remote Raids|no\s+limit\s+on\s+Remote Raids|Remote Raid(?: Pass)? limit[^.]{0,80}?(?:removed|unlimited))/gi;
+
+  while ((match = unlimitedRegex.exec(normalized))) {
+    const window = nearbyDateWindow(normalized, match.index, 420);
+    const range = inferDateRangeFromText(window);
+    if (!range) continue;
+
+    rules.push({
+      event_name: "Official temporary Remote Raid limit: Unlimited",
+      start_date: range.start_date,
+      end_date: range.end_date,
+      remote_raid_limit: 0,
+      is_unlimited: 1,
+      source_url: sourceUrl,
+      source_excerpt: window.slice(0, 500)
+    });
+  }
+
+  // Deduplicate identical rules from repeated page text.
+  const dedupe = new Map();
+  for (const rule of rules) {
+    const key = [
+      rule.start_date,
+      rule.end_date,
+      rule.remote_raid_limit,
+      rule.is_unlimited
+    ].join("|");
+    if (!dedupe.has(key)) dedupe.set(key, rule);
+  }
+
+  return [...dedupe.values()];
+}
+
+async function fetchOfficialHtml(url) {
+  const response = await fetch(url, {
+    headers: {
+      "user-agent": "PokemonGoPersonalCalendar/1.0 (+remote-raid-limit-detector)",
+      "accept": "text/html,application/xhtml+xml"
+    },
+    redirect: "follow"
+  });
+
+  if (!response.ok) {
+    throw new Error(`${url}: official page returned ${response.status}`);
+  }
+
+  return response.text();
+}
+
+async function syncOfficialRemoteRaidLimits(env) {
+  const detected = [];
+  const errors = [];
+
+  let indexHtml = "";
+  try {
+    indexHtml = await fetchOfficialHtml(OFFICIAL_POKEMON_GO_NEWS_URL);
+  } catch (error) {
+    errors.push(String(error.message || error));
+  }
+
+  const urls = officialEventLinksFromHtml(indexHtml, OFFICIAL_POKEMON_GO_NEWS_URL);
+
+  // Always include pinned high-value current event pages even if the news index
+  // changes its HTML structure.
+  for (const pinned of PINNED_OFFICIAL_EVENT_PAGES) {
+    if (!urls.includes(pinned)) urls.unshift(pinned);
+  }
+
+  const pageUrls = [...new Set(urls)].slice(0, MAX_OFFICIAL_EVENT_PAGES_PER_SYNC);
+  const timestamp = nowIso();
+
+  for (const url of pageUrls) {
+    try {
+      const html = await fetchOfficialHtml(url);
+      const plainText = htmlToPlainText(html);
+      const rules = remoteRaidRulesFromOfficialText(plainText, url);
+
+      for (const rule of rules) {
+        const id = await sha256Hex(
+          [
+            "official-remote-limit",
+            rule.source_url,
+            rule.start_date,
+            rule.end_date,
+            rule.is_unlimited ? "unlimited" : String(rule.remote_raid_limit)
+          ].join("|")
+        );
+
+        await env.DB.prepare(`
+          INSERT INTO remote_raid_limit_overrides (
+            id,
+            event_name,
+            start_date,
+            end_date,
+            remote_raid_limit,
+            source_url,
+            active,
+            updated_at,
+            is_unlimited,
+            detected_automatically,
+            source_excerpt,
+            detected_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, 1, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            event_name = excluded.event_name,
+            start_date = excluded.start_date,
+            end_date = excluded.end_date,
+            remote_raid_limit = excluded.remote_raid_limit,
+            source_url = excluded.source_url,
+            active = 1,
+            updated_at = excluded.updated_at,
+            is_unlimited = excluded.is_unlimited,
+            detected_automatically = 1,
+            source_excerpt = excluded.source_excerpt,
+            detected_at = excluded.detected_at
+        `).bind(
+          id,
+          rule.event_name,
+          rule.start_date,
+          rule.end_date,
+          rule.remote_raid_limit,
+          rule.source_url,
+          timestamp,
+          rule.is_unlimited,
+          rule.source_excerpt,
+          timestamp
+        ).run();
+
+        detected.push({ id, ...rule });
+      }
+    } catch (error) {
+      errors.push(String(error.message || error));
+    }
+  }
+
+  return {
+    pages_checked: pageUrls.length,
+    rules_detected: detected.length,
+    detected,
+    errors
+  };
+}
+
+
 function localDateForTimezone(timezone) {
   try {
     const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -1093,32 +1418,52 @@ function localDateForTimezone(timezone) {
 
 async function remoteRaidLimitForDate(env, localDate) {
   const override = await env.DB.prepare(`
-    SELECT event_name, start_date, end_date, remote_raid_limit, source_url
+    SELECT
+      event_name,
+      start_date,
+      end_date,
+      remote_raid_limit,
+      source_url,
+      COALESCE(is_unlimited, 0) AS is_unlimited,
+      COALESCE(detected_automatically, 0) AS detected_automatically,
+      source_excerpt,
+      detected_at
     FROM remote_raid_limit_overrides
     WHERE active = 1
       AND start_date <= ?
       AND end_date >= ?
-    ORDER BY remote_raid_limit DESC, updated_at DESC
+    ORDER BY
+      COALESCE(is_unlimited, 0) DESC,
+      remote_raid_limit DESC,
+      updated_at DESC
     LIMIT 1
   `).bind(localDate, localDate).first();
 
   if (override) {
     return {
-      limit: Number(override.remote_raid_limit),
+      limit: Number(override.remote_raid_limit || 0),
+      is_unlimited: Boolean(Number(override.is_unlimited || 0)),
       label: override.event_name,
       start_date: override.start_date,
       end_date: override.end_date,
       source_url: override.source_url,
+      source_excerpt: override.source_excerpt || null,
+      detected_at: override.detected_at || null,
+      detected_automatically: Boolean(Number(override.detected_automatically || 0)),
       is_override: true
     };
   }
 
   return {
     limit: DEFAULT_REMOTE_RAID_LIMIT,
+    is_unlimited: false,
     label: "Standard daily Remote Raid limit",
     start_date: null,
     end_date: null,
     source_url: DEFAULT_REMOTE_RAID_LIMIT_SOURCE,
+    source_excerpt: null,
+    detected_at: null,
+    detected_automatically: false,
     is_override: false
   };
 }
@@ -1171,28 +1516,33 @@ function buildRemoteRaidPlan({
   raidsUsed,
   minScore
 }) {
-  const officialLimit = Math.max(0, Number(officialRule.limit || 0));
+  const isUnlimited = Boolean(officialRule.is_unlimited);
+  const officialLimit = isUnlimited
+    ? null
+    : Math.max(0, Number(officialRule.limit || 0));
+
   const used = clamp(Math.floor(Number(raidsUsed || 0)), 0, 999);
-  const officialRemaining = Math.max(0, officialLimit - used);
+  const officialRemaining = isUnlimited
+    ? null
+    : Math.max(0, officialLimit - used);
 
   const configuredBudget =
     userBudget == null || userBudget === ""
       ? null
-      : clamp(Math.floor(Number(userBudget)), 0, officialLimit);
+      : Math.max(0, Math.floor(Number(userBudget)));
 
-  const dailyPlanningCap =
-    configuredBudget == null
-      ? officialLimit
-      : Math.min(officialLimit, configuredBudget);
-
-  const planningCapacity = Math.max(0, dailyPlanningCap - used);
-  const threshold = clamp(Number(minScore || DEFAULT_REMOTE_RAID_MIN_SCORE), 0, 100);
+  const threshold = clamp(
+    Number(minScore || DEFAULT_REMOTE_RAID_MIN_SCORE),
+    0,
+    100
+  );
 
   const candidates = recommendations
     .filter((rec) => rec.remote_eligible)
     .map((rec) => {
       const target = rec.target || null;
-      const explicitSkip = String(target?.priority || "").toLowerCase() === "skip";
+      const explicitSkip =
+        String(target?.priority || "").toLowerCase() === "skip";
       const completed = Boolean(Number(target?.completed));
       const cap = remoteTargetCap(target);
 
@@ -1212,14 +1562,61 @@ function buildRemoteRaidPlan({
       };
     });
 
+  // Maximum number of raids that can remain above the user's threshold after
+  // applying equal diminishing marginal value to every eligible boss.
+  const naturalValueCap = candidates.reduce((sum, candidate) => {
+    if (!candidate.eligible) return sum;
+
+    const scoreBasedCap = Math.max(
+      0,
+      Math.floor((candidate.score - threshold) / REMOTE_RAID_DECAY_PER_RAID) + 1
+    );
+
+    const targetCap =
+      candidate.target_cap == null
+        ? scoreBasedCap
+        : Math.min(scoreBasedCap, candidate.target_cap);
+
+    return sum + targetCap;
+  }, 0);
+
+  let dailyPlanningCap;
+
+  if (isUnlimited) {
+    // With no game cap, either respect the user's explicit budget or allow only
+    // the naturally worthwhile raids implied by the threshold/decay model.
+    dailyPlanningCap =
+      configuredBudget == null
+        ? used + naturalValueCap
+        : configuredBudget;
+  } else {
+    const budgetCap =
+      configuredBudget == null
+        ? officialLimit
+        : Math.min(configuredBudget, officialLimit);
+
+    dailyPlanningCap = budgetCap;
+  }
+
+  const planningCapacity = Math.max(0, dailyPlanningCap - used);
+
   for (let slot = 0; slot < planningCapacity; slot++) {
     let best = null;
 
     for (const candidate of candidates) {
       if (!candidate.eligible) continue;
-      if (candidate.target_cap != null && candidate.allocated >= candidate.target_cap) continue;
 
-      const marginalScore = candidate.score - candidate.allocated * REMOTE_RAID_DECAY_PER_RAID;
+      if (
+        candidate.target_cap != null &&
+        candidate.allocated >= candidate.target_cap
+      ) {
+        continue;
+      }
+
+      const marginalScore =
+        candidate.score -
+        candidate.allocated * REMOTE_RAID_DECAY_PER_RAID;
+
       if (marginalScore < threshold) continue;
 
       if (
@@ -1227,10 +1624,15 @@ function buildRemoteRaidPlan({
         marginalScore > best.marginal_score ||
         (
           marginalScore === best.marginal_score &&
-          candidate.pokemon_name.localeCompare(best.candidate.pokemon_name) < 0
+          candidate.pokemon_name.localeCompare(
+            best.candidate.pokemon_name
+          ) < 0
         )
       ) {
-        best = { candidate, marginal_score: marginalScore };
+        best = {
+          candidate,
+          marginal_score: marginalScore
+        };
       }
     }
 
@@ -1246,19 +1648,30 @@ function buildRemoteRaidPlan({
   return {
     official_rule: officialRule,
     official_limit: officialLimit,
+    official_is_unlimited: isUnlimited,
     raids_used: used,
     official_remaining: officialRemaining,
     user_budget: configuredBudget,
     daily_planning_cap: dailyPlanningCap,
     planning_capacity: planningCapacity,
+    natural_value_cap: naturalValueCap,
     min_score: threshold,
     decay_per_additional_raid: REMOTE_RAID_DECAY_PER_RAID,
     recommended_total: recommendedTotal,
-    unused_planning_capacity: Math.max(0, planningCapacity - recommendedTotal),
-    unused_official_capacity: Math.max(0, officialRemaining - recommendedTotal),
+    unused_planning_capacity: Math.max(
+      0,
+      planningCapacity - recommendedTotal
+    ),
+    unused_official_capacity: isUnlimited
+      ? null
+      : Math.max(0, officialRemaining - recommendedTotal),
     allocations: candidates
       .filter((candidate) => candidate.allocated > 0)
-      .sort((a, b) => b.allocated - a.allocated || b.score - a.score),
+      .sort(
+        (a, b) =>
+          b.allocated - a.allocated ||
+          b.score - a.score
+      ),
     not_allocated: candidates
       .filter((candidate) => candidate.allocated === 0)
       .sort((a, b) => b.score - a.score)
@@ -1702,24 +2115,68 @@ async function adminMetaList(request, env) {
 }
 
 
+
+async function adminRemoteRaidLimits(request, env) {
+  const url = new URL(request.url);
+  const key = url.searchParams.get("key");
+
+  if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
+    return bad("Invalid admin key.", 401);
+  }
+
+  const { results } = await env.DB.prepare(`
+    SELECT
+      id,
+      event_name,
+      start_date,
+      end_date,
+      remote_raid_limit,
+      source_url,
+      active,
+      updated_at,
+      COALESCE(is_unlimited, 0) AS is_unlimited,
+      COALESCE(detected_automatically, 0) AS detected_automatically,
+      source_excerpt,
+      detected_at
+    FROM remote_raid_limit_overrides
+    ORDER BY start_date DESC, end_date DESC, remote_raid_limit DESC
+    LIMIT 100
+  `).all();
+
+  return json({ rules: results });
+}
+
 async function adminSync(request, env) {
   const body = await request.json();
+
   if (!env.ADMIN_KEY || body.key !== env.ADMIN_KEY) {
     return bad("Invalid admin key.", 401);
   }
 
   const eventResults = await syncAllEvents(env);
 
+  let remoteRaidLimits;
+  try {
+    remoteRaidLimits = await syncOfficialRemoteRaidLimits(env);
+  } catch (error) {
+    remoteRaidLimits = {
+      error: String(error.message || error)
+    };
+  }
+
   let automaticMeta;
   try {
     automaticMeta = await syncAutomaticMeta(env);
   } catch (error) {
-    automaticMeta = { error: String(error.message || error) };
+    automaticMeta = {
+      error: String(error.message || error)
+    };
   }
 
   return json({
     ok: true,
     events: eventResults,
+    remote_raid_limits: remoteRaidLimits,
     automatic_meta: automaticMeta
   });
 }
@@ -1763,6 +2220,10 @@ async function handleFetch(request, env) {
       return adminMetaList(request, env);
     }
 
+    if (request.method === "GET" && path === "/api/admin/remote-limits") {
+      return adminRemoteRaidLimits(request, env);
+    }
+
 
     if (request.method === "POST" && path === "/api/admin/sync") {
       return adminSync(request, env);
@@ -1802,6 +2263,16 @@ export default {
       (async () => {
         const eventResults = await syncAllEvents(env);
         console.log("Event sync:", JSON.stringify(eventResults));
+
+        try {
+          const remoteRaidLimits = await syncOfficialRemoteRaidLimits(env);
+          console.log(
+            "Official Remote Raid limit sync:",
+            JSON.stringify(remoteRaidLimits)
+          );
+        } catch (error) {
+          console.error("Official Remote Raid limit sync failed:", error);
+        }
 
         try {
           const automaticMeta = await syncAutomaticMeta(env);
