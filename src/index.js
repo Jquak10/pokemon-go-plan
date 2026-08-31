@@ -41,6 +41,11 @@ const RAID_SOURCE_TYPES = new Set([
 const PVPOKE_MASTER_LEAGUE =
   "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-10000.json";
 
+const POGO_API_POKEDEX =
+  "https://pokemon-go-api.github.io/pokemon-go-api/api/pokedex.json";
+
+const AUTO_META_METHOD_VERSION = "auto-meta-v1";
+
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
@@ -288,28 +293,332 @@ async function syncAllEvents(env) {
   return results;
 }
 
-async function syncPvPoke(env) {
-  const response = await fetch(PVPOKE_MASTER_LEAGUE, {
-    headers: { "user-agent": "PokemonGoPersonalCalendar/1.0" }
+
+function englishName(pokemon) {
+  return String(
+    pokemon?.names?.English ||
+    pokemon?.name ||
+    pokemon?.id ||
+    ""
+  ).trim();
+}
+
+function objectValues(value) {
+  if (!value || typeof value !== "object") return [];
+  return Array.isArray(value) ? value : Object.values(value);
+}
+
+function moveTypeName(move) {
+  return String(
+    move?.type?.names?.English ||
+    move?.type?.type ||
+    ""
+  ).trim();
+}
+
+function pokemonTypeNames(pokemon) {
+  const values = [
+    pokemon?.primaryType?.names?.English || pokemon?.primaryType?.type,
+    pokemon?.secondaryType?.names?.English || pokemon?.secondaryType?.type
+  ];
+  return values.filter(Boolean).map((v) => String(v).toLowerCase());
+}
+
+function bestPveCycleDps(pokemon) {
+  const quickMoves = objectValues(pokemon?.quickMoves);
+  const chargedMoves = objectValues(pokemon?.cinematicMoves);
+
+  if (!quickMoves.length || !chargedMoves.length) {
+    return null;
+  }
+
+  const types = new Set(pokemonTypeNames(pokemon));
+  let best = 0;
+
+  for (const fast of quickMoves) {
+    const fastPower = Number(fast?.power || 0);
+    const fastDuration = Math.max(Number(fast?.durationMs || 1000) / 1000, 0.1);
+    const fastEnergy = Math.max(Math.abs(Number(fast?.energy || 0)), 1);
+    const fastStab = types.has(moveTypeName(fast).toLowerCase()) ? 1.2 : 1.0;
+
+    for (const charged of chargedMoves) {
+      const chargePower = Number(charged?.power || 0);
+      const chargeDuration = Math.max(Number(charged?.durationMs || 2000) / 1000, 0.1);
+      const chargeCost = Math.max(Math.abs(Number(charged?.energy || 50)), 1);
+      const chargeStab = types.has(moveTypeName(charged).toLowerCase()) ? 1.2 : 1.0;
+
+      const fastCount = Math.max(1, Math.ceil(chargeCost / fastEnergy));
+      const damage =
+        fastCount * fastPower * fastStab +
+        chargePower * chargeStab;
+      const seconds =
+        fastCount * fastDuration +
+        chargeDuration;
+
+      if (seconds > 0) {
+        best = Math.max(best, damage / seconds);
+      }
+    }
+  }
+
+  return best || null;
+}
+
+function rawPvePower(pokemon) {
+  const attack = Number(pokemon?.stats?.attack || 0);
+  const defense = Number(pokemon?.stats?.defense || 0);
+  const stamina = Number(pokemon?.stats?.stamina || 0);
+
+  if (!attack) return 0;
+
+  const cycleDps = bestPveCycleDps(pokemon);
+  const bulk = Math.sqrt(Math.max(defense, 1) * Math.max(stamina, 1));
+
+  if (cycleDps) {
+    // Attack and best same-species move cycle dominate.
+    // Bulk gets only a small weight because this is a raid-attacker proxy.
+    return attack * cycleDps * Math.pow(bulk, 0.15);
+  }
+
+  return attack * Math.pow(bulk, 0.25);
+}
+
+function percentileScore(sortedValues, value) {
+  if (!sortedValues.length) return 50;
+  let low = 0;
+  let high = sortedValues.length;
+
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (sortedValues[mid] <= value) low = mid + 1;
+    else high = mid;
+  }
+
+  const percentile = low / sortedValues.length;
+  // Keep the bottom from being exactly zero and the top close to 100.
+  return clamp(5 + percentile * 95, 0, 100);
+}
+
+function classRarity(pokemon) {
+  const cls = String(pokemon?.pokemonClass || "");
+  if (cls.includes("MYTHIC")) return 95;
+  if (cls.includes("LEGENDARY")) return 90;
+  if (cls.includes("ULTRA_BEAST")) return 88;
+  return 55;
+}
+
+function daysBetween(startDate, endDate) {
+  if (!startDate || !endDate) return null;
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return null;
+  return Math.max(1, Math.round((end - start) / 86400000) + 1);
+}
+
+function availabilityRarity(event, pokemon, kind) {
+  let score = classRarity(pokemon);
+  if (kind === "mega" || kind === "primal") score = Math.max(score, 82);
+  if (kind === "gigantamax") score = Math.max(score, 82);
+
+  const duration = daysBetween(event.start_date, event.end_date);
+  if (duration != null) {
+    if (duration <= 2) score += 15;
+    else if (duration <= 4) score += 12;
+    else if (duration <= 7) score += 8;
+    else if (duration <= 14) score += 4;
+  }
+
+  return clamp(score, 0, 100);
+}
+
+function eventKindForMatch(summary, pokemonName) {
+  const s = normalizeName(summary);
+  const n = normalizeName(pokemonName);
+  if (s.includes(`mega ${n}`)) return "mega";
+  if (s.includes(`primal ${n}`)) return "primal";
+  if (s.includes(`gigantamax ${n}`)) return "gigantamax";
+  if (s.includes(`dynamax ${n}`)) return "dynamax";
+  return "normal";
+}
+
+function displayNameForMatch(pokemonName, kind) {
+  if (kind === "mega") return `Mega ${pokemonName}`;
+  if (kind === "primal") return `Primal ${pokemonName}`;
+  if (kind === "gigantamax") return `Gigantamax ${pokemonName}`;
+  if (kind === "dynamax") return `Dynamax ${pokemonName}`;
+  return pokemonName;
+}
+
+function automaticVerdict(pve, pvp, rarity, mega, kind) {
+  const pveText =
+    pve >= 85 ? "elite PvE potential" :
+    pve >= 70 ? "strong PvE potential" :
+    pve >= 50 ? "moderate PvE potential" :
+    "limited PvE value";
+
+  const rarityText =
+    rarity >= 88 ? "highly limited/valuable availability" :
+    rarity >= 72 ? "limited availability" :
+    "normal availability";
+
+  const extra =
+    kind === "mega" || kind === "primal"
+      ? ` Mega/support utility is ${mega >= 85 ? "excellent" : mega >= 70 ? "good" : "moderate"}.`
+      : "";
+
+  return `${pveText}; ${rarityText}.${extra}`;
+}
+
+async function fetchJson(url, label) {
+  const response = await fetch(url, {
+    headers: { "user-agent": "PokemonGoPersonalCalendar/1.0" },
+    redirect: "follow"
   });
 
   if (!response.ok) {
-    throw new Error(`PvPoke returned ${response.status}`);
+    throw new Error(`${label} returned ${response.status}`);
   }
 
-  const rankings = await response.json();
-  const { results: metas } = await env.DB.prepare(
-    `SELECT pokemon_name FROM pokemon_meta`
-  ).all();
+  return response.json();
+}
 
-  if (!metas.length) {
-    return { updated: 0, message: "No pokemon_meta rows to match yet." };
+async function raidEventsForMeta(env) {
+  const placeholders = [...RAID_SOURCE_TYPES].map(() => "?").join(",");
+
+  const { results } = await env.DB.prepare(`
+    SELECT *
+    FROM events
+    WHERE status = 'active'
+      AND source_type IN (${placeholders})
+      AND COALESCE(end_date, start_date, '9999-12-31') >= date('now', '-1 day')
+      AND COALESCE(start_date, '0000-01-01') <= date('now', '+30 days')
+    ORDER BY start_date, summary
+    LIMIT 400
+  `).bind(...RAID_SOURCE_TYPES).all();
+
+  return results;
+}
+
+function findPokemonMatchesInSummary(summary, pokedex) {
+  const haystack = normalizeName(summary);
+  const matches = [];
+
+  for (const pokemon of pokedex) {
+    const name = englishName(pokemon);
+    const needle = normalizeName(name);
+    if (!needle || needle.length < 3) continue;
+
+    if (haystack.includes(needle)) {
+      matches.push({
+        pokemon,
+        name,
+        kind: eventKindForMatch(summary, name),
+        length: needle.length
+      });
+    }
   }
 
-  const rankMap = new Map();
-  for (const item of rankings) {
-    if (item?.speciesName && Number.isFinite(Number(item?.score))) {
-      rankMap.set(normalizeName(item.speciesName), Number(item.score));
+  // Longest matches first; remove nested accidental duplicates.
+  matches.sort((a, b) => b.length - a.length);
+  const selected = [];
+  const seen = new Set();
+
+  for (const match of matches) {
+    const key = normalizeName(match.name);
+    if (seen.has(key)) continue;
+
+    // Avoid selecting a shorter name fully contained inside a longer already-selected name.
+    if (selected.some((x) => normalizeName(x.name).includes(key) && normalizeName(x.name) !== key)) {
+      continue;
+    }
+
+    seen.add(key);
+    selected.push(match);
+  }
+
+  return selected.slice(0, 8);
+}
+
+async function syncAutomaticMeta(env) {
+  const [pokedexRaw, pvpRankings, raidEvents] = await Promise.all([
+    fetchJson(POGO_API_POKEDEX, "Pokémon GO API"),
+    fetchJson(PVPOKE_MASTER_LEAGUE, "PvPoke"),
+    raidEventsForMeta(env)
+  ]);
+
+  const pokedex = Array.isArray(pokedexRaw) ? pokedexRaw : [];
+  if (!pokedex.length) {
+    throw new Error("Pokémon GO API returned no Pokédex entries.");
+  }
+
+  const rawPowers = pokedex
+    .map(rawPvePower)
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b);
+
+  const pvpMap = new Map();
+  for (const item of Array.isArray(pvpRankings) ? pvpRankings : []) {
+    const species =
+      item?.speciesName ||
+      item?.speciesId ||
+      item?.name;
+    const score = Number(item?.score);
+
+    if (species && Number.isFinite(score)) {
+      pvpMap.set(normalizeName(species), clamp(score, 0, 100));
+    }
+  }
+
+  const bestByDisplayName = new Map();
+
+  for (const event of raidEvents) {
+    const matches = findPokemonMatchesInSummary(event.summary, pokedex);
+
+    for (const match of matches) {
+      const displayName = displayNameForMatch(match.name, match.kind);
+      const key = normalizeName(displayName);
+      const pve = percentileScore(rawPowers, rawPvePower(match.pokemon));
+      const pvp =
+        match.kind === "mega" || match.kind === "primal"
+          ? null
+          : (pvpMap.get(normalizeName(match.name)) ?? null);
+      const rarity = availabilityRarity(event, match.pokemon, match.kind);
+
+      const mega =
+        match.kind === "mega" || match.kind === "primal"
+          ? clamp(55 + pve * 0.45, 0, 100)
+          : match.kind === "gigantamax"
+            ? clamp(50 + pve * 0.35, 0, 100)
+            : null;
+
+      const pvpForOverall = pvp == null ? 50 : pvp;
+      const megaForOverall = mega == null ? 50 : mega;
+      const overall = clamp(
+        pve * 0.55 +
+        pvpForOverall * 0.10 +
+        rarity * 0.20 +
+        megaForOverall * 0.15,
+        0,
+        100
+      );
+
+      const candidate = {
+        displayName,
+        baseName: match.name,
+        kind: match.kind,
+        pve,
+        pvp,
+        rarity,
+        mega,
+        overall,
+        event,
+        pokemon: match.pokemon
+      };
+
+      const existing = bestByDisplayName.get(key);
+      if (!existing || candidate.overall > existing.overall) {
+        bestByDisplayName.set(key, candidate);
+      }
     }
   }
 
@@ -317,26 +626,114 @@ async function syncPvPoke(env) {
   const statements = [];
   let updated = 0;
 
-  for (const row of metas) {
-    const key = normalizeName(row.pokemon_name);
-    const score = rankMap.get(key);
-    if (score == null) continue;
+  for (const candidate of bestByDisplayName.values()) {
+    const verdict = automaticVerdict(
+      candidate.pve,
+      candidate.pvp,
+      candidate.rarity,
+      candidate.mega,
+      candidate.kind
+    );
+
+    const notes = [
+      `Automatically calculated by ${AUTO_META_METHOD_VERSION}.`,
+      `PvE score is a relative raid-attacker proxy derived from current Pokémon GO base stats and best available move-cycle data from the public Pokémon GO API; it is not a matchup-specific simulator.`,
+      candidate.pvp == null
+        ? "PvP score not applied for this raid form."
+        : "PvP score comes from PvPoke Master League overall rankings when a name match is available.",
+      `Rarity/availability score uses Pokémon class plus the current raid-window duration.`,
+      `Matched raid event: ${candidate.event.summary}`
+    ].join("\n");
 
     statements.push(
       env.DB.prepare(`
-        UPDATE pokemon_meta
-        SET pvp_score = ?, updated_at = ?
-        WHERE pokemon_name = ?
-      `).bind(score, timestamp, row.pokemon_name)
+        INSERT INTO pokemon_meta (
+          pokemon_name, pve_score, pvp_score, rarity_score,
+          mega_score, overall_score, verdict, notes, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(pokemon_name) DO UPDATE SET
+          pve_score = excluded.pve_score,
+          pvp_score = excluded.pvp_score,
+          rarity_score = excluded.rarity_score,
+          mega_score = excluded.mega_score,
+          overall_score = excluded.overall_score,
+          verdict = excluded.verdict,
+          notes = excluded.notes,
+          updated_at = excluded.updated_at
+      `).bind(
+        candidate.displayName,
+        Math.round(candidate.pve * 10) / 10,
+        candidate.pvp == null ? null : Math.round(candidate.pvp * 10) / 10,
+        Math.round(candidate.rarity * 10) / 10,
+        candidate.mega == null ? null : Math.round(candidate.mega * 10) / 10,
+        Math.round(candidate.overall * 10) / 10,
+        verdict,
+        notes,
+        timestamp
+      )
     );
+
+    const sourceRows = [
+      {
+        name: "Pokémon GO API",
+        url: POGO_API_POKEDEX,
+        note: "Machine-readable current Pokémon GO stats, types and moves."
+      },
+      {
+        name: "GO Calendar availability",
+        url: candidate.event.source_url || "https://gocalendar.info/",
+        note: `Raid availability window used for rarity/urgency: ${candidate.event.start_date || "?"} to ${candidate.event.end_date || "?"}.`
+      }
+    ];
+
+    if (candidate.pvp != null) {
+      sourceRows.push({
+        name: "PvPoke",
+        url: PVPOKE_MASTER_LEAGUE,
+        note: "Machine-readable Master League overall ranking score."
+      });
+    }
+
+    for (const source of sourceRows) {
+      const sourceId = await sha256Hex(
+        `${normalizeName(candidate.displayName)}|${source.name}|${source.url}`
+      );
+
+      statements.push(
+        env.DB.prepare(`
+          INSERT INTO meta_sources (
+            id, pokemon_name, source_name, source_url, note, updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            note = excluded.note,
+            updated_at = excluded.updated_at
+        `).bind(
+          sourceId,
+          candidate.displayName,
+          source.name,
+          source.url,
+          source.note,
+          timestamp
+        )
+      );
+    }
+
     updated++;
   }
 
   if (statements.length) {
+    // D1 batch can handle this small active/upcoming raid set comfortably.
     await env.DB.batch(statements);
   }
 
-  return { updated };
+  return {
+    updated,
+    raid_events_considered: raidEvents.length,
+    pokedex_entries: pokedex.length,
+    method: AUTO_META_METHOD_VERSION
+  };
 }
 
 async function userByManageToken(env, token) {
@@ -954,6 +1351,7 @@ async function calendarFeed(request, env, feedToken) {
   });
 }
 
+
 async function adminMetaList(request, env) {
   const url = new URL(request.url);
   const key = url.searchParams.get("key");
@@ -962,91 +1360,30 @@ async function adminMetaList(request, env) {
   }
 
   const { results: metas } = await env.DB.prepare(`
-    SELECT * FROM pokemon_meta ORDER BY pokemon_name
+    SELECT * FROM pokemon_meta
+    ORDER BY overall_score DESC, pokemon_name
   `).all();
 
   const { results: sources } = await env.DB.prepare(`
-    SELECT * FROM meta_sources ORDER BY pokemon_name, source_name
+    SELECT * FROM meta_sources
+    ORDER BY pokemon_name, source_name
   `).all();
 
-  return json({ metas, sources });
+  return json({
+    metas,
+    sources,
+    automation: {
+      enabled: true,
+      method: AUTO_META_METHOD_VERSION,
+      sources: [
+        "Pokémon GO API (stats/moves)",
+        "PvPoke (Master League ranking score)",
+        "GO Calendar event availability window"
+      ]
+    }
+  });
 }
 
-async function adminMetaUpsert(request, env) {
-  const body = await request.json();
-  if (!env.ADMIN_KEY || body.key !== env.ADMIN_KEY) {
-    return bad("Invalid admin key.", 401);
-  }
-
-  const name = String(body.pokemon_name || "").trim();
-  if (!name) return bad("Pokémon name is required.");
-
-  const numberOrNull = (value) => {
-    if (value === "" || value == null) return null;
-    const n = Number(value);
-    return Number.isFinite(n) ? clamp(n, 0, 100) : null;
-  };
-
-  const pve = numberOrNull(body.pve_score);
-  const pvp = numberOrNull(body.pvp_score);
-  const rarity = numberOrNull(body.rarity_score);
-  const mega = numberOrNull(body.mega_score);
-  const overall = numberOrNull(body.overall_score);
-
-  const timestamp = nowIso();
-
-  await env.DB.prepare(`
-    INSERT INTO pokemon_meta (
-      pokemon_name, pve_score, pvp_score, rarity_score,
-      mega_score, overall_score, verdict, notes, updated_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(pokemon_name) DO UPDATE SET
-      pve_score = excluded.pve_score,
-      pvp_score = COALESCE(excluded.pvp_score, pokemon_meta.pvp_score),
-      rarity_score = excluded.rarity_score,
-      mega_score = excluded.mega_score,
-      overall_score = excluded.overall_score,
-      verdict = excluded.verdict,
-      notes = excluded.notes,
-      updated_at = excluded.updated_at
-  `).bind(
-    name,
-    pve,
-    pvp,
-    rarity,
-    mega,
-    overall,
-    String(body.verdict || "").slice(0, 400),
-    String(body.notes || "").slice(0, 2000),
-    timestamp
-  ).run();
-
-  if (body.source_name && body.source_url) {
-    const sourceId = await sha256Hex(
-      `${normalizeName(name)}|${body.source_name}|${body.source_url}`
-    );
-
-    await env.DB.prepare(`
-      INSERT INTO meta_sources (
-        id, pokemon_name, source_name, source_url, note, updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        note = excluded.note,
-        updated_at = excluded.updated_at
-    `).bind(
-      sourceId,
-      name,
-      String(body.source_name).slice(0, 200),
-      String(body.source_url).slice(0, 1500),
-      String(body.source_note || "").slice(0, 1000),
-      timestamp
-    ).run();
-  }
-
-  return json({ ok: true });
-}
 
 async function adminSync(request, env) {
   const body = await request.json();
@@ -1055,14 +1392,19 @@ async function adminSync(request, env) {
   }
 
   const eventResults = await syncAllEvents(env);
-  let pvpoke;
+
+  let automaticMeta;
   try {
-    pvpoke = await syncPvPoke(env);
+    automaticMeta = await syncAutomaticMeta(env);
   } catch (error) {
-    pvpoke = { error: String(error.message || error) };
+    automaticMeta = { error: String(error.message || error) };
   }
 
-  return json({ ok: true, events: eventResults, pvpoke });
+  return json({
+    ok: true,
+    events: eventResults,
+    automatic_meta: automaticMeta
+  });
 }
 
 async function asset(request, env, pathname) {
@@ -1100,9 +1442,6 @@ async function handleFetch(request, env) {
       return adminMetaList(request, env);
     }
 
-    if (request.method === "POST" && path === "/api/admin/meta") {
-      return adminMetaUpsert(request, env);
-    }
 
     if (request.method === "POST" && path === "/api/admin/sync") {
       return adminSync(request, env);
@@ -1113,13 +1452,13 @@ async function handleFetch(request, env) {
       return calendarFeed(request, env, calendarMatch[1]);
     }
 
-  if (request.method === "GET" && /^\/manage\/[A-Za-z0-9_-]+\/?$/.test(path)) {
-    return asset(request, env, "/manage");
-  }
+    if (request.method === "GET" && /^\/manage\/[A-Za-z0-9_-]+\/?$/.test(path)) {
+      return asset(request, env, "/manage");
+    }
 
-  if (request.method === "GET" && path === "/admin") {
-    return asset(request, env, "/admin");
-  }
+    if (request.method === "GET" && path === "/admin") {
+      return asset(request, env, "/admin");
+    }
 
     return env.ASSETS.fetch(request);
   } catch (error) {
@@ -1144,10 +1483,10 @@ export default {
         console.log("Event sync:", JSON.stringify(eventResults));
 
         try {
-          const pvpoke = await syncPvPoke(env);
-          console.log("PvPoke sync:", JSON.stringify(pvpoke));
+          const automaticMeta = await syncAutomaticMeta(env);
+          console.log("Automatic meta sync:", JSON.stringify(automaticMeta));
         } catch (error) {
-          console.error("PvPoke sync failed:", error);
+          console.error("Automatic meta sync failed:", error);
         }
       })()
     );
