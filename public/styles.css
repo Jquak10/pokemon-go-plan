@@ -3637,3 +3637,33 @@ button.danger-soft:hover:not(:disabled) {
     width: 100%;
   }
 }
+
+
+/* ============================================================
+   TIE-AWARE TODAY PRIORITIES
+   ============================================================ */
+
+.co-leader-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border: 1px solid #efd9a9;
+  border-radius: 999px;
+  background: #fff8e8;
+  color: #8a631f;
+  font-size: .62rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+#todayTopPick {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  #todayTopPick {
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+}
