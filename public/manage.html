@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=11">
+  <link rel="stylesheet" href="/styles.css?v=12">
 </head>
 
 <body class="manage-page">
@@ -526,9 +526,24 @@
       <div class="modal-body">
         <div class="form-grid">
           <div>
-            <label for="pokemonName">Pokémon name</label>
-            <input id="pokemonName" placeholder="Mega Skarmory" autocomplete="off">
-            <p class="field-help">Use the raid-form name when appropriate, such as <strong>Mega Skarmory</strong>.</p>
+            <label for="pokemonName">Pokémon</label>
+            <select id="pokemonName">
+              <option value="">Select a target…</option>
+            </select>
+
+            <div id="customPokemonWrap" class="hidden">
+              <label for="customPokemonName">Custom Pokémon name</label>
+              <input
+                id="customPokemonName"
+                placeholder="Enter another Pokémon or form"
+                autocomplete="off"
+              >
+            </div>
+
+            <p class="field-help">
+              The dropdown prioritizes Pokémon available now, then known raid targets in the next 30 days.
+              Choose <strong>Other / custom Pokémon…</strong> if the target you want is not listed.
+            </p>
           </div>
 
           <div>
@@ -1438,8 +1453,168 @@ async function saveRaidUsage() {
   }
 }
 
+
+function allTargetOptionNames() {
+  const options =
+    state?.target_options ||
+    {
+      current: [],
+      upcoming: [],
+      existing: []
+    };
+
+  return [
+    ...(options.current || []),
+    ...(options.upcoming || []),
+    ...(options.existing || [])
+  ].map(option => option.name);
+}
+
+function renderTargetPokemonOptions(selectedName = "") {
+  const select =
+    document.getElementById("pokemonName");
+
+  const targetOptions =
+    state?.target_options ||
+    {
+      current: [],
+      upcoming: [],
+      existing: [],
+      horizon_days: 30
+    };
+
+  const groups = [
+    {
+      label: "Available now",
+      items: targetOptions.current || []
+    },
+    {
+      label: `Upcoming raids · next ${targetOptions.horizon_days || 30} days`,
+      items: targetOptions.upcoming || []
+    },
+    {
+      label: "Already tracking",
+      items: targetOptions.existing || []
+    }
+  ];
+
+  let html =
+    `<option value="">Select a target…</option>`;
+
+  for (const group of groups) {
+    if (!group.items.length) continue;
+
+    html +=
+      `<optgroup label="${esc(group.label)}">`;
+
+    html += group.items
+      .map(
+        option =>
+          `<option value="${esc(option.name)}">${esc(option.name)}</option>`
+      )
+      .join("");
+
+    html +=
+      `</optgroup>`;
+  }
+
+  html += `
+    <optgroup label="Other">
+      <option value="__custom__">Other / custom Pokémon…</option>
+    </optgroup>
+  `;
+
+  select.innerHTML = html;
+
+  const knownNames =
+    new Set(
+      allTargetOptionNames()
+        .map(name => normalizePickerName(name))
+    );
+
+  const selectedKey =
+    normalizePickerName(selectedName);
+
+  if (
+    selectedName &&
+    !knownNames.has(selectedKey)
+  ) {
+    select.value = "__custom__";
+    document
+      .getElementById("customPokemonWrap")
+      .classList.remove("hidden");
+
+    document
+      .getElementById("customPokemonName")
+      .value =
+        selectedName;
+
+    return;
+  }
+
+  select.value =
+    selectedName || "";
+
+  document
+    .getElementById("customPokemonWrap")
+    .classList.add("hidden");
+
+  document
+    .getElementById("customPokemonName")
+    .value = "";
+}
+
+function normalizePickerName(value) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase();
+}
+
+function selectedTargetPokemonName() {
+  const select =
+    document.getElementById("pokemonName");
+
+  if (select.value === "__custom__") {
+    return document
+      .getElementById("customPokemonName")
+      .value
+      .trim();
+  }
+
+  return select.value.trim();
+}
+
+function updateCustomPokemonVisibility() {
+  const select =
+    document.getElementById("pokemonName");
+
+  const wrap =
+    document.getElementById("customPokemonWrap");
+
+  const custom =
+    select.value === "__custom__";
+
+  wrap.classList.toggle(
+    "hidden",
+    !custom
+  );
+
+  if (custom) {
+    setTimeout(
+      () =>
+        document
+          .getElementById("customPokemonName")
+          .focus(),
+      20
+    );
+  }
+}
+
+
 function clearTargetForm() {
-  document.getElementById("pokemonName").value = "";
+  renderTargetPokemonOptions("");
+  document.getElementById("customPokemonName").value = "";
+  document.getElementById("customPokemonWrap").classList.add("hidden");
   document.getElementById("targetType").value = "mega_energy";
   document.getElementById("currentValue").value = "0";
   document.getElementById("targetValue").value = "";
@@ -1455,7 +1630,7 @@ function openTargetModal(target = null) {
 
   if (target) {
     document.getElementById("targetModalTitle").textContent = `Edit ${target.pokemon_name}`;
-    document.getElementById("pokemonName").value = target.pokemon_name;
+    renderTargetPokemonOptions(target.pokemon_name);
     document.getElementById("targetType").value = target.target_type;
     document.getElementById("currentValue").value = target.current_value ?? 0;
     document.getElementById("targetValue").value = target.target_value ?? "";
@@ -1481,7 +1656,7 @@ function closeTargetModal() {
 
 async function saveTarget() {
   const status = document.getElementById("targetStatus");
-  const pokemonName = document.getElementById("pokemonName").value.trim();
+  const pokemonName = selectedTargetPokemonName();
 
   if (!pokemonName) {
     status.textContent = "Enter a Pokémon name.";
@@ -1548,6 +1723,14 @@ document.getElementById("saveCalendar").addEventListener("click", saveCalendarFi
 document.getElementById("saveRaidUsage").addEventListener("click", saveRaidUsage);
 
 document.getElementById("openAddTarget").addEventListener("click", () => openTargetModal());
+
+document
+  .getElementById("pokemonName")
+  .addEventListener(
+    "change",
+    updateCustomPokemonVisibility
+  );
+
 document.getElementById("closeTargetModal").addEventListener("click", closeTargetModal);
 document.getElementById("cancelTarget").addEventListener("click", closeTargetModal);
 document.getElementById("saveTarget").addEventListener("click", saveTarget);
