@@ -73,7 +73,25 @@ button.danger {
 .error { color: #991b1b; }
 code, .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  word-break: break-all;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.recommendation,
+.target,
+.card {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .row {
   display: flex;
