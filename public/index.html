@@ -2,86 +2,251 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Pokémon GO Personal Calendar</title>
-  <link rel="stylesheet" href="/styles.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1f6feb">
+  <title>Pokémon GO Raid Planner</title>
+  <link rel="stylesheet" href="/styles.css?v=11">
 </head>
-<body>
-<main>
-  <section class="card">
-    <h1>Pokémon GO Personal Calendar</h1>
-    <p>
-      Create a private personalized calendar feed. Each subscriber gets their own
-      targets, progress, event filters and recommendations.
-    </p>
-    <p class="muted">
-      This starter uses GO Calendar for event timing. GO Battle League, GO Pass
-      and Season are off by default, but each subscriber can change their own filters.
-    </p>
 
-    <label for="timezone">Timezone</label>
-    <input id="timezone" value="Asia/Singapore">
+<body class="manage-page portal-page">
+  <div class="ambient-orb ambient-orb-one" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb-two" aria-hidden="true"></div>
 
-    <p><button id="create">Create my calendar</button></p>
-    <p id="status" class="muted"></p>
-  </section>
+  <main class="portal-shell">
+    <header class="dashboard-hero portal-hero">
+      <div class="hero-copy">
+        <div class="brand-kicker">
+          <span class="brand-mark" aria-hidden="true">⚡</span>
+          PERSONAL RAID STRATEGY
+        </div>
 
-  <section id="result" class="card hidden">
-    <h2>Calendar created</h2>
-    <p><strong>Save your management link.</strong> This starter version has no password recovery.</p>
+        <h1>Pokémon GO Raid Planner</h1>
 
-    <label>Management link</label>
-    <div id="manageUrl" class="mono"></div>
+        <p>
+          Build a private calendar that combines current Pokémon GO events,
+          raid value, your personal targets, and Remote Raid planning.
+        </p>
+      </div>
 
-    <label>Calendar subscription link</label>
-    <div id="calendarUrl" class="mono"></div>
+      <div class="hero-status">
+        <span class="live-dot" aria-hidden="true"></span>
+        Ready to create
+      </div>
+    </header>
 
-    <p class="row">
-      <a id="manageButton" class="button" href="#">Open my dashboard</a>
-      <button id="copyCalendar" class="secondary">Copy calendar URL</button>
-    </p>
-  </section>
-</main>
+    <section class="portal-feature-grid">
+      <article class="portal-feature">
+        <span class="metric-icon metric-icon-blue" aria-hidden="true">▦</span>
+        <div>
+          <strong>Live calendar</strong>
+          <small>Event feeds plus official schedule supplements.</small>
+        </div>
+      </article>
+
+      <article class="portal-feature">
+        <span class="metric-icon metric-icon-green" aria-hidden="true">⚔</span>
+        <div>
+          <strong>Raid strategy</strong>
+          <small>Internet/meta value combined with your goals.</small>
+        </div>
+      </article>
+
+      <article class="portal-feature">
+        <span class="metric-icon metric-icon-gold" aria-hidden="true">⚡</span>
+        <div>
+          <strong>Remote Raid plan</strong>
+          <small>Uses the official limit as a ceiling, not a spending target.</small>
+        </div>
+      </article>
+    </section>
+
+    <section class="dashboard-card portal-create-card">
+      <div class="section-heading-row">
+        <div>
+          <span class="section-eyebrow">GET STARTED</span>
+          <h2>Create your private planner</h2>
+          <p class="section-subtitle">
+            No account or password is required in this version. Your private
+            management link acts as your sign-in link, so save it securely.
+          </p>
+        </div>
+        <span class="status-badge badge-blue">Private</span>
+      </div>
+
+      <div class="portal-form-row">
+        <div>
+          <label for="timezone">Timezone</label>
+          <input id="timezone" value="Asia/Singapore" autocomplete="off">
+          <p class="field-help">
+            Used for local event dates, daily Remote Raid usage, and temporary event limits.
+          </p>
+        </div>
+
+        <button id="create" type="button" class="portal-create-button">
+          Create my planner
+        </button>
+      </div>
+
+      <p id="status" class="save-status"></p>
+    </section>
+
+    <section id="result" class="dashboard-card portal-result hidden">
+      <div class="success-orb" aria-hidden="true">✓</div>
+
+      <div>
+        <span class="section-eyebrow">PLANNER CREATED</span>
+        <h2>Your private links are ready</h2>
+        <p class="section-subtitle">
+          Save the management link somewhere secure. The calendar link is read-only
+          and can be added to Apple Calendar or another ICS-compatible calendar.
+        </p>
+      </div>
+
+      <div class="portal-link-grid">
+        <article class="portal-link-card">
+          <span>Management link</span>
+          <strong>Your private dashboard</strong>
+          <div id="manageUrl" class="portal-url mono"></div>
+
+          <div class="row">
+            <a id="manageButton" class="button" href="#">Open dashboard</a>
+            <button id="copyManage" type="button" class="secondary">Copy</button>
+          </div>
+        </article>
+
+        <article class="portal-link-card">
+          <span>Calendar subscription</span>
+          <strong>Read-only ICS feed</strong>
+          <div id="calendarUrl" class="portal-url mono"></div>
+
+          <div class="row">
+            <button id="copyCalendar" type="button">Copy calendar URL</button>
+          </div>
+        </article>
+      </div>
+
+      <div class="portal-security-note">
+        <span aria-hidden="true">🔒</span>
+        <div>
+          <strong>Keep the management URL private.</strong>
+          <p>
+            Anyone with the management URL can change that planner's targets and settings.
+            The ICS feed URL is read-only.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="portal-footer">
+      Event data is assembled from configured calendar sources and official Pokémon GO announcements.
+    </footer>
+  </main>
 
 <script>
 const createButton = document.getElementById("create");
 const status = document.getElementById("status");
 const result = document.getElementById("result");
+
 let calendarUrl = "";
+let manageUrl = "";
+
+async function copyText(value, button, normalLabel) {
+  if (!value) return;
+
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = value;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+
+  button.textContent = "Copied ✓";
+
+  setTimeout(() => {
+    button.textContent = normalLabel;
+  }, 1600);
+}
 
 createButton.addEventListener("click", async () => {
   createButton.disabled = true;
-  status.textContent = "Creating…";
+  status.textContent = "Creating your private planner…";
+  status.className = "save-status";
+
   try {
     const response = await fetch("/api/create", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json"
+      },
       body: JSON.stringify({
-        timezone: document.getElementById("timezone").value.trim()
+        timezone:
+          document
+            .getElementById("timezone")
+            .value
+            .trim()
       })
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Could not create calendar.");
 
-    document.getElementById("manageUrl").textContent = data.management_url;
-    document.getElementById("calendarUrl").textContent = data.calendar_url;
-    document.getElementById("manageButton").href = data.management_url;
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        "Could not create planner."
+      );
+    }
+
+    manageUrl = data.management_url;
     calendarUrl = data.calendar_url;
+
+    document.getElementById("manageUrl").textContent = manageUrl;
+    document.getElementById("calendarUrl").textContent = calendarUrl;
+    document.getElementById("manageButton").href = manageUrl;
+
     result.classList.remove("hidden");
-    status.textContent = "Created successfully.";
+    status.textContent = "Created successfully ✓";
+
+    result.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
   } catch (error) {
     status.textContent = error.message;
-    status.className = "error";
+    status.className = "save-status error";
   } finally {
     createButton.disabled = false;
   }
 });
 
-document.getElementById("copyCalendar").addEventListener("click", async () => {
-  if (!calendarUrl) return;
-  await navigator.clipboard.writeText(calendarUrl);
-  document.getElementById("copyCalendar").textContent = "Copied";
-});
+document
+  .getElementById("copyCalendar")
+  .addEventListener(
+    "click",
+    event =>
+      copyText(
+        calendarUrl,
+        event.currentTarget,
+        "Copy calendar URL"
+      )
+  );
+
+document
+  .getElementById("copyManage")
+  .addEventListener(
+    "click",
+    event =>
+      copyText(
+        manageUrl,
+        event.currentTarget,
+        "Copy"
+      )
+  );
 </script>
 </body>
 </html>
