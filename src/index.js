@@ -56,7 +56,8 @@ const OFFICIAL_POKEMON_GO_NEWS_URL =
   "https://pokemongo.com/news";
 
 const PINNED_OFFICIAL_EVENT_PAGES = [
-  "https://pokemongo.com/gofest/megafinale"
+  "https://pokemongo.com/gofest/megafinale",
+  "https://pokemongo.com/news/megafinale-2026-armored-mewtwo"
 ];
 
 const MAX_OFFICIAL_EVENT_PAGES_PER_SYNC = 8;
@@ -566,7 +567,23 @@ async function raidEventsForMeta(env) {
     LIMIT 400
   `).bind(...RAID_SOURCE_TYPES).all();
 
-  return results;
+  const rules =
+    await eventSuppressionRules(
+      env,
+      todayUtc(),
+      addDaysIso(
+        todayUtc(),
+        30
+      )
+    );
+
+  return results.filter(
+    (event) =>
+      !eventIsSuppressedByRules(
+        event,
+        rules
+      )
+  );
 }
 
 function findPokemonMatchesInSummary(summary, pokedex) {
@@ -1074,9 +1091,24 @@ async function currentRecommendations(env, user, targets, metas) {
     LIMIT 200
   `).bind(...RAID_SOURCE_TYPES, day, day).all();
 
+  const rules =
+    await eventSuppressionRules(
+      env,
+      day,
+      day
+    );
+
   const map = new Map();
 
   for (const event of events) {
+    if (
+      eventIsSuppressedByRules(
+        event,
+        rules
+      )
+    ) {
+      continue;
+    }
     const matches = findMatches(event.summary, targets, metas);
     for (const match of matches) {
       const key = normalizeName(match.name);
@@ -2077,6 +2109,264 @@ async function officialRaidSupplementStatements(env, supplements, timestamp) {
 }
 
 
+
+function officialEventSuppressionRulesFromText(text, sourceUrl) {
+  const fullText = String(text || "");
+  const rules = [];
+
+  const phraseIndex =
+    fullText.search(
+      /Seasonal Mega Raids,\s*Seasonal Five-Star Raids,\s*Seasonal Shadow Raids,\s*Seasonal Raid Hours,\s*and Seasonal Spotlight Hours will not take place/i
+    );
+
+  if (phraseIndex < 0) {
+    return rules;
+  }
+
+  const window =
+    fullText.slice(
+      phraseIndex,
+      phraseIndex + 760
+    );
+
+  const range =
+    inferDateRangeFromText(window);
+
+  if (!range) {
+    return rules;
+  }
+
+  rules.push({
+    event_name:
+      "Mega Ascension + Mega Finale seasonal schedule suspension",
+
+    start_date:
+      range.start_date,
+
+    end_date:
+      range.end_date,
+
+    suppressed_source_types: [
+      "raid_battles",
+      "raid_hour",
+      "pokemon_spotlight_hour"
+    ],
+
+    note:
+      "Hide normal seasonal Mega Raid, five-star Raid, Shadow Raid, Raid Hour, and Spotlight Hour schedule entries during the official replacement window. Official event supplements remain visible. Pokémon GO separately notes that seasonal Raid Bosses may still appear during Mega Ascension, so this suppresses scheduled calendar entries rather than claiming random seasonal appearances are impossible.",
+
+    source_url:
+      sourceUrl,
+
+    source_excerpt:
+      window.slice(0, 700)
+  });
+
+  return rules;
+}
+
+function armoredMewtwoSupplementsFromOfficialText(text, sourceUrl) {
+  const fullText =
+    String(text || "");
+
+  if (
+    !/Armored Mewtwo will appear in five-star raids on both Saturday and Sunday/i.test(
+      fullText
+    )
+  ) {
+    return [];
+  }
+
+  const headerIndex =
+    fullText.search(
+      /Pokémon GO Fest 2026:\s*Mega Finale/i
+    );
+
+  const headerWindow =
+    headerIndex >= 0
+      ? fullText.slice(
+          headerIndex,
+          headerIndex + 700
+        )
+      : fullText;
+
+  const range =
+    inferDateRangeFromText(
+      headerWindow
+    );
+
+  if (!range) {
+    return [];
+  }
+
+  const dates = [];
+  let current = range.start_date;
+
+  while (
+    current &&
+    current <= range.end_date &&
+    dates.length < 7
+  ) {
+    dates.push(current);
+    current =
+      addDaysIso(
+        current,
+        1
+      );
+  }
+
+  return dates.map((dateValue) => ({
+    event_name:
+      "Pokémon GO Fest 2026: Mega Finale",
+
+    pokemon_name:
+      "Armored Mewtwo",
+
+    start_date:
+      dateValue,
+
+    end_date:
+      dateValue,
+
+    start_time:
+      "100000",
+
+    end_time:
+      "180000",
+
+    source_url:
+      sourceUrl,
+
+    note:
+      "Armored Mewtwo will appear in five-star raids during Mega Finale event hours. Shiny Armored Mewtwo is not available for this event."
+  }));
+}
+
+async function officialArmoredMewtwoStatements(
+  env,
+  supplements,
+  timestamp
+) {
+  const statements = [];
+
+  for (const item of supplements) {
+    const sourceUid = [
+      "official-supplement",
+      "mega-finale",
+      "armored-mewtwo",
+      item.start_date
+    ].join(":");
+
+    const id =
+      await sha256Hex(
+        `raid_battles|${sourceUid}`
+      );
+
+    const summary =
+      "Armored Mewtwo — Mega Finale Five-Star Raids";
+
+    const description = [
+      `Official Pokémon GO Fest 2026: Mega Finale five-star raid schedule.`,
+      item.note,
+      `Official source: ${item.source_url}`
+    ].join("\n");
+
+    const eventObject = {
+      source_uid:
+        sourceUid,
+
+      summary,
+
+      description,
+
+      dtstart_line:
+        `DTSTART:${compactIcsDate(item.start_date)}T${item.start_time}`,
+
+      dtend_line:
+        `DTEND:${compactIcsDate(item.end_date)}T${item.end_time}`,
+
+      other_lines: [
+        `UID:${sourceUid}`,
+        `URL:${item.source_url}`,
+        "CATEGORIES:raid_battles",
+        "X-POGO-SOURCE:official",
+        "X-POGO-RAID-TIER:five-star"
+      ].join("\n"),
+
+      start_date:
+        item.start_date,
+
+      end_date:
+        item.end_date,
+
+      source_url:
+        item.source_url
+    };
+
+    const contentHash =
+      await sha256Hex(
+        JSON.stringify(eventObject)
+      );
+
+    statements.push(
+      env.DB.prepare(`
+        INSERT INTO events (
+          id,
+          source_type,
+          source_uid,
+          summary,
+          description,
+          dtstart_line,
+          dtend_line,
+          other_lines,
+          start_date,
+          end_date,
+          source_url,
+          content_hash,
+          sequence,
+          status,
+          updated_at
+        )
+        VALUES (?, 'raid_battles', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?)
+        ON CONFLICT(id) DO UPDATE SET
+          summary = excluded.summary,
+          description = excluded.description,
+          dtstart_line = excluded.dtstart_line,
+          dtend_line = excluded.dtend_line,
+          other_lines = excluded.other_lines,
+          start_date = excluded.start_date,
+          end_date = excluded.end_date,
+          source_url = excluded.source_url,
+          sequence = CASE
+            WHEN events.content_hash != excluded.content_hash
+              OR events.status != 'active'
+            THEN events.sequence + 1
+            ELSE events.sequence
+          END,
+          content_hash = excluded.content_hash,
+          status = 'active',
+          updated_at = excluded.updated_at
+      `).bind(
+        id,
+        sourceUid,
+        eventObject.summary,
+        eventObject.description,
+        eventObject.dtstart_line,
+        eventObject.dtend_line,
+        eventObject.other_lines,
+        eventObject.start_date,
+        eventObject.end_date,
+        eventObject.source_url,
+        contentHash,
+        timestamp
+      )
+    );
+  }
+
+  return statements;
+}
+
+
 async function fetchOfficialHtml(url) {
   const response = await fetch(url, {
     headers: {
@@ -2096,6 +2386,8 @@ async function fetchOfficialHtml(url) {
 async function syncOfficialRemoteRaidLimits(env) {
   const detected = [];
   const officialRaidSupplements = [];
+  const suppressionRules = [];
+  const armoredMewtwoSupplements = [];
   let megaFinaleData = null;
   const errors = [];
 
@@ -2126,6 +2418,70 @@ async function syncOfficialRemoteRaidLimits(env) {
     try {
       const html = await fetchOfficialHtml(url);
       const plainText = htmlToPlainText(html);
+
+      const pageSuppressions =
+        officialEventSuppressionRulesFromText(
+          plainText,
+          url
+        );
+
+      for (
+        const rule of pageSuppressions
+      ) {
+        const key = [
+          rule.start_date,
+          rule.end_date,
+          JSON.stringify(
+            rule.suppressed_source_types
+          )
+        ].join("|");
+
+        if (
+          !suppressionRules.some(
+            (existing) =>
+              [
+                existing.start_date,
+                existing.end_date,
+                JSON.stringify(
+                  existing.suppressed_source_types
+                )
+              ].join("|") === key
+          )
+        ) {
+          suppressionRules.push(
+            rule
+          );
+        }
+      }
+
+      const armored =
+        armoredMewtwoSupplementsFromOfficialText(
+          plainText,
+          url
+        );
+
+      for (
+        const item of armored
+      ) {
+        const key = [
+          item.pokemon_name,
+          item.start_date
+        ].join("|");
+
+        if (
+          !armoredMewtwoSupplements.some(
+            (existing) =>
+              [
+                existing.pokemon_name,
+                existing.start_date
+              ].join("|") === key
+          )
+        ) {
+          armoredMewtwoSupplements.push(
+            item
+          );
+        }
+      }
 
       const rules =
         remoteRaidRulesFromOfficialText(
@@ -2241,6 +2597,64 @@ async function syncOfficialRemoteRaidLimits(env) {
     }
   }
 
+  for (
+    const rule of suppressionRules
+  ) {
+    const id =
+      await sha256Hex(
+        [
+          "official-event-suppression",
+          rule.start_date,
+          rule.end_date,
+          JSON.stringify(
+            rule.suppressed_source_types
+          )
+        ].join("|")
+      );
+
+    dbStatements.push(
+      env.DB.prepare(`
+        INSERT INTO event_suppression_rules (
+          id,
+          event_name,
+          start_date,
+          end_date,
+          suppressed_source_types,
+          note,
+          source_url,
+          active,
+          detected_automatically,
+          source_excerpt,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          event_name = excluded.event_name,
+          start_date = excluded.start_date,
+          end_date = excluded.end_date,
+          suppressed_source_types = excluded.suppressed_source_types,
+          note = excluded.note,
+          source_url = excluded.source_url,
+          active = 1,
+          detected_automatically = 1,
+          source_excerpt = excluded.source_excerpt,
+          updated_at = excluded.updated_at
+      `).bind(
+        id,
+        rule.event_name,
+        rule.start_date,
+        rule.end_date,
+        JSON.stringify(
+          rule.suppressed_source_types
+        ),
+        rule.note,
+        rule.source_url,
+        rule.source_excerpt,
+        timestamp
+      )
+    );
+  }
+
   const supplementStatements =
     await officialRaidSupplementStatements(
       env,
@@ -2258,6 +2672,17 @@ async function syncOfficialRemoteRaidLimits(env) {
     );
 
   dbStatements.push(...megaFinaleStatements);
+
+  const armoredMewtwoStatements =
+    await officialArmoredMewtwoStatements(
+      env,
+      armoredMewtwoSupplements,
+      timestamp
+    );
+
+  dbStatements.push(
+    ...armoredMewtwoStatements
+  );
 
   if (dbStatements.length) {
     await env.DB.batch(dbStatements);
@@ -2279,6 +2704,18 @@ async function syncOfficialRemoteRaidLimits(env) {
       count:
         (megaFinaleData?.main_event ? 1 : 0) +
         (megaFinaleData?.raid_events?.length || 0)
+    },
+    armored_mewtwo_supplements: {
+      count:
+        armoredMewtwoSupplements.length,
+      events:
+        armoredMewtwoSupplements
+    },
+    suppression_rules: {
+      count:
+        suppressionRules.length,
+      rules:
+        suppressionRules
     },
     errors
   };
@@ -2666,31 +3103,58 @@ async function calendarEventsApi(request, env) {
     LIMIT 700
   `).bind(...included, bounds.end, bounds.start).all();
 
+  const rules =
+    await eventSuppressionRules(
+      env,
+      bounds.start,
+      bounds.end
+    );
+
   const dedupe = new Set();
   const events = [];
 
-  for (const event of results) {
-    const key =
-      calendarEventDedupeKey(
-        event,
-        targets,
-        metas
+  for (const rawEvent of results) {
+    const visibleSegments =
+      visibleEventSegments(
+        rawEvent,
+        rules
       );
 
-    if (dedupe.has(key)) continue;
-    dedupe.add(key);
+    for (const event of visibleSegments) {
+      const key =
+        calendarEventDedupeKey(
+          event,
+          targets,
+          metas
+        );
 
-    const personalized = personalizeEvent(event, user, targets, metas);
+      if (dedupe.has(key)) continue;
+      dedupe.add(key);
 
-    events.push({
-      id: event.id,
-      title: personalized.title,
-      description: personalized.description || "",
-      source_type: event.source_type,
-      start_date: event.start_date,
-      end_date: event.end_date || event.start_date,
-      original_title: event.summary
-    });
+      const personalized =
+        personalizeEvent(
+          event,
+          user,
+          targets,
+          metas
+        );
+
+      events.push({
+        id: event.id,
+        title: personalized.title,
+        description:
+          personalized.description || "",
+        source_type:
+          event.source_type,
+        start_date:
+          event.start_date,
+        end_date:
+          event.end_date ||
+          event.start_date,
+        original_title:
+          event.summary
+      });
+    }
   }
 
   return json({
@@ -2973,6 +3437,271 @@ function isOfficialSupplementEvent(event) {
 }
 
 
+function parseSuppressedSourceTypes(value) {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function eventSuppressionRules(
+  env,
+  startDate = "0000-01-01",
+  endDate = "9999-12-31"
+) {
+  const { results } = await env.DB.prepare(`
+    SELECT *
+    FROM event_suppression_rules
+    WHERE active = 1
+      AND start_date <= ?
+      AND end_date >= ?
+    ORDER BY start_date, event_name
+  `).bind(endDate, startDate).all();
+
+  return results.map((rule) => ({
+    ...rule,
+    suppressed_source_types:
+      parseSuppressedSourceTypes(
+        rule.suppressed_source_types
+      )
+  }));
+}
+
+function eventIsSuppressedByRules(event, rules) {
+  if (isOfficialSupplementEvent(event)) {
+    return false;
+  }
+
+  const eventStart =
+    event.start_date ||
+    "0000-01-01";
+
+  const eventEnd =
+    event.end_date ||
+    event.start_date ||
+    "9999-12-31";
+
+  return rules.some((rule) => {
+    if (
+      !rule.suppressed_source_types.includes(
+        event.source_type
+      )
+    ) {
+      return false;
+    }
+
+    const overlaps =
+      eventStart <= rule.end_date &&
+      eventEnd >= rule.start_date;
+
+    return overlaps;
+  });
+}
+
+
+function visibleEventSegments(event, rules) {
+  if (
+    isOfficialSupplementEvent(event) ||
+    !event.start_date
+  ) {
+    return [event];
+  }
+
+  const applicableRules =
+    rules.filter((rule) =>
+      rule.suppressed_source_types.includes(
+        event.source_type
+      )
+    );
+
+  if (!applicableRules.length) {
+    return [event];
+  }
+
+  let segments = [{
+    start_date:
+      event.start_date,
+
+    end_date:
+      event.end_date ||
+      event.start_date
+  }];
+
+  for (const rule of applicableRules) {
+    const nextSegments = [];
+
+    for (const segment of segments) {
+      const overlaps =
+        segment.start_date <= rule.end_date &&
+        segment.end_date >= rule.start_date;
+
+      if (!overlaps) {
+        nextSegments.push(segment);
+        continue;
+      }
+
+      if (
+        segment.start_date <
+        rule.start_date
+      ) {
+        const beforeEnd =
+          addDaysIso(
+            rule.start_date,
+            -1
+          );
+
+        if (
+          beforeEnd &&
+          segment.start_date <= beforeEnd
+        ) {
+          nextSegments.push({
+            start_date:
+              segment.start_date,
+
+            end_date:
+              beforeEnd
+          });
+        }
+      }
+
+      if (
+        segment.end_date >
+        rule.end_date
+      ) {
+        const afterStart =
+          addDaysIso(
+            rule.end_date,
+            1
+          );
+
+        if (
+          afterStart &&
+          afterStart <= segment.end_date
+        ) {
+          nextSegments.push({
+            start_date:
+              afterStart,
+
+            end_date:
+              segment.end_date
+          });
+        }
+      }
+    }
+
+    segments = nextSegments;
+  }
+
+  return segments.map(
+    (segment, index) =>
+      eventForVisibleSegment(
+        event,
+        segment.start_date,
+        segment.end_date,
+        index
+      )
+  );
+}
+
+function replaceDateInIcsPropertyLine(
+  line,
+  dateValue
+) {
+  if (!line || !dateValue) {
+    return line;
+  }
+
+  const colon =
+    line.indexOf(":");
+
+  if (colon < 0) {
+    return line;
+  }
+
+  const left =
+    line.slice(0, colon);
+
+  const value =
+    line.slice(colon + 1);
+
+  const compact =
+    compactIcsDate(dateValue);
+
+  const replaced =
+    value.replace(
+      /^\d{8}/,
+      compact
+    );
+
+  return `${left}:${replaced}`;
+}
+
+function isAllDayIcsLine(line) {
+  if (!line) return false;
+
+  return (
+    /;VALUE=DATE(?:;|:)/i.test(line) ||
+    /:\d{8}$/.test(line)
+  );
+}
+
+function eventForVisibleSegment(
+  event,
+  startDate,
+  endDate,
+  index
+) {
+  const clone = {
+    ...event,
+
+    start_date:
+      startDate,
+
+    end_date:
+      endDate,
+
+    source_uid:
+      `${event.source_uid || event.id || "event"}:visible:${startDate}:${endDate}:${index}`,
+
+    id:
+      `${event.id || "event"}:visible:${startDate}:${endDate}:${index}`
+  };
+
+  clone.dtstart_line =
+    replaceDateInIcsPropertyLine(
+      event.dtstart_line,
+      startDate
+    );
+
+  if (
+    isAllDayIcsLine(
+      event.dtstart_line
+    )
+  ) {
+    const exclusiveEnd =
+      addDaysIso(
+        endDate,
+        1
+      );
+
+    clone.dtend_line =
+      `DTEND;VALUE=DATE:${compactIcsDate(exclusiveEnd)}`;
+  } else if (event.dtend_line) {
+    clone.dtend_line =
+      replaceDateInIcsPropertyLine(
+        event.dtend_line,
+        endDate
+      );
+  }
+
+  return clone;
+}
+
+
+
+
 function personalizeEvent(event, user, targets, metas) {
   const matches = findMatches(event.summary, targets, metas);
   const recommendations = matches.map((match) =>
@@ -3092,19 +3821,44 @@ async function calendarFeedForUser(request, env, user) {
     LIMIT 1500
   `).bind(...included).all();
 
+  const rules =
+    await eventSuppressionRules(
+      env
+    );
+
   const dedupe = new Set();
   const vevents = [];
 
-  for (const event of events) {
-    const key =
-      event.source_uid ||
-      `${normalizeName(event.summary)}|${event.dtstart_line}|${event.dtend_line || ""}`;
+  for (const rawEvent of events) {
+    const visibleSegments =
+      visibleEventSegments(
+        rawEvent,
+        rules
+      );
 
-    if (dedupe.has(key)) continue;
-    dedupe.add(key);
+    for (const event of visibleSegments) {
+      const key =
+        event.source_uid ||
+        `${normalizeName(event.summary)}|${event.dtstart_line}|${event.dtend_line || ""}`;
 
-    const personalized = personalizeEvent(event, user, targets, metas);
-    vevents.push(buildVevent(event, personalized));
+      if (dedupe.has(key)) continue;
+      dedupe.add(key);
+
+      const personalized =
+        personalizeEvent(
+          event,
+          user,
+          targets,
+          metas
+        );
+
+      vevents.push(
+        buildVevent(
+          event,
+          personalized
+        )
+      );
+    }
   }
 
   const calendar = [
@@ -3273,6 +4027,34 @@ async function adminOfficialRaidSupplements(request, env) {
 }
 
 
+
+async function adminSuppressionRules(request, env) {
+  const url = new URL(request.url);
+  const key = url.searchParams.get("key");
+
+  if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
+    return bad("Invalid admin key.", 401);
+  }
+
+  const { results } = await env.DB.prepare(`
+    SELECT *
+    FROM event_suppression_rules
+    ORDER BY start_date DESC, event_name
+    LIMIT 100
+  `).all();
+
+  return json({
+    rules: results.map((rule) => ({
+      ...rule,
+      suppressed_source_types:
+        parseSuppressedSourceTypes(
+          rule.suppressed_source_types
+        )
+    }))
+  });
+}
+
+
 async function readAdminKey(request, env) {
   let body = {};
   try {
@@ -3389,6 +4171,10 @@ async function handleFetch(request, env) {
 
     if (request.method === "GET" && path === "/api/admin/official-raids") {
       return adminOfficialRaidSupplements(request, env);
+    }
+
+    if (request.method === "GET" && path === "/api/admin/suppressions") {
+      return adminSuppressionRules(request, env);
     }
 
 
