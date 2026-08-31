@@ -22,6 +22,7 @@
     <p class="row">
       <button id="sync">Sync everything now</button>
       <button id="loadMeta" class="secondary">Show automatic assessments</button>
+      <button id="loadRemoteLimits" class="secondary">Show detected Remote Raid limits</button>
     </p>
     <pre id="syncResult" class="mono"></pre>
   </section>
@@ -49,6 +50,17 @@
       simulation. It is designed to automate recommendations without scraping
       editorial websites or requiring a paid API.
     </p>
+  </section>
+
+  <section class="card">
+    <h2>Detected Remote Raid limits</h2>
+    <p class="muted">
+      The sync checks official Pokémon GO event/news pages for temporary numeric
+      Remote Raid limits and “no limit” announcements.
+    </p>
+    <div id="remoteLimits" class="muted">
+      Enter the admin key, then click “Show detected Remote Raid limits”.
+    </div>
   </section>
 
   <section class="card">
@@ -91,6 +103,46 @@ document.getElementById("sync").addEventListener("click", async () => {
     out.textContent = JSON.stringify(data, null, 2);
   } catch (error) {
     out.textContent = error.message;
+  }
+});
+
+document.getElementById("loadRemoteLimits").addEventListener("click", async () => {
+  const entries = document.getElementById("remoteLimits");
+  entries.textContent = "Loading…";
+
+  try {
+    const data = await requestJson(
+      `/api/admin/remote-limits?key=${encodeURIComponent(key())}`
+    );
+
+    if (!data.rules.length) {
+      entries.innerHTML =
+        "<p>No temporary Remote Raid limits are stored yet. Run “Sync everything now”.</p>";
+      return;
+    }
+
+    entries.innerHTML = data.rules.map(rule => `
+      <div class="recommendation">
+        <div class="score">
+          ${esc(rule.event_name)}
+        </div>
+        <div>
+          ${esc(rule.start_date)} → ${esc(rule.end_date)}
+        </div>
+        <div>
+          Official limit:
+          <strong>${Number(rule.is_unlimited) ? "Unlimited" : esc(rule.remote_raid_limit)}</strong>
+        </div>
+        <div class="field-help">
+          ${Number(rule.detected_automatically) ? "Automatically detected" : "Seeded/manual rule"}
+          ${rule.detected_at ? " · " + esc(rule.detected_at) : ""}
+        </div>
+        ${rule.source_url ? `<div class="field-help"><a href="${esc(rule.source_url)}" target="_blank" rel="noopener">Official source</a></div>` : ""}
+        ${rule.source_excerpt ? `<div class="assessment-notes mono">${esc(rule.source_excerpt)}</div>` : ""}
+      </div>
+    `).join("");
+  } catch (error) {
+    entries.textContent = error.message;
   }
 });
 
