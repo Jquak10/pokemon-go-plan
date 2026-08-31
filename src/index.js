@@ -3220,6 +3220,168 @@ async function updateRemoteRaidUsage(request, env) {
   return json({ ok: true, local_date: localDate, raids_used: Math.floor(raidsUsed) });
 }
 
+
+async function targetOptionsForUser(
+  env,
+  user,
+  targets,
+  metas,
+  recommendations
+) {
+  const today = localDateForTimezone(user.timezone);
+  const horizon = addDaysIso(today, 30);
+  const raidTypes = [...RAID_SOURCE_TYPES];
+  const placeholders = raidTypes.map(() => "?").join(",");
+
+  const rules = await eventSuppressionRules(
+    env,
+    today,
+    horizon
+  );
+
+  const { results } = await env.DB.prepare(`
+    SELECT *
+    FROM events
+    WHERE status = 'active'
+      AND source_type IN (${placeholders})
+      AND COALESCE(end_date, start_date, '9999-12-31') >= ?
+      AND COALESCE(start_date, '0000-01-01') <= ?
+    ORDER BY
+      CASE
+        WHEN source_uid LIKE 'official-supplement:%' THEN 0
+        ELSE 1
+      END,
+      start_date,
+      summary
+    LIMIT 500
+  `).bind(
+    ...raidTypes,
+    today,
+    horizon
+  ).all();
+
+  const current = new Map();
+  const upcoming = new Map();
+  const existing = new Map();
+
+  const addOption = (map, name, extra = {}) => {
+    const clean = String(name || "").trim();
+    if (!clean) return;
+
+    const key = normalizeName(clean);
+
+    if (!map.has(key)) {
+      map.set(key, {
+        name: clean,
+        ...extra
+      });
+    }
+  };
+
+  for (const recommendation of recommendations) {
+    addOption(
+      current,
+      recommendation.pokemon_name,
+      {
+        source: "current_recommendation"
+      }
+    );
+  }
+
+  for (const event of results) {
+    const visibleSegments =
+      visibleEventSegments(
+        event,
+        rules
+      );
+
+    if (!visibleSegments.length) {
+      continue;
+    }
+
+    const matches =
+      findMatches(
+        event.summary,
+        targets,
+        metas
+      );
+
+    for (const match of matches) {
+      const isCurrent =
+        visibleSegments.some(
+          (segment) =>
+            segment.start_date <= today &&
+            segment.end_date >= today
+        );
+
+      if (isCurrent) {
+        addOption(
+          current,
+          match.name,
+          {
+            source: "current_event"
+          }
+        );
+      } else {
+        addOption(
+          upcoming,
+          match.name,
+          {
+            source: "upcoming_event"
+          }
+        );
+      }
+    }
+  }
+
+  for (const target of targets) {
+    addOption(
+      existing,
+      target.pokemon_name,
+      {
+        source: "existing_target"
+      }
+    );
+  }
+
+  // Remove duplicates from lower-priority groups.
+  for (const key of current.keys()) {
+    upcoming.delete(key);
+    existing.delete(key);
+  }
+
+  for (const key of upcoming.keys()) {
+    existing.delete(key);
+  }
+
+  const sortOptions = (map) =>
+    [...map.values()].sort(
+      (a, b) =>
+        a.name.localeCompare(
+          b.name,
+          undefined,
+          {
+            sensitivity: "base",
+            numeric: true
+          }
+        )
+    );
+
+  return {
+    current:
+      sortOptions(current),
+
+    upcoming:
+      sortOptions(upcoming),
+
+    existing:
+      sortOptions(existing),
+
+    horizon_days: 30
+  };
+}
+
+
 async function getMe(request, env) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
@@ -3230,6 +3392,13 @@ async function getMe(request, env) {
   const metas = await getMeta(env);
   const recommendations = await currentRecommendations(env, user, targets, metas);
   const remoteRaidPlan = await remoteRaidPlanForUser(env, user, recommendations);
+  const targetOptions = await targetOptionsForUser(
+    env,
+    user,
+    targets,
+    metas,
+    recommendations
+  );
 
   return json({
     user: {
@@ -3247,6 +3416,7 @@ async function getMe(request, env) {
     targets,
     recommendations,
     remote_raid_plan: remoteRaidPlan,
+    target_options: targetOptions,
     available_sources: Object.keys(SOURCES)
   });
 }
