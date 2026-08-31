@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=12">
+  <link rel="stylesheet" href="/styles.css?v=13">
 </head>
 
 <body class="manage-page">
@@ -156,6 +156,50 @@
                   <span><i class="legend-dot legend-recommended"></i>Recommended</span>
                   <span><i class="legend-dot legend-open"></i>Left unused</span>
                 </div>
+              </div>
+
+              <div id="purchaseAdvice" class="purchase-advice"></div>
+
+              <div class="budget-forecast-wrap">
+                <div class="budget-forecast-heading">
+                  <div>
+                    <span class="section-eyebrow">NEXT 7 DAYS</span>
+                    <h3>Paid Raid Budget Forecast</h3>
+                  </div>
+                  <span class="field-help">
+                    Recalculates whenever targets or progress change.
+                  </span>
+                </div>
+
+                <div id="budgetForecast" class="budget-forecast-strip"></div>
+              </div>
+
+              <div class="daily-budget-override">
+                <div>
+                  <label for="dailyBudgetOverride">Today's budget override</label>
+                  <p class="field-help">
+                    Optional. Leave Auto to follow the planner. A one-day override can raise or lower today's ceiling, but the planner still refuses raids below your value threshold.
+                  </p>
+                </div>
+
+                <div class="daily-budget-override-controls">
+                  <input
+                    id="dailyBudgetOverride"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputmode="numeric"
+                    placeholder="Auto"
+                  >
+                  <button id="saveDailyBudgetOverride" type="button">
+                    Save override
+                  </button>
+                  <button id="clearDailyBudgetOverride" type="button" class="secondary">
+                    Use Auto
+                  </button>
+                </div>
+
+                <span id="dailyBudgetOverrideStatus" class="save-status"></span>
               </div>
 
               <div class="usage-inline">
@@ -349,10 +393,10 @@
 
             <div class="form-grid">
               <div>
-                <label for="remoteRaidBudget">Personal daily budget</label>
-                <input id="remoteRaidBudget" type="number" min="0" step="1" placeholder="Auto — use official cap">
+                <label for="remoteRaidBudget">Usual personal ceiling</label>
+                <input id="remoteRaidBudget" type="number" min="0" step="1" placeholder="Optional">
                 <p class="field-help">
-                  Leave blank for Auto. During an unlimited event, Auto still stops when raid value falls below your threshold.
+                  This is your normal maximum on ordinary days. The planner still calculates its own recommended budget first. You can override this ceiling for a single day from the Raid Plan tab.
                 </p>
               </div>
 
@@ -793,14 +837,21 @@ function renderRemoteRaidPlan() {
       ? "Unlimited"
       : formatNumber(plan.official_limit);
 
-  const budgetText =
-    plan.user_budget == null
-      ? (
-          plan.official_is_unlimited
-            ? "Auto · value-based"
-            : "Auto · official cap"
-        )
-      : formatNumber(plan.user_budget);
+  const systemBudgetText =
+    formatNumber(
+      plan.system_recommended_budget
+    );
+
+  const effectiveBudgetText =
+    plan.daily_budget_override != null
+      ? `${formatNumber(plan.effective_budget_cap)} · override`
+      : (
+          plan.usual_personal_ceiling != null &&
+          plan.effective_budget_cap <
+            plan.system_recommended_budget
+            ? `${formatNumber(plan.effective_budget_cap)} · personal ceiling`
+            : `${formatNumber(plan.effective_budget_cap)} · Auto`
+        );
 
   const officialRemainingText =
     plan.official_is_unlimited
@@ -817,15 +868,15 @@ function renderRemoteRaidPlan() {
     </article>
 
     <article class="remote-summary-item">
-      <span>Your budget</span>
-      <strong>${esc(budgetText)}</strong>
-      <small>${plan.official_is_unlimited ? "Auto still applies your value threshold" : "Never exceeds official limit"}</small>
+      <span>Planner budget</span>
+      <strong>${esc(systemBudgetText)}</strong>
+      <small>Forward-looking paid-raid recommendation</small>
     </article>
 
-    <article class="remote-summary-item highlight">
-      <span>Recommended now</span>
-      <strong>${formatNumber(plan.recommended_total)}</strong>
-      <small>Additional Remote Raids</small>
+    <article class="remote-summary-item">
+      <span>Today's ceiling</span>
+      <strong>${esc(effectiveBudgetText)}</strong>
+      <small>${plan.daily_budget_override != null ? "One-day override active" : "Auto after your usual preferences"}</small>
     </article>
 
     <article class="remote-summary-item">
@@ -858,6 +909,92 @@ function renderRemoteRaidPlan() {
     ? `Source: <a href="${esc(rule.source_url)}" target="_blank" rel="noopener">official Pokémon GO announcement</a>${rule.detected_automatically ? " · detected automatically" : ""}`
     : "";
 
+
+  const advice =
+    plan.purchase_advice || {};
+
+  const adviceClass =
+    {
+      max: "advice-max",
+      heavy: "advice-heavy",
+      selective: "advice-selective",
+      save: "advice-save"
+    }[advice.code] ||
+    "advice-selective";
+
+  const futureHint =
+    plan.best_future_day
+      ? `
+        <div class="purchase-advice-future">
+          <span>Best upcoming value</span>
+          <strong>${esc(plan.best_future_day.label)} · ${formatNumber(plan.best_future_day.recommended_budget)} raids</strong>
+        </div>
+      `
+      : "";
+
+  document
+    .getElementById("purchaseAdvice")
+    .innerHTML = `
+      <div class="purchase-advice-card ${adviceClass}">
+        <div class="purchase-advice-icon" aria-hidden="true">
+          ${advice.code === "max" ? "⚡" : advice.code === "save" ? "💰" : "◎"}
+        </div>
+
+        <div class="purchase-advice-copy">
+          <span>${esc(advice.label || "PAID RAID GUIDANCE")}</span>
+          <strong>${esc(advice.headline || "")}</strong>
+          <p>${esc(advice.detail || "")}</p>
+        </div>
+
+        ${futureHint}
+      </div>
+    `;
+
+  document
+    .getElementById("budgetForecast")
+    .innerHTML =
+      (plan.budget_forecast || [])
+        .map((day, index) => {
+          const allocationText =
+            (day.allocations || [])
+              .slice(0, 2)
+              .map(
+                item =>
+                  `${esc(item.pokemon_name)} ×${item.count}`
+              )
+              .join(" · ");
+
+          const extra =
+            Math.max(
+              0,
+              (day.allocations || []).length - 2
+            );
+
+          return `
+            <article class="budget-day ${index === 0 ? "today" : ""}">
+              <span>${esc(day.label)}</span>
+              <strong>${formatNumber(day.recommended_budget)}</strong>
+              <small>
+                ${
+                  allocationText ||
+                  "Save / no paid raids"
+                }
+                ${
+                  extra > 0
+                    ? ` · +${extra} more`
+                    : ""
+                }
+              </small>
+            </article>
+          `;
+        })
+        .join("");
+
+  document
+    .getElementById("dailyBudgetOverride")
+    .value =
+      plan.daily_budget_override ?? "";
+
   const cap = Math.max(
     1,
     Number(plan.daily_planning_cap || 0),
@@ -877,9 +1014,9 @@ function renderRemoteRaidPlan() {
   );
 
   document.getElementById("capacityText").textContent =
-    plan.official_is_unlimited && plan.user_budget == null
+    plan.official_is_unlimited
       ? `${formatNumber(plan.recommended_total)} worthwhile now`
-      : `${formatNumber(plan.raids_used + plan.recommended_total)} / ${formatNumber(plan.daily_planning_cap)}`;
+      : `${formatNumber(plan.raids_used + plan.recommended_total)} / ${formatNumber(plan.effective_budget_cap)}`;
 
   document.getElementById("allocationTotalBadge").textContent =
     `${formatNumber(plan.recommended_total)} raid${Number(plan.recommended_total) === 1 ? "" : "s"}`;
@@ -1432,6 +1569,64 @@ async function saveCalendarFilters() {
   }
 }
 
+
+async function saveDailyBudgetOverride() {
+  const status =
+    document.getElementById(
+      "dailyBudgetOverrideStatus"
+    );
+
+  const value =
+    document.getElementById(
+      "dailyBudgetOverride"
+    ).value;
+
+  status.textContent =
+    "Saving…";
+
+  try {
+    await api(
+      "/api/remote-raid-budget-override",
+      {
+        method: "POST",
+        headers: {
+          "content-type":
+            "application/json"
+        },
+        body:
+          JSON.stringify({
+            token,
+            local_date:
+              state.remote_raid_plan.local_date,
+            budget_override:
+              value
+          })
+      }
+    );
+
+    status.textContent =
+      value === ""
+        ? "Auto restored ✓"
+        : "Today's override saved ✓";
+
+    await load();
+  } catch (error) {
+    status.textContent =
+      error.message;
+  }
+}
+
+async function clearDailyBudgetOverride() {
+  document
+    .getElementById(
+      "dailyBudgetOverride"
+    )
+    .value = "";
+
+  await saveDailyBudgetOverride();
+}
+
+
 async function saveRaidUsage() {
   const status = document.getElementById("raidUsageStatus");
   status.textContent = "Saving…";
@@ -1721,6 +1916,8 @@ updateSliderOutput("remoteRaidMinScore", "remoteRaidMinScoreOutput", 0);
 document.getElementById("saveSettings").addEventListener("click", savePreferences);
 document.getElementById("saveCalendar").addEventListener("click", saveCalendarFilters);
 document.getElementById("saveRaidUsage").addEventListener("click", saveRaidUsage);
+document.getElementById("saveDailyBudgetOverride").addEventListener("click", saveDailyBudgetOverride);
+document.getElementById("clearDailyBudgetOverride").addEventListener("click", clearDailyBudgetOverride);
 
 document.getElementById("openAddTarget").addEventListener("click", () => openTargetModal());
 
