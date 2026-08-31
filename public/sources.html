@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1f6feb">
+  <title>Data Sources · Raid Planner</title>
+  <link rel="stylesheet" href="/styles.css?v=14">
+</head>
+<body class="manage-page portal-page">
+  <div class="ambient-orb ambient-orb-one" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb-two" aria-hidden="true"></div>
+
+  <main class="portal-shell sources-shell">
+    <header class="dashboard-hero portal-hero">
+      <div class="hero-copy">
+        <div class="brand-kicker">
+          <span class="brand-mark" aria-hidden="true">✓</span>
+          TRANSPARENCY
+        </div>
+        <h1>Data Sources & Precedence</h1>
+        <p>
+          How the planner decides what is happening, what is worth raiding,
+          and which source wins when schedules disagree.
+        </p>
+      </div>
+      <div class="hero-status">
+        <span class="live-dot" aria-hidden="true"></span>
+        Auditable planning
+      </div>
+    </header>
+
+    <section class="source-precedence-card dashboard-card">
+      <span class="section-eyebrow">SOURCE PRECEDENCE</span>
+      <h2>When sources disagree</h2>
+
+      <div class="precedence-flow">
+        <article class="precedence-step">
+          <span>1</span>
+          <div>
+            <strong>Explicit official Pokémon GO schedule</strong>
+            <small>Highest priority for published event, raid, and temporary-limit information.</small>
+          </div>
+        </article>
+
+        <article class="precedence-step">
+          <span>2</span>
+          <div>
+            <strong>Official replacement / suppression notice</strong>
+            <small>Hides conflicting normal seasonal schedules during an explicitly published override window.</small>
+          </div>
+        </article>
+
+        <article class="precedence-step">
+          <span>3</span>
+          <div>
+            <strong>GO Calendar</strong>
+            <small>General event and recurring schedule coverage where no official override supersedes it.</small>
+          </div>
+        </article>
+
+        <article class="precedence-step">
+          <span>4</span>
+          <div>
+            <strong>Do not invent availability</strong>
+            <small>If a reliable source does not establish an event, the planner does not create one merely to fill a gap.</small>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="source-card-grid">
+      <article class="dashboard-card source-info-card">
+        <span class="source-confidence-badge source-official">✓ Official Pokémon GO</span>
+        <h2>Official announcements</h2>
+        <p>
+          Explicit event schedules, special raid rotations, temporary Remote Raid limits,
+          and official notices that replace normal seasonal schedules.
+        </p>
+        <strong>Role: authoritative scheduling source</strong>
+      </article>
+
+      <article class="dashboard-card source-info-card">
+        <span class="source-confidence-badge source-calendar">GO Calendar</span>
+        <h2>General event calendar</h2>
+        <p>
+          Broad event coverage and recurring schedule information. Official supplements
+          take precedence when the same event is published directly.
+        </p>
+        <strong>Role: supporting event source</strong>
+      </article>
+
+      <article class="dashboard-card source-info-card">
+        <span class="source-confidence-badge source-meta">Pokémon GO API</span>
+        <h2>Stats and moves</h2>
+        <p>
+          Species data, GO stats, types, and moves used by the transparent PvE-value proxy.
+        </p>
+        <strong>Role: analytical input</strong>
+      </article>
+
+      <article class="dashboard-card source-info-card">
+        <span class="source-confidence-badge source-meta">PvPoke</span>
+        <h2>PvP rankings</h2>
+        <p>
+          Ranking information used when a user's personal profile gives PvP meaningful weight.
+        </p>
+        <strong>Role: analytical input</strong>
+      </article>
+    </section>
+
+    <footer class="portal-footer">
+      Independent Pokémon GO planning tool. Not affiliated with Niantic,
+      The Pokémon Company, Nintendo, or GAME FREAK.
+    </footer>
+  </main>
+</body>
+</html>
