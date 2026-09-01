@@ -71,7 +71,7 @@ const PVPOKE_MASTER_LEAGUE =
 const POGO_API_POKEDEX =
   "https://pokemon-go-api.github.io/pokemon-go-api/api/pokedex.json";
 
-const AUTO_META_METHOD_VERSION = "auto-meta-v2-coverage";
+const AUTO_META_METHOD_VERSION = "auto-meta-v3-exact-sprites";
 const MAX_META_POKEMON_PER_SYNC = 20;
 
 function json(data, status = 200, headers = {}) {
@@ -682,6 +682,134 @@ function spriteCandidatesForPokemon(
   return candidates;
 }
 
+const SPECIAL_SPRITE_ASSETS = {
+  "mega mewtwo x": {
+    sprite_url:
+      "https://raw.githubusercontent.com/pokemon-go-api/assets/main/Pokemon/pm150.fMEGA_X.icon.png",
+    shiny_sprite_url:
+      "https://raw.githubusercontent.com/pokemon-go-api/assets/main/Pokemon/pm150.fMEGA_X.s.icon.png",
+    source:
+      "pokemon-go-api-assets"
+  },
+
+  "mega mewtwo y": {
+    sprite_url:
+      "https://raw.githubusercontent.com/pokemon-go-api/assets/main/Pokemon/pm150.fMEGA_Y.icon.png",
+    shiny_sprite_url:
+      "https://raw.githubusercontent.com/pokemon-go-api/assets/main/Pokemon/pm150.fMEGA_Y.s.icon.png",
+    source:
+      "pokemon-go-api-assets"
+  },
+
+  "armored mewtwo": {
+    sprite_url:
+      "https://raw.githubusercontent.com/pokemon-go-api/assets/main/Pokemon/pm150.fA.icon.png",
+    shiny_sprite_url:
+      null,
+    source:
+      "pokemon-go-api-assets"
+  },
+
+  // The pokemon-go-api/assets repository does not currently expose the
+  // expected pm26.fMEGA_X / pm26.fMEGA_Y GO icon files. Use official
+  // Pokémon artwork as a temporary exact-form fallback rather than
+  // displaying an incorrect base/Alolan Raichu image.
+  "mega raichu x": {
+    sprite_url:
+      "https://archives.bulbagarden.net/media/upload/9/9f/0026Raichu-Mega_X.png",
+    shiny_sprite_url:
+      null,
+    source:
+      "official-art-fallback"
+  },
+
+  "mega raichu y": {
+    sprite_url:
+      "https://archives.bulbagarden.net/media/upload/6/65/0026Raichu-Mega_Y.png",
+    shiny_sprite_url:
+      null,
+    source:
+      "official-art-fallback"
+  }
+};
+
+function specialSpriteAssets(
+  displayName,
+  candidates = []
+) {
+  const key =
+    normalizeName(
+      displayName
+    );
+
+  const configured =
+    SPECIAL_SPRITE_ASSETS[
+      key
+    ];
+
+  if (!configured) {
+    return null;
+  }
+
+  // For Raichu X/Y, automatically switch back to a real GO icon if
+  // pokemon-go-api starts exposing a form-specific candidate later.
+  if (
+    key === "mega raichu x" ||
+    key === "mega raichu y"
+  ) {
+    const suffix =
+      key.endsWith(" x")
+        ? "x"
+        : "y";
+
+    const exactGoCandidate =
+      candidates.find(
+        candidate => {
+          const candidateText =
+            candidate.text || "";
+
+          return (
+            candidate.image &&
+            candidateText.includes(
+              "mega"
+            ) &&
+            (
+              candidateText.includes(
+                `mega ${suffix}`
+              ) ||
+              candidateText.includes(
+                `mega_${suffix}`
+              ) ||
+              candidateText.includes(
+                `mega-${suffix}`
+              ) ||
+              candidateText.endsWith(
+                ` ${suffix}`
+              )
+            )
+          );
+        }
+      );
+
+    if (exactGoCandidate) {
+      return {
+        sprite_url:
+          exactGoCandidate.image,
+        shiny_sprite_url:
+          exactGoCandidate.shinyImage ||
+          null
+      };
+    }
+  }
+
+  return {
+    sprite_url:
+      configured.sprite_url,
+    shiny_sprite_url:
+      configured.shiny_sprite_url
+  };
+}
+
 function spriteAssetsForDisplayName(
   pokemon,
   displayName,
@@ -691,6 +819,16 @@ function spriteAssetsForDisplayName(
     spriteCandidatesForPokemon(
       pokemon
     );
+
+  const special =
+    specialSpriteAssets(
+      displayName,
+      candidates
+    );
+
+  if (special) {
+    return special;
+  }
 
   if (!candidates.length) {
     return {
@@ -1138,6 +1276,16 @@ async function syncAutomaticMeta(env) {
           ) &&
           !existing?.sprite_url;
 
+        const spriteCorrection =
+          Boolean(
+            candidate.sprite_url
+          ) &&
+          Boolean(
+            existing?.sprite_url
+          ) &&
+          candidate.sprite_url !==
+            existing.sprite_url;
+
         const startDate =
           candidate.event.start_date ||
           "9999-12-31";
@@ -1154,16 +1302,19 @@ async function syncAutomaticMeta(env) {
         const priorityBucket =
           missingRecord
             ? 0
-            : spriteBackfill
+            : spriteCorrection
               ? 1
-              : activeToday
+              : spriteBackfill
                 ? 2
-                : 3;
+                : activeToday
+                  ? 3
+                  : 4;
 
         return {
           candidate,
           missingRecord,
           spriteBackfill,
+          spriteCorrection,
           activeToday,
           priorityBucket,
           startDate
@@ -1217,6 +1368,19 @@ async function syncAutomaticMeta(env) {
       .filter(
         item =>
           item.spriteBackfill &&
+          selectedKeys.has(
+            normalizeName(
+              item.candidate.displayName
+            )
+          )
+      )
+      .length;
+
+  const spriteCorrectionsSelected =
+    rankedCandidates
+      .filter(
+        item =>
+          item.spriteCorrection &&
           selectedKeys.has(
             normalizeName(
               item.candidate.displayName
@@ -1332,6 +1496,8 @@ async function syncAutomaticMeta(env) {
       missingBeforeSync,
     sprite_backfills_selected:
       spriteBackfillsSelected,
+    sprite_corrections_selected:
+      spriteCorrectionsSelected,
     method:
       AUTO_META_METHOD_VERSION,
     write_statements:
