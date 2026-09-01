@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=16">
+  <link rel="stylesheet" href="/styles.css?v=17">
 </head>
 
 <body class="manage-page">
@@ -1043,6 +1043,31 @@ function relativeFreshness(value) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+
+function spriteImg(
+  url,
+  name,
+  className = "pokemon-sprite"
+) {
+  if (!url) {
+    return "";
+  }
+
+  return `
+    <img
+      class="${esc(className)}"
+      src="${esc(url)}"
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      decoding="async"
+      onerror="this.hidden=true"
+      title="${esc(name || "")}"
+    >
+  `;
+}
+
+
 function renderTodayBriefing() {
   const dashboard =
     state.dashboard || {};
@@ -1083,10 +1108,33 @@ function renderTodayBriefing() {
             : `${topPick.emoji || ""} ${leaderNames.join(" + ")}`.trim()
         );
 
+  const leaderSprites =
+    topPicks
+      .filter(
+        pick =>
+          pick.sprite_url
+      )
+      .slice(0, 3)
+      .map(
+        pick =>
+          spriteImg(
+            pick.sprite_url,
+            pick.pokemon_name,
+            "pokemon-sprite today-leader-sprite"
+          )
+      )
+      .join("");
+
   document
     .getElementById("todayTopPick")
-    .textContent =
-      leaderTitle;
+    .innerHTML = `
+      ${
+        leaderSprites
+          ? `<span class="today-leader-sprites">${leaderSprites}</span>`
+          : ""
+      }
+      <span>${esc(leaderTitle)}</span>
+    `;
 
   const uniqueSources =
     [...new Map(
@@ -1372,10 +1420,18 @@ function renderRemoteRaidPlan() {
             (day.allocations || [])
               .slice(0, 2)
               .map(
-                item =>
-                  `${esc(item.pokemon_name)} ×${item.count}`
+                item => `
+                  <span class="forecast-boss">
+                    ${spriteImg(
+                      item.sprite_url,
+                      item.pokemon_name,
+                      "pokemon-sprite forecast-sprite"
+                    )}
+                    <span>${esc(item.pokemon_name)} ×${item.count}</span>
+                  </span>
+                `
               )
-              .join(" · ");
+              .join("");
 
           const extra =
             Math.max(
@@ -1387,14 +1443,14 @@ function renderRemoteRaidPlan() {
             <article class="budget-day ${index === 0 ? "today" : ""}">
               <span>${esc(day.label)}</span>
               <strong>${formatNumber(day.recommended_budget)}</strong>
-              <small>
+              <small class="forecast-boss-list">
                 ${
                   allocationText ||
                   "Save / no paid raids"
                 }
                 ${
                   extra > 0
-                    ? ` · +${extra} more`
+                    ? `<span class="forecast-more">+${extra} more</span>`
                     : ""
                 }
               </small>
@@ -1440,9 +1496,16 @@ function renderRemoteRaidPlan() {
         <div class="allocation-card-top">
           <div class="allocation-count">${item.allocated}</div>
 
-          <div class="allocation-title">
-            <span class="allocation-kicker">REMOTE RAID${item.allocated === 1 ? "" : "S"}</span>
-            <h3>${esc(item.emoji)} ${esc(item.pokemon_name)}</h3>
+          <div class="allocation-title allocation-title-with-sprite">
+            ${spriteImg(
+              item.sprite_url || item.meta?.sprite_url,
+              item.pokemon_name,
+              "pokemon-sprite allocation-sprite"
+            )}
+            <div>
+              <span class="allocation-kicker">REMOTE RAID${item.allocated === 1 ? "" : "S"}</span>
+              <h3>${esc(item.emoji)} ${esc(item.pokemon_name)}</h3>
+            </div>
           </div>
 
           <div class="score-pill">${formatNumber(item.score)}</div>
@@ -1489,10 +1552,19 @@ function renderRecommendations() {
     ? state.recommendations.map(rec => `
       <article class="recommendation-card ${scoreTone(rec.score)}">
         <div class="recommendation-card-head">
-          <div>
-            <span class="section-eyebrow">${esc(rec.event_title || "ACTIVE RAID")}</span>
-            <h3>${esc(rec.emoji)} ${esc(rec.pokemon_name)}</h3>
+          <div class="recommendation-pokemon">
+            ${spriteImg(
+              rec.sprite_url || rec.meta?.sprite_url,
+              rec.pokemon_name,
+              "pokemon-sprite recommendation-sprite"
+            )}
+
+            <div>
+              <span class="section-eyebrow">${esc(rec.event_title || "ACTIVE RAID")}</span>
+              <h3>${esc(rec.emoji)} ${esc(rec.pokemon_name)}</h3>
+            </div>
           </div>
+
           <div class="score-ring">${formatNumber(rec.score)}</div>
         </div>
 
@@ -1562,9 +1634,17 @@ function renderTargets() {
         return `
           <article class="target-card ${completed ? "target-complete" : ""}" data-target-id="${esc(target.id)}">
             <div class="target-card-head">
-              <div>
-                <span class="target-type-label">${esc(targetTypeLabels[target.target_type] || target.target_type)}</span>
-                <h3>${esc(target.pokemon_name)}</h3>
+              <div class="target-pokemon-heading">
+                ${spriteImg(
+                  target.sprite_url,
+                  target.pokemon_name,
+                  "pokemon-sprite target-sprite"
+                )}
+
+                <div>
+                  <span class="target-type-label">${esc(targetTypeLabels[target.target_type] || target.target_type)}</span>
+                  <h3>${esc(target.pokemon_name)}</h3>
+                </div>
               </div>
 
               <span class="status-badge ${targetPriorityTone(target.priority, target.completed)}">
@@ -1726,6 +1806,33 @@ function renderCalendarDayDetails(dateIso) {
             ${events.map(event => `
               <article class="calendar-detail-event ${calendarSourceClass(event.source_type)}">
                 <span class="calendar-detail-source">${esc(labels[event.source_type] || event.source_type)}</span>
+
+                ${
+                  event.sprites?.length
+                    ? `
+                      <div class="calendar-raid-sprites">
+                        ${event.sprites
+                          .slice(0, 6)
+                          .map(
+                            item =>
+                              spriteImg(
+                                item.sprite_url,
+                                item.pokemon_name,
+                                "pokemon-sprite calendar-detail-sprite"
+                              )
+                          )
+                          .join("")}
+
+                        ${
+                          event.sprites.length > 6
+                            ? `<span class="calendar-sprite-more">+${event.sprites.length - 6}</span>`
+                            : ""
+                        }
+                      </div>
+                    `
+                    : ""
+                }
+
                 <strong>${esc(event.title)}</strong>
                 ${
                   event.start_date !== event.end_date
