@@ -515,12 +515,379 @@ function eventKindForMatch(summary, pokemonName) {
   return "normal";
 }
 
-function displayNameForMatch(pokemonName, kind) {
-  if (kind === "mega") return `Mega ${pokemonName}`;
-  if (kind === "primal") return `Primal ${pokemonName}`;
-  if (kind === "gigantamax") return `Gigantamax ${pokemonName}`;
-  if (kind === "dynamax") return `Dynamax ${pokemonName}`;
+function displayNameForMatch(
+  pokemonName,
+  kind,
+  summary = ""
+) {
+  const normalizedSummary =
+    normalizeName(summary);
+
+  const normalizedName =
+    normalizeName(pokemonName);
+
+  if (
+    normalizedSummary.includes(
+      `armored ${normalizedName}`
+    )
+  ) {
+    return `Armored ${pokemonName}`;
+  }
+
+  if (kind === "mega") {
+    if (
+      normalizedSummary.includes(
+        `mega ${normalizedName} x`
+      )
+    ) {
+      return `Mega ${pokemonName} X`;
+    }
+
+    if (
+      normalizedSummary.includes(
+        `mega ${normalizedName} y`
+      )
+    ) {
+      return `Mega ${pokemonName} Y`;
+    }
+
+    return `Mega ${pokemonName}`;
+  }
+
+  if (kind === "primal") {
+    return `Primal ${pokemonName}`;
+  }
+
+  if (kind === "gigantamax") {
+    return `Gigantamax ${pokemonName}`;
+  }
+
+  if (kind === "dynamax") {
+    return `Dynamax ${pokemonName}`;
+  }
+
   return pokemonName;
+}
+
+function spriteCandidateText(
+  value,
+  extra = ""
+) {
+  if (!value) {
+    return normalizeName(extra);
+  }
+
+  return normalizeName(
+    [
+      extra,
+      value.id,
+      value.formId,
+      value.form,
+      value.costume,
+      value.names?.English,
+      value.name?.English
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
+}
+
+function spriteCandidatesForPokemon(
+  pokemon
+) {
+  const candidates = [];
+
+  const push =
+    (
+      value,
+      label = "",
+      fallbackAssets = null
+    ) => {
+      if (!value && !fallbackAssets) {
+        return;
+      }
+
+      const assets =
+        value?.assets ||
+        fallbackAssets ||
+        value ||
+        {};
+
+      const image =
+        assets?.image || null;
+
+      const shinyImage =
+        assets?.shinyImage || null;
+
+      if (!image && !shinyImage) {
+        return;
+      }
+
+      candidates.push({
+        image,
+        shinyImage,
+        text:
+          spriteCandidateText(
+            value,
+            label
+          )
+      });
+    };
+
+  push(
+    pokemon,
+    "base",
+    pokemon?.assets
+  );
+
+  for (
+    const form of
+    Array.isArray(pokemon?.assetForms)
+      ? pokemon.assetForms
+      : []
+  ) {
+    push(
+      form,
+      `asset form ${form?.form || ""} ${form?.costume || ""}`,
+      form
+    );
+  }
+
+  for (
+    const [key, value] of
+    Object.entries(
+      pokemon?.megaEvolutions || {}
+    )
+  ) {
+    push(
+      value,
+      `mega ${key}`,
+      value?.assets
+    );
+  }
+
+  for (
+    const [key, value] of
+    Object.entries(
+      pokemon?.regionForms || {}
+    )
+  ) {
+    push(
+      value,
+      `region ${key}`,
+      value?.assets
+    );
+  }
+
+  return candidates;
+}
+
+function spriteAssetsForDisplayName(
+  pokemon,
+  displayName,
+  kind
+) {
+  const candidates =
+    spriteCandidatesForPokemon(
+      pokemon
+    );
+
+  if (!candidates.length) {
+    return {
+      sprite_url: null,
+      shiny_sprite_url: null
+    };
+  }
+
+  const desired =
+    normalizeName(displayName);
+
+  const desiredTokens =
+    desired.split(" ").filter(Boolean);
+
+  const wantsMega =
+    kind === "mega" ||
+    desiredTokens.includes("mega");
+
+  const wantsPrimal =
+    kind === "primal" ||
+    desiredTokens.includes("primal");
+
+  const wantsGigantamax =
+    kind === "gigantamax" ||
+    desiredTokens.includes("gigantamax");
+
+  const wantsDynamax =
+    kind === "dynamax" ||
+    desiredTokens.includes("dynamax");
+
+  const wantsArmored =
+    desiredTokens.includes("armored");
+
+  const wantsX =
+    desiredTokens.at(-1) === "x";
+
+  const wantsY =
+    desiredTokens.at(-1) === "y";
+
+  const scoreCandidate =
+    candidate => {
+      const text =
+        candidate.text || "";
+
+      let score = 0;
+
+      for (const token of desiredTokens) {
+        if (text.includes(token)) {
+          score += 8;
+        }
+      }
+
+      if (wantsMega) {
+        score +=
+          text.includes("mega")
+            ? 35
+            : -20;
+      }
+
+      if (wantsPrimal) {
+        score +=
+          text.includes("primal")
+            ? 35
+            : -20;
+      }
+
+      if (wantsGigantamax) {
+        score +=
+          text.includes("gigantamax")
+            ? 35
+            : -20;
+      }
+
+      if (wantsDynamax) {
+        score +=
+          text.includes("dynamax")
+            ? 25
+            : -10;
+      }
+
+      if (wantsArmored) {
+        score +=
+          text.includes("armored")
+            ? 50
+            : -25;
+      }
+
+      if (wantsX) {
+        score +=
+          (
+            text.includes("mega x") ||
+            text.includes("mega_x") ||
+            text.endsWith(" x")
+          )
+            ? 45
+            : -15;
+      }
+
+      if (wantsY) {
+        score +=
+          (
+            text.includes("mega y") ||
+            text.includes("mega_y") ||
+            text.endsWith(" y")
+          )
+            ? 45
+            : -15;
+      }
+
+      if (text.includes("base")) {
+        score +=
+          (
+            wantsMega ||
+            wantsPrimal ||
+            wantsGigantamax ||
+            wantsArmored ||
+            wantsX ||
+            wantsY
+          )
+            ? -10
+            : 5;
+      }
+
+      return score;
+    };
+
+  const ranked =
+    candidates
+      .map(candidate => ({
+        ...candidate,
+        score:
+          scoreCandidate(
+            candidate
+          )
+      }))
+      .sort(
+        (a, b) =>
+          b.score - a.score
+      );
+
+  const best =
+    ranked[0];
+
+  return {
+    sprite_url:
+      best?.image || null,
+    shiny_sprite_url:
+      best?.shinyImage || null
+  };
+}
+
+function spriteUrlForPokemonName(
+  name,
+  metas
+) {
+  const normalized =
+    normalizeName(name);
+
+  const exact =
+    metas.find(
+      meta =>
+        normalizeName(
+          meta.pokemon_name
+        ) === normalized
+    );
+
+  if (exact?.sprite_url) {
+    return exact.sprite_url;
+  }
+
+  const base =
+    normalized
+      .replace(
+        /^(mega|primal|gigantamax|dynamax|armored)\s+/,
+        ""
+      )
+      .replace(/\s+[xy]$/, "");
+
+  const fallback =
+    metas.find(meta => {
+      const candidate =
+        normalizeName(
+          meta.pokemon_name
+        )
+          .replace(
+            /^(mega|primal|gigantamax|dynamax|armored)\s+/,
+            ""
+          )
+          .replace(/\s+[xy]$/, "");
+
+      return (
+        candidate === base &&
+        meta.sprite_url
+      );
+    });
+
+  return fallback?.sprite_url || null;
 }
 
 function automaticVerdict(pve, pvp, rarity, mega, kind) {
@@ -665,7 +1032,12 @@ async function syncAutomaticMeta(env) {
     const matches = findPokemonMatchesInSummary(event.summary, pokedex);
 
     for (const match of matches) {
-      const displayName = displayNameForMatch(match.name, match.kind);
+      const displayName =
+        displayNameForMatch(
+          match.name,
+          match.kind,
+          event.summary
+        );
       const key = normalizeName(displayName);
       const pve = percentileScore(rawPowers, rawPvePower(match.pokemon));
       const pvp =
@@ -692,6 +1064,13 @@ async function syncAutomaticMeta(env) {
         100
       );
 
+      const spriteAssets =
+        spriteAssetsForDisplayName(
+          match.pokemon,
+          displayName,
+          match.kind
+        );
+
       const candidate = {
         displayName,
         baseName: match.name,
@@ -702,7 +1081,8 @@ async function syncAutomaticMeta(env) {
         mega,
         overall,
         event,
-        pokemon: match.pokemon
+        pokemon: match.pokemon,
+        ...spriteAssets
       };
 
       const existing = bestByDisplayName.get(key);
@@ -742,9 +1122,10 @@ async function syncAutomaticMeta(env) {
       env.DB.prepare(`
         INSERT INTO pokemon_meta (
           pokemon_name, pve_score, pvp_score, rarity_score,
-          mega_score, overall_score, verdict, notes, updated_at
+          mega_score, overall_score, verdict, notes,
+          sprite_url, shiny_sprite_url, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(pokemon_name) DO UPDATE SET
           pve_score = excluded.pve_score,
           pvp_score = excluded.pvp_score,
@@ -753,6 +1134,8 @@ async function syncAutomaticMeta(env) {
           overall_score = excluded.overall_score,
           verdict = excluded.verdict,
           notes = excluded.notes,
+          sprite_url = excluded.sprite_url,
+          shiny_sprite_url = excluded.shiny_sprite_url,
           updated_at = excluded.updated_at
       `).bind(
         candidate.displayName,
@@ -763,6 +1146,8 @@ async function syncAutomaticMeta(env) {
         Math.round(candidate.overall * 10) / 10,
         verdict,
         notes,
+        candidate.sprite_url,
+        candidate.shiny_sprite_url,
         timestamp
       )
     );
@@ -996,8 +1381,54 @@ function findMatches(summary, targets, metas) {
     }
   }
 
-  candidates.sort((a, b) => b.length - a.length);
-  return candidates;
+  candidates.sort(
+    (a, b) =>
+      b.length - a.length
+  );
+
+  const selected = [];
+
+  for (const candidate of candidates) {
+    const needle =
+      normalizeName(
+        candidate.name
+      );
+
+    const moreSpecific =
+      selected.find(
+        existing => {
+          const existingNeedle =
+            normalizeName(
+              existing.name
+            );
+
+          return (
+            existingNeedle !== needle &&
+            existingNeedle.includes(
+              needle
+            )
+          );
+        }
+      );
+
+    if (moreSpecific) {
+      if (
+        !moreSpecific.target &&
+        candidate.target
+      ) {
+        moreSpecific.target =
+          candidate.target;
+      }
+
+      continue;
+    }
+
+    selected.push(
+      candidate
+    );
+  }
+
+  return selected;
 }
 
 function weightedInternetScore(meta, user) {
@@ -1121,6 +1552,10 @@ function recommendationFor(name, meta, target, user) {
     label,
     emoji,
     reasons,
+    sprite_url:
+      meta?.sprite_url || null,
+    shiny_sprite_url:
+      meta?.shiny_sprite_url || null,
     meta,
     target
   };
@@ -3479,10 +3914,28 @@ async function buildRemoteRaidBudgetForecast(
       const allocations =
         [...day.allocations.entries()]
           .map(
-            ([pokemon_name, count]) => ({
-              pokemon_name,
-              count
-            })
+            ([pokemon_name, count]) => {
+              const speciesItem =
+                species.get(
+                  normalizeName(
+                    pokemon_name
+                  )
+                );
+
+              return {
+                pokemon_name,
+                count,
+                sprite_url:
+                  speciesItem
+                    ?.recommendation
+                    ?.sprite_url ||
+                  speciesItem
+                    ?.recommendation
+                    ?.meta
+                    ?.sprite_url ||
+                  null
+              };
+            }
           )
           .sort(
             (a, b) =>
@@ -4073,6 +4526,49 @@ async function calendarEventsApi(request, env) {
           metas
         );
 
+      const raidSprites =
+        RAID_SOURCE_TYPES.has(
+          event.source_type
+        )
+          ? findMatches(
+              event.summary,
+              targets,
+              metas
+            )
+              .map(
+                match => ({
+                  pokemon_name:
+                    match.name,
+                  sprite_url:
+                    match.meta?.sprite_url ||
+                    spriteUrlForPokemonName(
+                      match.name,
+                      metas
+                    )
+                })
+              )
+              .filter(
+                item =>
+                  item.sprite_url
+              )
+              .filter(
+                (
+                  item,
+                  index,
+                  array
+                ) =>
+                  array.findIndex(
+                    candidate =>
+                      normalizeName(
+                        candidate.pokemon_name
+                      ) ===
+                      normalizeName(
+                        item.pokemon_name
+                      )
+                  ) === index
+              )
+          : [];
+
       events.push({
         id: event.id,
         title: personalized.title,
@@ -4086,7 +4582,9 @@ async function calendarEventsApi(request, env) {
           event.end_date ||
           event.start_date,
         original_title:
-          event.summary
+          event.summary,
+        sprites:
+          raidSprites
       });
     }
   }
@@ -4549,7 +5047,11 @@ function recommendationCoLeaders(
       source_kind:
         rec.source_kind,
       source_label:
-        rec.source_label
+        rec.source_label,
+      sprite_url:
+        rec.sprite_url ||
+        rec.meta?.sprite_url ||
+        null
     }));
 }
 
@@ -4736,7 +5238,17 @@ async function getMe(request, env) {
           ? DEFAULT_REMOTE_RAID_MIN_SCORE
           : user.remote_raid_min_score
     },
-    targets,
+    targets:
+      targets.map(
+        target => ({
+          ...target,
+          sprite_url:
+            spriteUrlForPokemonName(
+              target.pokemon_name,
+              metas
+            )
+        })
+      ),
     recommendations,
     remote_raid_plan: remoteRaidPlan,
     target_options: targetOptions,
