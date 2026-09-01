@@ -71,7 +71,7 @@ const PVPOKE_MASTER_LEAGUE =
 const POGO_API_POKEDEX =
   "https://pokemon-go-api.github.io/pokemon-go-api/api/pokedex.json";
 
-const AUTO_META_METHOD_VERSION = "auto-meta-v1";
+const AUTO_META_METHOD_VERSION = "auto-meta-v2-coverage";
 const MAX_META_POKEMON_PER_SYNC = 20;
 
 function json(data, status = 200, headers = {}) {
@@ -1092,9 +1092,138 @@ async function syncAutomaticMeta(env) {
     }
   }
 
-  const candidates = [...bestByDisplayName.values()]
-    .sort((a, b) => b.overall - a.overall)
-    .slice(0, MAX_META_POKEMON_PER_SYNC);
+  const allCandidates =
+    [...bestByDisplayName.values()];
+
+  const {
+    results: existingMetaRows
+  } =
+    await env.DB.prepare(`
+      SELECT
+        pokemon_name,
+        sprite_url
+      FROM pokemon_meta
+    `).all();
+
+  const existingMetaMap =
+    new Map(
+      (existingMetaRows || [])
+        .map(row => [
+          normalizeName(
+            row.pokemon_name
+          ),
+          row
+        ])
+    );
+
+  const today =
+    todayUtc();
+
+  const rankedCandidates =
+    allCandidates
+      .map(candidate => {
+        const existing =
+          existingMetaMap.get(
+            normalizeName(
+              candidate.displayName
+            )
+          ) || null;
+
+        const missingRecord =
+          !existing;
+
+        const spriteBackfill =
+          Boolean(
+            candidate.sprite_url
+          ) &&
+          !existing?.sprite_url;
+
+        const startDate =
+          candidate.event.start_date ||
+          "9999-12-31";
+
+        const endDate =
+          candidate.event.end_date ||
+          candidate.event.start_date ||
+          startDate;
+
+        const activeToday =
+          startDate <= today &&
+          endDate >= today;
+
+        const priorityBucket =
+          missingRecord
+            ? 0
+            : spriteBackfill
+              ? 1
+              : activeToday
+                ? 2
+                : 3;
+
+        return {
+          candidate,
+          missingRecord,
+          spriteBackfill,
+          activeToday,
+          priorityBucket,
+          startDate
+        };
+      })
+      .sort(
+        (a, b) =>
+          a.priorityBucket -
+            b.priorityBucket ||
+          a.startDate.localeCompare(
+            b.startDate
+          ) ||
+          b.candidate.overall -
+            a.candidate.overall ||
+          a.candidate.displayName.localeCompare(
+            b.candidate.displayName
+          )
+      );
+
+  const candidates =
+    rankedCandidates
+      .slice(
+        0,
+        MAX_META_POKEMON_PER_SYNC
+      )
+      .map(
+        item =>
+          item.candidate
+      );
+
+  const selectedKeys =
+    new Set(
+      candidates.map(
+        candidate =>
+          normalizeName(
+            candidate.displayName
+          )
+      )
+    );
+
+  const missingBeforeSync =
+    rankedCandidates
+      .filter(
+        item =>
+          item.missingRecord
+      )
+      .length;
+
+  const spriteBackfillsSelected =
+    rankedCandidates
+      .filter(
+        item =>
+          item.spriteBackfill &&
+          selectedKeys.has(
+            normalizeName(
+              item.candidate.displayName
+            )
+          )
+      )
+      .length;
 
   const timestamp = nowIso();
   const statements = [];
@@ -1191,14 +1320,27 @@ async function syncAutomaticMeta(env) {
   }
 
   return {
-    updated: candidates.length,
-    raid_events_considered: raidEvents.length,
-    pokedex_entries: pokedex.length,
-    method: AUTO_META_METHOD_VERSION,
-    write_statements: statements.length,
+    updated:
+      candidates.length,
+    raid_events_considered:
+      raidEvents.length,
+    pokedex_entries:
+      pokedex.length,
+    discovered_candidates:
+      allCandidates.length,
+    missing_before_sync:
+      missingBeforeSync,
+    sprite_backfills_selected:
+      spriteBackfillsSelected,
+    method:
+      AUTO_META_METHOD_VERSION,
+    write_statements:
+      statements.length,
     truncated:
-      bestByDisplayName.size > MAX_META_POKEMON_PER_SYNC
-        ? bestByDisplayName.size - MAX_META_POKEMON_PER_SYNC
+      allCandidates.length >
+      MAX_META_POKEMON_PER_SYNC
+        ? allCandidates.length -
+          MAX_META_POKEMON_PER_SYNC
         : 0
   };
 }
