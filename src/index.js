@@ -710,26 +710,22 @@ const SPECIAL_SPRITE_ASSETS = {
       "pokemon-go-api-assets"
   },
 
-  // The pokemon-go-api/assets repository does not currently expose the
-  // expected pm26.fMEGA_X / pm26.fMEGA_Y GO icon files. Use official
-  // Pokémon artwork as a temporary exact-form fallback rather than
-  // displaying an incorrect base/Alolan Raichu image.
+  // Do not substitute a visually different Raichu image for these forms.
+  // If pokemon-go-api later exposes an exact GO form candidate, the resolver
+  // below will automatically use it. Until then the UI intentionally shows
+  // no sprite for these two forms.
   "mega raichu x": {
-    sprite_url:
-      "https://archives.bulbagarden.net/media/upload/9/9f/0026Raichu-Mega_X.png",
-    shiny_sprite_url:
-      null,
-    source:
-      "official-art-fallback"
+    sprite_url: null,
+    shiny_sprite_url: null,
+    source: "exact-go-asset-pending",
+    force_clear_sprite: true
   },
 
   "mega raichu y": {
-    sprite_url:
-      "https://archives.bulbagarden.net/media/upload/6/65/0026Raichu-Mega_Y.png",
-    shiny_sprite_url:
-      null,
-    source:
-      "official-art-fallback"
+    sprite_url: null,
+    shiny_sprite_url: null,
+    source: "exact-go-asset-pending",
+    force_clear_sprite: true
   }
 };
 
@@ -806,7 +802,11 @@ function specialSpriteAssets(
     sprite_url:
       configured.sprite_url,
     shiny_sprite_url:
-      configured.shiny_sprite_url
+      configured.shiny_sprite_url,
+    force_clear_sprite:
+      Boolean(
+        configured.force_clear_sprite
+      )
   };
 }
 
@@ -1277,14 +1277,24 @@ async function syncAutomaticMeta(env) {
           !existing?.sprite_url;
 
         const spriteCorrection =
-          Boolean(
-            candidate.sprite_url
-          ) &&
-          Boolean(
-            existing?.sprite_url
-          ) &&
-          candidate.sprite_url !==
-            existing.sprite_url;
+          (
+            Boolean(
+              candidate.sprite_url
+            ) &&
+            Boolean(
+              existing?.sprite_url
+            ) &&
+            candidate.sprite_url !==
+              existing.sprite_url
+          ) ||
+          (
+            Boolean(
+              candidate.force_clear_sprite
+            ) &&
+            Boolean(
+              existing?.sprite_url
+            )
+          );
 
         const startDate =
           candidate.event.start_date ||
@@ -5106,6 +5116,614 @@ async function updateRemoteRaidBudgetOverride(
 }
 
 
+async function raidActivityForUser(
+  env,
+  user,
+  metas
+) {
+  const localDate =
+    localDateForTimezone(
+      user.timezone
+    );
+
+  const remoteUsage =
+    await remoteRaidUsageForDate(
+      env,
+      user.id,
+      localDate
+    );
+
+  const totals =
+    await env.DB.prepare(`
+      SELECT
+        COALESCE(
+          SUM(
+            CASE
+              WHEN raid_type = 'local'
+              THEN raid_count
+              ELSE 0
+            END
+          ),
+          0
+        ) AS local_raids,
+        COALESCE(
+          SUM(
+            CASE
+              WHEN raid_type = 'remote'
+              THEN raid_count
+              ELSE 0
+            END
+          ),
+          0
+        ) AS logged_remote_raids
+      FROM raid_log
+      WHERE user_id = ?
+        AND local_date = ?
+        AND undone_at IS NULL
+    `).bind(
+      user.id,
+      localDate
+    ).first();
+
+  const {
+    results: recentRows
+  } =
+    await env.DB.prepare(`
+      SELECT
+        id,
+        pokemon_name,
+        raid_type,
+        raid_count,
+        progress_gained,
+        target_id,
+        target_before_value,
+        target_after_value,
+        local_date,
+        created_at
+      FROM raid_log
+      WHERE user_id = ?
+        AND undone_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 8
+    `).bind(
+      user.id
+    ).all();
+
+  const localRaids =
+    Math.max(
+      0,
+      Number(
+        totals?.local_raids || 0
+      )
+    );
+
+  const loggedRemoteRaids =
+    Math.max(
+      0,
+      Number(
+        totals
+          ?.logged_remote_raids || 0
+      )
+    );
+
+  const manualRemoteAdjustment =
+    remoteUsage -
+    loggedRemoteRaids;
+
+  return {
+    local_date:
+      localDate,
+    remote_raids:
+      remoteUsage,
+    local_raids:
+      localRaids,
+    total_raids:
+      remoteUsage + localRaids,
+    logged_remote_raids:
+      loggedRemoteRaids,
+    manual_remote_adjustment:
+      manualRemoteAdjustment,
+    recent:
+      (recentRows || [])
+        .map(
+          row => ({
+            ...row,
+            sprite_url:
+              spriteUrlForPokemonName(
+                row.pokemon_name,
+                metas
+              )
+          })
+        )
+  };
+}
+
+
+async function logRaidApi(
+  request,
+  env
+) {
+  const body =
+    await request.json();
+
+  const user =
+    await userByManageToken(
+      env,
+      body.token
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  const pokemonName =
+    String(
+      body.pokemon_name || ""
+    ).trim();
+
+  if (!pokemonName) {
+    return bad(
+      "Pokémon name is required."
+    );
+  }
+
+  const raidType =
+    String(
+      body.raid_type || ""
+    ).toLowerCase();
+
+  if (
+    ![
+      "remote",
+      "local"
+    ].includes(
+      raidType
+    )
+  ) {
+    return bad(
+      "Raid type must be remote or local."
+    );
+  }
+
+  const raidCount =
+    Number(
+      body.raid_count
+    );
+
+  if (
+    !Number.isInteger(
+      raidCount
+    ) ||
+    raidCount < 1 ||
+    raidCount > 99
+  ) {
+    return bad(
+      "Raid count must be a whole number between 1 and 99."
+    );
+  }
+
+  let progressGained =
+    Number(
+      body.progress_gained ?? 0
+    );
+
+  if (
+    !Number.isFinite(
+      progressGained
+    ) ||
+    progressGained < 0 ||
+    progressGained > 1000000
+  ) {
+    return bad(
+      "Progress gained must be a number between 0 and 1,000,000."
+    );
+  }
+
+  const targets =
+    await getTargets(
+      env,
+      user.id
+    );
+
+  let target = null;
+
+  if (body.target_id) {
+    target =
+      targets.find(
+        item =>
+          String(item.id) ===
+          String(
+            body.target_id
+          )
+      ) || null;
+  }
+
+  if (!target) {
+    const wanted =
+      normalizeName(
+        pokemonName
+      );
+
+    target =
+      targets.find(
+        item =>
+          normalizeName(
+            item.pokemon_name
+          ) === wanted
+      ) || null;
+  }
+
+  const updateTarget =
+    Boolean(target) &&
+    body.update_target !== false;
+
+  if (
+    updateTarget &&
+    target.target_type ===
+      "raids" &&
+    (
+      body.progress_gained == null ||
+      body.progress_gained === ""
+    )
+  ) {
+    progressGained =
+      raidCount;
+  }
+
+  const targetBeforeValue =
+    updateTarget
+      ? Number(
+          target.current_value || 0
+        )
+      : null;
+
+  const targetAfterValue =
+    updateTarget
+      ? (
+          targetBeforeValue +
+          progressGained
+        )
+      : null;
+
+  const localDate =
+    localDateForTimezone(
+      user.timezone
+    );
+
+  const timestamp =
+    nowIso();
+
+  const logId =
+    randomToken(18);
+
+  const statements = [
+    env.DB.prepare(`
+      INSERT INTO raid_log (
+        id,
+        user_id,
+        pokemon_name,
+        raid_type,
+        raid_count,
+        progress_gained,
+        target_id,
+        target_before_value,
+        target_after_value,
+        local_date,
+        created_at,
+        undone_at
+      )
+      VALUES (
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, NULL
+      )
+    `).bind(
+      logId,
+      user.id,
+      pokemonName,
+      raidType,
+      raidCount,
+      updateTarget
+        ? progressGained
+        : 0,
+      updateTarget
+        ? target.id
+        : null,
+      targetBeforeValue,
+      targetAfterValue,
+      localDate,
+      timestamp
+    )
+  ];
+
+  if (updateTarget) {
+    statements.push(
+      env.DB.prepare(`
+        UPDATE targets
+        SET
+          current_value = ?,
+          updated_at = ?
+        WHERE id = ?
+          AND user_id = ?
+      `).bind(
+        targetAfterValue,
+        timestamp,
+        target.id,
+        user.id
+      )
+    );
+  }
+
+  let newRemoteUsage = null;
+
+  if (raidType === "remote") {
+    const currentRemoteUsage =
+      await remoteRaidUsageForDate(
+        env,
+        user.id,
+        localDate
+      );
+
+    newRemoteUsage =
+      currentRemoteUsage +
+      raidCount;
+
+    statements.push(
+      env.DB.prepare(`
+        INSERT INTO remote_raid_usage (
+          user_id,
+          local_date,
+          raids_used,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(
+          user_id,
+          local_date
+        )
+        DO UPDATE SET
+          raids_used =
+            excluded.raids_used,
+          updated_at =
+            excluded.updated_at
+      `).bind(
+        user.id,
+        localDate,
+        newRemoteUsage,
+        timestamp
+      )
+    );
+  }
+
+  await env.DB.batch(
+    statements
+  );
+
+  return json({
+    ok: true,
+    log_id:
+      logId,
+    pokemon_name:
+      pokemonName,
+    raid_type:
+      raidType,
+    raid_count:
+      raidCount,
+    progress_gained:
+      updateTarget
+        ? progressGained
+        : 0,
+    target_updated:
+      updateTarget,
+    target_before_value:
+      targetBeforeValue,
+    target_after_value:
+      targetAfterValue,
+    remote_raids_used:
+      newRemoteUsage,
+    local_date:
+      localDate
+  });
+}
+
+
+async function undoRaidLogApi(
+  request,
+  env
+) {
+  const body =
+    await request.json();
+
+  const user =
+    await userByManageToken(
+      env,
+      body.token
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  const logId =
+    String(
+      body.log_id || ""
+    );
+
+  if (!logId) {
+    return bad(
+      "Raid log id is required."
+    );
+  }
+
+  const log =
+    await env.DB.prepare(`
+      SELECT *
+      FROM raid_log
+      WHERE id = ?
+        AND user_id = ?
+        AND undone_at IS NULL
+    `).bind(
+      logId,
+      user.id
+    ).first();
+
+  if (!log) {
+    return bad(
+      "Raid log entry was not found or was already undone.",
+      404
+    );
+  }
+
+  const timestamp =
+    nowIso();
+
+  const statements = [];
+
+  if (
+    log.target_id &&
+    log.target_before_value != null
+  ) {
+    const target =
+      await env.DB.prepare(`
+        SELECT *
+        FROM targets
+        WHERE id = ?
+          AND user_id = ?
+      `).bind(
+        log.target_id,
+        user.id
+      ).first();
+
+    if (target) {
+      const currentValue =
+        Number(
+          target.current_value || 0
+        );
+
+      const recordedAfter =
+        Number(
+          log.target_after_value
+        );
+
+      const progress =
+        Number(
+          log.progress_gained || 0
+        );
+
+      const restoredValue =
+        Number.isFinite(
+          recordedAfter
+        ) &&
+        Math.abs(
+          currentValue -
+          recordedAfter
+        ) < 0.000001
+          ? Number(
+              log.target_before_value
+            )
+          : Math.max(
+              0,
+              currentValue -
+              progress
+            );
+
+      statements.push(
+        env.DB.prepare(`
+          UPDATE targets
+          SET
+            current_value = ?,
+            updated_at = ?
+          WHERE id = ?
+            AND user_id = ?
+        `).bind(
+          restoredValue,
+          timestamp,
+          target.id,
+          user.id
+        )
+      );
+    }
+  }
+
+  if (
+    log.raid_type ===
+    "remote"
+  ) {
+    const currentRemoteUsage =
+      await remoteRaidUsageForDate(
+        env,
+        user.id,
+        log.local_date
+      );
+
+    const restoredRemoteUsage =
+      Math.max(
+        0,
+        currentRemoteUsage -
+        Number(
+          log.raid_count || 0
+        )
+      );
+
+    statements.push(
+      env.DB.prepare(`
+        INSERT INTO remote_raid_usage (
+          user_id,
+          local_date,
+          raids_used,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(
+          user_id,
+          local_date
+        )
+        DO UPDATE SET
+          raids_used =
+            excluded.raids_used,
+          updated_at =
+            excluded.updated_at
+      `).bind(
+        user.id,
+        log.local_date,
+        restoredRemoteUsage,
+        timestamp
+      )
+    );
+  }
+
+  statements.push(
+    env.DB.prepare(`
+      UPDATE raid_log
+      SET undone_at = ?
+      WHERE id = ?
+        AND user_id = ?
+        AND undone_at IS NULL
+    `).bind(
+      timestamp,
+      logId,
+      user.id
+    )
+  );
+
+  await env.DB.batch(
+    statements
+  );
+
+  return json({
+    ok: true,
+    log_id:
+      logId
+  });
+}
+
+
+
 async function updateRemoteRaidUsage(request, env) {
   const body = await request.json();
   const user = await userByManageToken(env, body.token);
@@ -5527,6 +6145,13 @@ async function getMe(request, env) {
   const dataFreshness =
     await dataFreshnessForDashboard(env);
 
+  const raidActivity =
+    await raidActivityForUser(
+      env,
+      user,
+      metas
+    );
+
   const dashboard =
     dashboardOverview(
       recommendations,
@@ -5559,6 +6184,8 @@ async function getMe(request, env) {
       ),
     recommendations,
     remote_raid_plan: remoteRaidPlan,
+    raid_activity:
+      raidActivity,
     target_options: targetOptions,
     dashboard,
     data_freshness: dataFreshness,
@@ -6500,6 +7127,26 @@ async function handleFetch(request, env) {
 
     if (request.method === "POST" && path === "/api/remote-raid-usage") {
       return updateRemoteRaidUsage(request, env);
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/raid-log"
+    ) {
+      return logRaidApi(
+        request,
+        env
+      );
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/raid-log/undo"
+    ) {
+      return undoRaidLogApi(
+        request,
+        env
+      );
     }
 
     if (
