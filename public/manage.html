@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=17">
+  <link rel="stylesheet" href="/styles.css?v=18">
 </head>
 
 <body class="manage-page">
@@ -245,21 +245,48 @@
 
               <div class="usage-inline">
                 <div>
-                  <label for="raidsUsedToday">Remote Raids used today</label>
+                  <label for="raidsUsedToday">Remote Raids used today · manual correction</label>
                   <p class="field-help">
-                    Update this after using Remote Raid Passes. It is stored by your local date.
+                    Logging a Remote Raid below updates this automatically. Use this field only to correct the total or enter raids you did before using the raid logger.
                   </p>
                 </div>
 
                 <div class="usage-control">
                   <input id="raidsUsedToday" type="number" min="0" step="1" inputmode="numeric">
-                  <button id="saveRaidUsage" type="button">Save usage</button>
+                  <button id="saveRaidUsage" type="button">Save correction</button>
                 </div>
 
                 <span id="raidUsageStatus" class="save-status"></span>
               </div>
 
               <div id="remoteRuleSource" class="source-note"></div>
+            </section>
+
+            <!-- Raid activity -->
+            <section class="dashboard-card raid-activity-card">
+              <div class="section-heading-row">
+                <div>
+                  <span class="section-eyebrow">QUICK LOG</span>
+                  <h2>Today's Raid Activity</h2>
+                  <p class="section-subtitle">
+                    Log Remote or Local raids here. Remote raids update the official-cap counter automatically; Local raids are tracked separately.
+                  </p>
+                </div>
+
+                <button id="openRaidLog" type="button" class="button">
+                  + Log raid
+                </button>
+              </div>
+
+              <div id="raidActivitySummary" class="raid-activity-summary"></div>
+
+              <div class="recent-raid-log-wrap">
+                <div class="mini-section-heading">
+                  <strong>Recent raid logs</strong>
+                  <span>Use Undo if you tapped the wrong raid.</span>
+                </div>
+                <div id="recentRaidLogs" class="recent-raid-log"></div>
+              </div>
             </section>
 
             <!-- Allocations -->
@@ -722,6 +749,85 @@
   </main>
 
   <!-- =========================================================
+       RAID LOG MODAL
+       ========================================================= -->
+  <div id="raidLogModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="raidLogModalTitle">
+    <section class="target-modal raid-log-modal">
+      <div class="modal-header">
+        <div>
+          <span class="section-eyebrow">QUICK RAID UPDATE</span>
+          <h2 id="raidLogModalTitle">Log raid</h2>
+        </div>
+        <button id="closeRaidLogModal" type="button" class="icon-button" aria-label="Close raid logger">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="raid-log-form">
+          <div>
+            <label for="raidLogPokemon">Pokémon</label>
+            <select id="raidLogPokemon"></select>
+          </div>
+
+          <div>
+            <label>Raid type</label>
+            <div class="raid-type-toggle" role="group" aria-label="Raid type">
+              <button type="button" data-raid-type="remote" class="active">
+                Remote
+              </button>
+              <button type="button" data-raid-type="local">
+                Local
+              </button>
+            </div>
+          </div>
+
+          <div class="raid-log-two-col">
+            <div>
+              <label for="raidLogCount">Raids completed</label>
+              <input
+                id="raidLogCount"
+                type="number"
+                min="1"
+                max="99"
+                step="1"
+                inputmode="numeric"
+                value="1"
+              >
+            </div>
+
+            <div>
+              <label for="raidLogProgress">Total target progress gained</label>
+              <input
+                id="raidLogProgress"
+                type="number"
+                min="0"
+                step="1"
+                inputmode="decimal"
+                value="0"
+              >
+            </div>
+          </div>
+
+          <label class="raid-update-target-row">
+            <input id="raidLogUpdateTarget" type="checkbox" checked>
+            <span>
+              <strong>Update matching target progress</strong>
+              <small id="raidLogTargetHint">The expected progress per raid is used as the starting estimate.</small>
+            </span>
+          </label>
+
+          <div id="raidLogPreview" class="raid-log-preview"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <span id="raidLogStatus" class="save-status"></span>
+        <button id="cancelRaidLog" type="button" class="secondary">Cancel</button>
+        <button id="confirmRaidLog" type="button">Confirm raid log</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================================================
        TARGET EDITOR MODAL
        ========================================================= -->
   <div id="targetModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="targetModalTitle">
@@ -831,6 +937,10 @@ const app = document.getElementById("app");
 const loadStatus = document.getElementById("loadStatus");
 let state = null;
 let targetById = new Map();
+
+let raidLogType = "remote";
+let raidLogProgressDirty = false;
+let raidLogExplicitTargetId = null;
 
 let calendarMonthDate = null;
 let calendarMonthData = null;
@@ -1270,6 +1380,732 @@ function renderTodayBriefing() {
 }
 
 
+
+function raidLogMatchingTarget(
+  pokemonName,
+  explicitTargetId = null
+) {
+  if (explicitTargetId) {
+    const exactById =
+      state.targets.find(
+        target =>
+          String(target.id) ===
+          String(explicitTargetId)
+      );
+
+    if (exactById) {
+      return exactById;
+    }
+  }
+
+  const wanted =
+    normalizePickerName(
+      pokemonName
+    );
+
+  return state.targets.find(
+    target =>
+      normalizePickerName(
+        target.pokemon_name
+      ) === wanted
+  ) || null;
+}
+
+function raidLogPokemonNames() {
+  const names = [];
+  const seen = new Set();
+
+  const add = name => {
+    const value =
+      String(name || "").trim();
+
+    const key =
+      normalizePickerName(value);
+
+    if (!value || seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    names.push(value);
+  };
+
+  for (
+    const recommendation of
+    state.recommendations || []
+  ) {
+    add(
+      recommendation.pokemon_name
+    );
+  }
+
+  for (
+    const target of
+    state.targets || []
+  ) {
+    add(
+      target.pokemon_name
+    );
+  }
+
+  return names;
+}
+
+function setRaidLogType(
+  raidType
+) {
+  raidLogType =
+    raidType === "local"
+      ? "local"
+      : "remote";
+
+  localStorage.setItem(
+    "pogo-last-raid-type",
+    raidLogType
+  );
+
+  document
+    .querySelectorAll(
+      "[data-raid-type]"
+    )
+    .forEach(
+      button => {
+        button.classList.toggle(
+          "active",
+          button.dataset.raidType ===
+            raidLogType
+        );
+      }
+    );
+
+  updateRaidLogPreview();
+}
+
+function raidLogDefaultProgress(
+  target,
+  count
+) {
+  if (!target) {
+    return 0;
+  }
+
+  if (
+    target.target_type ===
+    "raids"
+  ) {
+    return count;
+  }
+
+  const perRaid =
+    Number(
+      target
+        .expected_progress_per_raid
+    );
+
+  return Number.isFinite(
+    perRaid
+  ) &&
+  perRaid > 0
+    ? perRaid * count
+    : 0;
+}
+
+function populateRaidLogPokemon(
+  selectedName = ""
+) {
+  const select =
+    document.getElementById(
+      "raidLogPokemon"
+    );
+
+  const names =
+    raidLogPokemonNames();
+
+  if (
+    selectedName &&
+    !names.some(
+      name =>
+        normalizePickerName(
+          name
+        ) ===
+        normalizePickerName(
+          selectedName
+        )
+    )
+  ) {
+    names.unshift(
+      selectedName
+    );
+  }
+
+  select.innerHTML =
+    names.length
+      ? names
+          .map(
+            name =>
+              `<option value="${esc(name)}">${esc(name)}</option>`
+          )
+          .join("")
+      : `<option value="">No raid Pokémon available</option>`;
+
+  if (selectedName) {
+    const matched =
+      names.find(
+        name =>
+          normalizePickerName(
+            name
+          ) ===
+          normalizePickerName(
+            selectedName
+          )
+      );
+
+    if (matched) {
+      select.value =
+        matched;
+    }
+  }
+}
+
+function syncRaidLogProgressDefault() {
+  if (raidLogProgressDirty) {
+    return;
+  }
+
+  const pokemonName =
+    document.getElementById(
+      "raidLogPokemon"
+    ).value;
+
+  const count =
+    Math.max(
+      1,
+      Number(
+        document.getElementById(
+          "raidLogCount"
+        ).value || 1
+      )
+    );
+
+  const target =
+    raidLogMatchingTarget(
+      pokemonName,
+      raidLogExplicitTargetId
+    );
+
+  document.getElementById(
+    "raidLogProgress"
+  ).value =
+    raidLogDefaultProgress(
+      target,
+      count
+    );
+}
+
+function updateRaidLogPreview() {
+  const pokemonName =
+    document.getElementById(
+      "raidLogPokemon"
+    ).value;
+
+  const count =
+    Math.max(
+      1,
+      Number(
+        document.getElementById(
+          "raidLogCount"
+        ).value || 1
+      )
+    );
+
+  const progress =
+    Math.max(
+      0,
+      Number(
+        document.getElementById(
+          "raidLogProgress"
+        ).value || 0
+      )
+    );
+
+  const target =
+    raidLogMatchingTarget(
+      pokemonName,
+      raidLogExplicitTargetId
+    );
+
+  const updateCheckbox =
+    document.getElementById(
+      "raidLogUpdateTarget"
+    );
+
+  const hint =
+    document.getElementById(
+      "raidLogTargetHint"
+    );
+
+  if (!target) {
+    updateCheckbox.checked = false;
+    updateCheckbox.disabled = true;
+
+    hint.textContent =
+      "No matching target. The raid count will still be logged.";
+
+    document.getElementById(
+      "raidLogPreview"
+    ).innerHTML = `
+      <span class="mini-label">AFTER CONFIRMING</span>
+      <strong>
+        ${formatNumber(count)}
+        ${raidLogType === "remote" ? "Remote" : "Local"}
+        raid${count === 1 ? "" : "s"} logged
+      </strong>
+      <small>No target progress will be changed.</small>
+    `;
+
+    return;
+  }
+
+  updateCheckbox.disabled = false;
+
+  const current =
+    Number(
+      target.current_value || 0
+    );
+
+  const after =
+    current + progress;
+
+  const unit =
+    targetTypeLabels[
+      target.target_type
+    ] ||
+    "Progress";
+
+  const expected =
+    Number(
+      target
+        .expected_progress_per_raid
+    );
+
+  hint.textContent =
+    target.target_type === "raids"
+      ? "Raid-count targets default to +1 progress per raid."
+      : (
+          Number.isFinite(expected) &&
+          expected > 0
+            ? `Starting estimate: ${formatNumber(expected)} ${unit} per raid. You can edit the total.`
+            : "No expected progress is saved. Enter the total gained from these raids."
+        );
+
+  const willUpdate =
+    updateCheckbox.checked;
+
+  document.getElementById(
+    "raidLogPreview"
+  ).innerHTML = `
+    <span class="mini-label">AFTER CONFIRMING</span>
+    <strong>
+      ${formatNumber(count)}
+      ${raidLogType === "remote" ? "Remote" : "Local"}
+      raid${count === 1 ? "" : "s"} logged
+    </strong>
+
+    ${
+      willUpdate
+        ? `
+          <small>
+            ${esc(target.pokemon_name)}:
+            ${formatNumber(current)}
+            → ${formatNumber(after)}
+            ${esc(unit)}
+          </small>
+        `
+        : `
+          <small>
+            Target progress will not be changed.
+          </small>
+        `
+    }
+  `;
+}
+
+function openRaidLogModal(
+  pokemonName = "",
+  targetId = null
+) {
+  raidLogExplicitTargetId =
+    targetId || null;
+
+  raidLogProgressDirty =
+    false;
+
+  populateRaidLogPokemon(
+    pokemonName
+  );
+
+  document.getElementById(
+    "raidLogCount"
+  ).value = "1";
+
+  document.getElementById(
+    "raidLogUpdateTarget"
+  ).checked = true;
+
+  document.getElementById(
+    "raidLogStatus"
+  ).textContent = "";
+
+  const savedType =
+    localStorage.getItem(
+      "pogo-last-raid-type"
+    );
+
+  raidLogType =
+    savedType === "local"
+      ? "local"
+      : "remote";
+
+  syncRaidLogProgressDefault();
+  setRaidLogType(
+    raidLogType
+  );
+
+  const modal =
+    document.getElementById(
+      "raidLogModal"
+    );
+
+  modal.classList.remove(
+    "hidden"
+  );
+
+  document.body.classList.add(
+    "modal-open"
+  );
+
+  setTimeout(
+    () =>
+      document
+        .getElementById(
+          "raidLogCount"
+        )
+        .focus(),
+    30
+  );
+}
+
+function closeRaidLogModal() {
+  document
+    .getElementById(
+      "raidLogModal"
+    )
+    .classList.add(
+      "hidden"
+    );
+
+  document.body.classList.remove(
+    "modal-open"
+  );
+
+  raidLogExplicitTargetId =
+    null;
+}
+
+async function confirmRaidLog() {
+  const status =
+    document.getElementById(
+      "raidLogStatus"
+    );
+
+  const pokemonName =
+    document.getElementById(
+      "raidLogPokemon"
+    ).value;
+
+  const count =
+    Number(
+      document.getElementById(
+        "raidLogCount"
+      ).value
+    );
+
+  const progress =
+    Number(
+      document.getElementById(
+        "raidLogProgress"
+      ).value || 0
+    );
+
+  const updateTarget =
+    document.getElementById(
+      "raidLogUpdateTarget"
+    ).checked;
+
+  const target =
+    raidLogMatchingTarget(
+      pokemonName,
+      raidLogExplicitTargetId
+    );
+
+  status.textContent =
+    "Logging…";
+
+  try {
+    const result =
+      await api(
+        "/api/raid-log",
+        {
+          method: "POST",
+          headers: {
+            "content-type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              token,
+              pokemon_name:
+                pokemonName,
+              raid_type:
+                raidLogType,
+              raid_count:
+                count,
+              progress_gained:
+                progress,
+              update_target:
+                updateTarget,
+              target_id:
+                target?.id || null
+            })
+        }
+      );
+
+    closeRaidLogModal();
+
+    await load();
+
+    const targetMessage =
+      result.target_updated
+        ? ` · target ${formatNumber(result.target_before_value)} → ${formatNumber(result.target_after_value)}`
+        : "";
+
+    document.getElementById(
+      "raidActivityStatus"
+    ).textContent =
+      `✓ ${formatNumber(result.raid_count)} ${result.raid_type} raid${Number(result.raid_count) === 1 ? "" : "s"} logged for ${result.pokemon_name}${targetMessage}`;
+  } catch (error) {
+    status.textContent =
+      error.message;
+  }
+}
+
+async function undoRaidLog(
+  logId
+) {
+  const confirmed =
+    window.confirm(
+      "Undo this raid log? Target progress and the Remote Raid counter will be reversed where applicable."
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const status =
+    document.getElementById(
+      "raidActivityStatus"
+    );
+
+  status.textContent =
+    "Undoing…";
+
+  try {
+    await api(
+      "/api/raid-log/undo",
+      {
+        method: "POST",
+        headers: {
+          "content-type":
+            "application/json"
+        },
+        body:
+          JSON.stringify({
+            token,
+            log_id:
+              logId
+          })
+      }
+    );
+
+    await load();
+
+    document.getElementById(
+      "raidActivityStatus"
+    ).textContent =
+      "Raid log undone ✓";
+  } catch (error) {
+    status.textContent =
+      error.message;
+  }
+}
+
+function raidLogTimeLabel(
+  createdAt
+) {
+  const date =
+    new Date(
+      createdAt
+    );
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(
+    undefined,
+    {
+      hour: "numeric",
+      minute: "2-digit"
+    }
+  ).format(date);
+}
+
+function renderRaidActivity() {
+  const activity =
+    state.raid_activity || {
+      remote_raids:
+        state.remote_raid_plan
+          ?.raids_used || 0,
+      local_raids: 0,
+      total_raids:
+        state.remote_raid_plan
+          ?.raids_used || 0,
+      recent: []
+    };
+
+  document.getElementById(
+    "raidActivitySummary"
+  ).innerHTML = `
+    <article>
+      <span>Remote</span>
+      <strong>${formatNumber(activity.remote_raids)}</strong>
+      <small>Counts toward the game's Remote Raid limit</small>
+    </article>
+
+    <article>
+      <span>Local</span>
+      <strong>${formatNumber(activity.local_raids)}</strong>
+      <small>In-person raids logged today</small>
+    </article>
+
+    <article>
+      <span>Total raids</span>
+      <strong>${formatNumber(activity.total_raids)}</strong>
+      <small>Remote + Local today</small>
+    </article>
+  `;
+
+  const manualAdjustment =
+    Number(
+      activity
+        .manual_remote_adjustment || 0
+    );
+
+  const recent =
+    activity.recent || [];
+
+  document.getElementById(
+    "recentRaidLogs"
+  ).innerHTML =
+    recent.length
+      ? `
+        ${
+          manualAdjustment !== 0
+            ? `
+              <div class="raid-log-adjustment-note">
+                Remote total includes a ${manualAdjustment > 0 ? "+" : ""}${formatNumber(manualAdjustment)}
+                manual correction outside the raid log.
+              </div>
+            `
+            : ""
+        }
+
+        ${recent
+          .map(
+            item => `
+              <article class="recent-raid-row">
+                <div class="recent-raid-main">
+                  ${spriteImg(
+                    item.sprite_url,
+                    item.pokemon_name,
+                    "pokemon-sprite recent-raid-sprite"
+                  )}
+
+                  <div>
+                    <strong>${esc(item.pokemon_name)}</strong>
+                    <small>
+                      ${esc(raidLogTimeLabel(item.created_at))}
+                      · ${esc(item.raid_type === "remote" ? "Remote" : "Local")}
+                      ×${formatNumber(item.raid_count)}
+                      ${
+                        Number(item.progress_gained || 0) > 0
+                          ? ` · +${formatNumber(item.progress_gained)} progress`
+                          : ""
+                      }
+                    </small>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="secondary small-button"
+                  data-undo-raid="${esc(item.id)}"
+                >
+                  Undo
+                </button>
+              </article>
+            `
+          )
+          .join("")}
+      `
+      : `
+        <div class="empty-state compact-empty">
+          <strong>No raids logged yet today.</strong>
+          <p>Use “Log raid” after a Remote or Local raid.</p>
+        </div>
+      `;
+
+  if (
+    !document.getElementById(
+      "raidActivityStatus"
+    )
+  ) {
+    const status =
+      document.createElement(
+        "div"
+      );
+
+    status.id =
+      "raidActivityStatus";
+
+    status.className =
+      "save-status raid-activity-status";
+
+    document
+      .querySelector(
+        ".raid-activity-card"
+      )
+      ?.appendChild(
+        status
+      );
+  }
+}
+
+
 function renderHero() {
   const plan = state.remote_raid_plan;
   const rule = plan.official_rule;
@@ -1588,6 +2424,16 @@ function renderRecommendations() {
             ${rec.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}
           </ul>
         </details>
+
+        <div class="recommendation-actions">
+          <button
+            type="button"
+            class="log-raid-button"
+            data-log-raid="${esc(rec.pokemon_name)}"
+          >
+            + Log raid
+          </button>
+        </div>
       </article>
     `).join("")
     : `
@@ -1672,6 +2518,14 @@ function renderTargets() {
             </div>
 
             <div class="target-actions">
+              <button
+                type="button"
+                class="log-raid-button small-button"
+                data-log-raid="${esc(target.pokemon_name)}"
+                data-log-target-id="${esc(target.id)}"
+              >
+                + Log raid
+              </button>
               <button type="button" class="secondary small-button" data-edit-target="${esc(target.id)}">Edit</button>
               <button type="button" class="ghost-danger small-button" data-delete-target="${esc(target.id)}">Delete</button>
             </div>
@@ -2273,6 +3127,7 @@ function render() {
   renderHero();
   renderTodayBriefing();
   renderRemoteRaidPlan();
+  renderRaidActivity();
   renderRecommendations();
   renderTargets();
   renderCalendar();
@@ -2679,6 +3534,156 @@ updateSliderOutput("remoteRaidMinScore", "remoteRaidMinScoreOutput", 0);
 document.getElementById("saveSettings").addEventListener("click", savePreferences);
 document.getElementById("saveCalendar").addEventListener("click", saveCalendarFilters);
 document.getElementById("saveRaidUsage").addEventListener("click", saveRaidUsage);
+
+document
+  .getElementById(
+    "openRaidLog"
+  )
+  .addEventListener(
+    "click",
+    () =>
+      openRaidLogModal()
+  );
+
+document
+  .getElementById(
+    "closeRaidLogModal"
+  )
+  .addEventListener(
+    "click",
+    closeRaidLogModal
+  );
+
+document
+  .getElementById(
+    "cancelRaidLog"
+  )
+  .addEventListener(
+    "click",
+    closeRaidLogModal
+  );
+
+document
+  .getElementById(
+    "confirmRaidLog"
+  )
+  .addEventListener(
+    "click",
+    confirmRaidLog
+  );
+
+document
+  .querySelectorAll(
+    "[data-raid-type]"
+  )
+  .forEach(
+    button => {
+      button.addEventListener(
+        "click",
+        () =>
+          setRaidLogType(
+            button.dataset.raidType
+          )
+      );
+    }
+  );
+
+document
+  .getElementById(
+    "raidLogPokemon"
+  )
+  .addEventListener(
+    "change",
+    () => {
+      raidLogExplicitTargetId =
+        null;
+      raidLogProgressDirty =
+        false;
+      syncRaidLogProgressDefault();
+      updateRaidLogPreview();
+    }
+  );
+
+document
+  .getElementById(
+    "raidLogCount"
+  )
+  .addEventListener(
+    "input",
+    () => {
+      syncRaidLogProgressDefault();
+      updateRaidLogPreview();
+    }
+  );
+
+document
+  .getElementById(
+    "raidLogProgress"
+  )
+  .addEventListener(
+    "input",
+    () => {
+      raidLogProgressDirty =
+        true;
+      updateRaidLogPreview();
+    }
+  );
+
+document
+  .getElementById(
+    "raidLogUpdateTarget"
+  )
+  .addEventListener(
+    "change",
+    updateRaidLogPreview
+  );
+
+document
+  .getElementById(
+    "raidLogModal"
+  )
+  .addEventListener(
+    "click",
+    event => {
+      if (
+        event.target ===
+        event.currentTarget
+      ) {
+        closeRaidLogModal();
+      }
+    }
+  );
+
+document.addEventListener(
+  "click",
+  event => {
+    const logButton =
+      event.target.closest(
+        "[data-log-raid]"
+      );
+
+    if (logButton) {
+      openRaidLogModal(
+        logButton.dataset.logRaid,
+        logButton.dataset.logTargetId ||
+          null
+      );
+      return;
+    }
+
+    const undoButton =
+      event.target.closest(
+        "[data-undo-raid]"
+      );
+
+    if (undoButton) {
+      undoRaidLog(
+        undoButton.dataset.undoRaid
+      );
+    }
+  }
+);
+
 document.getElementById("saveDailyBudgetOverride").addEventListener("click", saveDailyBudgetOverride);
 document.getElementById("clearDailyBudgetOverride").addEventListener("click", clearDailyBudgetOverride);
 
