@@ -3667,3 +3667,158 @@ button.danger-soft:hover:not(:disabled) {
     line-height: 1.25;
   }
 }
+
+
+/* ============================================================
+   POKÉMON RAID SPRITES
+   ============================================================ */
+
+.pokemon-sprite {
+  display: block;
+  object-fit: contain;
+  object-position: center;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.today-leader-sprites {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.today-leader-sprite {
+  width: 58px;
+  height: 58px;
+  filter:
+    drop-shadow(
+      0 6px 8px
+      rgba(47, 73, 101, .12)
+    );
+}
+
+#todayTopPick {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.recommendation-pokemon,
+.target-pokemon-heading,
+.allocation-title-with-sprite {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  min-width: 0;
+}
+
+.recommendation-pokemon > div,
+.target-pokemon-heading > div,
+.allocation-title-with-sprite > div {
+  min-width: 0;
+}
+
+.recommendation-sprite {
+  flex: 0 0 auto;
+  width: 68px;
+  height: 68px;
+  padding: 3px;
+  border-radius: 16px;
+  background:
+    radial-gradient(
+      circle at 50% 60%,
+      rgba(222, 241, 255, .8),
+      rgba(255,255,255,0) 68%
+    );
+}
+
+.target-sprite {
+  flex: 0 0 auto;
+  width: 50px;
+  height: 50px;
+}
+
+.allocation-sprite {
+  flex: 0 0 auto;
+  width: 50px;
+  height: 50px;
+}
+
+.forecast-boss-list {
+  display: grid !important;
+  gap: 3px;
+}
+
+.forecast-boss {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+
+.forecast-boss > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forecast-sprite {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+}
+
+.forecast-more {
+  display: block;
+  margin-top: 2px;
+}
+
+.calendar-raid-sprites {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 7px 0 5px;
+}
+
+.calendar-detail-sprite {
+  width: 44px;
+  height: 44px;
+  padding: 2px;
+  border-radius: 11px;
+  background: rgba(241,248,255,.78);
+}
+
+.calendar-sprite-more {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #eef4fa;
+  color: #61758b;
+  font-size: .65rem;
+  font-weight: 900;
+}
+
+@media (max-width: 700px) {
+  .today-leader-sprite {
+    width: 46px;
+    height: 46px;
+  }
+
+  .recommendation-sprite {
+    width: 58px;
+    height: 58px;
+  }
+
+  .target-sprite,
+  .allocation-sprite {
+    width: 44px;
+    height: 44px;
+  }
+}
