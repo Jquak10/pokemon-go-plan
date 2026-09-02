@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=22">
+  <link rel="stylesheet" href="/styles.css?v=23">
 </head>
 
 <body class="manage-page">
@@ -150,7 +150,27 @@
           <span>Calendar</span>
           <span id="calendarTabCount" class="tab-count">0</span>
         </button>
+
+        <button
+          id="mobileMoreButton"
+          class="tab-button mobile-more-tab"
+          type="button"
+          aria-expanded="false"
+          aria-controls="mobileMoreSheet"
+        >
+          <span class="tab-icon" aria-hidden="true">•••</span>
+          <span>More</span>
+        </button>
       </nav>
+
+      <button
+        id="mobileQuickLog"
+        type="button"
+        class="mobile-quick-log"
+        aria-label="Log a raid"
+      >
+        + Log raid
+      </button>
 
       <!-- =======================================================
            TAB: RAID PLAN
@@ -337,40 +357,64 @@
 
           </div>
 
-          <!-- Sticky sidebar -->
+          <!-- Sticky desktop quick rail -->
           <aside class="plan-sidebar">
-            <section class="dashboard-card sticky-card">
-              <span class="section-eyebrow">QUICK GUIDE</span>
-              <h3>How to read the plan</h3>
-
-              <div class="guide-list">
-                <div class="guide-item">
-                  <span class="guide-number">1</span>
-                  <div>
-                    <strong>Check the official cap</strong>
-                    <small>Temporary event limits are detected separately from your personal budget.</small>
-                  </div>
+            <section class="dashboard-card sticky-card desktop-quick-rail">
+              <div class="desktop-rail-heading">
+                <div>
+                  <span class="section-eyebrow">TODAY</span>
+                  <h3>Quick status</h3>
                 </div>
 
-                <div class="guide-item">
-                  <span class="guide-number">2</span>
-                  <div>
-                    <strong>Use the recommended count</strong>
-                    <small>The planner stops when marginal value falls below your threshold.</small>
-                  </div>
-                </div>
-
-                <div class="guide-item">
-                  <span class="guide-number">3</span>
-                  <div>
-                    <strong>Update your progress</strong>
-                    <small>Target progress changes your next recommendation immediately.</small>
-                  </div>
-                </div>
+                <button
+                  id="desktopCommandButton"
+                  type="button"
+                  class="secondary icon-button desktop-command-button"
+                  title="Quick search · Ctrl/⌘ K"
+                  aria-label="Open quick search"
+                >
+                  ⌕
+                </button>
               </div>
 
-              <button type="button" class="button secondary full-width" data-open-tab="targets">
-                Update my targets
+              <div class="desktop-rail-priority">
+                <span>Top priority</span>
+                <strong id="desktopRailTopPick">—</strong>
+              </div>
+
+              <div class="desktop-rail-stats">
+                <article>
+                  <span>Remote used</span>
+                  <strong id="desktopRailRemoteUsed">—</strong>
+                </article>
+                <article>
+                  <span>Recommended</span>
+                  <strong id="desktopRailRecommended">—</strong>
+                </article>
+                <article>
+                  <span>Local</span>
+                  <strong id="desktopRailLocal">—</strong>
+                </article>
+                <article>
+                  <span>Total raids</span>
+                  <strong id="desktopRailTotal">—</strong>
+                </article>
+              </div>
+
+              <button
+                id="desktopRailLogRaid"
+                type="button"
+                class="button full-width"
+              >
+                + Log raid
+              </button>
+
+              <button
+                id="desktopDensityToggle"
+                type="button"
+                class="secondary full-width desktop-density-toggle"
+              >
+                Compact density
               </button>
             </section>
           </aside>
@@ -392,9 +436,16 @@
               </p>
             </div>
 
-            <button id="openAddTarget" type="button" class="button add-target-button">
-              + Add target
-            </button>
+            <div class="target-heading-actions">
+              <div class="target-view-toggle" role="group" aria-label="Target view">
+                <button type="button" class="active" data-target-view="cards">Cards</button>
+                <button type="button" data-target-view="list">Compact list</button>
+              </div>
+
+              <button id="openAddTarget" type="button" class="button add-target-button">
+                + Add target
+              </button>
+            </div>
           </div>
 
           <div class="target-overview-row">
@@ -413,9 +464,36 @@
                 autocomplete="off"
               >
             </div>
+
+            <button
+              id="openTargetFilters"
+              type="button"
+              class="secondary mobile-target-filter-button"
+              aria-expanded="false"
+              aria-controls="targetFilterDrawer"
+            >
+              Filters <span id="targetFilterCount">0</span>
+            </button>
           </div>
 
-          <div class="target-filter-bar">
+          <div id="targetFilterDrawer" class="target-filter-drawer">
+            <div class="target-filter-drawer-head">
+              <div>
+                <span class="section-eyebrow">FILTERS</span>
+                <strong>Organize targets</strong>
+              </div>
+
+              <button
+                id="closeTargetFilters"
+                type="button"
+                class="icon-button"
+                aria-label="Close target filters"
+              >
+                ×
+              </button>
+            </div>
+
+            <div class="target-filter-bar">
             <label>
               <span>Goal type</span>
               <select id="targetTypeFilter">
@@ -459,9 +537,14 @@
               </select>
             </label>
 
-            <button id="clearTargetFilters" type="button" class="secondary target-clear-filters">
-              Clear
-            </button>
+              <button id="clearTargetFilters" type="button" class="secondary target-clear-filters">
+                Clear
+              </button>
+            </div>
+
+            <div class="target-filter-drawer-actions">
+              <button id="applyTargetFilters" type="button">Show targets</button>
+            </div>
           </div>
 
           <div id="targetFilterSummary" class="target-filter-summary"></div>
@@ -473,7 +556,8 @@
            TAB: HUNDO CP
            ======================================================= -->
       <section class="tab-panel" data-panel="hundo">
-        <section class="dashboard-card hundo-search-card">
+        <div class="hundo-workspace">
+          <section class="dashboard-card hundo-search-card">
           <div class="section-heading-row">
             <div>
               <span class="section-eyebrow">15 / 15 / 15 IV</span>
@@ -524,7 +608,18 @@
             <span class="field-help">All values assume 15 / 15 / 15 IVs.</span>
           </div>
 
-          <div id="hundoBenchmarks" class="hundo-benchmark-grid"></div>
+          <div id="hundoBenchmarks" class="hundo-benchmark-grid hundo-primary-benchmarks"></div>
+
+          <button
+            id="hundoMoreLevelsToggle"
+            type="button"
+            class="secondary hundo-more-levels-toggle"
+            aria-expanded="false"
+          >
+            More levels
+          </button>
+
+          <div id="hundoMoreBenchmarks" class="hundo-benchmark-grid hundo-more-benchmarks"></div>
 
           <div class="hundo-custom-level">
             <div>
@@ -555,6 +650,7 @@
             Research encounters are commonly Level 15, ordinary raid/egg encounters Level 20, and weather-boosted raid encounters Level 25. Not every Pokémon or form is obtainable through every encounter method.
           </p>
         </section>
+        </div>
       </section>
 
       <!-- =======================================================
@@ -915,6 +1011,61 @@
   </main>
 
   <!-- =========================================================
+       MOBILE MORE SHEET
+       ========================================================= -->
+  <div id="mobileMoreBackdrop" class="mobile-more-backdrop hidden">
+    <section id="mobileMoreSheet" class="mobile-more-sheet" role="dialog" aria-modal="true" aria-labelledby="mobileMoreTitle">
+      <div class="mobile-sheet-handle" aria-hidden="true"></div>
+
+      <div class="mobile-more-head">
+        <div>
+          <span class="section-eyebrow">MORE</span>
+          <h2 id="mobileMoreTitle">More options</h2>
+        </div>
+
+        <button id="closeMobileMore" type="button" class="icon-button" aria-label="Close more options">×</button>
+      </div>
+
+      <button type="button" class="mobile-more-action" data-mobile-more-tab="preferences">
+        <span class="tab-icon">⚙</span>
+        <span>
+          <strong>Preferences</strong>
+          <small>Recommendation weights, timezone, raid budget</small>
+        </span>
+      </button>
+
+      <a class="mobile-more-action" href="/sources">
+        <span class="tab-icon">i</span>
+        <span>
+          <strong>Data sources</strong>
+          <small>See where event and assessment data comes from</small>
+        </span>
+      </a>
+    </section>
+  </div>
+
+  <!-- =========================================================
+       DESKTOP COMMAND PALETTE
+       ========================================================= -->
+  <div id="commandPaletteBackdrop" class="command-palette-backdrop hidden">
+    <section class="command-palette" role="dialog" aria-modal="true" aria-labelledby="commandPaletteTitle">
+      <div class="command-palette-search">
+        <span aria-hidden="true">⌕</span>
+        <input
+          id="commandPaletteInput"
+          type="search"
+          placeholder="Search Pokémon, targets, raids, or actions…"
+          autocomplete="off"
+          aria-label="Quick search"
+        >
+        <kbd>Esc</kbd>
+      </div>
+
+      <div id="commandPaletteResults" class="command-palette-results"></div>
+    </section>
+  </div>
+
+  <!-- =========================================================
        RAID LOG MODAL
        ========================================================= -->
   <div id="raidLogModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="raidLogModalTitle">
@@ -1113,6 +1264,13 @@ let targetFilterState = {
   sort: "priority"
 };
 
+let targetViewMode =
+  localStorage.getItem(
+    "pogo-target-view"
+  ) === "list"
+    ? "list"
+    : "cards";
+
 let pokemonCatalog = null;
 let pokemonCatalogPromise = null;
 let selectedHundoPokemon = null;
@@ -1250,11 +1408,26 @@ function activateTab(name, scroll = true) {
     ensurePokemonCatalogLoaded();
   }
 
+  closeMobileMoreSheet();
+
+  document
+    .getElementById(
+      "mobileQuickLog"
+    )
+    ?.classList.toggle(
+      "hidden",
+      name !== "plan"
+    );
+
   if (scroll) {
-    document.querySelector(".tab-nav")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
+    document
+      .querySelector(
+        `[data-panel="${CSS.escape(name)}"]`
+      )
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
   }
 }
 
@@ -2304,6 +2477,505 @@ function renderRaidActivity() {
         status
       );
   }
+}
+
+
+
+function isDesktopLayout() {
+  return window.matchMedia(
+    "(min-width: 1180px)"
+  ).matches;
+}
+
+function closeMobileMoreSheet() {
+  document
+    .getElementById(
+      "mobileMoreBackdrop"
+    )
+    ?.classList.add(
+      "hidden"
+    );
+
+  document
+    .getElementById(
+      "mobileMoreButton"
+    )
+    ?.setAttribute(
+      "aria-expanded",
+      "false"
+    );
+}
+
+function openMobileMoreSheet() {
+  document
+    .getElementById(
+      "mobileMoreBackdrop"
+    )
+    ?.classList.remove(
+      "hidden"
+    );
+
+  document
+    .getElementById(
+      "mobileMoreButton"
+    )
+    ?.setAttribute(
+      "aria-expanded",
+      "true"
+    );
+}
+
+function closeTargetFilterDrawer() {
+  document
+    .getElementById(
+      "targetFilterDrawer"
+    )
+    ?.classList.remove(
+      "open"
+    );
+
+  document.body.classList.remove(
+    "mobile-drawer-open"
+  );
+
+  document
+    .getElementById(
+      "openTargetFilters"
+    )
+    ?.setAttribute(
+      "aria-expanded",
+      "false"
+    );
+}
+
+function openTargetFilterDrawer() {
+  document
+    .getElementById(
+      "targetFilterDrawer"
+    )
+    ?.classList.add(
+      "open"
+    );
+
+  document.body.classList.add(
+    "mobile-drawer-open"
+  );
+
+  document
+    .getElementById(
+      "openTargetFilters"
+    )
+    ?.setAttribute(
+      "aria-expanded",
+      "true"
+    );
+}
+
+function activeTargetFilterCount() {
+  return [
+    targetFilterState.type !==
+      "all",
+    targetFilterState.priority !==
+      "all",
+    targetFilterState.availability !==
+      "all",
+    targetFilterState.sort !==
+      "priority"
+  ].filter(Boolean).length;
+}
+
+function syncTargetViewUi() {
+  document
+    .querySelectorAll(
+      "[data-target-view]"
+    )
+    .forEach(
+      button => {
+        button.classList.toggle(
+          "active",
+          button.dataset.targetView ===
+            targetViewMode
+        );
+      }
+    );
+
+  document
+    .getElementById(
+      "targets"
+    )
+    ?.classList.toggle(
+      "target-list-view",
+      targetViewMode ===
+        "list"
+    );
+}
+
+function currentDensity() {
+  return (
+    localStorage.getItem(
+      "pogo-density"
+    ) === "compact"
+      ? "compact"
+      : "comfortable"
+  );
+}
+
+function applyDensity() {
+  const compact =
+    currentDensity() ===
+    "compact";
+
+  document.body.classList.toggle(
+    "density-compact",
+    compact
+  );
+
+  const button =
+    document.getElementById(
+      "desktopDensityToggle"
+    );
+
+  if (button) {
+    button.textContent =
+      compact
+        ? "Comfortable density"
+        : "Compact density";
+  }
+}
+
+function toggleDensity() {
+  localStorage.setItem(
+    "pogo-density",
+    currentDensity() ===
+      "compact"
+      ? "comfortable"
+      : "compact"
+  );
+
+  applyDensity();
+}
+
+function renderDesktopQuickRail() {
+  if (!state) {
+    return;
+  }
+
+  const dashboard =
+    state.dashboard || {};
+
+  const picks =
+    dashboard.top_picks?.length
+      ? dashboard.top_picks
+      : (
+          dashboard.top_pick
+            ? [dashboard.top_pick]
+            : []
+        );
+
+  document.getElementById(
+    "desktopRailTopPick"
+  ).textContent =
+    picks.length
+      ? picks
+          .map(
+            item =>
+              item.pokemon_name
+          )
+          .join(" + ")
+      : "No urgent target";
+
+  const activity =
+    state.raid_activity || {};
+
+  document.getElementById(
+    "desktopRailRemoteUsed"
+  ).textContent =
+    formatNumber(
+      activity.remote_raids ??
+      state.remote_raid_plan
+        ?.raids_used ??
+      0
+    );
+
+  document.getElementById(
+    "desktopRailRecommended"
+  ).textContent =
+    formatNumber(
+      state.remote_raid_plan
+        ?.recommended_raids ??
+      state.remote_raid_plan
+        ?.recommended_additional_raids ??
+      0
+    );
+
+  document.getElementById(
+    "desktopRailLocal"
+  ).textContent =
+    formatNumber(
+      activity.local_raids || 0
+    );
+
+  document.getElementById(
+    "desktopRailTotal"
+  ).textContent =
+    formatNumber(
+      activity.total_raids || 0
+    );
+}
+
+function setHundoMoreLevels(
+  expanded
+) {
+  document
+    .getElementById(
+      "hundoMoreBenchmarks"
+    )
+    ?.classList.toggle(
+      "mobile-expanded",
+      Boolean(expanded)
+    );
+
+  const button =
+    document.getElementById(
+      "hundoMoreLevelsToggle"
+    );
+
+  if (button) {
+    button.setAttribute(
+      "aria-expanded",
+      expanded
+        ? "true"
+        : "false"
+    );
+
+    button.textContent =
+      expanded
+        ? "Fewer levels"
+        : "More levels";
+  }
+}
+
+function commandEntries() {
+  if (!state) {
+    return [];
+  }
+
+  const entries = [
+    {
+      label: "Log a raid",
+      meta: "Quick action",
+      action: () =>
+        openRaidLogModal()
+    },
+    {
+      label: "Open Targets",
+      meta: "Navigation",
+      action: () =>
+        activateTab(
+          "targets"
+        )
+    },
+    {
+      label: "Open Hundo CP",
+      meta: "Navigation",
+      action: () =>
+        activateTab(
+          "hundo"
+        )
+    },
+    {
+      label: "Open Calendar",
+      meta: "Navigation",
+      action: () =>
+        activateTab(
+          "calendar"
+        )
+    },
+    {
+      label: "Open Preferences",
+      meta: "Navigation",
+      action: () =>
+        activateTab(
+          "preferences"
+        )
+    }
+  ];
+
+  for (
+    const target of
+    state.targets || []
+  ) {
+    entries.push({
+      label:
+        target.pokemon_name,
+      meta:
+        "Target",
+      action: () => {
+        activateTab(
+          "targets"
+        );
+
+        document.getElementById(
+          "targetSearch"
+        ).value =
+          target.pokemon_name;
+
+        targetFilterState.search =
+          target.pokemon_name;
+
+        renderTargets();
+      }
+    });
+  }
+
+  for (
+    const rec of
+    state.recommendations || []
+  ) {
+    entries.push({
+      label:
+        rec.pokemon_name,
+      meta:
+        "Raid recommendation",
+      action: () => {
+        activateTab(
+          "plan"
+        );
+
+        setTimeout(
+          () =>
+            document
+              .getElementById(
+                "recommendations"
+              )
+              ?.scrollIntoView({
+                behavior:
+                  "smooth",
+                block:
+                  "start"
+              }),
+          80
+        );
+      }
+    });
+
+    entries.push({
+      label:
+        `Log ${rec.pokemon_name} raid`,
+      meta:
+        "Quick action",
+      action: () =>
+        openRaidLogModal(
+          rec.pokemon_name
+        )
+    });
+  }
+
+  return entries;
+}
+
+function renderCommandPaletteResults() {
+  const input =
+    document.getElementById(
+      "commandPaletteInput"
+    );
+
+  const container =
+    document.getElementById(
+      "commandPaletteResults"
+    );
+
+  if (!input || !container) {
+    return;
+  }
+
+  const query =
+    normalizePickerName(
+      input.value
+    );
+
+  const entries =
+    commandEntries()
+      .filter(
+        entry =>
+          !query ||
+          normalizePickerName(
+            `${entry.label} ${entry.meta}`
+          ).includes(
+            query
+          )
+      )
+      .slice(
+        0,
+        9
+      );
+
+  container.innerHTML =
+    entries.length
+      ? entries
+          .map(
+            (
+              entry,
+              index
+            ) => `
+              <button
+                type="button"
+                class="command-result"
+                data-command-index="${index}"
+              >
+                <span>
+                  <strong>${esc(entry.label)}</strong>
+                  <small>${esc(entry.meta)}</small>
+                </span>
+                <span aria-hidden="true">→</span>
+              </button>
+            `
+          )
+          .join("")
+      : `
+        <div class="command-empty">
+          No matching action or Pokémon.
+        </div>
+      `;
+
+  container._entries =
+    entries;
+}
+
+function openCommandPalette() {
+  const backdrop =
+    document.getElementById(
+      "commandPaletteBackdrop"
+    );
+
+  backdrop.classList.remove(
+    "hidden"
+  );
+
+  const input =
+    document.getElementById(
+      "commandPaletteInput"
+    );
+
+  input.value = "";
+
+  renderCommandPaletteResults();
+
+  setTimeout(
+    () =>
+      input.focus(),
+    25
+  );
+}
+
+function closeCommandPalette() {
+  document
+    .getElementById(
+      "commandPaletteBackdrop"
+    )
+    ?.classList.add(
+      "hidden"
+    );
 }
 
 
@@ -3467,20 +4139,48 @@ function renderHundoResult() {
     </div>
   `;
 
+  const benchmarks =
+    hundoBenchmarkData(
+      entry
+    );
+
+  const benchmarkCard =
+    item => `
+      <article class="${item.level === 20 || item.level === 25 ? "featured" : ""}">
+        <span>${esc(item.label)}</span>
+        <strong>${formatNumber(item.cp)}</strong>
+        <small>${esc(item.note)}</small>
+      </article>
+    `;
+
   document.getElementById(
     "hundoBenchmarks"
   ).innerHTML =
-    hundoBenchmarkData(entry)
+    benchmarks
+      .slice(
+        0,
+        3
+      )
       .map(
-        item => `
-          <article class="${item.level === 20 || item.level === 25 ? "featured" : ""}">
-            <span>${esc(item.label)}</span>
-            <strong>${formatNumber(item.cp)}</strong>
-            <small>${esc(item.note)}</small>
-          </article>
-        `
+        benchmarkCard
       )
       .join("");
+
+  document.getElementById(
+    "hundoMoreBenchmarks"
+  ).innerHTML =
+    benchmarks
+      .slice(
+        3
+      )
+      .map(
+        benchmarkCard
+      )
+      .join("");
+
+  setHundoMoreLevels(
+    false
+  );
 
   updateHundoCustomCp();
 }
@@ -4093,10 +4793,19 @@ function renderTargets() {
   ).textContent =
     `${formatNumber(list.length)} shown · ${formatNumber(activeCount)} active · ${formatNumber(completedCount)} completed`;
 
+  document.getElementById(
+    "targetFilterCount"
+  ).textContent =
+    formatNumber(
+      activeTargetFilterCount()
+    );
+
   const container =
     document.getElementById(
       "targets"
     );
+
+  syncTargetViewUi();
 
   if (!state.targets.length) {
     container.innerHTML = `
@@ -4801,6 +5510,8 @@ function render() {
   renderTargets();
   renderCalendar();
   renderPreferences();
+  renderDesktopQuickRail();
+  applyDensity();
 }
 
 async function savePreferences() {
@@ -5202,6 +5913,253 @@ updateSliderOutput("remoteRaidMinScore", "remoteRaidMinScoreOutput", 0);
 
 document.getElementById("saveSettings").addEventListener("click", savePreferences);
 document.getElementById("saveCalendar").addEventListener("click", saveCalendarFilters);
+document
+  .getElementById(
+    "mobileQuickLog"
+  )
+  .addEventListener(
+    "click",
+    () =>
+      openRaidLogModal()
+  );
+
+document
+  .getElementById(
+    "desktopRailLogRaid"
+  )
+  .addEventListener(
+    "click",
+    () =>
+      openRaidLogModal()
+  );
+
+document
+  .getElementById(
+    "desktopDensityToggle"
+  )
+  .addEventListener(
+    "click",
+    toggleDensity
+  );
+
+document
+  .getElementById(
+    "desktopCommandButton"
+  )
+  .addEventListener(
+    "click",
+    openCommandPalette
+  );
+
+document
+  .getElementById(
+    "mobileMoreButton"
+  )
+  .addEventListener(
+    "click",
+    openMobileMoreSheet
+  );
+
+document
+  .getElementById(
+    "closeMobileMore"
+  )
+  .addEventListener(
+    "click",
+    closeMobileMoreSheet
+  );
+
+document
+  .getElementById(
+    "mobileMoreBackdrop"
+  )
+  .addEventListener(
+    "click",
+    event => {
+      if (
+        event.target ===
+        event.currentTarget
+      ) {
+        closeMobileMoreSheet();
+      }
+    }
+  );
+
+document
+  .querySelectorAll(
+    "[data-mobile-more-tab]"
+  )
+  .forEach(
+    button => {
+      button.addEventListener(
+        "click",
+        () =>
+          activateTab(
+            button.dataset.mobileMoreTab
+          )
+      );
+    }
+  );
+
+document
+  .getElementById(
+    "openTargetFilters"
+  )
+  .addEventListener(
+    "click",
+    openTargetFilterDrawer
+  );
+
+document
+  .getElementById(
+    "closeTargetFilters"
+  )
+  .addEventListener(
+    "click",
+    closeTargetFilterDrawer
+  );
+
+document
+  .getElementById(
+    "applyTargetFilters"
+  )
+  .addEventListener(
+    "click",
+    closeTargetFilterDrawer
+  );
+
+document
+  .querySelectorAll(
+    "[data-target-view]"
+  )
+  .forEach(
+    button => {
+      button.addEventListener(
+        "click",
+        () => {
+          targetViewMode =
+            button.dataset.targetView ===
+              "list"
+              ? "list"
+              : "cards";
+
+          localStorage.setItem(
+            "pogo-target-view",
+            targetViewMode
+          );
+
+          renderTargets();
+        }
+      );
+    }
+  );
+
+document
+  .getElementById(
+    "hundoMoreLevelsToggle"
+  )
+  .addEventListener(
+    "click",
+    event => {
+      const expanded =
+        event.currentTarget
+          .getAttribute(
+            "aria-expanded"
+          ) ===
+        "true";
+
+      setHundoMoreLevels(
+        !expanded
+      );
+    }
+  );
+
+document
+  .getElementById(
+    "commandPaletteInput"
+  )
+  .addEventListener(
+    "input",
+    renderCommandPaletteResults
+  );
+
+document
+  .getElementById(
+    "commandPaletteResults"
+  )
+  .addEventListener(
+    "click",
+    event => {
+      const button =
+        event.target.closest(
+          "[data-command-index]"
+        );
+
+      if (!button) {
+        return;
+      }
+
+      const entries =
+        event.currentTarget
+          ._entries || [];
+
+      const entry =
+        entries[
+          Number(
+            button.dataset.commandIndex
+          )
+        ];
+
+      if (entry) {
+        closeCommandPalette();
+        entry.action();
+      }
+    }
+  );
+
+document
+  .getElementById(
+    "commandPaletteBackdrop"
+  )
+  .addEventListener(
+    "click",
+    event => {
+      if (
+        event.target ===
+        event.currentTarget
+      ) {
+        closeCommandPalette();
+      }
+    }
+  );
+
+document.addEventListener(
+  "keydown",
+  event => {
+    if (
+      (
+        event.ctrlKey ||
+        event.metaKey
+      ) &&
+      event.key.toLowerCase() ===
+        "k"
+    ) {
+      event.preventDefault();
+      openCommandPalette();
+      return;
+    }
+
+    if (
+      event.key ===
+      "Escape"
+    ) {
+      closeCommandPalette();
+      closeMobileMoreSheet();
+      closeTargetFilterDrawer();
+    }
+  }
+);
+
 document.getElementById("saveRaidUsage").addEventListener("click", saveRaidUsage);
 
 document
