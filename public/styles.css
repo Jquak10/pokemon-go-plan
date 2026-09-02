@@ -4865,3 +4865,113 @@ button.danger-soft:hover:not(:disabled) {
     text-align: left;
   }
 }
+
+
+/* ============================================================
+   COMPACT SINGLE-ROW TAB NAVIGATION
+   ============================================================ */
+
+/*
+  The previous nav used a four-column grid while the app now has five tabs.
+  That forced Calendar onto a second row and made each tab unnecessarily wide.
+  Keep the navigation as one compact, centered segmented row instead.
+*/
+.tab-nav {
+  display: flex;
+  grid-template-columns: none;
+  justify-content: center;
+  align-items: center;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  gap: 4px;
+  margin: 16px auto;
+  padding: 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 16px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.tab-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  gap: 7px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  white-space: nowrap;
+  font-size: .78rem;
+  font-weight: 850;
+}
+
+.tab-button.active {
+  border-color: rgba(255,255,255,.18);
+  box-shadow:
+    0 5px 14px
+    rgba(36,116,229,.18);
+}
+
+.tab-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: rgba(38, 91, 145, .07);
+  font-size: .75rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.tab-icon-iv {
+  font-size: .58rem;
+  letter-spacing: -.02em;
+}
+
+.tab-button:hover .tab-icon {
+  background: rgba(36,116,229,.10);
+}
+
+.tab-button.active .tab-icon {
+  background: rgba(255,255,255,.16);
+}
+
+.tab-count {
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  font-size: .62rem;
+}
+
+/* Keep all five tabs on one row on phones; scroll horizontally if needed. */
+@media (max-width: 760px) {
+  .tab-nav {
+    justify-content: flex-start;
+    width: auto;
+    max-width: 100%;
+    margin: 12px 0 16px;
+    padding: 5px;
+  }
+
+  .tab-button {
+    min-height: 42px;
+    gap: 6px;
+    padding: 7px 10px;
+    font-size: .72rem;
+  }
+
+  .tab-icon {
+    width: 22px;
+    height: 22px;
+  }
+}
