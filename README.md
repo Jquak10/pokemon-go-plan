@@ -69,6 +69,23 @@ For normal development, use a feature branch and open a pull request rather than
 directly to `main`. Production deployment remains the existing GitHub `main` → Cloudflare
 workflow.
 
+### Dev Container Quick Check
+
+After opening or rebuilding the Dev Container, use these commands to verify the environment:
+
+```bash
+pwd
+git status --short
+gh auth status
+node --version
+npm --version
+wrangler --version
+codex --version
+```
+
+`pwd` should report `/workspace`, and `git status --short` should normally be empty before
+starting new work.
+
 ## Cloudflare setup
 
 1. Create a D1 database named `pokemon-go-calendar-db`.
