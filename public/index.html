@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=15">
+  <link rel="stylesheet" href="/styles.css?v=16">
 </head>
 
 <body class="manage-page portal-page">
@@ -73,18 +73,18 @@
         <span class="status-badge badge-blue">Private</span>
       </div>
 
-      <div class="portal-form-row">
-        <div>
-          <label for="timezone">Timezone</label>
+      <div>
+        <label for="timezone">Timezone</label>
+        <div class="portal-form-row">
           <input id="timezone" value="Asia/Singapore" autocomplete="off">
-          <p class="field-help">
-            Used for local event dates, daily Remote Raid usage, and temporary event limits.
-          </p>
-        </div>
 
-        <button id="create" type="button" class="portal-create-button">
-          Create my planner
-        </button>
+          <button id="create" type="button" class="portal-create-button">
+            Create my planner
+          </button>
+        </div>
+        <p class="field-help">
+          Used for local event dates, daily Remote Raid usage, and temporary event limits.
+        </p>
       </div>
 
       <p id="status" class="save-status"></p>
