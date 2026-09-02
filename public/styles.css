@@ -6149,3 +6149,202 @@ details[open] > summary .details-chevron {
       );
   }
 }
+
+
+/* ============================================================
+   RESPONSIVE LAYOUT BUGFIXES · v25
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. Desktop Raid Plan: make Quick Status viewport-fixed
+   ------------------------------------------------------------
+   Sticky positioning continued to be unreliable in the existing nested/grid
+   dashboard structure. On wide desktop screens the rail is now fixed to the
+   viewport, just like the left navigation, and the plan content reserves room
+   for it explicitly.
+*/
+@media (min-width: 1180px) {
+  .tab-panel[data-panel="plan"] .plan-layout {
+    display: block;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-main {
+    min-width: 0;
+    margin-right: 276px;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar {
+    position: fixed;
+    z-index: 62;
+    top: 24px;
+    right: 20px;
+    width: 250px;
+    height: auto;
+    max-height: calc(100dvh - 48px);
+    margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar > .sticky-card,
+  .tab-panel[data-panel="plan"] .desktop-quick-rail {
+    position: static;
+    width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+  }
+}
+
+/* At narrower desktop widths, preserve enough room for the main planner. */
+@media (min-width: 1180px) and (max-width: 1320px) {
+  .tab-panel[data-panel="plan"] .plan-main {
+    margin-right: 244px;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar {
+    right: 12px;
+    width: 222px;
+  }
+}
+
+/* ------------------------------------------------------------
+   2. Mobile: reserve enough space for the fixed bottom nav
+   ------------------------------------------------------------ */
+@media (max-width: 760px) {
+  :root {
+    --mobile-app-nav-space:
+      calc(
+        126px +
+        env(safe-area-inset-bottom)
+      );
+  }
+
+  body.manage-page {
+    padding-bottom:
+      var(
+        --mobile-app-nav-space
+      );
+  }
+
+  .dashboard-shell {
+    margin-bottom:
+      calc(
+        28px +
+        var(
+          --mobile-app-nav-space
+        )
+      );
+  }
+
+  .tab-panel.active {
+    padding-bottom: 18px;
+  }
+
+  /*
+    When a foreground drawer is open the bottom app navigation is not useful
+    and can cover the drawer actions. Move it completely out of the way.
+  */
+  html.mobile-drawer-open .tab-nav,
+  body.mobile-drawer-open .tab-nav {
+    opacity: 0;
+    pointer-events: none;
+    transform:
+      translateY(
+        calc(
+          130% +
+          env(safe-area-inset-bottom)
+        )
+      );
+  }
+
+  html.mobile-drawer-open .mobile-quick-log,
+  body.mobile-drawer-open .mobile-quick-log {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .tab-nav,
+  .mobile-quick-log {
+    transition:
+      opacity .18s ease,
+      transform .2s ease;
+  }
+
+  /* ----------------------------------------------------------
+     3. Mobile Targets: keep + Add target fully inside the card
+     ---------------------------------------------------------- */
+  .target-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .target-heading > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .target-heading-actions {
+    display: block;
+    width: 100%;
+  }
+
+  .target-heading-actions .add-target-button,
+  #openAddTarget {
+    width: 100%;
+    max-width: 100%;
+    min-height: 46px;
+    margin: 0;
+    box-sizing: border-box;
+  }
+
+  /* ----------------------------------------------------------
+     4. Mobile Target drawer: true scroll lock + safe scrolling
+     ---------------------------------------------------------- */
+  html.mobile-drawer-open,
+  body.mobile-drawer-open {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+  }
+
+  body.mobile-drawer-open {
+    /* position/top are set in JS so iOS Safari cannot move the page behind
+       the sheet while still allowing the drawer itself to scroll. */
+    height: 100%;
+  }
+
+  body.mobile-drawer-open::after {
+    position: fixed;
+    inset: 0;
+  }
+
+  body.mobile-drawer-open .target-filter-drawer {
+    z-index: 171;
+  }
+
+  body.mobile-drawer-open::after {
+    z-index: 170;
+  }
+
+  .target-filter-drawer {
+    max-height:
+      min(
+        84dvh,
+        740px
+      );
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .target-filter-drawer-actions {
+    padding-bottom:
+      calc(
+        20px +
+        env(safe-area-inset-bottom)
+      );
+  }
+}
