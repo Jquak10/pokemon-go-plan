@@ -6118,6 +6118,354 @@ async function dataFreshnessForDashboard(env) {
 }
 
 
+
+function cleanTypeName(typeObject) {
+  const raw =
+    typeObject?.names?.English ||
+    typeObject?.type ||
+    "";
+
+  return String(raw)
+    .replace(/^POKEMON_TYPE_/i, "")
+    .replace(/_/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(
+      /\b\w/g,
+      character =>
+        character.toUpperCase()
+    );
+}
+
+function catalogDisplayName(
+  pokemon,
+  fallback = ""
+) {
+  return String(
+    pokemon?.names?.English ||
+    pokemon?.name?.English ||
+    fallback ||
+    ""
+  ).trim();
+}
+
+function catalogAssets(
+  pokemon
+) {
+  return {
+    sprite_url:
+      pokemon?.assets?.image ||
+      null,
+    shiny_sprite_url:
+      pokemon?.assets
+        ?.shinyImage ||
+      null
+  };
+}
+
+function compactCatalogEntry(
+  pokemon,
+  options = {}
+) {
+  const name =
+    catalogDisplayName(
+      pokemon,
+      options.name
+    );
+
+  const stats =
+    pokemon?.stats || {};
+
+  const dexNr =
+    Number(
+      pokemon?.dexNr ??
+      options.dexNr
+    );
+
+  if (
+    !name ||
+    !Number.isFinite(dexNr) ||
+    !Number.isFinite(
+      Number(stats.attack)
+    ) ||
+    !Number.isFinite(
+      Number(stats.defense)
+    ) ||
+    !Number.isFinite(
+      Number(stats.stamina)
+    )
+  ) {
+    return null;
+  }
+
+  const primaryType =
+    cleanTypeName(
+      pokemon.primaryType
+    );
+
+  const secondaryType =
+    cleanTypeName(
+      pokemon.secondaryType
+    );
+
+  const types =
+    [
+      primaryType,
+      secondaryType
+    ].filter(Boolean);
+
+  const formId =
+    String(
+      pokemon.formId ||
+      pokemon.form ||
+      options.formId ||
+      ""
+    );
+
+  const kind =
+    options.kind ||
+    "base";
+
+  const {
+    sprite_url,
+    shiny_sprite_url
+  } =
+    catalogAssets(
+      pokemon
+    );
+
+  return {
+    key:
+      [
+        dexNr,
+        kind,
+        normalizeName(name),
+        normalizeName(formId)
+      ].join("|"),
+    dex_nr:
+      dexNr,
+    name,
+    form_id:
+      formId || null,
+    kind,
+    attack:
+      Number(stats.attack),
+    defense:
+      Number(stats.defense),
+    stamina:
+      Number(stats.stamina),
+    types,
+    sprite_url,
+    shiny_sprite_url
+  };
+}
+
+function buildPokemonCatalog(
+  pokedex
+) {
+  const map =
+    new Map();
+
+  const add =
+    entry => {
+      if (!entry) {
+        return;
+      }
+
+      const dedupeKey =
+        [
+          normalizeName(
+            entry.name
+          ),
+          entry.attack,
+          entry.defense,
+          entry.stamina,
+          entry.types.join("/")
+        ].join("|");
+
+      if (
+        !map.has(
+          dedupeKey
+        )
+      ) {
+        map.set(
+          dedupeKey,
+          entry
+        );
+      }
+    };
+
+  for (
+    const pokemon of
+    Array.isArray(pokedex)
+      ? pokedex
+      : []
+  ) {
+    add(
+      compactCatalogEntry(
+        pokemon,
+        {
+          kind: "base"
+        }
+      )
+    );
+
+    for (
+      const [
+        formKey,
+        formPokemon
+      ] of
+      Object.entries(
+        pokemon.regionForms || {}
+      )
+    ) {
+      add(
+        compactCatalogEntry(
+          formPokemon,
+          {
+            kind: "regional",
+            dexNr:
+              pokemon.dexNr,
+            formId:
+              formKey
+          }
+        )
+      );
+    }
+
+    for (
+      const [
+        megaKey,
+        megaPokemon
+      ] of
+      Object.entries(
+        pokemon.megaEvolutions || {}
+      )
+    ) {
+      const fallbackName =
+        megaKey
+          .replace(/_/g, " ")
+          .replace(
+            /\b\w/g,
+            character =>
+              character.toUpperCase()
+          );
+
+      add(
+        compactCatalogEntry(
+          megaPokemon,
+          {
+            kind:
+              /primal/i.test(
+                fallbackName
+              )
+                ? "primal"
+                : "mega",
+            dexNr:
+              pokemon.dexNr,
+            formId:
+              megaKey,
+            name:
+              catalogDisplayName(
+                megaPokemon,
+                fallbackName
+              )
+          }
+        )
+      );
+    }
+  }
+
+  return [...map.values()]
+    .sort(
+      (a, b) =>
+        a.dex_nr - b.dex_nr ||
+        a.name.localeCompare(
+          b.name
+        )
+    );
+}
+
+async function pokemonCatalogApi(
+  request,
+  env
+) {
+  const requestUrl =
+    new URL(
+      request.url
+    );
+
+  const cacheUrl =
+    new URL(
+      requestUrl.origin +
+      "/api/pokemon-catalog?v=2"
+    );
+
+  const cacheKey =
+    new Request(
+      cacheUrl.toString(),
+      {
+        method: "GET"
+      }
+    );
+
+  const cache =
+    caches.default;
+
+  const cached =
+    await cache.match(
+      cacheKey
+    );
+
+  if (cached) {
+    return cached;
+  }
+
+  const response =
+    await fetch(
+      POGO_API_POKEDEX
+    );
+
+  if (!response.ok) {
+    return bad(
+      `Pokédex source returned ${response.status}.`,
+      502
+    );
+  }
+
+  const pokedex =
+    await response.json();
+
+  const entries =
+    buildPokemonCatalog(
+      pokedex
+    );
+
+  const result =
+    json(
+      {
+        source:
+          POGO_API_POKEDEX,
+        generated_at:
+          nowIso(),
+        entries
+      },
+      200,
+      {
+        "cache-control":
+          "public, max-age=21600"
+      }
+    );
+
+  await cache.put(
+    cacheKey,
+    result.clone()
+  );
+
+  return result;
+}
+
+
 async function getMe(request, env) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
@@ -7101,6 +7449,16 @@ async function handleFetch(request, env) {
 
     if (request.method === "GET" && path === "/api/me") {
       return getMe(request, env);
+    }
+
+    if (
+      request.method === "GET" &&
+      path === "/api/pokemon-catalog"
+    ) {
+      return pokemonCatalogApi(
+        request,
+        env
+      );
     }
 
     if (request.method === "GET" && path === "/api/calendar-events") {
