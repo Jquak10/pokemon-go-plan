@@ -6348,3 +6348,264 @@ details[open] > summary .details-chevron {
       );
   }
 }
+
+
+/* ============================================================
+   RESPONSIVE LAYOUT BUGFIXES · v26
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. Raid/Target modal scroll lock
+   ------------------------------------------------------------
+   iOS Safari can still scroll the page behind a fixed modal when only
+   overflow:hidden is used. JS now freezes the body at the current scroll
+   position and restores it after the modal closes.
+*/
+html.modal-open,
+body.modal-open {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+@media (max-width: 760px) {
+  body.modal-open {
+    height: 100%;
+    touch-action: none;
+  }
+
+  /*
+    The modal body remains independently scrollable even though the page behind
+    it is completely frozen.
+  */
+  #raidLogModal .modal-body,
+  #targetModal .modal-body {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+}
+
+/* ------------------------------------------------------------
+   2. Desktop Quick Status: natural position first, affix later
+   ------------------------------------------------------------
+   The previous v25 implementation was fixed from page load, so it covered the
+   Today briefing before the Raid Plan itself reached the top of the viewport.
+
+   The rail now:
+   - starts in its natural right column beside Remote Raid Plan
+   - becomes fixed only after that column reaches 24px from the viewport top
+   - returns to the bottom of the Raid Plan when the section ends
+*/
+@media (min-width: 1180px) {
+  .tab-panel[data-panel="plan"] .plan-layout {
+    position: relative;
+    display: block;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-main {
+    min-width: 0;
+    margin-right: 276px;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar {
+    position: absolute;
+    z-index: 62;
+    top: 0;
+    right: 0;
+    bottom: auto;
+    width: 250px;
+    height: auto;
+    max-height: none;
+    margin: 0;
+    overflow: visible;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar.is-affixed {
+    position: fixed;
+    top: 24px;
+    right: 20px;
+    bottom: auto;
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar.is-bottomed {
+    position: absolute;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar > .sticky-card,
+  .tab-panel[data-panel="plan"] .desktop-quick-rail {
+    position: static;
+    width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+  }
+}
+
+@media (min-width: 1180px) and (max-width: 1320px) {
+  .tab-panel[data-panel="plan"] .plan-main {
+    margin-right: 244px;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar {
+    width: 222px;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar.is-affixed {
+    right: 12px;
+  }
+}
+
+
+/* ============================================================
+   RESPONSIVE LAYOUT BUGFIXES · v27
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. Desktop Quick Status: real grid-sticky rail
+   ------------------------------------------------------------
+   Put the sidebar back into normal grid flow. This guarantees it begins beside
+   Remote Raid Plan rather than floating over the Today briefing. It only
+   becomes sticky once its own natural position reaches the viewport top.
+*/
+@media (min-width: 1180px) {
+  .tab-panel[data-panel="plan"] .plan-layout {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0, 1fr)
+      250px !important;
+    gap: 16px !important;
+    align-items: start !important;
+    position: relative;
+    overflow: visible !important;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-main {
+    min-width: 0;
+    margin-right: 0 !important;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar,
+  .tab-panel[data-panel="plan"] .plan-sidebar.is-affixed,
+  .tab-panel[data-panel="plan"] .plan-sidebar.is-bottomed {
+    position: sticky !important;
+    top: 24px !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    height: fit-content;
+    max-height: calc(100dvh - 48px);
+    margin: 0 !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    align-self: start;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .tab-panel[data-panel="plan"] .plan-sidebar > .sticky-card,
+  .tab-panel[data-panel="plan"] .desktop-quick-rail {
+    position: static !important;
+    top: auto !important;
+    width: 100%;
+    margin: 0 !important;
+    box-sizing: border-box;
+  }
+}
+
+@media (min-width: 1180px) and (max-width: 1320px) {
+  .tab-panel[data-panel="plan"] .plan-layout {
+    grid-template-columns:
+      minmax(0, 1fr)
+      222px !important;
+  }
+}
+
+/* ------------------------------------------------------------
+   2. Foreground mobile sheets must own the whole viewport
+   ------------------------------------------------------------ */
+@media (max-width: 760px) {
+  /*
+    Do not merely move the bottom nav behind a sheet: remove it from layout
+    interaction entirely while Raid Log / Target Filters are in the foreground.
+  */
+  body.foreground-sheet-open .tab-nav,
+  body.foreground-sheet-open .mobile-quick-log {
+    display: none !important;
+    pointer-events: none !important;
+  }
+
+  /*
+    Ensure the raid modal backdrop itself is a true viewport surface and cannot
+    hand a swipe gesture back to the document behind it.
+  */
+  #raidLogModal.modal-backdrop:not(.hidden),
+  #targetModal.modal-backdrop:not(.hidden) {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 180 !important;
+    overflow: hidden !important;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+
+  #raidLogModal .raid-log-modal,
+  #targetModal .target-modal {
+    max-height: min(92dvh, 820px);
+    overflow: hidden;
+    touch-action: auto;
+  }
+
+  #raidLogModal .modal-body,
+  #targetModal .modal-body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  /*
+    With the app nav removed, the filter drawer can use the full bottom edge.
+    Keep the action area above the iPhone home indicator.
+  */
+  .target-filter-drawer {
+    z-index: 181 !important;
+    max-height: min(88dvh, 760px);
+    padding-bottom:
+      calc(
+        12px +
+        env(safe-area-inset-bottom)
+      );
+  }
+
+  .target-filter-drawer-actions {
+    bottom: 0 !important;
+    margin:
+      10px
+      -16px
+      calc(
+        -12px -
+        env(safe-area-inset-bottom)
+      );
+    padding:
+      12px
+      16px
+      calc(
+        18px +
+        env(safe-area-inset-bottom)
+      );
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,.9),
+        #fff 24%
+      );
+  }
+}
