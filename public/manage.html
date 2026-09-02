@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=23">
+  <link rel="stylesheet" href="/styles.css?v=24">
 </head>
 
 <body class="manage-page">
@@ -1271,6 +1271,10 @@ let targetViewMode =
     ? "list"
     : "cards";
 
+let targetFilterHomeParent = null;
+let targetFilterHomeNextSibling = null;
+let targetFilterRestoreTimer = null;
+
 let pokemonCatalog = null;
 let pokemonCatalogPromise = null;
 let selectedHundoPokemon = null;
@@ -2525,14 +2529,80 @@ function openMobileMoreSheet() {
     );
 }
 
-function closeTargetFilterDrawer() {
-  document
-    .getElementById(
+function mountTargetFilterDrawerForMobile() {
+  const drawer =
+    document.getElementById(
       "targetFilterDrawer"
-    )
-    ?.classList.remove(
-      "open"
     );
+
+  if (
+    !drawer ||
+    window.matchMedia(
+      "(min-width: 761px)"
+    ).matches
+  ) {
+    return drawer;
+  }
+
+  if (!targetFilterHomeParent) {
+    targetFilterHomeParent =
+      drawer.parentNode;
+
+    targetFilterHomeNextSibling =
+      drawer.nextSibling;
+  }
+
+  if (
+    drawer.parentNode !==
+    document.body
+  ) {
+    document.body.appendChild(
+      drawer
+    );
+  }
+
+  return drawer;
+}
+
+function restoreTargetFilterDrawerHome() {
+  const drawer =
+    document.getElementById(
+      "targetFilterDrawer"
+    );
+
+  if (
+    !drawer ||
+    !targetFilterHomeParent ||
+    drawer.classList.contains(
+      "open"
+    )
+  ) {
+    return;
+  }
+
+  const nextSiblingStillValid =
+    targetFilterHomeNextSibling &&
+    targetFilterHomeNextSibling
+      .parentNode ===
+      targetFilterHomeParent;
+
+  targetFilterHomeParent.insertBefore(
+    drawer,
+    nextSiblingStillValid
+      ? targetFilterHomeNextSibling
+      : null
+  );
+}
+
+function closeTargetFilterDrawer() {
+  const drawer =
+    document.getElementById(
+      "targetFilterDrawer"
+    );
+
+  drawer?.classList.remove(
+    "open"
+  );
 
   document.body.classList.remove(
     "mobile-drawer-open"
@@ -2546,16 +2616,29 @@ function closeTargetFilterDrawer() {
       "aria-expanded",
       "false"
     );
+
+  clearTimeout(
+    targetFilterRestoreTimer
+  );
+
+  targetFilterRestoreTimer =
+    setTimeout(
+      restoreTargetFilterDrawerHome,
+      260
+    );
 }
 
 function openTargetFilterDrawer() {
-  document
-    .getElementById(
-      "targetFilterDrawer"
-    )
-    ?.classList.add(
-      "open"
-    );
+  clearTimeout(
+    targetFilterRestoreTimer
+  );
+
+  const drawer =
+    mountTargetFilterDrawerForMobile();
+
+  if (!drawer) {
+    return;
+  }
 
   document.body.classList.add(
     "mobile-drawer-open"
@@ -2569,6 +2652,18 @@ function openTargetFilterDrawer() {
       "aria-expanded",
       "true"
     );
+
+  // Mount first, then animate on the next frame so Safari has a
+  // stable fixed-position containing block.
+  requestAnimationFrame(
+    () =>
+      requestAnimationFrame(
+        () =>
+          drawer.classList.add(
+            "open"
+          )
+      )
+  );
 }
 
 function activeTargetFilterCount() {
@@ -6155,6 +6250,19 @@ document.addEventListener(
     ) {
       closeCommandPalette();
       closeMobileMoreSheet();
+      closeTargetFilterDrawer();
+    }
+  }
+);
+
+window.addEventListener(
+  "resize",
+  () => {
+    if (
+      window.matchMedia(
+        "(min-width: 761px)"
+      ).matches
+    ) {
       closeTargetFilterDrawer();
     }
   }
