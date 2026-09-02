@@ -6015,3 +6015,137 @@ details[open] > summary .details-chevron {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================
+   RESPONSIVE LAYOUT BUGFIXES · v24
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. Desktop Raid Plan right rail
+   ------------------------------------------------------------
+   Make the grid item itself sticky. A nested sticky card is less reliable
+   inside grid layouts and Safari/Chromium can behave differently when
+   backdrop-filtered descendants are involved.
+*/
+@media (min-width: 1180px) {
+  .plan-sidebar {
+    display: block;
+    position: sticky;
+    top: 24px;
+    align-self: start;
+    height: fit-content;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .plan-sidebar > .sticky-card,
+  .desktop-quick-rail {
+    position: static;
+    top: auto;
+    margin-top: 0;
+  }
+
+  /*
+    The generic .dashboard-card + .dashboard-card rule gives a second card
+    margin-top:16px. In the Hundo split grid that pushed the calculator
+    downward relative to the search panel.
+  */
+  .hundo-workspace > .hundo-search-card,
+  .hundo-workspace > .hundo-result-card {
+    align-self: start;
+    margin-top: 0 !important;
+  }
+
+  .hundo-search-card .pokemon-combobox,
+  .hundo-search-card .pokemon-search-results {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .hundo-search-card .pokemon-search-results {
+    box-sizing: border-box;
+  }
+}
+
+/* ------------------------------------------------------------
+   2. Mobile Target filter drawer
+   ------------------------------------------------------------
+   The drawer is mounted directly under <body> while open so it is no longer
+   trapped by the dashboard card's backdrop-filter stacking/containing block.
+*/
+@media (max-width: 760px) {
+  body.mobile-drawer-open {
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  body.mobile-drawer-open .target-filter-drawer {
+    z-index: 151;
+  }
+
+  body.mobile-drawer-open::after {
+    z-index: 150;
+  }
+
+  .target-filter-drawer {
+    width: 100%;
+    max-width: 100%;
+    max-height:
+      min(
+        82dvh,
+        720px
+      );
+    box-sizing: border-box;
+    will-change: transform;
+    transform:
+      translate3d(
+        0,
+        105%,
+        0
+      );
+  }
+
+  .target-filter-drawer.open {
+    transform:
+      translate3d(
+        0,
+        0,
+        0
+      );
+  }
+
+  .target-filter-drawer-head {
+    position: sticky;
+    z-index: 2;
+    top: -10px;
+    padding-top: 10px;
+    padding-bottom: 8px;
+    background: #fff;
+  }
+
+  .target-filter-drawer-actions {
+    position: sticky;
+    z-index: 2;
+    bottom:
+      calc(
+        -16px -
+        env(safe-area-inset-bottom)
+      );
+    padding:
+      10px
+      0
+      calc(
+        16px +
+        env(safe-area-inset-bottom)
+      );
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,.88),
+        #fff 22%
+      );
+  }
+}
