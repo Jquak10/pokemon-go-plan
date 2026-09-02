@@ -26,7 +26,7 @@
     "source=pogo-gh,target=/root/.config/gh,type=volume"
   ],
 
-  "postCreateCommand": "if [ -f package-lock.json ]; then npm ci; elif [ -f package.json ]; then npm install; fi",
+  "postCreateCommand": "npm ci && if gh auth status >/dev/null 2>&1; then gh auth setup-git; else echo 'GitHub CLI not authenticated; run gh auth login'; fi",
 
   "remoteUser": "root"
 }
