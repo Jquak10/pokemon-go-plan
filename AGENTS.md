@@ -16,11 +16,14 @@ Do not require the user to manually perform routine Git, validation, push, or PR
 1. Confirm this is the `Jquak10/pokemon-go-plan` repository.
 2. Check `git status --porcelain`.
 3. If unexplained pre-existing changes are present, STOP and report them. Never discard, reset, overwrite, stash, or commit unexplained user work.
-4. Start from the newest GitHub `main`:
+4. For normal new work, start from the newest GitHub `main`:
    - `git switch main`
    - `git fetch origin`
    - `git pull --ff-only origin main`
-5. Create a new descriptive feature branch before editing:
+5. If the user explicitly asks to continue an existing branch or pull request from another
+   computer, fetch and check out that existing remote branch or PR instead of creating a new
+   branch.
+6. Otherwise, create a new descriptive feature branch before editing:
    - `fix/<short-description>` for fixes
    - `feat/<short-description>` for features
    - `chore/<short-description>` for maintenance
@@ -89,12 +92,15 @@ Do not commit known-broken code.
 
 Once validation succeeds:
 
-1. Stage only the intended files. Avoid broad `git add .` when specific files can be named.
-2. Re-run:
+1. If repository-local Git author name or email is missing and GitHub CLI is authenticated,
+   derive the missing identity from the authenticated GitHub account and configure it locally
+   for this repository.
+2. Stage only the intended files. Avoid broad `git add .` when specific files can be named.
+3. Re-run:
    - `git diff --cached --check`
    - `git diff --cached --name-only`
-3. Create a concise conventional commit message.
-4. Confirm the worktree is clean after the commit.
+4. Create a concise conventional commit message.
+5. Confirm the worktree is clean after the commit.
 
 ## GitHub workflow
 

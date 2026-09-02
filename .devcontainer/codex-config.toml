@@ -1,0 +1,9 @@
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+sandbox_mode = "workspace-write"
+
+[projects."/workspace"]
+trust_level = "trusted"
+
+[sandbox_workspace_write]
+writable_roots = ["/workspace"]

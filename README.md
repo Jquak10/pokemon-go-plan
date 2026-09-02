@@ -69,6 +69,29 @@ For normal development, use a feature branch and open a pull request rather than
 directly to `main`. Production deployment remains the existing GitHub `main` → Cloudflare
 workflow.
 
+### Windows laptop setup
+
+On a fresh Windows computer:
+
+1. Install Docker Desktop and make sure it is running.
+2. Install Visual Studio Code.
+3. In VS Code, install Microsoft's **Dev Containers** extension.
+4. From PowerShell, clone the repository with Docker into `C:\Projects\pokemon-go-plan`;
+   this does not require a native Windows Git installation:
+
+   ```powershell
+   New-Item -ItemType Directory -Force C:\Projects
+   docker run --rm -v "C:\Projects:/projects" alpine/git clone https://github.com/Jquak10/pokemon-go-plan.git /projects/pokemon-go-plan
+   ```
+
+5. Open the cloned repository in VS Code.
+6. Open the Command Palette and run **Dev Containers: Reopen in Container**.
+7. In the container terminal, run `gh auth login` once, then authenticate the Codex extension
+   when prompted.
+
+The container installs project dependencies and the official Codex extension automatically.
+GitHub CLI and Codex authentication persist in Docker volumes across container rebuilds.
+
 ### Dev Container Quick Check
 
 After opening or rebuilding the Dev Container, use these commands to verify the environment:
