@@ -6647,3 +6647,48 @@ body.modal-open {
     pointer-events: auto !important;
   }
 }
+
+
+/* ============================================================
+   MOBILE NAV BADGE POSITION FIX · v29
+   ============================================================ */
+
+/*
+  Mobile .tab-count badges are absolutely positioned. The tab button itself
+  must therefore be the positioning context. Without position:relative, every
+  badge is positioned against the shared bottom-nav container, causing the
+  Targets and Calendar counts to stack above the More tab.
+*/
+@media (max-width: 760px) {
+  .tab-nav .tab-button {
+    position: relative;
+    overflow: visible;
+  }
+
+  .tab-nav .tab-count {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    z-index: 2;
+
+    display: inline-grid;
+    place-items: center;
+
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+
+    border: 2px solid rgba(255,255,255,.95);
+    border-radius: 999px;
+
+    box-sizing: border-box;
+    line-height: 1;
+  }
+
+  /*
+    Keep active-tab badges readable against the blue selected background.
+  */
+  .tab-nav .tab-button.active .tab-count {
+    border-color: rgba(36, 103, 192, .96);
+  }
+}
