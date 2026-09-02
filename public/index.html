@@ -149,6 +149,13 @@ const createButton = document.getElementById("create");
 const status = document.getElementById("status");
 const result = document.getElementById("result");
 
+document.getElementById("timezone").addEventListener("keydown", event => {
+  if (event.key !== "Enter") return;
+
+  event.preventDefault();
+  createButton.click();
+});
+
 let calendarUrl = "";
 let manageUrl = "";
 
