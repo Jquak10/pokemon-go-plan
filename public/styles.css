@@ -4975,3 +4975,251 @@ button.danger-soft:hover:not(:disabled) {
     height: 22px;
   }
 }
+
+
+/* ============================================================
+   HUNDO SEARCH — IN-FLOW RESULTS
+   ============================================================ */
+
+/*
+  Search results used to be absolutely positioned. That made the result list
+  float over the previously-selected Hundo card (for example Eevee) and created
+  the clipped/overlapping state shown in the screenshot.
+*/
+.pokemon-search-results {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  max-height: 290px;
+  margin-top: 7px;
+  overflow-y: auto;
+  border-radius: 13px;
+  box-shadow:
+    0 10px 24px
+    rgba(35, 74, 110, .10);
+}
+
+.pokemon-search-result {
+  min-height: 58px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.hundo-result-card.hundo-result-searching {
+  display: none;
+}
+
+/* ============================================================
+   COMPACT RAID PLAN
+   ============================================================ */
+
+.compact-log-details,
+.planner-controls-details,
+.more-recommendations {
+  border: 1px solid #e1e9f0;
+  border-radius: 13px;
+  background: #fafcff;
+}
+
+.compact-log-details {
+  margin-top: 14px;
+  padding: 0;
+  border-top: 1px solid #e1e9f0;
+}
+
+.compact-log-details > summary,
+.planner-controls-details > summary,
+.more-recommendations > summary {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.compact-log-details > summary::-webkit-details-marker,
+.planner-controls-details > summary::-webkit-details-marker,
+.more-recommendations > summary::-webkit-details-marker {
+  display: none;
+}
+
+.recent-log-summary > div {
+  min-width: 0;
+}
+
+.recent-log-summary strong,
+.recent-log-summary span {
+  display: block;
+}
+
+.recent-log-summary span {
+  margin-top: 2px;
+  overflow: hidden;
+  color: #8392a1;
+  font-size: .64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details-chevron {
+  flex: 0 0 auto;
+  transition: transform .18s ease;
+}
+
+details[open] > summary .details-chevron {
+  transform: rotate(180deg);
+}
+
+.recent-log-body {
+  padding: 0 12px 12px;
+}
+
+.recent-log-help {
+  display: block;
+  margin-bottom: 8px;
+  color: #8a98a6;
+  font-size: .62rem;
+}
+
+.planner-controls-details {
+  margin-top: 14px;
+}
+
+.planner-controls-details > summary strong,
+.planner-controls-details > summary span {
+  display: block;
+}
+
+.planner-controls-details > summary strong {
+  color: #425f78;
+  font-size: .73rem;
+}
+
+.planner-controls-details > summary span:not(.details-chevron) {
+  margin-top: 2px;
+  color: #8795a3;
+  font-size: .63rem;
+}
+
+.planner-controls-body {
+  padding: 0 12px 12px;
+}
+
+.planner-controls-body > .daily-budget-override {
+  margin-top: 0;
+}
+
+.raid-recommendations-card {
+  overflow: visible;
+}
+
+.compact-recommendation-grid {
+  margin-top: 12px;
+}
+
+.compact-recommendation-card {
+  padding: 13px;
+}
+
+.compact-recommendation-card .recommendation-sprite {
+  width: 58px;
+  height: 58px;
+}
+
+.compact-recommendation-card .raid-intel {
+  padding: 9px;
+}
+
+.allocation-inline-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: .62rem;
+  font-weight: 900;
+}
+
+.allocation-inline-badge.has-allocation {
+  border: 1px solid #bfe3cf;
+  background: #edf9f2;
+  color: #247349;
+}
+
+.allocation-inline-badge.no-allocation {
+  border: 1px solid #e0e6ec;
+  background: #f5f7f9;
+  color: #7c8b99;
+}
+
+.recommendation-footer-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid #e7edf3;
+}
+
+.recommendation-footer-row .compact-details {
+  margin: 0;
+}
+
+.recommendation-footer-row .log-raid-button {
+  flex: 0 0 auto;
+}
+
+.more-recommendations {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+}
+
+.more-recommendations > summary {
+  color: #547089;
+  font-size: .72rem;
+  font-weight: 850;
+}
+
+.more-recommendations > summary strong {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 22px;
+  margin-left: 5px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #eaf3fc;
+  color: #2b6fae;
+  font-size: .64rem;
+}
+
+.more-recommendation-grid {
+  padding: 0 10px 10px;
+}
+
+.zero-raid-details {
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .pokemon-search-results {
+    max-height: 250px;
+  }
+
+  .recommendation-footer-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recommendation-footer-row .log-raid-button {
+    width: 100%;
+  }
+
+  .recent-log-summary span {
+    white-space: normal;
+  }
+}
