@@ -6609,3 +6609,41 @@ body.modal-open {
       );
   }
 }
+
+
+/* ============================================================
+   TARGET FILTER CLOSED-STATE FIX · v28
+   ============================================================ */
+
+/*
+  On iOS Safari, a fixed-position element inside a backdrop-filtered card can
+  still be visually exposed near the bottom of that card even when translated
+  off-screen. The filter drawer should not exist visually at all until the user
+  explicitly opens it.
+
+  Closed state:
+  - display:none
+  - visibility:hidden
+  - pointer-events:none
+
+  Open state:
+  - display:block
+  - visible and interactive
+
+  openTargetFilterDrawer() already moves the drawer directly under <body>
+  before adding .open, so the open drawer still behaves as a viewport-level
+  bottom sheet.
+*/
+@media (max-width: 760px) {
+  .target-filter-drawer:not(.open) {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  .target-filter-drawer.open {
+    display: block !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+}
