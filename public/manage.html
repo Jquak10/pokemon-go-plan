@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=21">
+  <link rel="stylesheet" href="/styles.css?v=22">
 </head>
 
 <body class="manage-page">
@@ -220,6 +220,16 @@
                 <div id="budgetForecast" class="budget-forecast-strip"></div>
               </div>
 
+              <details class="planner-controls-details">
+                <summary>
+                  <div>
+                    <strong>Planner controls & manual corrections</strong>
+                    <span>Budget override, usage correction, and rule source</span>
+                  </div>
+                  <span class="details-chevron" aria-hidden="true">⌄</span>
+                </summary>
+
+                <div class="planner-controls-body">
               <div class="daily-budget-override">
                 <div>
                   <label for="dailyBudgetOverride">Today's budget override</label>
@@ -265,6 +275,8 @@
               </div>
 
               <div id="remoteRuleSource" class="source-note"></div>
+                </div>
+              </details>
             </section>
 
             <!-- Raid activity -->
@@ -285,49 +297,42 @@
 
               <div id="raidActivitySummary" class="raid-activity-summary"></div>
 
-              <div class="recent-raid-log-wrap">
-                <div class="mini-section-heading">
-                  <strong>Recent raid logs</strong>
-                  <span>Use Undo if you tapped the wrong raid.</span>
+              <details class="recent-raid-log-wrap compact-log-details">
+                <summary class="mini-section-heading recent-log-summary">
+                  <div>
+                    <strong>Recent raid logs</strong>
+                    <span id="recentRaidLogSummary">No raids logged yet</span>
+                  </div>
+                  <span class="details-chevron" aria-hidden="true">⌄</span>
+                </summary>
+
+                <div class="recent-log-body">
+                  <span class="recent-log-help">Showing up to 5 recent entries. Use Undo if you tapped the wrong raid.</span>
+                  <div id="recentRaidLogs" class="recent-raid-log"></div>
                 </div>
-                <div id="recentRaidLogs" class="recent-raid-log"></div>
-              </div>
+              </details>
             </section>
 
-            <!-- Allocations -->
-            <section class="dashboard-card">
+            <!-- Combined allocation + recommendation intelligence -->
+            <section class="dashboard-card raid-recommendations-card">
               <div class="section-heading-row">
                 <div>
-                  <span class="section-eyebrow">ALLOCATION</span>
-                  <h2>Recommended Remote Raids</h2>
+                  <span class="section-eyebrow">RAID RECOMMENDATIONS</span>
+                  <h2>What to raid now</h2>
                   <p class="section-subtitle">
-                    Each additional raid has diminishing marginal value, so one boss cannot absorb the whole quota just because it starts with the highest score.
+                    Meta value, personal targets, battle intel, and Remote Raid allocation in one place.
                   </p>
                 </div>
+
                 <span id="allocationTotalBadge" class="status-badge badge-green">0 raids</span>
               </div>
 
-              <div id="remoteRaidAllocations" class="allocation-grid"></div>
+              <div id="recommendations" class="recommendation-grid compact-recommendation-grid"></div>
 
               <details class="compact-details zero-raid-details">
                 <summary>Bosses receiving 0 Remote Raids</summary>
                 <div id="remoteRaidZero" class="zero-raid-list"></div>
               </details>
-            </section>
-
-            <!-- General recommendations -->
-            <section class="dashboard-card">
-              <div class="section-heading-row">
-                <div>
-                  <span class="section-eyebrow">META + PERSONAL</span>
-                  <h2>Current Raid Recommendations</h2>
-                  <p class="section-subtitle">
-                    General raid value answers “is it good?” Personal value answers “do I still need it?”
-                  </p>
-                </div>
-              </div>
-
-              <div id="recommendations" class="recommendation-grid"></div>
             </section>
 
           </div>
@@ -2198,6 +2203,22 @@ function renderRaidActivity() {
   const recent =
     activity.recent || [];
 
+  const visibleRecent =
+    recent.slice(
+      0,
+      5
+    );
+
+  const latest =
+    recent[0] || null;
+
+  document.getElementById(
+    "recentRaidLogSummary"
+  ).textContent =
+    latest
+      ? `${formatNumber(recent.length)} recent · latest ${latest.pokemon_name} ${latest.raid_type === "remote" ? "Remote" : "Local"} ×${formatNumber(latest.raid_count)}`
+      : "No raids logged yet";
+
   document.getElementById(
     "recentRaidLogs"
   ).innerHTML =
@@ -2214,7 +2235,7 @@ function renderRaidActivity() {
             : ""
         }
 
-        ${recent
+        ${visibleRecent
           .map(
             item => `
               <article class="recent-raid-row">
@@ -2506,47 +2527,8 @@ function renderRemoteRaidPlan() {
   document.getElementById("allocationTotalBadge").textContent =
     `${formatNumber(plan.recommended_total)} raid${Number(plan.recommended_total) === 1 ? "" : "s"}`;
 
-  document.getElementById("remoteRaidAllocations").innerHTML = plan.allocations.length
-    ? plan.allocations.map(item => `
-      <article class="allocation-card ${scoreTone(item.score)}">
-        <div class="allocation-card-top">
-          <div class="allocation-count">${item.allocated}</div>
+  // Allocation counts are displayed directly on recommendation cards.
 
-          <div class="allocation-title allocation-title-with-sprite">
-            ${spriteImg(
-              item.sprite_url || item.meta?.sprite_url,
-              item.pokemon_name,
-              "pokemon-sprite allocation-sprite"
-            )}
-            <div>
-              <span class="allocation-kicker">REMOTE RAID${item.allocated === 1 ? "" : "S"}</span>
-              <h3>${esc(item.emoji)} ${esc(item.pokemon_name)}</h3>
-            </div>
-          </div>
-
-          <div class="score-pill">${formatNumber(item.score)}</div>
-        </div>
-
-        <div class="allocation-meta">
-          <span class="status-badge ${scoreTone(item.score)}">${esc(item.label)}</span>
-          ${item.target_cap == null ? "" : `<span>Target cap ≈ ${formatNumber(item.target_cap)}</span>`}
-        </div>
-
-        <details class="compact-details">
-          <summary>Why ${item.allocated} raid${item.allocated === 1 ? "" : "s"}?</summary>
-          <ul>
-            ${item.reasons.slice(0, 6).map(reason => `<li>${esc(reason)}</li>`).join("")}
-          </ul>
-        </details>
-      </article>
-    `).join("")
-    : `
-      <div class="empty-state">
-        <span aria-hidden="true">✓</span>
-        <strong>No additional Remote Raids are justified right now.</strong>
-        <p>The planner will not spend quota just because it is available.</p>
-      </div>
-    `;
 
   document.getElementById("remoteRaidZero").innerHTML = plan.not_allocated.length
     ? plan.not_allocated.map(item => `
@@ -3228,6 +3210,50 @@ function hundoSearchMatches(query) {
     );
 }
 
+
+function updateHundoSearchMode() {
+  const card =
+    document.getElementById(
+      "hundoResultCard"
+    );
+
+  const input =
+    document.getElementById(
+      "hundoPokemonSearch"
+    );
+
+  if (
+    !card ||
+    !input ||
+    !selectedHundoPokemon
+  ) {
+    return;
+  }
+
+  const query =
+    normalizePickerName(
+      input.value
+    );
+
+  const selectedName =
+    normalizePickerName(
+      selectedHundoPokemon.name
+    );
+
+  const activelySearching =
+    query &&
+    query !==
+      selectedName;
+
+  card.classList.toggle(
+    "hundo-result-searching",
+    Boolean(
+      activelySearching
+    )
+  );
+}
+
+
 function renderHundoSearchResults() {
   const input =
     document.getElementById(
@@ -3344,6 +3370,7 @@ function selectHundoPokemon(entry) {
   );
 
   renderHundoResult();
+  updateHundoSearchMode();
 }
 
 function hundoBenchmarkData(entry) {
@@ -3491,45 +3518,64 @@ function updateHundoCustomCp() {
 }
 
 
-function renderRecommendations() {
-  const container = document.getElementById("recommendations");
+function renderRecommendationCard(
+  rec,
+  allocation
+) {
+  const allocated =
+    Number(
+      allocation?.allocated || 0
+    );
 
-  container.innerHTML = state.recommendations.length
-    ? state.recommendations.map(rec => `
-      <article class="recommendation-card ${scoreTone(rec.score)}">
-        <div class="recommendation-card-head">
-          <div class="recommendation-pokemon">
-            ${spriteImg(
-              rec.sprite_url || rec.meta?.sprite_url,
-              rec.pokemon_name,
-              "pokemon-sprite recommendation-sprite"
-            )}
+  const allocationClass =
+    allocated > 0
+      ? "has-allocation"
+      : "no-allocation";
 
-            <div>
-              <span class="section-eyebrow">${esc(rec.event_title || "ACTIVE RAID")}</span>
-              <h3>${esc(rec.emoji)} ${esc(rec.pokemon_name)}</h3>
-            </div>
+  return `
+    <article class="recommendation-card compact-recommendation-card ${scoreTone(rec.score)}">
+      <div class="recommendation-card-head">
+        <div class="recommendation-pokemon">
+          ${spriteImg(
+            rec.sprite_url || rec.meta?.sprite_url,
+            rec.pokemon_name,
+            "pokemon-sprite recommendation-sprite"
+          )}
+
+          <div>
+            <span class="section-eyebrow">${esc(rec.event_title || "ACTIVE RAID")}</span>
+            <h3>${esc(rec.emoji)} ${esc(rec.pokemon_name)}</h3>
           </div>
-
-          <div class="score-ring">${formatNumber(rec.score)}</div>
         </div>
 
-        <div class="recommendation-card-meta">
-          <span class="status-badge ${scoreTone(rec.score)}">${esc(rec.label)}</span>
+        <div class="score-ring">${formatNumber(rec.score)}</div>
+      </div>
 
+      <div class="recommendation-card-meta">
+        <span class="status-badge ${scoreTone(rec.score)}">${esc(rec.label)}</span>
+
+        <span class="allocation-inline-badge ${allocationClass}">
           ${
-            rec.source_label
-              ? `
-                <span class="source-confidence-badge source-${esc(rec.source_kind || "calendar")}">
-                  ${rec.source_kind === "official" ? "✓ " : ""}${esc(rec.source_label)}
-                </span>
-              `
-              : ""
+            allocated > 0
+              ? `${formatNumber(allocated)} Remote raid${allocated === 1 ? "" : "s"}`
+              : "0 Remote raids"
           }
-        </div>
+        </span>
 
-        ${raidIntelHtml(rec)}
+        ${
+          rec.source_label
+            ? `
+              <span class="source-confidence-badge source-${esc(rec.source_kind || "calendar")}">
+                ${rec.source_kind === "official" ? "✓ " : ""}${esc(rec.source_label)}
+              </span>
+            `
+            : ""
+        }
+      </div>
 
+      ${raidIntelHtml(rec)}
+
+      <div class="recommendation-footer-row">
         <details class="compact-details">
           <summary>Why?</summary>
           <ul>
@@ -3537,24 +3583,103 @@ function renderRecommendations() {
           </ul>
         </details>
 
-        <div class="recommendation-actions">
-          <button
-            type="button"
-            class="log-raid-button"
-            data-log-raid="${esc(rec.pokemon_name)}"
-          >
-            + Log raid
-          </button>
-        </div>
-      </article>
-    `).join("")
-    : `
+        <button
+          type="button"
+          class="log-raid-button"
+          data-log-raid="${esc(rec.pokemon_name)}"
+        >
+          + Log raid
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+function renderRecommendations() {
+  const container =
+    document.getElementById(
+      "recommendations"
+    );
+
+  const recommendations =
+    state.recommendations || [];
+
+  const allocations =
+    state.remote_raid_plan
+      ?.allocations || [];
+
+  const allocationByName =
+    new Map(
+      allocations.map(
+        allocation => [
+          normalizePickerName(
+            allocation.pokemon_name
+          ),
+          allocation
+        ]
+      )
+    );
+
+  if (!recommendations.length) {
+    container.innerHTML = `
       <div class="empty-state">
         <span aria-hidden="true">⌕</span>
         <strong>No matching active raid recommendations yet.</strong>
         <p>Recommendations appear after current raid data and automatic assessments are available.</p>
       </div>
     `;
+    return;
+  }
+
+  const primary =
+    recommendations.slice(
+      0,
+      4
+    );
+
+  const additional =
+    recommendations.slice(
+      4
+    );
+
+  const renderCard =
+    rec =>
+      renderRecommendationCard(
+        rec,
+        allocationByName.get(
+          normalizePickerName(
+            rec.pokemon_name
+          )
+        )
+      );
+
+  container.innerHTML = `
+    ${primary
+      .map(renderCard)
+      .join("")}
+
+    ${
+      additional.length
+        ? `
+          <details class="more-recommendations">
+            <summary>
+              <span>
+                More raid recommendations
+                <strong>${formatNumber(additional.length)}</strong>
+              </span>
+              <span class="details-chevron" aria-hidden="true">⌄</span>
+            </summary>
+
+            <div class="recommendation-grid more-recommendation-grid">
+              ${additional
+                .map(renderCard)
+                .join("")}
+            </div>
+          </details>
+        `
+        : ""
+    }
+  `;
 }
 
 function targetProgress(target) {
@@ -5362,6 +5487,7 @@ document.getElementById("hundoPokemonSearch").addEventListener("focus", async ()
 
 document.getElementById("hundoPokemonSearch").addEventListener("input", async () => {
   await ensurePokemonCatalogLoaded();
+  updateHundoSearchMode();
   renderHundoSearchResults();
 });
 
