@@ -4676,86 +4676,68 @@ function targetCardHtml(target) {
   `;
 }
 
-function filteredTargets() {
+function targetsMatchingNonStatusFilters() {
   const search =
     normalizePickerName(
       targetFilterState.search
     );
 
-  const list =
-    state.targets
-      .filter(
-        target => {
-          const completed =
-            Number(
-              target.completed
-            );
-
-          if (
-            targetFilterState.status ===
-              "active" &&
-            completed
-          ) {
-            return false;
-          }
-
-          if (
-            targetFilterState.status ===
-              "completed" &&
-            !completed
-          ) {
-            return false;
-          }
-
-          if (
-            search &&
-            !normalizePickerName(
-              target.pokemon_name
-            ).includes(
-              search
-            )
-          ) {
-            return false;
-          }
-
-          if (
-            targetFilterState.type !==
-              "all" &&
-            String(
-              target.target_type
-            ) !==
-              targetFilterState.type
-          ) {
-            return false;
-          }
-
-          if (
-            targetFilterState.priority !==
-              "all" &&
-            String(
-              target.priority
-            ) !==
-              targetFilterState.priority
-          ) {
-            return false;
-          }
-
-          if (
-            targetFilterState.availability !==
-              "all" &&
-            targetAvailability(
-              target
-            ) !==
-              targetFilterState.availability
-          ) {
-            return false;
-          }
-
-          return true;
+  return state.targets
+    .filter(
+      target => {
+        if (
+          search &&
+          !normalizePickerName(
+            target.pokemon_name
+          ).includes(
+            search
+          )
+        ) {
+          return false;
         }
-      );
 
-  return list.sort(
+        if (
+          targetFilterState.type !==
+            "all" &&
+          String(
+            target.target_type
+          ) !==
+            targetFilterState.type
+        ) {
+          return false;
+        }
+
+        if (
+          targetFilterState.priority !==
+            "all" &&
+          String(
+            target.priority
+          ) !==
+            targetFilterState.priority
+        ) {
+          return false;
+        }
+
+        if (
+          targetFilterState.availability !==
+            "all" &&
+          targetAvailability(
+            target
+          ) !==
+            targetFilterState.availability
+        ) {
+          return false;
+        }
+
+        return true;
+      }
+    );
+}
+
+function sortTargets(
+  list
+) {
+  return [...list].sort(
     (a, b) => {
       if (
         targetFilterState.sort ===
@@ -4822,6 +4804,43 @@ function filteredTargets() {
   );
 }
 
+function filteredTargets(
+  baseList =
+    targetsMatchingNonStatusFilters()
+) {
+  const statusFiltered =
+    baseList.filter(
+      target => {
+        const completed =
+          Number(
+            target.completed
+          );
+
+        if (
+          targetFilterState.status ===
+            "active"
+        ) {
+          return !completed;
+        }
+
+        if (
+          targetFilterState.status ===
+            "completed"
+        ) {
+          return Boolean(
+            completed
+          );
+        }
+
+        return true;
+      }
+    );
+
+  return sortTargets(
+    statusFiltered
+  );
+}
+
 function renderTargets() {
   targetById =
     new Map(
@@ -4833,8 +4852,11 @@ function renderTargets() {
       )
     );
 
+  const matchingTargets =
+    targetsMatchingNonStatusFilters();
+
   const activeCount =
-    state.targets.filter(
+    matchingTargets.filter(
       target =>
         !Number(
           target.completed
@@ -4842,8 +4864,15 @@ function renderTargets() {
     ).length;
 
   const completedCount =
-    state.targets.length -
-    activeCount;
+    matchingTargets.filter(
+      target =>
+        Number(
+          target.completed
+        )
+    ).length;
+
+  const allCount =
+    matchingTargets.length;
 
   document.getElementById(
     "targetActiveCount"
@@ -4863,7 +4892,7 @@ function renderTargets() {
     "targetAllCount"
   ).textContent =
     formatNumber(
-      state.targets.length
+      allCount
     );
 
   document
@@ -4881,12 +4910,14 @@ function renderTargets() {
     );
 
   const list =
-    filteredTargets();
+    filteredTargets(
+      matchingTargets
+    );
 
   document.getElementById(
     "targetFilterSummary"
   ).textContent =
-    `${formatNumber(list.length)} shown · ${formatNumber(activeCount)} active · ${formatNumber(completedCount)} completed`;
+    `${formatNumber(list.length)} shown · ${formatNumber(activeCount)} active match${activeCount === 1 ? "" : "es"} · ${formatNumber(completedCount)} completed match${completedCount === 1 ? "" : "es"}`;
 
   document.getElementById(
     "targetFilterCount"
