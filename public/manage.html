@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=19">
+  <link rel="stylesheet" href="/styles.css?v=20">
 </head>
 
 <body class="manage-page">
@@ -133,6 +133,11 @@
           <span aria-hidden="true">◎</span>
           <span>Targets</span>
           <span id="targetTabCount" class="tab-count">0</span>
+        </button>
+
+        <button class="tab-button" type="button" data-tab="hundo" aria-selected="false">
+          <span aria-hidden="true">100</span>
+          <span>Hundo CP</span>
         </button>
 
         <button class="tab-button" type="button" data-tab="preferences" aria-selected="false">
@@ -372,13 +377,13 @@
            TAB: TARGETS
            ======================================================= -->
       <section class="tab-panel" data-panel="targets">
-        <section class="dashboard-card">
+        <section class="dashboard-card target-organizer-card">
           <div class="section-heading-row target-heading">
             <div>
               <span class="section-eyebrow">YOUR GOALS</span>
               <h2>Targets</h2>
               <p class="section-subtitle">
-                Track Mega Energy, raids, Candy XL, Candy, or any custom goal without keeping the full editor open all the time.
+                Focus on active goals first, then filter or search when you need something specific.
               </p>
             </div>
 
@@ -387,7 +392,163 @@
             </button>
           </div>
 
-          <div id="targets" class="target-grid"></div>
+          <div class="target-overview-row">
+            <div id="targetStatusTabs" class="target-status-tabs" role="group" aria-label="Target status">
+              <button type="button" class="active" data-target-status="active">Active <span id="targetActiveCount">0</span></button>
+              <button type="button" data-target-status="completed">Completed <span id="targetCompletedCount">0</span></button>
+              <button type="button" data-target-status="all">All <span id="targetAllCount">0</span></button>
+            </div>
+
+            <div class="target-search-wrap">
+              <span aria-hidden="true">⌕</span>
+              <input
+                id="targetSearch"
+                type="search"
+                placeholder="Search Pokémon…"
+                autocomplete="off"
+              >
+            </div>
+          </div>
+
+          <div class="target-filter-bar">
+            <label>
+              <span>Goal type</span>
+              <select id="targetTypeFilter">
+                <option value="all">All types</option>
+                <option value="mega_energy">Mega Energy</option>
+                <option value="candy">Candy</option>
+                <option value="candy_xl">Candy XL</option>
+                <option value="raids">Raids</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Priority</span>
+              <select id="targetPriorityFilter">
+                <option value="all">All priorities</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Optional</option>
+                <option value="skip">Skip</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Raid availability</span>
+              <select id="targetAvailabilityFilter">
+                <option value="all">All</option>
+                <option value="now">Available now</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="not_raiding">Not currently raiding</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Sort</span>
+              <select id="targetSort">
+                <option value="priority">Priority</option>
+                <option value="closest">Closest to goal</option>
+                <option value="name">Name</option>
+                <option value="updated">Recently updated</option>
+              </select>
+            </label>
+
+            <button id="clearTargetFilters" type="button" class="secondary target-clear-filters">
+              Clear
+            </button>
+          </div>
+
+          <div id="targetFilterSummary" class="target-filter-summary"></div>
+          <div id="targets" class="target-organized-list"></div>
+        </section>
+      </section>
+
+      <!-- =======================================================
+           TAB: HUNDO CP
+           ======================================================= -->
+      <section class="tab-panel" data-panel="hundo">
+        <section class="dashboard-card hundo-search-card">
+          <div class="section-heading-row">
+            <div>
+              <span class="section-eyebrow">15 / 15 / 15 IV</span>
+              <h2>Hundo CP Calculator</h2>
+              <p class="section-subtitle">
+                Search the full Pokémon GO Pokédex—not just current raid bosses.
+              </p>
+            </div>
+            <span class="status-badge badge-blue">Full Pokédex</span>
+          </div>
+
+          <div class="pokemon-combobox">
+            <label for="hundoPokemonSearch">Find a Pokémon</label>
+            <div class="pokemon-search-input-wrap">
+              <span aria-hidden="true">⌕</span>
+              <input
+                id="hundoPokemonSearch"
+                type="search"
+                placeholder="Search by name or Pokédex number…"
+                autocomplete="off"
+                role="combobox"
+                aria-expanded="false"
+                aria-controls="hundoPokemonResults"
+              >
+            </div>
+
+            <div id="hundoPokemonResults" class="pokemon-search-results hidden" role="listbox"></div>
+          </div>
+
+          <div id="hundoRecentWrap" class="hundo-recent-wrap hidden">
+            <span class="mini-label">RECENT</span>
+            <div id="hundoRecent" class="hundo-recent"></div>
+          </div>
+
+          <div id="hundoCatalogStatus" class="hundo-catalog-status">
+            Open this tab to load the Pokémon catalog.
+          </div>
+        </section>
+
+        <section id="hundoResultCard" class="dashboard-card hundo-result-card hidden">
+          <div id="hundoSelectedHeader" class="hundo-selected-header"></div>
+
+          <div class="hundo-benchmark-heading">
+            <div>
+              <span class="section-eyebrow">COMMON BENCHMARKS</span>
+              <h3>100% IV CP by level</h3>
+            </div>
+            <span class="field-help">All values assume 15 / 15 / 15 IVs.</span>
+          </div>
+
+          <div id="hundoBenchmarks" class="hundo-benchmark-grid"></div>
+
+          <div class="hundo-custom-level">
+            <div>
+              <span class="section-eyebrow">CUSTOM LEVEL</span>
+              <h3>Calculate another level</h3>
+            </div>
+
+            <label>
+              <span>Pokémon level</span>
+              <input
+                id="hundoCustomLevel"
+                type="number"
+                min="1"
+                max="50"
+                step="0.5"
+                value="20"
+                inputmode="decimal"
+              >
+            </label>
+
+            <div class="hundo-custom-result">
+              <span>100% IV CP</span>
+              <strong id="hundoCustomCp">—</strong>
+            </div>
+          </div>
+
+          <p class="hundo-note">
+            Research encounters are commonly Level 15, ordinary raid/egg encounters Level 20, and weather-boosted raid encounters Level 25. Not every Pokémon or form is obtainable through every encounter method.
+          </p>
         </section>
       </section>
 
@@ -938,6 +1099,19 @@ const loadStatus = document.getElementById("loadStatus");
 let state = null;
 let targetById = new Map();
 
+let targetFilterState = {
+  status: "active",
+  search: "",
+  type: "all",
+  priority: "all",
+  availability: "all",
+  sort: "priority"
+};
+
+let pokemonCatalog = null;
+let pokemonCatalogPromise = null;
+let selectedHundoPokemon = null;
+
 let raidLogType = "remote";
 let raidLogProgressDirty = false;
 let raidLogExplicitTargetId = null;
@@ -1034,6 +1208,8 @@ async function load() {
     state = await api(`/api/me?token=${encodeURIComponent(token)}`);
     render();
 
+    ensurePokemonCatalogLoaded().catch(() => {});
+
     loadStatus.innerHTML = '<span class="live-copy">Live plan loaded</span>';
     app.classList.remove("hidden");
 
@@ -1046,7 +1222,7 @@ async function load() {
 }
 
 function activateTab(name, scroll = true) {
-  const valid = ["plan", "targets", "preferences", "calendar"];
+  const valid = ["plan", "targets", "hundo", "preferences", "calendar"];
   if (!valid.includes(name)) name = "plan";
 
   document.querySelectorAll(".tab-button").forEach(button => {
@@ -1063,6 +1239,10 @@ function activateTab(name, scroll = true) {
 
   if (name === "calendar" && state) {
     ensureCalendarTabLoaded();
+  }
+
+  if (name === "hundo") {
+    ensurePokemonCatalogLoaded();
   }
 
   if (scroll) {
@@ -2381,6 +2561,936 @@ function renderRemoteRaidPlan() {
     : `<p class="muted">Every remotely eligible boss received at least one recommended raid.</p>`;
 }
 
+
+const CP_MULTIPLIERS = {
+  "1": 0.094,
+  "2": 0.16639787,
+  "3": 0.21573247,
+  "4": 0.25572005,
+  "5": 0.29024988,
+  "6": 0.3210876,
+  "7": 0.34921268,
+  "8": 0.3752356,
+  "9": 0.39956728,
+  "10": 0.4225,
+  "11": 0.44310755,
+  "12": 0.4627984,
+  "13": 0.48168495,
+  "14": 0.49985844,
+  "15": 0.51739395,
+  "16": 0.5343543,
+  "17": 0.5507927,
+  "18": 0.5667545,
+  "19": 0.5822789,
+  "20": 0.5974,
+  "21": 0.6121573,
+  "22": 0.6265671,
+  "23": 0.64065295,
+  "24": 0.65443563,
+  "25": 0.667934,
+  "26": 0.6811649,
+  "27": 0.69414365,
+  "28": 0.7068842,
+  "29": 0.7193991,
+  "30": 0.7317,
+  "31": 0.7377695,
+  "32": 0.74378943,
+  "33": 0.74976104,
+  "34": 0.7556855,
+  "35": 0.76156384,
+  "36": 0.76739717,
+  "37": 0.7731865,
+  "38": 0.77893275,
+  "39": 0.784637,
+  "40": 0.7903,
+  "41": 0.7953,
+  "42": 0.8003,
+  "43": 0.8053,
+  "44": 0.8103,
+  "45": 0.8153,
+  "46": 0.8203,
+  "47": 0.8253,
+  "48": 0.8303,
+  "49": 0.8353,
+  "50": 0.8403
+};
+
+const TYPE_SYMBOLS = {
+  Normal: "◯",
+  Fire: "🔥",
+  Water: "💧",
+  Electric: "⚡",
+  Grass: "🌿",
+  Ice: "❄",
+  Fighting: "✊",
+  Poison: "☠",
+  Ground: "⛰",
+  Flying: "🪽",
+  Psychic: "🔮",
+  Bug: "🐛",
+  Rock: "🪨",
+  Ghost: "👻",
+  Dragon: "🐉",
+  Dark: "🌑",
+  Steel: "⚙",
+  Fairy: "✨"
+};
+
+const TYPE_RELATIONS = {
+  Normal: { weak: ["Fighting"], resist: [], immune: ["Ghost"] },
+  Fire: { weak: ["Water", "Ground", "Rock"], resist: ["Fire", "Grass", "Ice", "Bug", "Steel", "Fairy"], immune: [] },
+  Water: { weak: ["Electric", "Grass"], resist: ["Fire", "Water", "Ice", "Steel"], immune: [] },
+  Electric: { weak: ["Ground"], resist: ["Electric", "Flying", "Steel"], immune: [] },
+  Grass: { weak: ["Fire", "Ice", "Poison", "Flying", "Bug"], resist: ["Water", "Electric", "Grass", "Ground"], immune: [] },
+  Ice: { weak: ["Fire", "Fighting", "Rock", "Steel"], resist: ["Ice"], immune: [] },
+  Fighting: { weak: ["Flying", "Psychic", "Fairy"], resist: ["Bug", "Rock", "Dark"], immune: [] },
+  Poison: { weak: ["Ground", "Psychic"], resist: ["Grass", "Fighting", "Poison", "Bug", "Fairy"], immune: [] },
+  Ground: { weak: ["Water", "Grass", "Ice"], resist: ["Poison", "Rock"], immune: ["Electric"] },
+  Flying: { weak: ["Electric", "Ice", "Rock"], resist: ["Grass", "Fighting", "Bug"], immune: ["Ground"] },
+  Psychic: { weak: ["Bug", "Ghost", "Dark"], resist: ["Fighting", "Psychic"], immune: [] },
+  Bug: { weak: ["Fire", "Flying", "Rock"], resist: ["Grass", "Fighting", "Ground"], immune: [] },
+  Rock: { weak: ["Water", "Grass", "Fighting", "Ground", "Steel"], resist: ["Normal", "Fire", "Poison", "Flying"], immune: [] },
+  Ghost: { weak: ["Ghost", "Dark"], resist: ["Poison", "Bug"], immune: ["Normal", "Fighting"] },
+  Dragon: { weak: ["Ice", "Dragon", "Fairy"], resist: ["Fire", "Water", "Electric", "Grass"], immune: [] },
+  Dark: { weak: ["Fighting", "Bug", "Fairy"], resist: ["Ghost", "Dark"], immune: ["Psychic"] },
+  Steel: { weak: ["Fire", "Fighting", "Ground"], resist: ["Normal", "Grass", "Ice", "Flying", "Psychic", "Bug", "Rock", "Dragon", "Steel", "Fairy"], immune: ["Poison"] },
+  Fairy: { weak: ["Poison", "Steel"], resist: ["Fighting", "Bug", "Dark"], immune: ["Dragon"] }
+};
+
+function cpMultiplierForLevel(level) {
+  const value = Number(level);
+
+  if (
+    !Number.isFinite(value) ||
+    value < 1 ||
+    value > 50 ||
+    Math.round(value * 2) !== value * 2
+  ) {
+    return null;
+  }
+
+  if (Number.isInteger(value)) {
+    return CP_MULTIPLIERS[String(value)] || null;
+  }
+
+  const lower = Math.floor(value);
+  const upper = Math.ceil(value);
+  const lowerCpm = CP_MULTIPLIERS[String(lower)];
+  const upperCpm = CP_MULTIPLIERS[String(upper)];
+
+  if (!lowerCpm || !upperCpm) {
+    return null;
+  }
+
+  return (lowerCpm + upperCpm) / 2;
+}
+
+function hundoCp(entry, level) {
+  if (!entry) return null;
+
+  const cpm = cpMultiplierForLevel(level);
+  if (!cpm) return null;
+
+  const attack = Number(entry.attack) + 15;
+  const defense = Number(entry.defense) + 15;
+  const stamina = Number(entry.stamina) + 15;
+
+  if (
+    !Number.isFinite(attack) ||
+    !Number.isFinite(defense) ||
+    !Number.isFinite(stamina)
+  ) {
+    return null;
+  }
+
+  return Math.max(
+    10,
+    Math.floor(
+      (
+        attack *
+        Math.sqrt(defense) *
+        Math.sqrt(stamina) *
+        cpm *
+        cpm
+      ) / 10
+    )
+  );
+}
+
+function catalogKey(value) {
+  return normalizePickerName(value);
+}
+
+function catalogEntryByName(name) {
+  if (!pokemonCatalog?.length) {
+    return null;
+  }
+
+  const wanted = catalogKey(name);
+
+  let exact =
+    pokemonCatalog.find(
+      entry =>
+        catalogKey(entry.name) === wanted
+    );
+
+  if (exact) {
+    return exact;
+  }
+
+  const stripped =
+    wanted
+      .replace(/^(shadow|armored)\s+/, "")
+      .trim();
+
+  return pokemonCatalog.find(
+    entry =>
+      catalogKey(entry.name) === stripped
+  ) || null;
+}
+
+function raidEncounterEntry(name) {
+  if (!pokemonCatalog?.length) {
+    return null;
+  }
+
+  const normalized =
+    catalogKey(name)
+      .replace(/^(mega|primal|gigantamax|dynamax)\s+/, "")
+      .replace(/\s+[xy]$/, "")
+      .trim();
+
+  return pokemonCatalog.find(
+    entry =>
+      entry.kind === "base" &&
+      catalogKey(entry.name) === normalized
+  ) ||
+  pokemonCatalog.find(
+    entry =>
+      catalogKey(entry.name) === normalized
+  ) ||
+  null;
+}
+
+function defendingTypeMultipliers(types) {
+  const attackTypes =
+    Object.keys(TYPE_SYMBOLS);
+
+  return attackTypes.map(
+    attackType => {
+      let multiplier = 1;
+
+      for (const defendingType of types || []) {
+        const relation =
+          TYPE_RELATIONS[defendingType];
+
+        if (!relation) continue;
+
+        if (
+          relation.weak.includes(
+            attackType
+          )
+        ) {
+          multiplier *= 1.6;
+        }
+
+        if (
+          relation.resist.includes(
+            attackType
+          )
+        ) {
+          multiplier *= 0.625;
+        }
+
+        if (
+          relation.immune.includes(
+            attackType
+          )
+        ) {
+          multiplier *= 0.390625;
+        }
+      }
+
+      return {
+        type: attackType,
+        multiplier
+      };
+    }
+  );
+}
+
+function typePill(type, extraClass = "") {
+  return `
+    <span class="type-pill type-${esc(type.toLowerCase())} ${esc(extraClass)}">
+      <span aria-hidden="true">${TYPE_SYMBOLS[type] || "•"}</span>
+      <span>${esc(type)}</span>
+    </span>
+  `;
+}
+
+function raidIntelForRecommendation(rec) {
+  if (!pokemonCatalog?.length) {
+    return null;
+  }
+
+  const boss =
+    catalogEntryByName(
+      rec.pokemon_name
+    );
+
+  const encounter =
+    raidEncounterEntry(
+      rec.pokemon_name
+    ) || boss;
+
+  if (!boss) {
+    return null;
+  }
+
+  const matchups =
+    defendingTypeMultipliers(
+      boss.types
+    );
+
+  const extraWeak =
+    matchups
+      .filter(
+        item =>
+          item.multiplier >= 2.5
+      )
+      .sort(
+        (a, b) =>
+          b.multiplier -
+          a.multiplier
+      );
+
+  const weak =
+    matchups
+      .filter(
+        item =>
+          item.multiplier > 1.01 &&
+          item.multiplier < 2.5
+      )
+      .sort(
+        (a, b) =>
+          b.multiplier -
+          a.multiplier
+      );
+
+  const resist =
+    matchups
+      .filter(
+        item =>
+          item.multiplier < 0.99
+      )
+      .sort(
+        (a, b) =>
+          a.multiplier -
+          b.multiplier
+      );
+
+  return {
+    boss,
+    encounter,
+    extraWeak,
+    weak,
+    resist,
+    normalCp:
+      hundoCp(
+        encounter,
+        20
+      ),
+    boostedCp:
+      hundoCp(
+        encounter,
+        25
+      )
+  };
+}
+
+function raidIntelHtml(rec) {
+  const intel =
+    raidIntelForRecommendation(
+      rec
+    );
+
+  if (!intel) {
+    return pokemonCatalogPromise
+      ? `<div class="raid-intel-loading">Loading battle intel…</div>`
+      : "";
+  }
+
+  const weaknessPills =
+    [
+      ...intel.extraWeak.map(
+        item =>
+          typePill(
+            item.type,
+            "extra-weak"
+          )
+      ),
+      ...intel.weak.map(
+        item =>
+          typePill(
+            item.type
+          )
+      )
+    ].join("");
+
+  return `
+    <div class="raid-intel">
+      <div class="raid-intel-row">
+        <span class="raid-intel-label">Weak to</span>
+        <div class="type-pill-row">
+          ${weaknessPills || '<span class="muted">No weakness data</span>'}
+        </div>
+      </div>
+
+      ${
+        intel.normalCp && intel.boostedCp
+          ? `
+            <div class="raid-hundo-cp">
+              <span class="raid-intel-label">100% IV CP</span>
+              <span><strong>${formatNumber(intel.normalCp)}</strong> normal</span>
+              <span><strong>${formatNumber(intel.boostedCp)}</strong> weather boosted</span>
+            </div>
+          `
+          : ""
+      }
+
+      <details class="battle-details">
+        <summary>Battle details</summary>
+        <div class="battle-details-grid">
+          <div>
+            <span class="mini-label">BOSS TYPE</span>
+            <div class="type-pill-row">
+              ${intel.boss.types.map(type => typePill(type)).join("")}
+            </div>
+          </div>
+
+          <div>
+            <span class="mini-label">RESISTS</span>
+            <div class="type-pill-row">
+              ${intel.resist.map(item => typePill(item.type)).join("") || '<span class="muted">None</span>'}
+            </div>
+          </div>
+
+          ${
+            intel.encounter &&
+            catalogKey(intel.encounter.name) !==
+              catalogKey(intel.boss.name)
+              ? `
+                <div class="battle-catch-note">
+                  Raid battle form: <strong>${esc(intel.boss.name)}</strong><br>
+                  Catch encounter used for hundo CP: <strong>${esc(intel.encounter.name)}</strong>
+                </div>
+              `
+              : ""
+          }
+        </div>
+      </details>
+    </div>
+  `;
+}
+
+async function ensurePokemonCatalogLoaded() {
+  if (pokemonCatalog) {
+    renderHundoRecent();
+    return pokemonCatalog;
+  }
+
+  if (pokemonCatalogPromise) {
+    return pokemonCatalogPromise;
+  }
+
+  const status =
+    document.getElementById(
+      "hundoCatalogStatus"
+    );
+
+  if (status) {
+    status.textContent =
+      "Loading Pokémon catalog…";
+  }
+
+  pokemonCatalogPromise =
+    api(
+      "/api/pokemon-catalog"
+    )
+      .then(
+        data => {
+          pokemonCatalog =
+            data.entries || [];
+
+          if (status) {
+            status.textContent =
+              `${formatNumber(pokemonCatalog.length)} Pokémon/forms ready`;
+          }
+
+          renderHundoRecent();
+          renderRecommendations();
+
+          if (selectedHundoPokemon) {
+            const fresh =
+              pokemonCatalog.find(
+                item =>
+                  item.key ===
+                  selectedHundoPokemon.key
+              );
+
+            if (fresh) {
+              selectedHundoPokemon =
+                fresh;
+              renderHundoResult();
+            }
+          }
+
+          return pokemonCatalog;
+        }
+      )
+      .catch(
+        error => {
+          pokemonCatalogPromise =
+            null;
+
+          if (status) {
+            status.textContent =
+              error.message;
+          }
+
+          throw error;
+        }
+      );
+
+  return pokemonCatalogPromise;
+}
+
+function hundoRecentKeys() {
+  try {
+    const parsed =
+      JSON.parse(
+        localStorage.getItem(
+          "pogo-hundo-recent"
+        ) || "[]"
+      );
+
+    return Array.isArray(parsed)
+      ? parsed.slice(0, 6)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHundoRecent(entry) {
+  const keys =
+    hundoRecentKeys()
+      .filter(
+        key =>
+          key !== entry.key
+      );
+
+  keys.unshift(entry.key);
+
+  localStorage.setItem(
+    "pogo-hundo-recent",
+    JSON.stringify(
+      keys.slice(0, 6)
+    )
+  );
+
+  renderHundoRecent();
+}
+
+function renderHundoRecent() {
+  const wrap =
+    document.getElementById(
+      "hundoRecentWrap"
+    );
+
+  const container =
+    document.getElementById(
+      "hundoRecent"
+    );
+
+  if (
+    !wrap ||
+    !container ||
+    !pokemonCatalog
+  ) {
+    return;
+  }
+
+  const entries =
+    hundoRecentKeys()
+      .map(
+        key =>
+          pokemonCatalog.find(
+            entry =>
+              entry.key === key
+          )
+      )
+      .filter(Boolean);
+
+  wrap.classList.toggle(
+    "hidden",
+    entries.length === 0
+  );
+
+  container.innerHTML =
+    entries
+      .map(
+        entry => `
+          <button
+            type="button"
+            class="hundo-recent-chip"
+            data-hundo-key="${esc(entry.key)}"
+          >
+            ${spriteImg(
+              entry.sprite_url,
+              entry.name,
+              "pokemon-sprite hundo-recent-sprite"
+            )}
+            <span>${esc(entry.name)}</span>
+          </button>
+        `
+      )
+      .join("");
+}
+
+function hundoSearchMatches(query) {
+  if (!pokemonCatalog) {
+    return [];
+  }
+
+  const raw =
+    String(query || "")
+      .trim()
+      .toLowerCase();
+
+  if (!raw) {
+    return [];
+  }
+
+  const numeric =
+    raw.replace(/^#/, "");
+
+  return pokemonCatalog
+    .map(
+      entry => {
+        const name =
+          entry.name.toLowerCase();
+
+        let score = 99;
+
+        if (
+          /^\d+$/.test(numeric) &&
+          String(entry.dex_nr) === numeric
+        ) {
+          score = 0;
+        } else if (
+          name === raw
+        ) {
+          score = 1;
+        } else if (
+          name.startsWith(raw)
+        ) {
+          score = 2;
+        } else if (
+          name.includes(raw)
+        ) {
+          score = 3;
+        }
+
+        return {
+          entry,
+          score
+        };
+      }
+    )
+    .filter(
+      item =>
+        item.score < 99
+    )
+    .sort(
+      (a, b) =>
+        a.score - b.score ||
+        a.entry.dex_nr -
+          b.entry.dex_nr ||
+        a.entry.name.localeCompare(
+          b.entry.name
+        )
+    )
+    .slice(0, 12)
+    .map(
+      item =>
+        item.entry
+    );
+}
+
+function renderHundoSearchResults() {
+  const input =
+    document.getElementById(
+      "hundoPokemonSearch"
+    );
+
+  const results =
+    document.getElementById(
+      "hundoPokemonResults"
+    );
+
+  if (
+    !input ||
+    !results
+  ) {
+    return;
+  }
+
+  const matches =
+    hundoSearchMatches(
+      input.value
+    );
+
+  const show =
+    String(input.value || "")
+      .trim()
+      .length > 0;
+
+  results.classList.toggle(
+    "hidden",
+    !show
+  );
+
+  input.setAttribute(
+    "aria-expanded",
+    show ? "true" : "false"
+  );
+
+  if (!show) {
+    results.innerHTML = "";
+    return;
+  }
+
+  results.innerHTML =
+    matches.length
+      ? matches
+          .map(
+            entry => `
+              <button
+                type="button"
+                class="pokemon-search-result"
+                role="option"
+                data-hundo-key="${esc(entry.key)}"
+              >
+                ${spriteImg(
+                  entry.sprite_url,
+                  entry.name,
+                  "pokemon-sprite hundo-search-sprite"
+                )}
+
+                <span class="pokemon-search-result-main">
+                  <strong>${esc(entry.name)}</strong>
+                  <small>
+                    #${String(entry.dex_nr).padStart(4, "0")}
+                    · ${entry.types.map(esc).join(" · ")}
+                  </small>
+                </span>
+
+                ${
+                  entry.kind !== "base"
+                    ? `<span class="form-badge">${esc(entry.kind)}</span>`
+                    : ""
+                }
+              </button>
+            `
+          )
+          .join("")
+      : `
+        <div class="pokemon-search-empty">
+          No Pokémon or form matched that search.
+        </div>
+      `;
+}
+
+function selectHundoPokemon(entry) {
+  if (!entry) {
+    return;
+  }
+
+  selectedHundoPokemon =
+    entry;
+
+  saveHundoRecent(
+    entry
+  );
+
+  const search =
+    document.getElementById(
+      "hundoPokemonSearch"
+    );
+
+  search.value =
+    entry.name;
+
+  document.getElementById(
+    "hundoPokemonResults"
+  ).classList.add(
+    "hidden"
+  );
+
+  search.setAttribute(
+    "aria-expanded",
+    "false"
+  );
+
+  renderHundoResult();
+}
+
+function hundoBenchmarkData(entry) {
+  return [
+    {
+      label: "Research",
+      level: 15,
+      note: "Lv 15"
+    },
+    {
+      label: "Raid / Egg",
+      level: 20,
+      note: "Lv 20"
+    },
+    {
+      label: "Weather-boosted raid",
+      level: 25,
+      note: "Lv 25"
+    },
+    {
+      label: "Wild max",
+      level: 30,
+      note: "Lv 30"
+    },
+    {
+      label: "Weather-boosted wild max",
+      level: 35,
+      note: "Lv 35"
+    },
+    {
+      label: "Level 40",
+      level: 40,
+      note: "Lv 40"
+    },
+    {
+      label: "Level 50",
+      level: 50,
+      note: "Lv 50"
+    }
+  ].map(
+    item => ({
+      ...item,
+      cp:
+        hundoCp(
+          entry,
+          item.level
+        )
+    })
+  );
+}
+
+function renderHundoResult() {
+  const entry =
+    selectedHundoPokemon;
+
+  const card =
+    document.getElementById(
+      "hundoResultCard"
+    );
+
+  if (!entry || !card) {
+    card?.classList.add(
+      "hidden"
+    );
+    return;
+  }
+
+  card.classList.remove(
+    "hidden"
+  );
+
+  document.getElementById(
+    "hundoSelectedHeader"
+  ).innerHTML = `
+    <div class="hundo-selected-pokemon">
+      ${spriteImg(
+        entry.sprite_url,
+        entry.name,
+        "pokemon-sprite hundo-selected-sprite"
+      )}
+
+      <div>
+        <span class="section-eyebrow">#${String(entry.dex_nr).padStart(4, "0")}</span>
+        <h2>${esc(entry.name)}</h2>
+        <div class="type-pill-row">
+          ${entry.types.map(type => typePill(type)).join("")}
+        </div>
+      </div>
+    </div>
+
+    <div class="hundo-iv-badge">
+      <span>IV</span>
+      <strong>15 / 15 / 15</strong>
+    </div>
+  `;
+
+  document.getElementById(
+    "hundoBenchmarks"
+  ).innerHTML =
+    hundoBenchmarkData(entry)
+      .map(
+        item => `
+          <article class="${item.level === 20 || item.level === 25 ? "featured" : ""}">
+            <span>${esc(item.label)}</span>
+            <strong>${formatNumber(item.cp)}</strong>
+            <small>${esc(item.note)}</small>
+          </article>
+        `
+      )
+      .join("");
+
+  updateHundoCustomCp();
+}
+
+function updateHundoCustomCp() {
+  const output =
+    document.getElementById(
+      "hundoCustomCp"
+    );
+
+  if (!output) return;
+
+  if (!selectedHundoPokemon) {
+    output.textContent = "—";
+    return;
+  }
+
+  const level =
+    Number(
+      document.getElementById(
+        "hundoCustomLevel"
+      ).value
+    );
+
+  const cp =
+    hundoCp(
+      selectedHundoPokemon,
+      level
+    );
+
+  output.textContent =
+    cp == null
+      ? "Use 1–50 in 0.5 steps"
+      : formatNumber(cp);
+}
+
+
 function renderRecommendations() {
   const container = document.getElementById("recommendations");
 
@@ -2417,6 +3527,8 @@ function renderRecommendations() {
               : ""
           }
         </div>
+
+        ${raidIntelHtml(rec)}
 
         <details class="compact-details">
           <summary>Why?</summary>
@@ -2466,73 +3578,403 @@ function targetProgress(target) {
   };
 }
 
+function targetAvailability(target) {
+  const name =
+    normalizePickerName(
+      target.pokemon_name
+    );
+
+  const currentNames =
+    new Set(
+      (
+        state.target_options
+          ?.current || []
+      ).map(
+        item =>
+          normalizePickerName(
+            item.name
+          )
+      )
+    );
+
+  const upcomingNames =
+    new Set(
+      (
+        state.target_options
+          ?.upcoming || []
+      ).map(
+        item =>
+          normalizePickerName(
+            item.name
+          )
+      )
+    );
+
+  if (currentNames.has(name)) {
+    return "now";
+  }
+
+  if (upcomingNames.has(name)) {
+    return "upcoming";
+  }
+
+  return "not_raiding";
+}
+
+function targetPriorityRank(priority) {
+  return {
+    high: 0,
+    medium: 1,
+    low: 2,
+    skip: 3
+  }[
+    String(priority || "medium")
+  ] ?? 4;
+}
+
+function targetCardHtml(target) {
+  const progress =
+    targetProgress(
+      target
+    );
+
+  const completed =
+    Number(
+      target.completed
+    );
+
+  const priorityText =
+    completed
+      ? "Complete"
+      : String(
+          target.priority ||
+          "medium"
+        );
+
+  const availability =
+    targetAvailability(
+      target
+    );
+
+  const availabilityLabel = {
+    now: "Available now",
+    upcoming: "Upcoming",
+    not_raiding: "Not in current raid window"
+  }[availability];
+
+  return `
+    <article
+      class="target-card compact-target-card ${completed ? "target-complete" : ""}"
+      data-target-id="${esc(target.id)}"
+    >
+      <div class="target-card-head">
+        <div class="target-pokemon-heading">
+          ${spriteImg(
+            target.sprite_url,
+            target.pokemon_name,
+            "pokemon-sprite target-sprite"
+          )}
+
+          <div>
+            <span class="target-type-label">${esc(targetTypeLabels[target.target_type] || target.target_type)}</span>
+            <h3>${esc(target.pokemon_name)}</h3>
+          </div>
+        </div>
+
+        <span class="status-badge ${targetPriorityTone(target.priority, target.completed)}">
+          ${esc(priorityText)}
+        </span>
+      </div>
+
+      <div class="target-progress-row">
+        <strong>${esc(progress.label)}</strong>
+        ${progress.known ? `<span>${Math.round(progress.percent)}%</span>` : ""}
+      </div>
+
+      ${progress.known ? `
+        <div class="target-progress-track">
+          <span style="width:${progress.percent}%"></span>
+        </div>
+      ` : ""}
+
+      <div class="target-compact-meta">
+        <span class="target-availability target-availability-${esc(availability)}">
+          ${esc(availabilityLabel)}
+        </span>
+
+        ${
+          target.expected_progress_per_raid == null
+            ? ""
+            : `<span>≈ ${formatNumber(target.expected_progress_per_raid)} / raid</span>`
+        }
+      </div>
+
+      <div class="target-actions compact-target-actions">
+        <button
+          type="button"
+          class="log-raid-button small-button"
+          data-log-raid="${esc(target.pokemon_name)}"
+          data-log-target-id="${esc(target.id)}"
+        >
+          + Log raid
+        </button>
+
+        <button
+          type="button"
+          class="secondary small-button"
+          data-edit-target="${esc(target.id)}"
+        >
+          Edit
+        </button>
+
+        <button
+          type="button"
+          class="target-more-button secondary small-button"
+          data-target-more="${esc(target.id)}"
+          aria-label="More target actions"
+        >
+          ⋯
+        </button>
+      </div>
+
+      <div class="target-more-menu hidden" data-target-more-menu="${esc(target.id)}">
+        ${
+          target.notes
+            ? `<div class="target-note-preview">${esc(target.notes)}</div>`
+            : ""
+        }
+
+        <button
+          type="button"
+          class="ghost-danger small-button"
+          data-delete-target="${esc(target.id)}"
+        >
+          Delete target
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+function filteredTargets() {
+  const search =
+    normalizePickerName(
+      targetFilterState.search
+    );
+
+  const list =
+    state.targets
+      .filter(
+        target => {
+          const completed =
+            Number(
+              target.completed
+            );
+
+          if (
+            targetFilterState.status ===
+              "active" &&
+            completed
+          ) {
+            return false;
+          }
+
+          if (
+            targetFilterState.status ===
+              "completed" &&
+            !completed
+          ) {
+            return false;
+          }
+
+          if (
+            search &&
+            !normalizePickerName(
+              target.pokemon_name
+            ).includes(
+              search
+            )
+          ) {
+            return false;
+          }
+
+          if (
+            targetFilterState.type !==
+              "all" &&
+            String(
+              target.target_type
+            ) !==
+              targetFilterState.type
+          ) {
+            return false;
+          }
+
+          if (
+            targetFilterState.priority !==
+              "all" &&
+            String(
+              target.priority
+            ) !==
+              targetFilterState.priority
+          ) {
+            return false;
+          }
+
+          if (
+            targetFilterState.availability !==
+              "all" &&
+            targetAvailability(
+              target
+            ) !==
+              targetFilterState.availability
+          ) {
+            return false;
+          }
+
+          return true;
+        }
+      );
+
+  return list.sort(
+    (a, b) => {
+      if (
+        targetFilterState.sort ===
+        "name"
+      ) {
+        return a.pokemon_name.localeCompare(
+          b.pokemon_name
+        );
+      }
+
+      if (
+        targetFilterState.sort ===
+        "updated"
+      ) {
+        return String(
+          b.updated_at || ""
+        ).localeCompare(
+          String(
+            a.updated_at || ""
+          )
+        );
+      }
+
+      if (
+        targetFilterState.sort ===
+        "closest"
+      ) {
+        const aProgress =
+          targetProgress(a);
+
+        const bProgress =
+          targetProgress(b);
+
+        return (
+          bProgress.percent -
+          aProgress.percent
+        );
+      }
+
+      return (
+        Number(a.completed) -
+          Number(b.completed) ||
+        targetPriorityRank(
+          a.priority
+        ) -
+          targetPriorityRank(
+            b.priority
+          ) ||
+        (
+          targetAvailability(a) === "now"
+            ? -1
+            : 0
+        ) -
+        (
+          targetAvailability(b) === "now"
+            ? -1
+            : 0
+        ) ||
+        a.pokemon_name.localeCompare(
+          b.pokemon_name
+        )
+      );
+    }
+  );
+}
+
 function renderTargets() {
-  targetById = new Map(state.targets.map(target => [String(target.id), target]));
+  targetById =
+    new Map(
+      state.targets.map(
+        target => [
+          String(target.id),
+          target
+        ]
+      )
+    );
 
-  const container = document.getElementById("targets");
+  const activeCount =
+    state.targets.filter(
+      target =>
+        !Number(
+          target.completed
+        )
+    ).length;
 
-  container.innerHTML = state.targets.length
-    ? state.targets.map(target => {
-        const progress = targetProgress(target);
-        const completed = Number(target.completed);
-        const priorityText = completed ? "Complete" : String(target.priority || "medium");
+  const completedCount =
+    state.targets.length -
+    activeCount;
 
-        return `
-          <article class="target-card ${completed ? "target-complete" : ""}" data-target-id="${esc(target.id)}">
-            <div class="target-card-head">
-              <div class="target-pokemon-heading">
-                ${spriteImg(
-                  target.sprite_url,
-                  target.pokemon_name,
-                  "pokemon-sprite target-sprite"
-                )}
+  document.getElementById(
+    "targetActiveCount"
+  ).textContent =
+    formatNumber(
+      activeCount
+    );
 
-                <div>
-                  <span class="target-type-label">${esc(targetTypeLabels[target.target_type] || target.target_type)}</span>
-                  <h3>${esc(target.pokemon_name)}</h3>
-                </div>
-              </div>
+  document.getElementById(
+    "targetCompletedCount"
+  ).textContent =
+    formatNumber(
+      completedCount
+    );
 
-              <span class="status-badge ${targetPriorityTone(target.priority, target.completed)}">
-                ${esc(priorityText)}
-              </span>
-            </div>
+  document.getElementById(
+    "targetAllCount"
+  ).textContent =
+    formatNumber(
+      state.targets.length
+    );
 
-            <div class="target-progress-row">
-              <strong>${esc(progress.label)}</strong>
-              ${progress.known ? `<span>${Math.round(progress.percent)}%</span>` : ""}
-            </div>
+  document
+    .querySelectorAll(
+      "[data-target-status]"
+    )
+    .forEach(
+      button => {
+        button.classList.toggle(
+          "active",
+          button.dataset.targetStatus ===
+            targetFilterState.status
+        );
+      }
+    );
 
-            ${progress.known ? `
-              <div class="target-progress-track">
-                <span style="width:${progress.percent}%"></span>
-              </div>
-            ` : ""}
+  const list =
+    filteredTargets();
 
-            <div class="target-extra">
-              ${target.expected_progress_per_raid == null
-                ? ""
-                : `<span>≈ ${formatNumber(target.expected_progress_per_raid)} progress / raid</span>`
-              }
-              ${target.notes ? `<span>${esc(target.notes)}</span>` : ""}
-            </div>
+  document.getElementById(
+    "targetFilterSummary"
+  ).textContent =
+    `${formatNumber(list.length)} shown · ${formatNumber(activeCount)} active · ${formatNumber(completedCount)} completed`;
 
-            <div class="target-actions">
-              <button
-                type="button"
-                class="log-raid-button small-button"
-                data-log-raid="${esc(target.pokemon_name)}"
-                data-log-target-id="${esc(target.id)}"
-              >
-                + Log raid
-              </button>
-              <button type="button" class="secondary small-button" data-edit-target="${esc(target.id)}">Edit</button>
-              <button type="button" class="ghost-danger small-button" data-delete-target="${esc(target.id)}">Delete</button>
-            </div>
-          </article>
-        `;
-      }).join("")
-    : `
+  const container =
+    document.getElementById(
+      "targets"
+    );
+
+  if (!state.targets.length) {
+    container.innerHTML = `
       <div class="empty-state target-empty">
         <span aria-hidden="true">◎</span>
         <strong>No targets yet.</strong>
@@ -2540,6 +3982,108 @@ function renderTargets() {
         <button type="button" class="button" data-empty-add-target>+ Add your first target</button>
       </div>
     `;
+    return;
+  }
+
+  if (!list.length) {
+    container.innerHTML = `
+      <div class="empty-state target-empty">
+        <span aria-hidden="true">⌕</span>
+        <strong>No targets match these filters.</strong>
+        <p>Clear one or more filters to see your goals again.</p>
+        <button type="button" class="secondary" data-clear-target-filters>Clear filters</button>
+      </div>
+    `;
+    return;
+  }
+
+  const active =
+    list.filter(
+      target =>
+        !Number(
+          target.completed
+        )
+    );
+
+  const needsAttention =
+    active.filter(
+      target =>
+        target.priority === "high" ||
+        targetAvailability(target) ===
+          "now"
+    );
+
+  const tracking =
+    active.filter(
+      target =>
+        !needsAttention.includes(
+          target
+        )
+    );
+
+  const completed =
+    list.filter(
+      target =>
+        Number(
+          target.completed
+        )
+    );
+
+  const sections = [];
+
+  if (needsAttention.length) {
+    sections.push(`
+      <section class="target-group">
+        <div class="target-group-heading">
+          <div>
+            <span class="section-eyebrow">NEEDS ATTENTION</span>
+            <h3>Available now or high priority</h3>
+          </div>
+          <span class="target-group-count">${formatNumber(needsAttention.length)}</span>
+        </div>
+        <div class="target-grid compact-target-grid">
+          ${needsAttention.map(targetCardHtml).join("")}
+        </div>
+      </section>
+    `);
+  }
+
+  if (tracking.length) {
+    sections.push(`
+      <section class="target-group">
+        <div class="target-group-heading">
+          <div>
+            <span class="section-eyebrow">TRACKING</span>
+            <h3>Other active goals</h3>
+          </div>
+          <span class="target-group-count">${formatNumber(tracking.length)}</span>
+        </div>
+        <div class="target-grid compact-target-grid">
+          ${tracking.map(targetCardHtml).join("")}
+        </div>
+      </section>
+    `);
+  }
+
+  if (completed.length) {
+    sections.push(`
+      <details class="target-group completed-target-group" ${targetFilterState.status === "completed" ? "open" : ""}>
+        <summary class="target-group-heading">
+          <div>
+            <span class="section-eyebrow">COMPLETED</span>
+            <h3>Finished goals</h3>
+          </div>
+          <span class="target-group-count">${formatNumber(completed.length)}</span>
+        </summary>
+        <div class="target-grid compact-target-grid">
+          ${completed.map(targetCardHtml).join("")}
+        </div>
+      </details>
+    `);
+  }
+
+  container.innerHTML =
+    sections.join("");
 }
 
 function renderCalendar() {
@@ -3718,14 +5262,158 @@ document.getElementById("targets").addEventListener("click", event => {
     return;
   }
 
+  const more = event.target.closest("[data-target-more]");
+  if (more) {
+    const id = String(more.dataset.targetMore);
+    document
+      .querySelector(`[data-target-more-menu="${CSS.escape(id)}"]`)
+      ?.classList.toggle("hidden");
+    return;
+  }
+
   const remove = event.target.closest("[data-delete-target]");
   if (remove) {
     removeTarget(remove.dataset.deleteTarget);
     return;
   }
 
-  if (event.target.closest("[data-empty-add-target]")) {
+  if (
+    event.target.closest("[data-empty-add-target]")
+  ) {
     openTargetModal();
+    return;
+  }
+
+  if (
+    event.target.closest("[data-clear-target-filters]")
+  ) {
+    clearTargetFilters();
+  }
+});
+
+
+function clearTargetFilters() {
+  targetFilterState = {
+    status: "active",
+    search: "",
+    type: "all",
+    priority: "all",
+    availability: "all",
+    sort: "priority"
+  };
+
+  document.getElementById("targetSearch").value = "";
+  document.getElementById("targetTypeFilter").value = "all";
+  document.getElementById("targetPriorityFilter").value = "all";
+  document.getElementById("targetAvailabilityFilter").value = "all";
+  document.getElementById("targetSort").value = "priority";
+
+  renderTargets();
+}
+
+document
+  .querySelectorAll(
+    "[data-target-status]"
+  )
+  .forEach(
+    button => {
+      button.addEventListener(
+        "click",
+        () => {
+          targetFilterState.status =
+            button.dataset.targetStatus;
+          renderTargets();
+        }
+      );
+    }
+  );
+
+document.getElementById("targetSearch").addEventListener("input", event => {
+  targetFilterState.search = event.target.value;
+  renderTargets();
+});
+
+document.getElementById("targetTypeFilter").addEventListener("change", event => {
+  targetFilterState.type = event.target.value;
+  renderTargets();
+});
+
+document.getElementById("targetPriorityFilter").addEventListener("change", event => {
+  targetFilterState.priority = event.target.value;
+  renderTargets();
+});
+
+document.getElementById("targetAvailabilityFilter").addEventListener("change", event => {
+  targetFilterState.availability = event.target.value;
+  renderTargets();
+});
+
+document.getElementById("targetSort").addEventListener("change", event => {
+  targetFilterState.sort = event.target.value;
+  renderTargets();
+});
+
+document.getElementById("clearTargetFilters").addEventListener("click", clearTargetFilters);
+
+document.getElementById("hundoPokemonSearch").addEventListener("focus", async () => {
+  await ensurePokemonCatalogLoaded();
+  renderHundoSearchResults();
+});
+
+document.getElementById("hundoPokemonSearch").addEventListener("input", async () => {
+  await ensurePokemonCatalogLoaded();
+  renderHundoSearchResults();
+});
+
+document.getElementById("hundoPokemonResults").addEventListener("click", event => {
+  const button =
+    event.target.closest("[data-hundo-key]");
+
+  if (!button || !pokemonCatalog) return;
+
+  const entry =
+    pokemonCatalog.find(
+      item =>
+        item.key ===
+        button.dataset.hundoKey
+    );
+
+  selectHundoPokemon(entry);
+});
+
+document.getElementById("hundoRecent").addEventListener("click", event => {
+  const button =
+    event.target.closest("[data-hundo-key]");
+
+  if (!button || !pokemonCatalog) return;
+
+  const entry =
+    pokemonCatalog.find(
+      item =>
+        item.key ===
+        button.dataset.hundoKey
+    );
+
+  selectHundoPokemon(entry);
+});
+
+document.getElementById("hundoCustomLevel").addEventListener("input", updateHundoCustomCp);
+
+document.addEventListener("click", event => {
+  const searchWrap =
+    event.target.closest(".pokemon-combobox");
+
+  if (!searchWrap) {
+    document
+      .getElementById("hundoPokemonResults")
+      ?.classList.add("hidden");
+
+    document
+      .getElementById("hundoPokemonSearch")
+      ?.setAttribute(
+        "aria-expanded",
+        "false"
+      );
   }
 });
 
