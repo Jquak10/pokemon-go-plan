@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=25">
+  <link rel="stylesheet" href="/styles.css?v=27">
 </head>
 
 <body class="manage-page">
@@ -1276,6 +1276,11 @@ let targetFilterHomeNextSibling = null;
 let targetFilterRestoreTimer = null;
 let targetFilterLockedScrollY = 0;
 
+let modalLockedScrollY = 0;
+let modalPageLocked = false;
+let modalTouchStartY = 0;
+let desktopQuickRailFrame = 0;
+
 let pokemonCatalog = null;
 let pokemonCatalogPromise = null;
 let selectedHundoPokemon = null;
@@ -1423,6 +1428,8 @@ function activateTab(name, scroll = true) {
       "hidden",
       name !== "plan"
     );
+
+  scheduleDesktopQuickRailAffix();
 
   if (scroll) {
     document
@@ -2143,9 +2150,7 @@ function openRaidLogModal(
     "hidden"
   );
 
-  document.body.classList.add(
-    "modal-open"
-  );
+  lockPageForModal();
 
   setTimeout(
     () =>
@@ -2167,9 +2172,7 @@ function closeRaidLogModal() {
       "hidden"
     );
 
-  document.body.classList.remove(
-    "modal-open"
-  );
+  unlockPageForModal();
 
   raidLogExplicitTargetId =
     null;
@@ -2643,6 +2646,20 @@ function unlockPageForTargetDrawer() {
   document.body.style.right = "";
   document.body.style.width = "";
 
+  document.removeEventListener(
+    "touchstart",
+    modalTouchStartGuard
+  );
+
+  document.removeEventListener(
+    "touchmove",
+    modalTouchMoveGuard
+  );
+
+  setForegroundSheetOpen(
+    false
+  );
+
   window.scrollTo(
     0,
     restoreY
@@ -2660,6 +2677,10 @@ function closeTargetFilterDrawer() {
   );
 
   unlockPageForTargetDrawer();
+
+  setForegroundSheetOpen(
+    false
+  );
 
   document
     .getElementById(
@@ -2694,6 +2715,10 @@ function openTargetFilterDrawer() {
   }
 
   lockPageForTargetDrawer();
+
+  setForegroundSheetOpen(
+    true
+  );
 
   document
     .getElementById(
@@ -2799,6 +2824,7 @@ function toggleDensity() {
   );
 
   applyDensity();
+  scheduleDesktopQuickRailAffix();
 }
 
 function renderDesktopQuickRail() {
@@ -3121,6 +3147,246 @@ function closeCommandPalette() {
     )
     ?.classList.add(
       "hidden"
+    );
+}
+
+
+
+function setForegroundSheetOpen(
+  open
+) {
+  document.body.classList.toggle(
+    "foreground-sheet-open",
+    Boolean(open)
+  );
+}
+
+function modalTouchStartGuard(
+  event
+) {
+  modalTouchStartY =
+    event.touches?.[0]
+      ?.clientY || 0;
+}
+
+function modalTouchMoveGuard(
+  event
+) {
+  if (!modalPageLocked) {
+    return;
+  }
+
+  const scrollArea =
+    event.target.closest(
+      "#raidLogModal .modal-body, #targetModal .modal-body"
+    );
+
+  if (!scrollArea) {
+    event.preventDefault();
+    return;
+  }
+
+  const currentY =
+    event.touches?.[0]
+      ?.clientY ||
+    modalTouchStartY;
+
+  const movingFingerDown =
+    currentY >
+    modalTouchStartY;
+
+  const movingFingerUp =
+    currentY <
+    modalTouchStartY;
+
+  const atTop =
+    scrollArea.scrollTop <= 0;
+
+  const atBottom =
+    Math.ceil(
+      scrollArea.scrollTop +
+      scrollArea.clientHeight
+    ) >=
+    scrollArea.scrollHeight;
+
+  const canScroll =
+    scrollArea.scrollHeight >
+    scrollArea.clientHeight + 1;
+
+  if (
+    !canScroll ||
+    (
+      atTop &&
+      movingFingerDown
+    ) ||
+    (
+      atBottom &&
+      movingFingerUp
+    )
+  ) {
+    event.preventDefault();
+  }
+
+  modalTouchStartY =
+    currentY;
+}
+
+function lockPageForModal() {
+  if (modalPageLocked) {
+    return;
+  }
+
+  modalPageLocked = true;
+
+  modalLockedScrollY =
+    window.scrollY ||
+    window.pageYOffset ||
+    0;
+
+  document.documentElement.classList.add(
+    "modal-open"
+  );
+
+  document.body.classList.add(
+    "modal-open"
+  );
+
+  document.body.style.position =
+    "fixed";
+
+  document.body.style.top =
+    `-${modalLockedScrollY}px`;
+
+  document.body.style.left =
+    "0";
+
+  document.body.style.right =
+    "0";
+
+  document.body.style.width =
+    "100%";
+
+  setForegroundSheetOpen(
+    true
+  );
+
+  document.addEventListener(
+    "touchstart",
+    modalTouchStartGuard,
+    {
+      passive: true
+    }
+  );
+
+  document.addEventListener(
+    "touchmove",
+    modalTouchMoveGuard,
+    {
+      passive: false
+    }
+  );
+}
+
+function unlockPageForModal() {
+  if (!modalPageLocked) {
+    return;
+  }
+
+  const restoreY =
+    modalLockedScrollY;
+
+  modalPageLocked = false;
+
+  document.documentElement.classList.remove(
+    "modal-open"
+  );
+
+  document.body.classList.remove(
+    "modal-open"
+  );
+
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  document.body.style.width = "";
+
+  window.scrollTo(
+    0,
+    restoreY
+  );
+}
+
+function updateDesktopQuickRailAffix() {
+  desktopQuickRailFrame = 0;
+
+  const panel =
+    document.querySelector(
+      '[data-panel="plan"]'
+    );
+
+  const layout =
+    panel?.querySelector(
+      ".plan-layout"
+    );
+
+  const sidebar =
+    panel?.querySelector(
+      ".plan-sidebar"
+    );
+
+  if (
+    !panel ||
+    !layout ||
+    !sidebar ||
+    !panel.classList.contains(
+      "active"
+    ) ||
+    !window.matchMedia(
+      "(min-width: 1180px)"
+    ).matches
+  ) {
+    sidebar?.classList.remove(
+      "is-affixed",
+      "is-bottomed"
+    );
+    return;
+  }
+
+  const topGap = 24;
+  const layoutRect =
+    layout.getBoundingClientRect();
+
+  const railHeight =
+    sidebar.offsetHeight;
+
+  const shouldBottom =
+    layoutRect.bottom <=
+    topGap + railHeight;
+
+  const shouldAffix =
+    !shouldBottom &&
+    layoutRect.top <= topGap;
+
+  sidebar.classList.toggle(
+    "is-affixed",
+    shouldAffix
+  );
+
+  sidebar.classList.toggle(
+    "is-bottomed",
+    shouldBottom
+  );
+}
+
+function scheduleDesktopQuickRailAffix() {
+  if (desktopQuickRailFrame) {
+    return;
+  }
+
+  desktopQuickRailFrame =
+    requestAnimationFrame(
+      updateDesktopQuickRailAffix
     );
 }
 
@@ -5689,6 +5955,7 @@ function render() {
   renderPreferences();
   renderDesktopQuickRail();
   applyDensity();
+  scheduleDesktopQuickRailAffix();
 }
 
 async function savePreferences() {
@@ -6014,14 +6281,14 @@ function openTargetModal(target = null) {
 
   const modal = document.getElementById("targetModal");
   modal.classList.remove("hidden");
-  document.body.classList.add("modal-open");
+  lockPageForModal();
 
   setTimeout(() => document.getElementById("pokemonName").focus(), 30);
 }
 
 function closeTargetModal() {
   document.getElementById("targetModal").classList.add("hidden");
-  document.body.classList.remove("modal-open");
+  unlockPageForModal();
 }
 
 async function saveTarget() {
@@ -6347,6 +6614,16 @@ window.addEventListener(
     ) {
       closeTargetFilterDrawer();
     }
+
+    scheduleDesktopQuickRailAffix();
+  }
+);
+
+window.addEventListener(
+  "scroll",
+  scheduleDesktopQuickRailAffix,
+  {
+    passive: true
   }
 );
 
