@@ -1,0 +1,32 @@
+{
+  "name": "Pokemon GO Planner",
+
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+
+  "workspaceFolder": "/workspace",
+
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+
+  "forwardPorts": [
+    8787
+  ],
+
+  "portsAttributes": {
+    "8787": {
+      "label": "Pokemon GO Planner",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "mounts": [
+    "source=pogo-codex,target=/root/.codex,type=volume",
+    "source=pogo-gh,target=/root/.config/gh,type=volume"
+  ],
+
+  "postCreateCommand": "npm ci && if gh auth status >/dev/null 2>&1; then gh auth setup-git; else echo 'GitHub CLI not authenticated; run gh auth login'; fi",
+
+  "remoteUser": "root"
+}
