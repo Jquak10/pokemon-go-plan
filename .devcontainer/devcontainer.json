@@ -26,7 +26,16 @@
     "source=pogo-gh,target=/root/.config/gh,type=volume"
   ],
 
-  "postCreateCommand": "npm ci && if gh auth status >/dev/null 2>&1; then gh auth setup-git; else echo 'GitHub CLI not authenticated; run gh auth login'; fi",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "OpenAI.chatgpt"
+      ]
+    }
+  },
+
+  "postCreateCommand": "sh .devcontainer/post-create.sh",
+  "postStartCommand": "sh .devcontainer/post-start.sh",
 
   "remoteUser": "root"
 }
