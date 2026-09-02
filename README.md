@@ -50,6 +50,25 @@ than scraping third-party sites without verifying their allowed automated-use te
 permitted automated PvE source adapter can replace this later without changing subscriber
 accounts or calendar URLs.
 
+## Development environment
+
+The source remains on Windows at `C:\Projects\pokemon-go-plan`, while development tools run
+in the Docker VS Code Dev Container at `/workspace`. Git, Node/npm, Wrangler, GitHub CLI and
+Codex all run inside the container.
+
+Install dependencies and start local development from `/workspace`:
+
+```sh
+npm ci
+npm run dev
+```
+
+The local Worker is available at `http://localhost:8787`.
+
+For normal development, use a feature branch and open a pull request rather than pushing
+directly to `main`. Production deployment remains the existing GitHub `main` → Cloudflare
+workflow.
+
 ## Cloudflare setup
 
 1. Create a D1 database named `pokemon-go-calendar-db`.
