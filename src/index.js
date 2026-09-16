@@ -224,6 +224,27 @@ function dateFromPropertyLine(line) {
   return `${match[1]}-${match[2]}-${match[3]}`;
 }
 
+function inclusiveEndDateFromPropertyLine(line, fallbackStartDate = null) {
+  const endDate = dateFromPropertyLine(line);
+  if (!endDate) return fallbackStartDate;
+
+  const colon = line.indexOf(":");
+  const left = colon >= 0 ? line.slice(0, colon).toUpperCase() : "";
+  const raw = colon >= 0 ? line.slice(colon + 1).trim() : "";
+  const isAllDay = left.includes("VALUE=DATE") || /^\d{8}$/.test(raw);
+
+  if (!isAllDay) return endDate;
+
+  // RFC 5545 all-day DTEND is exclusive. Internally the app compares
+  // inclusive calendar days, so subtract one day before storing/using it.
+  const adjusted = addDaysIso(endDate, -1);
+  if (!adjusted) return fallbackStartDate || endDate;
+  if (fallbackStartDate && adjusted < fallbackStartDate) {
+    return fallbackStartDate;
+  }
+  return adjusted;
+}
+
 function parseIcsEvents(text) {
   const unfolded = unfoldIcs(text);
   const blocks = unfolded.match(/BEGIN:VEVENT\n[\s\S]*?\nEND:VEVENT/g) || [];
@@ -257,7 +278,12 @@ function parseIcsEvents(text) {
       dtend_line: dtendProp ? dtendProp.line : null,
       other_lines: otherLines.join("\n"),
       start_date: dateFromPropertyLine(dtstartProp.line),
-      end_date: dateFromPropertyLine(dtendProp?.line || dtstartProp.line),
+      end_date: dtendProp
+      ? inclusiveEndDateFromPropertyLine(
+          dtendProp.line,
+          dateFromPropertyLine(dtstartProp.line)
+        )
+      : dateFromPropertyLine(dtstartProp.line),
       source_url: urlProp ? urlProp.value : null
     };
   }).filter(Boolean);
@@ -1915,6 +1941,14 @@ async function recommendationsForDate(
   const map = new Map();
 
   for (const event of events) {
+    const effectiveEndDate = event.dtend_line
+      ? inclusiveEndDateFromPropertyLine(event.dtend_line, event.start_date)
+      : (event.end_date || event.start_date);
+
+    if (effectiveEndDate && effectiveEndDate < day) {
+      continue;
+    }
+
     if (
       eventIsSuppressedByRules(
         event,
@@ -6691,6 +6725,41 @@ async function deleteTarget(request, env) {
   return json({ ok: true });
 }
 
+async function bulkDeleteTargets(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return bad("Invalid JSON body.");
+  }
+
+  const user = await userByManageToken(env, body?.token);
+  if (!user) return bad("Invalid management link.", 401);
+
+  const ids = [...new Set(
+    (Array.isArray(body?.target_ids) ? body.target_ids : [])
+      .map((id) => String(id || "").trim())
+      .filter(Boolean)
+  )];
+
+  if (!ids.length) return bad("Select at least one target.");
+  if (ids.length > 200) return bad("Too many targets selected.");
+
+  const results = await env.DB.batch(
+    ids.map((id) => env.DB.prepare(`
+      DELETE FROM targets
+      WHERE id = ? AND user_id = ?
+    `).bind(id, user.id))
+  );
+
+  const deleted = results.reduce(
+    (sum, result) => sum + Number(result?.meta?.changes || 0),
+    0
+  );
+
+  return json({ ok: true, deleted });
+}
+
 function targetTypeLabel(type) {
   return {
     mega_energy: "Mega Energy",
@@ -7519,6 +7588,10 @@ async function handleFetch(request, env) {
 
     if (request.method === "POST" && path === "/api/targets") {
       return upsertTarget(request, env);
+    }
+
+    if (request.method === "POST" && path === "/api/targets/bulk-delete") {
+      return bulkDeleteTargets(request, env);
     }
 
     if (request.method === "DELETE" && path === "/api/targets") {
