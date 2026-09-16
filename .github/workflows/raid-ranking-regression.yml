@@ -1,0 +1,49 @@
+name: Raid ranking regression
+
+on:
+  pull_request:
+    paths:
+      - "src/raid-rankings.js"
+      - "src/index.js"
+      - "public/manage.html"
+      - "public/styles.css"
+      - "tests/raid-rankings*.mjs"
+      - "package.json"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/raid-rankings.js"
+      - "src/index.js"
+      - "public/manage.html"
+      - "public/styles.css"
+      - "tests/raid-rankings*.mjs"
+      - "package.json"
+  schedule:
+    - cron: "17 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check src/raid-rankings.js
+      - run: node --check src/index.js
+      - run: npm test
+      - run: git diff --check
+
+  live-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run test:live
