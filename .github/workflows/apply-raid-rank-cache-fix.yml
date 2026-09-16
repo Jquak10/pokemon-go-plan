@@ -28,12 +28,13 @@ jobs:
           text = path.read_text()
 
           if "export function raidRankProfileJsonIsCurrent" not in text:
-              def sub_once(pattern, replacement, label, flags=0):
-                  global text
-                  text, count = re.subn(pattern, replacement, text, count=1, flags=flags)
+              def sub_once(source, pattern, replacement, label, flags=0):
+                  updated, count = re.subn(pattern, replacement, source, count=1, flags=flags)
                   assert count == 1, f"{label} anchor changed"
+                  return updated
 
-              sub_once(
+              text = sub_once(
+                  text,
                   r'''function raidRankingsJsonForPokemonName\(\n\s*name,\n\s*metas\n\) \{\n\s*const normalized =\n\s*normalizeName\(name\);\n''',
                   '''export function raidRankProfileJsonIsCurrent(value) {
             if (!value) return false;
@@ -71,8 +72,9 @@ jobs:
                   "raidRankingsJsonForPokemonName"
               )
 
-              sub_once(
-                  r'''\s*if \(exact\?\.raid_rankings_json\) \{\n\s*return exact\.raid_rankings_json;\n\s*\}\n''',
+              text = sub_once(
+                  text,
+                  r'''\n\s*if \(exact\?\.raid_rankings_json\) \{\n\s*return exact\.raid_rankings_json;\n\s*\}\n''',
                   '''
 
             const exactRankingsJson =
@@ -87,8 +89,9 @@ jobs:
                   "exact ranking return"
               )
 
-              sub_once(
-                  r'''\s*return fallback\?\.raid_rankings_json \|\| null;\n\}''',
+              text = sub_once(
+                  text,
+                  r'''\n\s*return fallback\?\.raid_rankings_json \|\| null;\n\}''',
                   '''
 
             return currentRaidRankingsJson(
@@ -119,12 +122,10 @@ jobs:
               sync_end = text.index("\nasync function userByManageToken", sync_start)
               sync = text[sync_start:sync_end]
 
-              old = '''        ) AS raid_rank_updated_at
-              FROM pokemon_meta pm
-            `).bind(
-              RAID_RANK_SOURCE_NAME
-            ).all();'''
-              new = '''        ) AS raid_rank_updated_at,
+              sync = sub_once(
+                  sync,
+                  r'''\) AS raid_rank_updated_at\n\s*FROM pokemon_meta pm\n\s*`\)\.bind\(\n\s*RAID_RANK_SOURCE_NAME\n\s*\)\.all\(\);''',
+                  ''') AS raid_rank_updated_at,
               (
                 SELECT ms.note
                 FROM meta_sources ms
@@ -133,73 +134,36 @@ jobs:
                 ORDER BY ms.updated_at DESC
                 LIMIT 1
               ) AS raid_rankings_json
-              FROM pokemon_meta pm
-            `).bind(
-              RAID_RANK_SOURCE_NAME,
-              RAID_RANK_SOURCE_NAME
-            ).all();'''
-              assert old in sync, "existing meta query anchor changed"
-              sync = sync.replace(old, new, 1)
+            FROM pokemon_meta pm
+          `).bind(
+            RAID_RANK_SOURCE_NAME,
+            RAID_RANK_SOURCE_NAME
+          ).all();''',
+                  "existing meta query"
+              )
 
-              old = '''        const raidRankRefresh =
+              sync = sub_once(
+                  sync,
+                  r'''const raidRankRefresh =\n\s*!existing\?\.raid_rank_updated_at \|\|\n\s*existing\.raid_rank_updated_at <\n\s*raidRankStaleBefore;''',
+                  '''const raidRankRefresh =
                   !existing?.raid_rank_updated_at ||
                   existing.raid_rank_updated_at <
-                    raidRankStaleBefore;
+                    raidRankStaleBefore ||
+                  (
+                    Boolean(
+                      existing?.raid_rankings_json
+                    ) &&
+                    !raidRankProfileJsonIsCurrent(
+                      existing.raid_rankings_json
+                    )
+                  );''',
+                  "raidRankRefresh"
+              )
 
-                const priorityBucket =
-                  missingRecord
-                    ? 0
-                    : spriteCorrection
-                      ? 1
-                      : spriteBackfill
-                        ? 2
-                        : activeToday
-                          ? 3
-                          : raidRankRefresh
-                            ? 4
-                            : 5;'''
-              new = '''        const raidRankMethodStale =
-                  Boolean(
-                    existing?.raid_rankings_json
-                  ) &&
-                  !raidRankProfileJsonIsCurrent(
-                    existing.raid_rankings_json
-                  );
-
-                const raidRankRefresh =
-                  raidRankMethodStale ||
-                  !existing?.raid_rank_updated_at ||
-                  existing.raid_rank_updated_at <
-                    raidRankStaleBefore;
-
-                const priorityBucket =
-                  missingRecord
-                    ? 0
-                    : spriteCorrection
-                      ? 1
-                      : spriteBackfill
-                        ? 2
-                        : activeToday
-                          ? 3
-                          : raidRankMethodStale
-                            ? 4
-                            : raidRankRefresh
-                              ? 5
-                              : 6;'''
-              assert old in sync, "raidRankRefresh anchor changed"
-              sync = sync.replace(old, new, 1)
-
-              old = '''          spriteCorrection,
-                  raidRankRefresh,
-                  activeToday,'''
-              new = '''          spriteCorrection,
-                  raidRankMethodStale,
-                  raidRankRefresh,
-                  activeToday,'''
-              assert old in sync, "ranked candidate fields anchor changed"
-              sync = sync.replace(old, new, 1)
-
-              old = '''  const raidRankBackfillRows =
+              sync = sub_once(
+                  sync,
+                  r'''const raidRankBackfillRows =\n\s*\(existingMetaRows \|\| \[\]\)\n\s*\.filter\(row =>[\s\S]*?MAX_RAID_RANK_BACKFILLS_PER_SYNC\n\s*\);''',
+                  '''const raidRankBackfillRows =
             (existingMetaRows || [])
               .filter(row =>
                 !selectedKeys.has(
@@ -210,64 +174,45 @@ jobs:
                 (
                   !row.raid_rank_updated_at ||
                   row.raid_rank_updated_at <
-                    raidRankStaleBefore
-                )
-              )
-              .slice(
-                0,
-                MAX_RAID_RANK_BACKFILLS_PER_SYNC
-              );'''
-              new = '''  const raidRankBackfillRows =
-            (existingMetaRows || [])
-              .map(row => ({
-                row,
-                method_stale:
-                  Boolean(
-                    row.raid_rankings_json
-                  ) &&
-                  !raidRankProfileJsonIsCurrent(
-                    row.raid_rankings_json
+                    raidRankStaleBefore ||
+                  (
+                    Boolean(
+                      row.raid_rankings_json
+                    ) &&
+                    !raidRankProfileJsonIsCurrent(
+                      row.raid_rankings_json
+                    )
                   )
-              }))
-              .filter(item =>
-                !selectedKeys.has(
-                  normalizeName(
-                    item.row.pokemon_name
-                  )
-                ) &&
-                (
-                  item.method_stale ||
-                  !item.row.raid_rank_updated_at ||
-                  item.row.raid_rank_updated_at <
-                    raidRankStaleBefore
                 )
               )
               .sort(
                 (a, b) =>
-                  Number(b.method_stale) -
-                    Number(a.method_stale) ||
-                  String(
-                    a.row.raid_rank_updated_at || ""
-                  ).localeCompare(
-                    String(
-                      b.row.raid_rank_updated_at || ""
+                  Number(
+                    Boolean(b.raid_rankings_json) &&
+                    !raidRankProfileJsonIsCurrent(
+                      b.raid_rankings_json
                     )
-                  ) ||
+                  ) -
+                    Number(
+                      Boolean(a.raid_rankings_json) &&
+                      !raidRankProfileJsonIsCurrent(
+                        a.raid_rankings_json
+                      )
+                    ) ||
                   String(
-                    a.row.pokemon_name || ""
+                    a.raid_rank_updated_at || ""
                   ).localeCompare(
                     String(
-                      b.row.pokemon_name || ""
+                      b.raid_rank_updated_at || ""
                     )
                   )
               )
               .slice(
                 0,
                 MAX_RAID_RANK_BACKFILLS_PER_SYNC
+              );''',
+                  "raidRankBackfillRows"
               )
-              .map(item => item.row);'''
-              assert old in sync, "raidRankBackfillRows anchor changed"
-              sync = sync.replace(old, new, 1)
 
               text = text[:sync_start] + sync + text[sync_end:]
               path.write_text(text)
