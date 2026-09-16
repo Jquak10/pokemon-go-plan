@@ -1,0 +1,476 @@
+name: Apply raid and target fixes
+
+on:
+  push:
+    branches:
+      - fix/raid-plan-targets-correctness
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'fix: raid plan and target correctness'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/raid-plan-targets-correctness
+          fetch-depth: 0
+
+      - name: Apply focused fixes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly 1 match, found {count}")
+              return text.replace(old, new, 1)
+
+          # ------------------------------------------------------------
+          # Worker: normalize all-day DTEND correctly and add bulk delete.
+          # ------------------------------------------------------------
+          worker_path = Path("src/index.js")
+          worker = worker_path.read_text(encoding="utf-8")
+
+          old = '''function dateFromPropertyLine(line) {
+            if (!line) return null;
+            const colon = line.indexOf(":");
+            if (colon < 0) return null;
+            const raw = line.slice(colon + 1);
+            const match = raw.match(/^(\\d{4})(\\d{2})(\\d{2})/);
+            if (!match) return null;
+            return `${match[1]}-${match[2]}-${match[3]}`;
+          }
+          '''
+          new = old + '''
+          function inclusiveEndDateFromPropertyLine(line, fallbackStartDate = null) {
+            const endDate = dateFromPropertyLine(line);
+            if (!endDate) return fallbackStartDate;
+
+            const colon = line.indexOf(":");
+            const left = colon >= 0 ? line.slice(0, colon).toUpperCase() : "";
+            const raw = colon >= 0 ? line.slice(colon + 1).trim() : "";
+            const isAllDay = left.includes("VALUE=DATE") || /^\\d{8}$/.test(raw);
+
+            if (!isAllDay) return endDate;
+
+            // RFC 5545 DTEND is exclusive for all-day events. Store/display
+            // inclusive dates internally so an event ending Sep 15 does not
+            // remain eligible on Sep 16 merely because DTEND is Sep 16.
+            const exclusiveAdjusted = addDaysIso(endDate, -1);
+            if (!exclusiveAdjusted) return fallbackStartDate || endDate;
+            if (fallbackStartDate && exclusiveAdjusted < fallbackStartDate) {
+              return fallbackStartDate;
+            }
+            return exclusiveAdjusted;
+          }
+          '''
+          worker = replace_once(worker, old, new, "insert inclusive DTEND helper")
+
+          old = '''      start_date: dateFromPropertyLine(dtstartProp.line),
+                end_date: dateFromPropertyLine(dtendProp?.line || dtstartProp.line),
+          '''
+          new = '''      start_date: dateFromPropertyLine(dtstartProp.line),
+                end_date: dtendProp
+                  ? inclusiveEndDateFromPropertyLine(
+                      dtendProp.line,
+                      dateFromPropertyLine(dtstartProp.line)
+                    )
+                  : dateFromPropertyLine(dtstartProp.line),
+          '''
+          worker = replace_once(worker, old, new, "normalize parsed event end date")
+
+          old = '''  for (const event of events) {
+              if (
+                eventIsSuppressedByRules(
+          '''
+          new = '''  for (const event of events) {
+              const effectiveEndDate =
+                event.dtend_line
+                  ? inclusiveEndDateFromPropertyLine(
+                      event.dtend_line,
+                      event.start_date
+                    )
+                  : (event.end_date || event.start_date);
+
+              // Defensively correct already-imported all-day rows. This makes
+              // current recommendations accurate immediately, even before the
+              // next scheduled feed sync rewrites their stored end_date.
+              if (effectiveEndDate && effectiveEndDate < day) {
+                continue;
+              }
+
+              if (
+                eventIsSuppressedByRules(
+          '''
+          worker = replace_once(worker, old, new, "defensive recommendation end-date gate")
+
+          old = '''        start_date: event.start_date,
+                end_date: event.end_date,
+                remote_eligible: remoteEligible
+          '''
+          new = '''        start_date: event.start_date,
+                end_date: effectiveEndDate,
+                remote_eligible: remoteEligible
+          '''
+          worker = replace_once(worker, old, new, "use effective recommendation end date")
+
+          old = '''  await env.DB.prepare(`
+              DELETE FROM targets
+              WHERE id = ? AND user_id = ?
+            `).bind(id, user.id).run();
+
+            return json({ ok: true });
+          }
+          '''
+          new = old + '''
+          async function bulkDeleteTargets(request, env) {
+            let body;
+            try {
+              body = await request.json();
+            } catch {
+              return bad("Invalid JSON body.");
+            }
+
+            const user = await userByManageToken(env, body?.token);
+            if (!user) return bad("Invalid management link.", 401);
+
+            const ids = [
+              ...new Set(
+                (Array.isArray(body?.target_ids) ? body.target_ids : [])
+                  .map((id) => String(id || "").trim())
+                  .filter(Boolean)
+              )
+            ];
+
+            if (!ids.length) return bad("Select at least one target.");
+            if (ids.length > 200) return bad("Too many targets selected.");
+
+            const statements = ids.map((id) =>
+              env.DB.prepare(`
+                DELETE FROM targets
+                WHERE id = ? AND user_id = ?
+              `).bind(id, user.id)
+            );
+
+            const results = await env.DB.batch(statements);
+            const deleted = results.reduce(
+              (sum, result) => sum + Number(result?.meta?.changes || 0),
+              0
+            );
+
+            return json({ ok: true, deleted });
+          }
+          '''
+          worker = replace_once(worker, old, new, "add bulk target delete endpoint")
+
+          old = '''    if (request.method === "DELETE" && path === "/api/targets") {
+                return deleteTarget(request, env);
+              }
+          '''
+          new = '''    if (request.method === "POST" && path === "/api/targets/bulk-delete") {
+                return bulkDeleteTargets(request, env);
+              }
+
+              if (request.method === "DELETE" && path === "/api/targets") {
+                return deleteTarget(request, env);
+              }
+          '''
+          worker = replace_once(worker, old, new, "route bulk target delete")
+          worker_path.write_text(worker, encoding="utf-8")
+
+          # ------------------------------------------------------------
+          # Management UI: mobile nav cleanup, active badge, bulk targets.
+          # ------------------------------------------------------------
+          manage_path = Path("public/manage.html")
+          manage = manage_path.read_text(encoding="utf-8")
+
+          old = '''              <button id="openAddTarget" type="button" class="button add-target-button">
+                        + Add target
+                      </button>
+          '''
+          new = '''              <button id="toggleTargetSelection" type="button" class="secondary">
+                        Select
+                      </button>
+
+                      <button id="openAddTarget" type="button" class="button add-target-button">
+                        + Add target
+                      </button>
+          '''
+          manage = replace_once(manage, old, new, "add target selection toggle")
+
+          old = '''          <div id="targetFilterSummary" class="target-filter-summary"></div>
+                    <div id="targets" class="target-organized-list"></div>
+          '''
+          new = '''          <div id="targetFilterSummary" class="target-filter-summary"></div>
+
+                    <div id="bulkTargetActions" class="target-heading-actions hidden" aria-live="polite">
+                      <button id="selectAllVisibleTargets" type="button" class="secondary">Select all shown</button>
+                      <button id="deleteSelectedTargets" type="button" class="ghost-danger" disabled>Delete selected</button>
+                      <button id="cancelTargetSelection" type="button" class="secondary">Cancel</button>
+                    </div>
+
+                    <div id="targets" class="target-organized-list"></div>
+          '''
+          manage = replace_once(manage, old, new, "add bulk target actions")
+
+          old = '''let state = null;
+          let targetById = new Map();
+          '''
+          new = '''let state = null;
+          let targetById = new Map();
+          let targetSelectionMode = false;
+          const selectedTargetIds = new Set();
+          '''
+          manage = replace_once(manage, old, new, "add target selection state")
+
+          old = '''  document.body.style.position = "";
+            document.body.style.top = "";
+            document.body.style.left = "";
+            document.body.style.right = "";
+            document.body.style.width = "";
+
+            window.scrollTo(
+          '''
+          new = '''  document.body.style.position = "";
+            document.body.style.top = "";
+            document.body.style.left = "";
+            document.body.style.right = "";
+            document.body.style.width = "";
+
+            document.removeEventListener(
+              "touchstart",
+              modalTouchStartGuard
+            );
+
+            document.removeEventListener(
+              "touchmove",
+              modalTouchMoveGuard
+            );
+
+            setForegroundSheetOpen(false);
+
+            window.scrollTo(
+          '''
+          manage = replace_once(manage, old, new, "restore mobile nav after modal close")
+
+          old = '''  document.getElementById("targetTabCount").textContent = state.targets.length;
+          '''
+          new = '''  document.getElementById("targetTabCount").textContent = activeTargets;
+          '''
+          manage = replace_once(manage, old, new, "active target nav badge")
+
+          old = '''      <div class="target-actions compact-target-actions">
+                <button
+                  type="button"
+                  class="log-raid-button small-button"
+          '''
+          new = '''      <div class="target-actions compact-target-actions">
+                ${
+                  targetSelectionMode
+                    ? `
+                      <button
+                        type="button"
+                        class="${selectedTargetIds.has(String(target.id)) ? "button" : "secondary"} small-button"
+                        data-select-target="${esc(target.id)}"
+                        aria-pressed="${selectedTargetIds.has(String(target.id)) ? "true" : "false"}"
+                      >
+                        ${selectedTargetIds.has(String(target.id)) ? "Selected ✓" : "Select"}
+                      </button>
+                    `
+                    : ""
+                }
+
+                <button
+                  type="button"
+                  class="log-raid-button small-button"
+          '''
+          manage = replace_once(manage, old, new, "add per-target selection control")
+
+          marker = '''function renderTargets() {
+          '''
+          if manage.count(marker) != 1:
+              raise SystemExit("target selection helpers: renderTargets marker mismatch")
+          helpers = '''function visibleTargetIdsForSelection() {
+            return filteredTargets().map((target) => String(target.id));
+          }
+
+          function syncTargetSelectionUi(list = filteredTargets()) {
+            const validIds = new Set((state?.targets || []).map((target) => String(target.id)));
+            for (const id of [...selectedTargetIds]) {
+              if (!validIds.has(id)) selectedTargetIds.delete(id);
+            }
+
+            const toggle = document.getElementById("toggleTargetSelection");
+            const actions = document.getElementById("bulkTargetActions");
+            const deleteButton = document.getElementById("deleteSelectedTargets");
+            const selectAllButton = document.getElementById("selectAllVisibleTargets");
+            const visibleIds = list.map((target) => String(target.id));
+            const allVisibleSelected =
+              visibleIds.length > 0 && visibleIds.every((id) => selectedTargetIds.has(id));
+
+            toggle.textContent = targetSelectionMode ? "Done" : "Select";
+            toggle.setAttribute("aria-pressed", targetSelectionMode ? "true" : "false");
+            actions.classList.toggle("hidden", !targetSelectionMode);
+
+            deleteButton.disabled = selectedTargetIds.size === 0;
+            deleteButton.textContent = selectedTargetIds.size
+              ? `Delete ${selectedTargetIds.size} selected`
+              : "Delete selected";
+
+            selectAllButton.disabled = visibleIds.length === 0;
+            selectAllButton.textContent = allVisibleSelected
+              ? `Clear shown (${visibleIds.length})`
+              : `Select all shown (${visibleIds.length})`;
+          }
+
+          function toggleTargetSelectionMode() {
+            targetSelectionMode = !targetSelectionMode;
+            if (!targetSelectionMode) selectedTargetIds.clear();
+            renderTargets();
+          }
+
+          function toggleTargetSelected(id) {
+            const key = String(id);
+            if (selectedTargetIds.has(key)) selectedTargetIds.delete(key);
+            else selectedTargetIds.add(key);
+            renderTargets();
+          }
+
+          function toggleAllVisibleTargets() {
+            const ids = visibleTargetIdsForSelection();
+            const allSelected = ids.length > 0 && ids.every((id) => selectedTargetIds.has(id));
+            for (const id of ids) {
+              if (allSelected) selectedTargetIds.delete(id);
+              else selectedTargetIds.add(id);
+            }
+            renderTargets();
+          }
+
+          async function bulkDeleteSelectedTargets() {
+            const ids = [...selectedTargetIds];
+            if (!ids.length) return;
+
+            if (!confirm(`Delete ${ids.length} selected target${ids.length === 1 ? "" : "s"}?`)) {
+              return;
+            }
+
+            const button = document.getElementById("deleteSelectedTargets");
+            button.disabled = true;
+            button.textContent = "Deleting…";
+
+            try {
+              await api("/api/targets/bulk-delete", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ token, target_ids: ids })
+              });
+
+              selectedTargetIds.clear();
+              targetSelectionMode = false;
+              await load();
+              activateTab("targets", false);
+            } catch (error) {
+              alert(error.message);
+              syncTargetSelectionUi();
+            }
+          }
+
+          '''
+          manage = manage.replace(marker, helpers + marker, 1)
+
+          old = '''  const list =
+              filteredTargets(
+                matchingTargets
+              );
+
+            document.getElementById(
+          '''
+          new = '''  const list =
+              filteredTargets(
+                matchingTargets
+              );
+
+            syncTargetSelectionUi(list);
+
+            document.getElementById(
+          '''
+          manage = replace_once(manage, old, new, "sync target bulk actions")
+
+          old = '''    status.textContent = "Saved ✓";
+              await load();
+              closeTargetModal();
+              activateTab("targets", false);
+          '''
+          new = '''    status.textContent = "Saved ✓";
+              closeTargetModal();
+              await load();
+              activateTab("targets", false);
+          '''
+          manage = replace_once(manage, old, new, "close target modal before reload")
+
+          old = '''document.getElementById("openAddTarget").addEventListener("click", () => openTargetModal());
+          '''
+          new = '''document.getElementById("openAddTarget").addEventListener("click", () => openTargetModal());
+          document.getElementById("toggleTargetSelection").addEventListener("click", toggleTargetSelectionMode);
+          document.getElementById("cancelTargetSelection").addEventListener("click", () => {
+            targetSelectionMode = false;
+            selectedTargetIds.clear();
+            renderTargets();
+          });
+          document.getElementById("selectAllVisibleTargets").addEventListener("click", toggleAllVisibleTargets);
+          document.getElementById("deleteSelectedTargets").addEventListener("click", bulkDeleteSelectedTargets);
+          '''
+          manage = replace_once(manage, old, new, "wire target bulk controls")
+
+          old = '''document.getElementById("targets").addEventListener("click", event => {
+            const edit = event.target.closest("[data-edit-target]");
+          '''
+          new = '''document.getElementById("targets").addEventListener("click", event => {
+            const select = event.target.closest("[data-select-target]");
+            if (select) {
+              toggleTargetSelected(select.dataset.selectTarget);
+              return;
+            }
+
+            const edit = event.target.closest("[data-edit-target]");
+          '''
+          manage = replace_once(manage, old, new, "handle target selection clicks")
+
+          manage_path.write_text(manage, encoding="utf-8")
+          PY
+
+      - name: Validate
+        shell: bash
+        run: |
+          git diff --check
+          node --check src/index.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('public/manage.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script>([\s\S]*?)</script>', html)
+          if len(scripts) != 1:
+              raise SystemExit(f'Expected one inline script, found {len(scripts)}')
+          Path('/tmp/manage-inline.js').write_text(scripts[0], encoding='utf-8')
+          PY
+          node --check /tmp/manage-inline.js
+          grep -q 'targetTabCount").textContent = activeTargets' public/manage.html
+          grep -q 'inclusiveEndDateFromPropertyLine' src/index.js
+          grep -q '/api/targets/bulk-delete' src/index.js
+          test -z "$(git diff --name-only | grep -Ev '^(public/manage.html|src/index.js|\.github/workflows/apply-raid-target-fixes.yml)$')"
+
+      - name: Commit implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-raid-target-fixes.yml
+          git add public/manage.html src/index.js
+          git diff --cached --check
+          git commit -m "fix: raid plan and target correctness"
+          git push origin HEAD:fix/raid-plan-targets-correctness
