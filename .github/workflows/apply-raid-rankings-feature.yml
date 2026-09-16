@@ -118,7 +118,8 @@ jobs:
       - name: Validate diff
         run: |
           git diff --check
-          test "$(git diff --name-only | sort | tr '\n' ' ')" = "public/manage.html src/index.js src/raid-rankings.js "
+          EXPECTED=".github/scripts/apply_raid_rankings_feature.py .github/workflows/apply-raid-rankings-feature.yml public/manage.html src/index.js src/raid-rankings.js "
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "$EXPECTED"
           grep -q 'Raid ranks · Planner PvE' public/manage.html
           grep -q 'RAID_RANK_SOURCE_NAME' src/index.js
           grep -q 'kind === "shadow"' src/index.js
