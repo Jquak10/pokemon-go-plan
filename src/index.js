@@ -876,7 +876,7 @@ function specialSpriteAssets(
   };
 }
 
-function spriteAssetsForDisplayName(
+export function spriteAssetsForDisplayName(
   pokemon,
   displayName,
   kind
@@ -939,11 +939,90 @@ function spriteAssetsForDisplayName(
           (candidate.text || "").includes("shadow")
       );
 
-    // Never substitute a base-form image for a Shadow raid form.
-    return exactShadow
+    if (exactShadow) {
+      return {
+        sprite_url: exactShadow.image,
+        shiny_sprite_url: exactShadow.shinyImage || null
+      };
+    }
+
+    // pokemon-go-api does not normally publish separate static Shadow icons;
+    // the in-game Shadow treatment is applied over the species/form model.
+    // Reuse only the best matching underlying GO form, then let the UI apply
+    // an explicit Shadow aura treatment. This avoids both a blank card and a
+    // silent substitution to a different form (for example Therian vs Incarnate).
+    const shadowAliases = new Map([
+      ["alolan", "alola"],
+      ["galarian", "galar"],
+      ["hisuian", "hisui"],
+      ["paldean", "paldea"]
+    ]);
+
+    const shadowTokens =
+      desiredTokens
+        .filter(
+          token =>
+            token !== "shadow" &&
+            token !== "form" &&
+            token !== "forme"
+        )
+        .map(
+          token =>
+            shadowAliases.get(token) || token
+        );
+
+    const formMarkers = new Set([
+      "alola",
+      "galar",
+      "hisui",
+      "paldea",
+      "incarnate",
+      "therian",
+      "origin",
+      "attack",
+      "defense",
+      "speed"
+    ]);
+
+    const requestedMarkers =
+      shadowTokens.filter(
+        token =>
+          formMarkers.has(token)
+      );
+
+    const underlying =
+      candidates
+        .filter(candidate => candidate.image)
+        .map(candidate => {
+          const text = candidate.text || "";
+          let score = 0;
+
+          for (const token of shadowTokens) {
+            if (text.includes(token)) {
+              score += formMarkers.has(token) ? 30 : 8;
+            }
+          }
+
+          if (
+            requestedMarkers.length &&
+            !requestedMarkers.some(
+              marker => text.includes(marker)
+            )
+          ) {
+            score -= 40;
+          }
+
+          return { candidate, score };
+        })
+        .sort((a, b) => b.score - a.score)
+        .find(item => item.score > 0)
+        ?.candidate || null;
+
+    return underlying
       ? {
-          sprite_url: exactShadow.image,
-          shiny_sprite_url: exactShadow.shinyImage || null
+          sprite_url: underlying.image,
+          shiny_sprite_url: null,
+          shadow_visual_fallback: true
         }
       : {
           sprite_url: null,
@@ -1091,7 +1170,7 @@ function spriteUrlForPokemonName(
   const base =
     normalized
       .replace(
-        /^(mega|primal|gigantamax|dynamax|armored)\s+/,
+        /^(shadow|mega|primal|gigantamax|dynamax|armored)\s+/,
         ""
       )
       .replace(/\s+[xy]$/, "");
@@ -1103,7 +1182,7 @@ function spriteUrlForPokemonName(
           meta.pokemon_name
         )
           .replace(
-            /^(mega|primal|gigantamax|dynamax|armored)\s+/,
+            /^(shadow|mega|primal|gigantamax|dynamax|armored)\s+/,
             ""
           )
           .replace(/\s+[xy]$/, "");
@@ -1494,9 +1573,9 @@ async function syncAutomaticMeta(env) {
               ? 1
               : spriteBackfill
                 ? 2
-                : raidRankRefresh
+                : activeToday
                   ? 3
-                  : activeToday
+                  : raidRankRefresh
                     ? 4
                     : 5;
 

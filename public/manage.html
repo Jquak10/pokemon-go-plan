@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=29">
+  <link rel="stylesheet" href="/styles.css?v=30">
 </head>
 
 <body class="manage-page">
@@ -1542,9 +1542,17 @@ function spriteImg(
     return "";
   }
 
+  const isShadow =
+    /^shadow\b/i.test(
+      String(name || "").trim()
+    );
+
+  const classes =
+    `${className}${isShadow ? " shadow-sprite" : ""}`;
+
   return `
     <img
-      class="${esc(className)}"
+      class="${esc(classes)}"
       src="${esc(url)}"
       alt=""
       aria-hidden="true"
@@ -1555,7 +1563,6 @@ function spriteImg(
     >
   `;
 }
-
 
 function renderTodayBriefing() {
   const dashboard =
@@ -4671,67 +4678,90 @@ function raidRankingsHtml(value) {
     parseRaidRankProfile(value);
 
   const variants =
-    Array.isArray(profile?.variants)
+    (Array.isArray(profile?.variants)
       ? profile.variants
-      : [];
+      : [])
+      .map(variant => ({
+        ...variant,
+        rankings:
+          Array.isArray(variant?.rankings)
+            ? variant.rankings.slice(0, 2)
+            : []
+      }))
+      .filter(
+        variant =>
+          variant.rankings.length
+      );
 
   if (!variants.length) return "";
 
-  const chips =
-    variants
-      .map(variant => {
-        const rankings =
-          Array.isArray(variant?.rankings)
-            ? variant.rankings.slice(0, 2)
-            : [];
+  const bestVariant =
+    [...variants]
+      .sort(
+        (a, b) =>
+          Math.min(...a.rankings.map(rank => Number(rank.rank) || 9999)) -
+          Math.min(...b.rankings.map(rank => Number(rank.rank) || 9999))
+      )[0];
 
-        if (!rankings.length) return "";
+  const rankText =
+    variant =>
+      variant.rankings
+        .map(rank =>
+          `#${formatNumber(rank.rank)} ${rank.type}`
+        )
+        .join(" · ");
 
-        const rankText =
-          rankings
-            .map(rank =>
-              `#${formatNumber(rank.rank)} ${rank.type}`
-            )
-            .join(" · ");
+  const moveText =
+    variant =>
+      variant.rankings
+        .map(rank => {
+          const moves =
+            [
+              rank.fast_move,
+              rank.charged_move
+            ]
+              .filter(Boolean)
+              .join(" + ");
 
-        const moveText =
-          rankings
-            .map(rank => {
-              const moves =
-                [
-                  rank.fast_move,
-                  rank.charged_move
-                ]
-                  .filter(Boolean)
-                  .join(" + ");
-
-              return moves
-                ? `${rank.type} #${rank.rank}: ${moves}`
-                : `${rank.type} #${rank.rank}`;
-            })
-            .join(" | ");
-
-        return `
-          <span
-            class="status-badge ${variant.current ? "badge-blue" : ""}"
-            title="${esc(moveText)}"
-          >
-            ${esc(variant.name)} · ${esc(rankText)}
-          </span>
-        `;
-      })
-      .filter(Boolean)
-      .join("");
-
-  if (!chips) return "";
+          return moves
+            ? `${rank.type}: ${moves}`
+            : rank.type;
+        })
+        .join(" · ");
 
   return `
-    <div class="recommendation-card-meta" aria-label="Raid attacker rankings">
-      <span class="source-confidence-badge source-calendar">
-        Raid ranks · Planner PvE
-      </span>
-      ${chips}
-    </div>
+    <details class="raid-rank-details">
+      <summary>
+        <span class="raid-rank-summary-label">PvE attacker</span>
+        <strong class="raid-rank-summary-value">
+          ${esc(bestVariant.name)} · ${esc(rankText(bestVariant))}
+        </strong>
+        <span class="details-chevron" aria-hidden="true">⌄</span>
+      </summary>
+
+      <div class="raid-rank-list">
+        ${variants
+          .map(variant => `
+            <div class="raid-rank-variant">
+              <div>
+                <strong>${esc(variant.name)}</strong>
+                ${
+                  variant.current
+                    ? `<small class="raid-rank-current">Current raid form</small>`
+                    : ""
+                }
+              </div>
+              <span class="raid-rank-values">${esc(rankText(variant))}</span>
+              <small class="raid-rank-moves">${esc(moveText(variant))}</small>
+            </div>
+          `)
+          .join("")}
+
+        <small class="raid-rank-method">
+          Planner PvE · automatically recalculated from current Pokémon GO stats and moves
+        </small>
+      </div>
+    </details>
   `;
 }
 
@@ -4760,7 +4790,7 @@ function renderRecommendationCard(
           )}
 
           <div>
-            <span class="section-eyebrow">${esc(rec.event_title || "ACTIVE RAID")}</span>
+            <span class="section-eyebrow" title="${esc(rec.source_label ? `Source: ${rec.source_label}` : "")}">${esc(rec.event_title || "ACTIVE RAID")}</span>
             <h3>${esc(rec.emoji)} ${esc(rec.pokemon_name)}</h3>
           </div>
         </div>
@@ -4780,10 +4810,11 @@ function renderRecommendationCard(
         </span>
 
         ${
-          rec.source_label
+          rec.source_label &&
+          rec.source_kind === "official"
             ? `
-              <span class="source-confidence-badge source-${esc(rec.source_kind || "calendar")}">
-                ${rec.source_kind === "official" ? "✓ " : ""}${esc(rec.source_label)}
+              <span class="source-confidence-badge source-official">
+                ✓ ${esc(rec.source_label)}
               </span>
             `
             : ""
