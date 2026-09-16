@@ -1,4 +1,4 @@
-export const RAID_RANK_METHOD_VERSION = "raid-rank-v2-crowned-form-moves";
+export const RAID_RANK_METHOD_VERSION = "raid-rank-v3-form-scope-dedupe";
 
 const MAX_VARIANTS = 6;
 
@@ -37,6 +37,18 @@ const CROWNED_SIGNATURE_MOVE_FALLBACKS = new Map([
     }
   ]
 ]);
+
+const FIXED_SPECIES_NAME_BY_DEX = new Map([
+  [888, "Zacian"],
+  [889, "Zamazenta"]
+]);
+
+const REGIONAL_PATTERNS = [
+  ["alola", ["alola", "alolan"]],
+  ["galar", ["galar", "galarian"]],
+  ["hisui", ["hisui", "hisuian"]],
+  ["paldea", ["paldea", "paldean"]]
+];
 
 function normalize(value) {
   return String(value || "")
@@ -128,6 +140,16 @@ function fallbackFormName(baseName, formId) {
   return human;
 }
 
+function regionalFamily(displayName, formId) {
+  const text = normalize(`${displayName || ""} ${formId || ""}`);
+  for (const [key, patterns] of REGIONAL_PATTERNS) {
+    if (patterns.some((pattern) => text.includes(pattern))) {
+      return key;
+    }
+  }
+  return null;
+}
+
 function formKind(displayName, formId, fallbackKind = "variant") {
   const text = normalize(`${displayName || ""} ${formId || ""}`);
   if (text.includes("shadow")) return "shadow";
@@ -135,6 +157,7 @@ function formKind(displayName, formId, fallbackKind = "variant") {
   if (text.includes("mega")) return "mega";
   if (text.includes("crowned")) return "crowned";
   if (text.includes("origin")) return "origin";
+  if (regionalFamily(displayName, formId)) return "regional";
   return fallbackKind;
 }
 
@@ -198,10 +221,7 @@ function chargedMovesForForm(form, moveIndex) {
   const signatureName = crownedSignatureMoveName(form);
   if (!signatureName) return chargedMoves;
 
-  // Zacian/Zamazenta Crowned forms are special transformation forms in GO:
-  // Iron Head becomes the signature move while Crowned. The public Pokédex
-  // payload can expose the form without that transformed move in its normal
-  // charged-move list, so apply the transformation explicitly for PvE ranks.
+  // In Pokémon GO, Iron Head transforms into the Crowned signature move.
   chargedMoves = chargedMoves.filter(
     (move) => normalize(moveName(move)) !== "iron head"
   );
@@ -345,6 +365,24 @@ function isComparable(form) {
   );
 }
 
+function speciesNameForDex(dexNr, candidate) {
+  return FIXED_SPECIES_NAME_BY_DEX.get(Number(dexNr)) || candidate;
+}
+
+function shouldPreferSpeciesName(current, candidate) {
+  if (!current) return true;
+  const currentText = normalize(current);
+  const candidateText = normalize(candidate);
+  const noisy = (value) =>
+    /\b(mega|primal|shadow|alola|alolan|galar|galarian|hisui|hisuian|paldea|paldean|crowned|origin|hero)\b/.test(
+      value
+    );
+
+  if (noisy(currentText) && !noisy(candidateText)) return true;
+  if (!noisy(currentText) && noisy(candidateText)) return false;
+  return candidateText.length < currentText.length;
+}
+
 function canonicalizeZacianZamazentaForms(dexNr, baseName, forms) {
   if (dexNr !== 888 && dexNr !== 889) return forms;
 
@@ -359,70 +397,92 @@ function canonicalizeZacianZamazentaForms(dexNr, baseName, forms) {
 
   if (!hasNamedHero && !hasNamedCrowned) return forms;
 
-  // The API can expose a generic species record alongside the explicit Hero
-  // and Crowned battle forms. It is a data container, not a third usable form,
-  // and showing it creates misleading entries such as plain "Zamazenta".
+  // A plain Zacian/Zamazenta record in the API can be a data container rather
+  // than a distinct usable battle form. Once explicit Hero/Crowned forms are
+  // present, remove the generic container from both display and rank pools.
   return forms.filter(
     (form) => normalize(form.displayName) !== baseKey
   );
 }
 
 function buildFormGroups(pokedex, moveIndex) {
-  const groups = [];
+  const groupMap = new Map();
 
-  for (const pokemon of Array.isArray(pokedex) ? pokedex : []) {
-    const baseName = englishName(pokemon);
-    const dexNr = Number(pokemon?.dexNr);
-    if (!baseName || !Number.isFinite(dexNr)) continue;
-
-    const forms = [];
-    const signatures = new Set();
-
-    const addForm = (formPokemon, options = {}) => {
-      if (!formPokemon?.stats) return;
-
-      const formId = String(
-        formPokemon?.formId || formPokemon?.id || options.formId || ""
-      );
-      const displayName = String(
-        options.displayName ||
-          formPokemon?.names?.English ||
-          formPokemon?.name?.English ||
-          fallbackFormName(baseName, formId) ||
-          baseName
-      ).trim();
-      const kind = formKind(
-        displayName,
-        formId,
-        options.kind || "variant"
-      );
-
-      const form = {
+  const ensureGroup = (dexNr, candidateBaseName) => {
+    let group = groupMap.get(dexNr);
+    if (!group) {
+      group = {
         dexNr,
-        baseName,
-        displayName,
-        formId,
-        kind,
-        pokemon: formPokemon,
-        fallbackPokemon: options.fallbackPokemon || null,
-        energyCost: options.energyCost ?? formPokemon?.energyCost ?? null
+        baseName: speciesNameForDex(dexNr, candidateBaseName),
+        forms: [],
+        identities: new Set()
       };
+      groupMap.set(dexNr, group);
+    } else if (
+      !FIXED_SPECIES_NAME_BY_DEX.has(dexNr) &&
+      shouldPreferSpeciesName(group.baseName, candidateBaseName)
+    ) {
+      group.baseName = candidateBaseName;
+    }
+    return group;
+  };
 
-      const signature = formSignature(form, moveIndex);
-      if (signatures.has(signature)) return;
-      signatures.add(signature);
-      forms.push(form);
+  const addForm = (group, formPokemon, options = {}) => {
+    if (!formPokemon?.stats) return;
+
+    const formId = String(
+      formPokemon?.formId || formPokemon?.id || options.formId || ""
+    );
+    const displayName = String(
+      options.displayName ||
+        formPokemon?.names?.English ||
+        formPokemon?.name?.English ||
+        fallbackFormName(group.baseName, formId) ||
+        group.baseName
+    ).trim();
+
+    const kind = formKind(
+      displayName,
+      formId,
+      options.kind || "variant"
+    );
+
+    const form = {
+      dexNr: group.dexNr,
+      baseName: group.baseName,
+      displayName,
+      formId,
+      kind,
+      region: regionalFamily(displayName, formId),
+      pokemon: formPokemon,
+      fallbackPokemon: options.fallbackPokemon || null,
+      energyCost: options.energyCost ?? formPokemon?.energyCost ?? null
     };
 
-    addForm(pokemon, {
+    // De-duplicate repeated API representations of the same usable form
+    // without collapsing legitimately different named forms.
+    const identity = `${normalize(displayName)}|${formSignature(form, moveIndex)}`;
+    if (group.identities.has(identity)) return;
+    group.identities.add(identity);
+    group.forms.push(form);
+  };
+
+  for (const pokemon of Array.isArray(pokedex) ? pokedex : []) {
+    const candidateBaseName = englishName(pokemon);
+    const dexNr = Number(pokemon?.dexNr);
+    if (!candidateBaseName || !Number.isFinite(dexNr)) continue;
+
+    const group = ensureGroup(dexNr, candidateBaseName);
+
+    addForm(group, pokemon, {
       kind: "base",
-      formId: pokemon?.formId || pokemon?.id || baseName
+      formId: pokemon?.formId || pokemon?.id || candidateBaseName
     });
 
     for (const [formKey, formPokemon] of Object.entries(
       pokemon?.regionForms || {}
     )) {
-      addForm(formPokemon, {
+      addForm(group, formPokemon, {
         formId: formKey,
         fallbackPokemon: pokemon
       });
@@ -431,23 +491,27 @@ function buildFormGroups(pokedex, moveIndex) {
     for (const [megaKey, megaPokemon] of Object.entries(
       pokemon?.megaEvolutions || {}
     )) {
-      addForm(megaPokemon, {
+      addForm(group, megaPokemon, {
         formId: megaKey,
         kind: /primal/i.test(megaKey) ? "primal" : "mega",
         fallbackPokemon: pokemon,
         energyCost: megaPokemon?.energyCost
       });
     }
+  }
 
-    const canonicalForms = canonicalizeZacianZamazentaForms(
-      dexNr,
-      baseName,
-      forms
+  const groups = [];
+  for (const group of groupMap.values()) {
+    group.forms = canonicalizeZacianZamazentaForms(
+      group.dexNr,
+      group.baseName,
+      group.forms
     );
-
-    if (canonicalForms.length) {
-      groups.push({ dexNr, baseName, forms: canonicalForms });
+    group.identities = undefined;
+    for (const form of group.forms) {
+      form.baseName = group.baseName;
     }
+    if (group.forms.length) groups.push(group);
   }
 
   return groups;
@@ -553,6 +617,52 @@ function entriesForForm(form, catalog, shadow = false) {
     .slice(0, 2);
 }
 
+function preferredFormForSpeciesRequest(group) {
+  if (!group) return null;
+
+  if (group.dexNr === 888 || group.dexNr === 889) {
+    const hero = group.forms.find((form) =>
+      normalize(`${form.displayName} ${form.formId}`).includes("hero")
+    );
+    if (hero) return hero;
+  }
+
+  return (
+    group.forms.find((form) => form.kind === "base" && !form.region) ||
+    group.forms.find((form) => !form.region) ||
+    group.forms[0] ||
+    null
+  );
+}
+
+function exactFormForRequest(requested, catalog) {
+  const direct =
+    catalog.allForms.find(
+      (form) => normalize(form.displayName) === requested
+    ) || null;
+  if (direct) return direct;
+
+  const group =
+    catalog.groups.find(
+      (item) => normalize(item.baseName) === requested
+    ) || null;
+
+  return preferredFormForSpeciesRequest(group);
+}
+
+function sameDisplayScope(form, exactForm) {
+  const exactRegion = exactForm?.region || null;
+  const candidateRegion = form?.region || null;
+
+  // Regional forms are opt-in: normal/Mega/Primal/etc. profiles never add
+  // regional comparisons, and a regional raid only compares within that
+  // same regional family.
+  if (exactRegion) {
+    return candidateRegion === exactRegion;
+  }
+  return !candidateRegion;
+}
+
 export function raidRankProfileForName(pokemonName, catalog) {
   const requested = normalize(pokemonName);
   if (!requested) return null;
@@ -562,18 +672,7 @@ export function raidRankProfileForName(pokemonName, catalog) {
     ? requested.replace(/^shadow\s+/, "")
     : requested;
 
-  let exactForm =
-    catalog.allForms.find(
-      (form) => normalize(form.displayName) === nonShadowRequested
-    ) || null;
-
-  if (!exactForm) {
-    exactForm =
-      catalog.allForms.find(
-        (form) => normalize(form.baseName) === nonShadowRequested
-      ) || null;
-  }
-
+  const exactForm = exactFormForRequest(nonShadowRequested, catalog);
   if (!exactForm) return null;
 
   const group = catalog.groups.find(
@@ -603,6 +702,7 @@ export function raidRankProfileForName(pokemonName, catalog) {
     .filter(
       (form) =>
         form.kind !== "shadow" &&
+        sameDisplayScope(form, exactForm) &&
         (form === exactForm || isComparable(form))
     )
     .map((form) => ({
@@ -621,7 +721,8 @@ export function raidRankProfileForName(pokemonName, catalog) {
       crowned: 2,
       origin: 3,
       variant: 4,
-      base: 5
+      regional: 5,
+      base: 6
     };
 
     return (
