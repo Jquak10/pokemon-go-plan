@@ -1,0 +1,294 @@
+name: Apply raid rank cache fix
+
+on:
+  push:
+    branches:
+      - fix/raid-rank-cache-version
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/raid-rank-cache-version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply cache-version patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("src/index.js")
+          text = path.read_text()
+
+          old = '''function raidRankingsJsonForPokemonName(
+            name,
+            metas
+          ) {
+            const normalized =
+              normalizeName(name);
+          '''
+          new = '''export function raidRankProfileJsonIsCurrent(value) {
+            if (!value) return false;
+
+            try {
+              const profile =
+                typeof value === "string"
+                  ? JSON.parse(value)
+                  : value;
+
+              return (
+                profile &&
+                typeof profile === "object" &&
+                profile.method ===
+                  RAID_RANK_METHOD_VERSION
+              );
+            } catch {
+              return false;
+            }
+          }
+
+          function currentRaidRankingsJson(value) {
+            return raidRankProfileJsonIsCurrent(value)
+              ? value
+              : null;
+          }
+
+          function raidRankingsJsonForPokemonName(
+            name,
+            metas
+          ) {
+            const normalized =
+              normalizeName(name);
+          '''
+          assert old in text, "raidRankingsJsonForPokemonName anchor changed"
+          text = text.replace(old, new, 1)
+
+          old = '''  if (exact?.raid_rankings_json) {
+            return exact.raid_rankings_json;
+          }
+          '''
+          new = '''  const exactRankingsJson =
+            currentRaidRankingsJson(
+              exact?.raid_rankings_json
+            );
+
+          if (exactRankingsJson) {
+            return exactRankingsJson;
+          }
+          '''
+          assert old in text, "exact ranking return anchor changed"
+          text = text.replace(old, new, 1)
+
+          old = '''  return fallback?.raid_rankings_json || null;
+          }
+          '''
+          new = '''  return currentRaidRankingsJson(
+            fallback?.raid_rankings_json
+          );
+          }
+          '''
+          assert old in text, "fallback ranking return anchor changed"
+          text = text.replace(old, new, 1)
+
+          old = '''  ).all();
+            return results;
+          }
+
+          function findMatches(summary, targets, metas) {
+          '''
+          new = '''  ).all();
+
+            return (results || []).map(row => ({
+              ...row,
+              raid_rankings_json:
+                currentRaidRankingsJson(
+                  row.raid_rankings_json
+                )
+            }));
+          }
+
+          function findMatches(summary, targets, metas) {
+          '''
+          assert old in text, "getMeta return anchor changed"
+          text = text.replace(old, new, 1)
+
+          old = '''        ) AS raid_rank_updated_at
+              FROM pokemon_meta pm
+            `).bind(
+              RAID_RANK_SOURCE_NAME
+            ).all();
+          '''
+          new = '''        ) AS raid_rank_updated_at,
+              (
+                SELECT ms.note
+                FROM meta_sources ms
+                WHERE ms.pokemon_name = pm.pokemon_name
+                  AND ms.source_name = ?
+                ORDER BY ms.updated_at DESC
+                LIMIT 1
+              ) AS raid_rankings_json
+              FROM pokemon_meta pm
+            `).bind(
+              RAID_RANK_SOURCE_NAME,
+              RAID_RANK_SOURCE_NAME
+            ).all();
+          '''
+          assert old in text, "existing meta query anchor changed"
+          text = text.replace(old, new, 1)
+
+          old = '''        const raidRankRefresh =
+                  !existing?.raid_rank_updated_at ||
+                  existing.raid_rank_updated_at <
+                    raidRankStaleBefore;
+
+                const priorityBucket =
+                  missingRecord
+                    ? 0
+                    : spriteCorrection
+                      ? 1
+                      : spriteBackfill
+                        ? 2
+                        : activeToday
+                          ? 3
+                          : raidRankRefresh
+                            ? 4
+                            : 5;
+          '''
+          new = '''        const raidRankMethodStale =
+                  Boolean(
+                    existing?.raid_rankings_json
+                  ) &&
+                  !raidRankProfileJsonIsCurrent(
+                    existing.raid_rankings_json
+                  );
+
+                const raidRankRefresh =
+                  raidRankMethodStale ||
+                  !existing?.raid_rank_updated_at ||
+                  existing.raid_rank_updated_at <
+                    raidRankStaleBefore;
+
+                const priorityBucket =
+                  missingRecord
+                    ? 0
+                    : spriteCorrection
+                      ? 1
+                      : spriteBackfill
+                        ? 2
+                        : activeToday
+                          ? 3
+                          : raidRankMethodStale
+                            ? 4
+                            : raidRankRefresh
+                              ? 5
+                              : 6;
+          '''
+          assert old in text, "raidRankRefresh anchor changed"
+          text = text.replace(old, new, 1)
+
+          old = '''          spriteCorrection,
+                  raidRankRefresh,
+                  activeToday,
+          '''
+          new = '''          spriteCorrection,
+                  raidRankMethodStale,
+                  raidRankRefresh,
+                  activeToday,
+          '''
+          assert old in text, "ranked candidate fields anchor changed"
+          text = text.replace(old, new, 1)
+
+          old = '''  const raidRankBackfillRows =
+            (existingMetaRows || [])
+              .filter(row =>
+                !selectedKeys.has(
+                  normalizeName(
+                    row.pokemon_name
+                  )
+                ) &&
+                (
+                  !row.raid_rank_updated_at ||
+                  row.raid_rank_updated_at <
+                    raidRankStaleBefore
+                )
+              )
+              .slice(
+                0,
+                MAX_RAID_RANK_BACKFILLS_PER_SYNC
+              );
+          '''
+          new = '''  const raidRankBackfillRows =
+            (existingMetaRows || [])
+              .map(row => ({
+                row,
+                method_stale:
+                  Boolean(
+                    row.raid_rankings_json
+                  ) &&
+                  !raidRankProfileJsonIsCurrent(
+                    row.raid_rankings_json
+                  )
+              }))
+              .filter(item =>
+                !selectedKeys.has(
+                  normalizeName(
+                    item.row.pokemon_name
+                  )
+                ) &&
+                (
+                  item.method_stale ||
+                  !item.row.raid_rank_updated_at ||
+                  item.row.raid_rank_updated_at <
+                    raidRankStaleBefore
+                )
+              )
+              .sort(
+                (a, b) =>
+                  Number(b.method_stale) -
+                    Number(a.method_stale) ||
+                  String(
+                    a.row.raid_rank_updated_at || ""
+                  ).localeCompare(
+                    String(
+                      b.row.raid_rank_updated_at || ""
+                    )
+                  ) ||
+                  String(
+                    a.row.pokemon_name || ""
+                  ).localeCompare(
+                    String(
+                      b.row.pokemon_name || ""
+                    )
+                  )
+              )
+              .slice(
+                0,
+                MAX_RAID_RANK_BACKFILLS_PER_SYNC
+              )
+              .map(item => item.row);
+          '''
+          assert old in text, "raidRankBackfillRows anchor changed"
+          text = text.replace(old, new, 1)
+
+          path.write_text(text)
+      - name: Validate
+        run: |
+          node --check src/index.js
+          npm test
+          git diff --check
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/index.js
+          git commit -m "fix: invalidate stale raid rank profiles"
+          git push origin HEAD:fix/raid-rank-cache-version
