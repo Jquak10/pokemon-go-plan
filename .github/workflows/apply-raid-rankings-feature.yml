@@ -1,0 +1,135 @@
+name: Apply raid attacker ranking feature
+
+on:
+  push:
+    branches:
+      - feat/raid-attacker-rankings
+    paths:
+      - .github/scripts/apply_raid_rankings_feature.py
+      - .github/workflows/apply-raid-rankings-feature.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/raid-attacker-rankings
+          fetch-depth: 0
+
+      - name: Apply integration patch
+        run: python .github/scripts/apply_raid_rankings_feature.py
+
+      - name: Validate JavaScript
+        run: |
+          node --check src/index.js
+          node --check src/raid-rankings.js
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('public/manage.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script(?:\s[^>]*)?>([\s\S]*?)</script>', text, flags=re.I)
+          if not scripts:
+              raise SystemExit('No inline script found in manage.html')
+          Path('/tmp/manage-inline.js').write_text('\n'.join(scripts), encoding='utf-8')
+          PY
+          node --check /tmp/manage-inline.js
+
+      - name: Run focused raid-rank checks
+        run: |
+          node --input-type=module <<'NODE'
+          import {
+            buildRaidAttackerRankCatalog,
+            raidRankProfileForName
+          } from './src/raid-rankings.js';
+
+          const move = (name, type, power, energy, durationMs) => ({
+            id: name.toUpperCase().replaceAll(' ', '_'),
+            names: { English: name },
+            type: { names: { English: type } },
+            power,
+            energy,
+            durationMs
+          });
+
+          const base = {
+            dexNr: 999,
+            id: 'TESTMON',
+            formId: 'TESTMON',
+            names: { English: 'Testmon' },
+            stats: { attack: 200, defense: 170, stamina: 180 },
+            primaryType: { names: { English: 'Electric' } },
+            secondaryType: null,
+            quickMoves: { A: move('Spark', 'Electric', 10, 12, 700) },
+            cinematicMoves: { B: move('Thunder', 'Electric', 100, -50, 2400) },
+            eliteQuickMoves: {},
+            eliteCinematicMoves: {},
+            regionForms: {},
+            megaEvolutions: {
+              TESTMON_MEGA: {
+                id: 'TESTMON_MEGA',
+                names: { English: 'Mega Testmon' },
+                stats: { attack: 280, defense: 190, stamina: 180 },
+                primaryType: { names: { English: 'Electric' } },
+                secondaryType: null,
+                energyCost: 200,
+                assets: { image: 'mega.png' }
+              }
+            }
+          };
+
+          const competitor = {
+            dexNr: 998,
+            id: 'RIVAL',
+            formId: 'RIVAL',
+            names: { English: 'Rival' },
+            stats: { attack: 240, defense: 170, stamina: 180 },
+            primaryType: { names: { English: 'Electric' } },
+            secondaryType: null,
+            quickMoves: { A: move('Spark', 'Electric', 10, 12, 700) },
+            cinematicMoves: { B: move('Thunder', 'Electric', 100, -50, 2400) },
+            eliteQuickMoves: {},
+            eliteCinematicMoves: {},
+            regionForms: {},
+            megaEvolutions: {}
+          };
+
+          const catalog = buildRaidAttackerRankCatalog([base, competitor]);
+          const normal = raidRankProfileForName('Testmon', catalog);
+          const shadow = raidRankProfileForName('Shadow Testmon', catalog);
+
+          if (!normal?.variants?.some((v) => v.name === 'Mega Testmon')) {
+            throw new Error('Mega comparison variant missing');
+          }
+          if (normal.variants.some((v) => v.kind === 'shadow')) {
+            throw new Error('Normal profile must not add Shadow comparisons');
+          }
+          if (shadow?.variants?.length !== 1 || shadow.variants[0].kind !== 'shadow') {
+            throw new Error('Exact Shadow profile must contain only the Shadow form');
+          }
+          if (!normal.variants[0]?.rankings?.[0]?.rank) {
+            throw new Error('Type-specific raid rank missing');
+          }
+          NODE
+
+      - name: Validate diff
+        run: |
+          git diff --check
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "public/manage.html src/index.js src/raid-rankings.js "
+          grep -q 'Raid ranks · Planner PvE' public/manage.html
+          grep -q 'RAID_RANK_SOURCE_NAME' src/index.js
+          grep -q 'kind === "shadow"' src/index.js
+          ! git diff --name-only | grep -Eq '^(wrangler\.jsonc|schema\.sql|package(-lock)?\.json)$'
+
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/manage.html src/index.js src/raid-rankings.js
+          git add -u .github/scripts/apply_raid_rankings_feature.py .github/workflows/apply-raid-rankings-feature.yml
+          git diff --cached --check
+          git commit -m "feat: add variant-aware raid attacker ranks"
+          git push origin HEAD:feat/raid-attacker-rankings
