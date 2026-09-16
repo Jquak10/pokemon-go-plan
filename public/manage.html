@@ -5462,7 +5462,7 @@ function renderTargets() {
 
   if (completed.length) {
     sections.push(`
-      <details class="target-group completed-target-group" ${targetFilterState.status === "completed" ? "open" : ""}>
+      <details class="target-group completed-target-group" ${targetFilterState.status === "completed" || targetFilterState.status === "all" ? "open" : ""}>
         <summary class="target-group-heading">
           <div>
             <span class="section-eyebrow">COMPLETED</span>
