@@ -22,18 +22,20 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import re
 
           path = Path("src/index.js")
           text = path.read_text()
 
-          old = '''function raidRankingsJsonForPokemonName(
-            name,
-            metas
-          ) {
-            const normalized =
-              normalizeName(name);
-          '''
-          new = '''export function raidRankProfileJsonIsCurrent(value) {
+          if "export function raidRankProfileJsonIsCurrent" not in text:
+              def sub_once(pattern, replacement, label, flags=0):
+                  global text
+                  text, count = re.subn(pattern, replacement, text, count=1, flags=flags)
+                  assert count == 1, f"{label} anchor changed"
+
+              sub_once(
+                  r'''function raidRankingsJsonForPokemonName\(\n\s*name,\n\s*metas\n\) \{\n\s*const normalized =\n\s*normalizeName\(name\);\n''',
+                  '''export function raidRankProfileJsonIsCurrent(value) {
             if (!value) return false;
 
             try {
@@ -65,66 +67,64 @@ jobs:
           ) {
             const normalized =
               normalizeName(name);
-          '''
-          assert old in text, "raidRankingsJsonForPokemonName anchor changed"
-          text = text.replace(old, new, 1)
+          ''',
+                  "raidRankingsJsonForPokemonName"
+              )
 
-          old = '''  if (exact?.raid_rankings_json) {
-            return exact.raid_rankings_json;
-          }
-          '''
-          new = '''  const exactRankingsJson =
-            currentRaidRankingsJson(
-              exact?.raid_rankings_json
+              sub_once(
+                  r'''\s*if \(exact\?\.raid_rankings_json\) \{\n\s*return exact\.raid_rankings_json;\n\s*\}\n''',
+                  '''
+
+            const exactRankingsJson =
+              currentRaidRankingsJson(
+                exact?.raid_rankings_json
+              );
+
+            if (exactRankingsJson) {
+              return exactRankingsJson;
+            }
+          ''',
+                  "exact ranking return"
+              )
+
+              sub_once(
+                  r'''\s*return fallback\?\.raid_rankings_json \|\| null;\n\}''',
+                  '''
+
+            return currentRaidRankingsJson(
+              fallback?.raid_rankings_json
             );
+          }''',
+                  "fallback ranking return"
+              )
 
-          if (exactRankingsJson) {
-            return exactRankingsJson;
-          }
-          '''
-          assert old in text, "exact ranking return anchor changed"
-          text = text.replace(old, new, 1)
+              get_meta_start = text.index("async function getMeta(env) {")
+              get_meta_end = text.index("\nfunction findMatches", get_meta_start)
+              get_meta = text[get_meta_start:get_meta_end]
+              assert "  return results;" in get_meta, "getMeta return anchor changed"
+              get_meta = get_meta.replace(
+                  "  return results;",
+                  '''  return (results || []).map(row => ({
+            ...row,
+            raid_rankings_json:
+              currentRaidRankingsJson(
+                row.raid_rankings_json
+              )
+          }));''',
+                  1
+              )
+              text = text[:get_meta_start] + get_meta + text[get_meta_end:]
 
-          old = '''  return fallback?.raid_rankings_json || null;
-          }
-          '''
-          new = '''  return currentRaidRankingsJson(
-            fallback?.raid_rankings_json
-          );
-          }
-          '''
-          assert old in text, "fallback ranking return anchor changed"
-          text = text.replace(old, new, 1)
+              sync_start = text.index("async function syncAutomaticMeta(env) {")
+              sync_end = text.index("\nasync function userByManageToken", sync_start)
+              sync = text[sync_start:sync_end]
 
-          old = '''  ).all();
-            return results;
-          }
-
-          function findMatches(summary, targets, metas) {
-          '''
-          new = '''  ).all();
-
-            return (results || []).map(row => ({
-              ...row,
-              raid_rankings_json:
-                currentRaidRankingsJson(
-                  row.raid_rankings_json
-                )
-            }));
-          }
-
-          function findMatches(summary, targets, metas) {
-          '''
-          assert old in text, "getMeta return anchor changed"
-          text = text.replace(old, new, 1)
-
-          old = '''        ) AS raid_rank_updated_at
+              old = '''        ) AS raid_rank_updated_at
               FROM pokemon_meta pm
             `).bind(
               RAID_RANK_SOURCE_NAME
-            ).all();
-          '''
-          new = '''        ) AS raid_rank_updated_at,
+            ).all();'''
+              new = '''        ) AS raid_rank_updated_at,
               (
                 SELECT ms.note
                 FROM meta_sources ms
@@ -137,12 +137,11 @@ jobs:
             `).bind(
               RAID_RANK_SOURCE_NAME,
               RAID_RANK_SOURCE_NAME
-            ).all();
-          '''
-          assert old in text, "existing meta query anchor changed"
-          text = text.replace(old, new, 1)
+            ).all();'''
+              assert old in sync, "existing meta query anchor changed"
+              sync = sync.replace(old, new, 1)
 
-          old = '''        const raidRankRefresh =
+              old = '''        const raidRankRefresh =
                   !existing?.raid_rank_updated_at ||
                   existing.raid_rank_updated_at <
                     raidRankStaleBefore;
@@ -158,9 +157,8 @@ jobs:
                           ? 3
                           : raidRankRefresh
                             ? 4
-                            : 5;
-          '''
-          new = '''        const raidRankMethodStale =
+                            : 5;'''
+              new = '''        const raidRankMethodStale =
                   Boolean(
                     existing?.raid_rankings_json
                   ) &&
@@ -187,24 +185,21 @@ jobs:
                             ? 4
                             : raidRankRefresh
                               ? 5
-                              : 6;
-          '''
-          assert old in text, "raidRankRefresh anchor changed"
-          text = text.replace(old, new, 1)
+                              : 6;'''
+              assert old in sync, "raidRankRefresh anchor changed"
+              sync = sync.replace(old, new, 1)
 
-          old = '''          spriteCorrection,
+              old = '''          spriteCorrection,
                   raidRankRefresh,
-                  activeToday,
-          '''
-          new = '''          spriteCorrection,
+                  activeToday,'''
+              new = '''          spriteCorrection,
                   raidRankMethodStale,
                   raidRankRefresh,
-                  activeToday,
-          '''
-          assert old in text, "ranked candidate fields anchor changed"
-          text = text.replace(old, new, 1)
+                  activeToday,'''
+              assert old in sync, "ranked candidate fields anchor changed"
+              sync = sync.replace(old, new, 1)
 
-          old = '''  const raidRankBackfillRows =
+              old = '''  const raidRankBackfillRows =
             (existingMetaRows || [])
               .filter(row =>
                 !selectedKeys.has(
@@ -221,9 +216,8 @@ jobs:
               .slice(
                 0,
                 MAX_RAID_RANK_BACKFILLS_PER_SYNC
-              );
-          '''
-          new = '''  const raidRankBackfillRows =
+              );'''
+              new = '''  const raidRankBackfillRows =
             (existingMetaRows || [])
               .map(row => ({
                 row,
@@ -271,12 +265,12 @@ jobs:
                 0,
                 MAX_RAID_RANK_BACKFILLS_PER_SYNC
               )
-              .map(item => item.row);
-          '''
-          assert old in text, "raidRankBackfillRows anchor changed"
-          text = text.replace(old, new, 1)
+              .map(item => item.row);'''
+              assert old in sync, "raidRankBackfillRows anchor changed"
+              sync = sync.replace(old, new, 1)
 
-          path.write_text(text)
+              text = text[:sync_start] + sync + text[sync_end:]
+              path.write_text(text)
       - name: Validate
         run: |
           node --check src/index.js
