@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   BATTLE_SOURCE_TYPES,
   BATTLE_SYSTEM,
@@ -132,6 +133,27 @@ assert.equal(
     summary: "Community Day"
   }),
   null
+);
+
+// Max Battle and Max Monday feeds already participate in the existing event
+// sync and default calendar selection. Keep that plumbing intact while the
+// recommendation/UI layers migrate to the shared battle model in later PRs.
+const workerSource = readFileSync(
+  new URL("../src/index.js", import.meta.url),
+  "utf8"
+);
+
+assert.match(
+  workerSource,
+  /max_battles:\s*SOURCE_BASE\s*\+\s*"gocal__max_battles\.ics"/
+);
+assert.match(
+  workerSource,
+  /max_mondays:\s*SOURCE_BASE\s*\+\s*"gocal__max_mondays\.ics"/
+);
+assert.match(
+  workerSource,
+  /const DEFAULT_SOURCES = \[[\s\S]*"max_battles"[\s\S]*"max_mondays"[\s\S]*\];/
 );
 
 console.log("battle opportunity foundation tests passed");
