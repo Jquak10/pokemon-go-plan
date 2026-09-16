@@ -21,6 +21,7 @@ jobs:
             public/admin.html
             src/index.js
             src/battle-opportunities.js
+            src/raid-rankings.js
             package.json
             tests
           if-no-files-found: error
