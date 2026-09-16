@@ -1,0 +1,67 @@
+name: Fix Shadow raid-rank fallback
+
+on:
+  push:
+    branches:
+      - feat/raid-attacker-rankings
+    paths:
+      - .github/workflows/fix-shadow-rank-fallback.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/raid-attacker-rankings
+          fetch-depth: 0
+
+      - name: Prevent normal-form fallback for Shadow targets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/index.js')
+          s = p.read_text(encoding='utf-8')
+          old = '''  if (exact?.raid_rankings_json) {
+            return exact.raid_rankings_json;
+          }
+
+          const familyKey =
+          '''
+          new = '''  if (exact?.raid_rankings_json) {
+            return exact.raid_rankings_json;
+          }
+
+          // A Shadow target must never inherit a normal-form comparison profile.
+          // It will appear once the exact Shadow raid form has been assessed.
+          if (normalized.startsWith("shadow ")) {
+            return null;
+          }
+
+          const familyKey =
+          '''
+          if s.count(old) != 1:
+              raise SystemExit(f'expected one fallback marker, found {s.count(old)}')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+          rm .github/workflows/fix-shadow-rank-fallback.yml
+
+      - name: Validate
+        run: |
+          node --check src/index.js
+          node --check src/raid-rankings.js
+          grep -q 'normalized.startsWith("shadow ")' src/index.js
+          git diff --check
+          ! git diff --name-only | grep -Eq '^(wrangler\.jsonc|schema\.sql|public/styles\.css)$'
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/index.js
+          git add -u .github/workflows/fix-shadow-rank-fallback.yml
+          git commit -m "fix: keep Shadow raid ranks form-specific"
+          git push origin HEAD:feat/raid-attacker-rankings
