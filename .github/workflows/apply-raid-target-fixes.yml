@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   apply:
-    if: github.event.head_commit.message != 'fix: raid plan and target correctness'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,9 +29,6 @@ jobs:
                   raise SystemExit(f"{label}: expected exactly 1 match, found {count}")
               return text.replace(old, new, 1)
 
-          # ------------------------------------------------------------
-          # Worker: normalize all-day DTEND correctly and add bulk delete.
-          # ------------------------------------------------------------
           worker_path = Path("src/index.js")
           worker = worker_path.read_text(encoding="utf-8")
 
@@ -58,9 +54,6 @@ jobs:
 
             if (!isAllDay) return endDate;
 
-            // RFC 5545 DTEND is exclusive for all-day events. Store/display
-            // inclusive dates internally so an event ending Sep 15 does not
-            // remain eligible on Sep 16 merely because DTEND is Sep 16.
             const exclusiveAdjusted = addDaysIso(endDate, -1);
             if (!exclusiveAdjusted) return fallbackStartDate || endDate;
             if (fallbackStartDate && exclusiveAdjusted < fallbackStartDate) {
@@ -97,9 +90,6 @@ jobs:
                     )
                   : (event.end_date || event.start_date);
 
-              // Defensively correct already-imported all-day rows. This makes
-              // current recommendations accurate immediately, even before the
-              // next scheduled feed sync rewrites their stored end_date.
               if (effectiveEndDate && effectiveEndDate < day) {
                 continue;
               }
@@ -183,9 +173,6 @@ jobs:
           worker = replace_once(worker, old, new, "route bulk target delete")
           worker_path.write_text(worker, encoding="utf-8")
 
-          # ------------------------------------------------------------
-          # Management UI: mobile nav cleanup, active badge, bulk targets.
-          # ------------------------------------------------------------
           manage_path = Path("public/manage.html")
           manage = manage_path.read_text(encoding="utf-8")
 
