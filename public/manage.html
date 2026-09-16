@@ -4652,6 +4652,89 @@ function updateHundoCustomCp() {
 }
 
 
+function parseRaidRankProfile(value) {
+  if (!value) return null;
+  if (typeof value === "object") return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object"
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function raidRankingsHtml(value) {
+  const profile =
+    parseRaidRankProfile(value);
+
+  const variants =
+    Array.isArray(profile?.variants)
+      ? profile.variants
+      : [];
+
+  if (!variants.length) return "";
+
+  const chips =
+    variants
+      .map(variant => {
+        const rankings =
+          Array.isArray(variant?.rankings)
+            ? variant.rankings.slice(0, 2)
+            : [];
+
+        if (!rankings.length) return "";
+
+        const rankText =
+          rankings
+            .map(rank =>
+              `#${formatNumber(rank.rank)} ${rank.type}`
+            )
+            .join(" · ");
+
+        const moveText =
+          rankings
+            .map(rank => {
+              const moves =
+                [
+                  rank.fast_move,
+                  rank.charged_move
+                ]
+                  .filter(Boolean)
+                  .join(" + ");
+
+              return moves
+                ? `${rank.type} #${rank.rank}: ${moves}`
+                : `${rank.type} #${rank.rank}`;
+            })
+            .join(" | ");
+
+        return `
+          <span
+            class="status-badge ${variant.current ? "badge-blue" : ""}"
+            title="${esc(moveText)}"
+          >
+            ${esc(variant.name)} · ${esc(rankText)}
+          </span>
+        `;
+      })
+      .filter(Boolean)
+      .join("");
+
+  if (!chips) return "";
+
+  return `
+    <div class="recommendation-card-meta" aria-label="Raid attacker rankings">
+      <span class="source-confidence-badge source-calendar">
+        Raid ranks · Planner PvE
+      </span>
+      ${chips}
+    </div>
+  `;
+}
+
 function renderRecommendationCard(
   rec,
   allocation
@@ -4706,6 +4789,8 @@ function renderRecommendationCard(
             : ""
         }
       </div>
+
+      ${raidRankingsHtml(rec.meta?.raid_rankings_json)}
 
       ${raidIntelHtml(rec)}
 
@@ -4967,6 +5052,8 @@ function targetCardHtml(target) {
             : `<span>≈ ${formatNumber(target.expected_progress_per_raid)} / raid</span>`
         }
       </div>
+
+      ${raidRankingsHtml(target.raid_rankings_json)}
 
       <div class="target-actions compact-target-actions">
         ${targetSelectionMode ? `

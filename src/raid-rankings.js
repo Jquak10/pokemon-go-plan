@@ -206,7 +206,9 @@ function isComparable(form) {
   if (form.kind === "base") return true;
 
   if (form.kind === "mega" || form.kind === "primal") {
-    return form.energyCost != null || Boolean(form.pokemon?.assets?.image);
+    // A real Mega/Primal energy cost is a stronger release signal than an
+    // asset alone, which can arrive before the form is actually obtainable.
+    return form.energyCost != null;
   }
 
   return Boolean(
