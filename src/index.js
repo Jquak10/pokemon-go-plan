@@ -1196,6 +1196,32 @@ function spriteUrlForPokemonName(
   return fallback?.sprite_url || null;
 }
 
+export function raidRankProfileJsonIsCurrent(value) {
+  if (!value) return false;
+
+  try {
+    const profile =
+      typeof value === "string"
+        ? JSON.parse(value)
+        : value;
+
+    return (
+      profile &&
+      typeof profile === "object" &&
+      profile.method ===
+        RAID_RANK_METHOD_VERSION
+    );
+  } catch {
+    return false;
+  }
+}
+
+function currentRaidRankingsJson(value) {
+  return raidRankProfileJsonIsCurrent(value)
+    ? value
+    : null;
+}
+
 function raidRankingsJsonForPokemonName(
   name,
   metas
@@ -1212,8 +1238,13 @@ function raidRankingsJsonForPokemonName(
         meta.raid_rankings_json
     );
 
-  if (exact?.raid_rankings_json) {
-    return exact.raid_rankings_json;
+  const exactRankingsJson =
+    currentRaidRankingsJson(
+      exact?.raid_rankings_json
+    );
+
+  if (exactRankingsJson) {
+    return exactRankingsJson;
   }
 
   // A Shadow target must never inherit a normal-form comparison profile.
@@ -1247,7 +1278,9 @@ function raidRankingsJsonForPokemonName(
         meta.raid_rankings_json
     );
 
-  return fallback?.raid_rankings_json || null;
+  return currentRaidRankingsJson(
+    fallback?.raid_rankings_json
+  );
 }
 
 function automaticVerdict(pve, pvp, rarity, mega, kind) {
@@ -1483,11 +1516,20 @@ async function syncAutomaticMeta(env) {
           FROM meta_sources ms
           WHERE ms.pokemon_name = pm.pokemon_name
             AND ms.source_name = ?
-        ) AS raid_rank_updated_at
-      FROM pokemon_meta pm
-    `).bind(
-      RAID_RANK_SOURCE_NAME
-    ).all();
+        ) AS raid_rank_updated_at,
+    (
+      SELECT ms.note
+      FROM meta_sources ms
+      WHERE ms.pokemon_name = pm.pokemon_name
+        AND ms.source_name = ?
+      ORDER BY ms.updated_at DESC
+      LIMIT 1
+    ) AS raid_rankings_json
+  FROM pokemon_meta pm
+`).bind(
+  RAID_RANK_SOURCE_NAME,
+  RAID_RANK_SOURCE_NAME
+).all();
 
   const existingMetaMap =
     new Map(
@@ -1562,9 +1604,17 @@ async function syncAutomaticMeta(env) {
           endDate >= today;
 
         const raidRankRefresh =
-          !existing?.raid_rank_updated_at ||
-          existing.raid_rank_updated_at <
-            raidRankStaleBefore;
+        !existing?.raid_rank_updated_at ||
+        existing.raid_rank_updated_at <
+          raidRankStaleBefore ||
+        (
+          Boolean(
+            existing?.raid_rankings_json
+          ) &&
+          !raidRankProfileJsonIsCurrent(
+            existing.raid_rankings_json
+          )
+        );
 
         const priorityBucket =
           missingRecord
@@ -1779,23 +1829,53 @@ async function syncAutomaticMeta(env) {
   }
 
   const raidRankBackfillRows =
-    (existingMetaRows || [])
-      .filter(row =>
-        !selectedKeys.has(
-          normalizeName(
-            row.pokemon_name
-          )
-        ) &&
+  (existingMetaRows || [])
+    .filter(row =>
+      !selectedKeys.has(
+        normalizeName(
+          row.pokemon_name
+        )
+      ) &&
+      (
+        !row.raid_rank_updated_at ||
+        row.raid_rank_updated_at <
+          raidRankStaleBefore ||
         (
-          !row.raid_rank_updated_at ||
-          row.raid_rank_updated_at <
-            raidRankStaleBefore
+          Boolean(
+            row.raid_rankings_json
+          ) &&
+          !raidRankProfileJsonIsCurrent(
+            row.raid_rankings_json
+          )
         )
       )
-      .slice(
-        0,
-        MAX_RAID_RANK_BACKFILLS_PER_SYNC
-      );
+    )
+    .sort(
+      (a, b) =>
+        Number(
+          Boolean(b.raid_rankings_json) &&
+          !raidRankProfileJsonIsCurrent(
+            b.raid_rankings_json
+          )
+        ) -
+          Number(
+            Boolean(a.raid_rankings_json) &&
+            !raidRankProfileJsonIsCurrent(
+              a.raid_rankings_json
+            )
+          ) ||
+        String(
+          a.raid_rank_updated_at || ""
+        ).localeCompare(
+          String(
+            b.raid_rank_updated_at || ""
+          )
+        )
+    )
+    .slice(
+      0,
+      MAX_RAID_RANK_BACKFILLS_PER_SYNC
+    );
 
   let raidRankBackfills = 0;
 
@@ -2036,7 +2116,13 @@ async function getMeta(env) {
   `).bind(
     RAID_RANK_SOURCE_NAME
   ).all();
-  return results;
+  return (results || []).map(row => ({
+  ...row,
+  raid_rankings_json:
+    currentRaidRankingsJson(
+      row.raid_rankings_json
+    )
+}));
 }
 
 function findMatches(summary, targets, metas) {

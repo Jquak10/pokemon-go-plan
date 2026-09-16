@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import {
+  RAID_RANK_METHOD_VERSION,
   buildRaidAttackerRankCatalog,
   raidRankProfileForName
 } from "../src/raid-rankings.js";
+import { raidRankProfileJsonIsCurrent } from "../src/index.js";
 
 const type = (name) => ({
   type: `POKEMON_TYPE_${name.toUpperCase()}`,
@@ -111,5 +113,25 @@ assert.ok(shadowAlolanProfile);
 assert.equal(shadowAlolanProfile.variants.length, 1);
 assert.equal(shadowAlolanProfile.variants[0].kind, "shadow");
 assert.equal(shadowAlolanProfile.variants[0].name, "Shadow Alolan Raichu");
+
+assert.equal(
+  raidRankProfileJsonIsCurrent(
+    JSON.stringify({ method: RAID_RANK_METHOD_VERSION })
+  ),
+  true,
+  "Current raid-rank method profiles must remain visible"
+);
+assert.equal(
+  raidRankProfileJsonIsCurrent(
+    JSON.stringify({ method: "raid-rank-old-method" })
+  ),
+  false,
+  "Old raid-rank method profiles must be invalidated"
+);
+assert.equal(
+  raidRankProfileJsonIsCurrent("{bad json"),
+  false,
+  "Malformed cached raid-rank profiles must be hidden"
+);
 
 console.log("raid ranking regression tests passed");
