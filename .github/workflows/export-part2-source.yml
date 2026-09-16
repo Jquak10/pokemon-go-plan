@@ -1,0 +1,26 @@
+name: Export Part 2 source
+
+on:
+  push:
+    branches:
+      - feat/battle-plan-max-ui
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part2-source
+          path: |
+            public/manage.html
+            public/styles.css
+            public/index.html
+            public/sources.html
+            public/admin.html
+            src/index.js
+            src/battle-opportunities.js
+            package.json
+            tests
+          if-no-files-found: error
