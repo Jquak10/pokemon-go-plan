@@ -1,0 +1,57 @@
+name: Apply raid and target fixes v4
+
+on:
+  push:
+    branches:
+      - fix/raid-plan-targets-correctness
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/raid-plan-targets-correctness
+          fetch-depth: 0
+
+      - name: Apply patch script
+        run: python3 .github/scripts/apply_raid_target_fixes.py
+
+      - name: Validate
+        shell: bash
+        run: |
+          git diff --check
+          node --check src/index.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('public/manage.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script>([\s\S]*?)</script>', html)
+          if len(scripts) != 1:
+              raise SystemExit(f'Expected one inline script, found {len(scripts)}')
+          Path('/tmp/manage-inline.js').write_text(scripts[0], encoding='utf-8')
+          PY
+          node --check /tmp/manage-inline.js
+          grep -q 'targetTabCount").textContent = activeTargets' public/manage.html
+          grep -q 'setForegroundSheetOpen(false)' public/manage.html
+          grep -q '/api/targets/bulk-delete' src/index.js
+          grep -q 'inclusiveEndDateFromPropertyLine' src/index.js
+
+      - name: Commit implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f \
+            .github/workflows/apply-raid-target-fixes.yml \
+            .github/workflows/apply-raid-target-fixes-v2.yml \
+            .github/workflows/apply-raid-target-fixes-v3.yml \
+            .github/workflows/apply-raid-target-fixes-v4.yml \
+            .github/scripts/apply_raid_target_fixes.py
+          git add public/manage.html src/index.js
+          git diff --cached --check
+          git commit -m "fix: raid plan and target correctness"
+          git push origin HEAD:fix/raid-plan-targets-correctness
