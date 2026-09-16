@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev"
+    "dev": "wrangler dev",
+    "test": "node tests/raid-rankings.test.mjs",
+    "test:live": "node tests/raid-rankings-live.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.68.0"

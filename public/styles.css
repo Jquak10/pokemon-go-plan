@@ -6692,3 +6692,125 @@ body.modal-open {
     border-color: rgba(36, 103, 192, .96);
   }
 }
+
+
+/* Raid rank compact details + Shadow sprite treatment */
+.shadow-sprite {
+  filter:
+    drop-shadow(0 0 3px rgba(112, 65, 180, 0.72))
+    drop-shadow(0 0 8px rgba(80, 44, 145, 0.42));
+}
+
+.raid-rank-details {
+  margin-top: 10px;
+  border: 1px solid rgba(79, 120, 166, 0.18);
+  border-radius: 12px;
+  background: rgba(239, 247, 255, 0.58);
+  overflow: hidden;
+}
+
+.raid-rank-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.raid-rank-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.raid-rank-summary-label {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.raid-rank-summary-value {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.raid-rank-details .details-chevron {
+  flex: 0 0 auto;
+  transition: transform 0.16s ease;
+}
+
+.raid-rank-details[open] .details-chevron {
+  transform: rotate(180deg);
+}
+
+.raid-rank-list {
+  display: grid;
+  gap: 7px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid rgba(79, 120, 166, 0.14);
+}
+
+.raid-rank-variant {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 2px 10px;
+}
+
+.raid-rank-variant > div {
+  min-width: 0;
+}
+
+.raid-rank-variant strong,
+.raid-rank-values {
+  font-size: 0.77rem;
+}
+
+.raid-rank-values {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.raid-rank-current,
+.raid-rank-moves,
+.raid-rank-method {
+  font-size: 0.68rem;
+  opacity: 0.72;
+}
+
+.raid-rank-current {
+  display: block;
+  margin-top: 1px;
+}
+
+.raid-rank-moves {
+  grid-column: 1 / -1;
+}
+
+.raid-rank-method {
+  padding-top: 3px;
+  border-top: 1px dashed rgba(79, 120, 166, 0.15);
+}
+
+@media (max-width: 760px) {
+  .raid-rank-details > summary {
+    align-items: flex-start;
+  }
+
+  .raid-rank-summary-value {
+    white-space: normal;
+  }
+
+  .raid-rank-variant {
+    grid-template-columns: 1fr;
+  }
+
+  .raid-rank-values {
+    white-space: normal;
+  }
+}
