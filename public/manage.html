@@ -442,6 +442,8 @@
                 <button type="button" data-target-view="list">Compact list</button>
               </div>
 
+              <button id="toggleTargetSelection" type="button" class="secondary">Select</button>
+
               <button id="openAddTarget" type="button" class="button add-target-button">
                 + Add target
               </button>
@@ -548,6 +550,11 @@
           </div>
 
           <div id="targetFilterSummary" class="target-filter-summary"></div>
+          <div id="bulkTargetActions" class="target-heading-actions hidden" aria-live="polite">
+            <button id="selectAllVisibleTargets" type="button" class="secondary">Select all shown</button>
+            <button id="deleteSelectedTargets" type="button" class="ghost-danger" disabled>Delete selected</button>
+            <button id="cancelTargetSelection" type="button" class="secondary">Cancel</button>
+          </div>
           <div id="targets" class="target-organized-list"></div>
         </section>
       </section>
@@ -1254,6 +1261,8 @@ const app = document.getElementById("app");
 const loadStatus = document.getElementById("loadStatus");
 let state = null;
 let targetById = new Map();
+let targetSelectionMode = false;
+const selectedTargetIds = new Set();
 
 let targetFilterState = {
   status: "active",
@@ -3311,6 +3320,19 @@ function unlockPageForModal() {
   document.body.style.right = "";
   document.body.style.width = "";
 
+
+  document.removeEventListener(
+    "touchstart",
+    modalTouchStartGuard
+  );
+
+  document.removeEventListener(
+    "touchmove",
+    modalTouchMoveGuard
+  );
+
+  setForegroundSheetOpen(false);
+
   window.scrollTo(
     0,
     restoreY
@@ -3406,7 +3428,7 @@ function renderHero() {
   document.getElementById("heroRecommended").textContent = formatNumber(plan.recommended_total);
   document.getElementById("heroTargets").textContent = formatNumber(activeTargets);
 
-  document.getElementById("targetTabCount").textContent = state.targets.length;
+  document.getElementById("targetTabCount").textContent = activeTargets;
   document.getElementById("calendarTabCount").textContent = state.user.included_sources.length;
 }
 
@@ -4947,6 +4969,15 @@ function targetCardHtml(target) {
       </div>
 
       <div class="target-actions compact-target-actions">
+        ${targetSelectionMode ? `
+          <button
+            type="button"
+            class="${selectedTargetIds.has(String(target.id)) ? "button" : "secondary"} small-button"
+            data-select-target="${esc(target.id)}"
+            aria-pressed="${selectedTargetIds.has(String(target.id)) ? "true" : "false"}"
+          >${selectedTargetIds.has(String(target.id)) ? "Selected ✓" : "Select"}</button>
+        ` : ""}
+
         <button
           type="button"
           class="log-raid-button small-button"
@@ -5158,6 +5189,91 @@ function filteredTargets(
   );
 }
 
+function visibleTargetIdsForSelection() {
+  return filteredTargets().map((target) => String(target.id));
+}
+
+function syncTargetSelectionUi(list = filteredTargets()) {
+  const validIds = new Set((state?.targets || []).map((target) => String(target.id)));
+  for (const id of [...selectedTargetIds]) {
+    if (!validIds.has(id)) selectedTargetIds.delete(id);
+  }
+
+  const visibleIds = list.map((target) => String(target.id));
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedTargetIds.has(id));
+  const toggle = document.getElementById("toggleTargetSelection");
+  const actions = document.getElementById("bulkTargetActions");
+  const deleteButton = document.getElementById("deleteSelectedTargets");
+  const selectAllButton = document.getElementById("selectAllVisibleTargets");
+
+  toggle.textContent = targetSelectionMode ? "Done" : "Select";
+  toggle.setAttribute("aria-pressed", targetSelectionMode ? "true" : "false");
+  actions.classList.toggle("hidden", !targetSelectionMode);
+
+  deleteButton.disabled = selectedTargetIds.size === 0;
+  deleteButton.textContent = selectedTargetIds.size
+    ? `Delete ${selectedTargetIds.size} selected`
+    : "Delete selected";
+
+  selectAllButton.disabled = visibleIds.length === 0;
+  selectAllButton.textContent = allVisibleSelected
+    ? `Clear shown (${visibleIds.length})`
+    : `Select all shown (${visibleIds.length})`;
+}
+
+function toggleTargetSelectionMode() {
+  targetSelectionMode = !targetSelectionMode;
+  if (!targetSelectionMode) selectedTargetIds.clear();
+  renderTargets();
+}
+
+function toggleTargetSelected(id) {
+  const key = String(id);
+  if (selectedTargetIds.has(key)) selectedTargetIds.delete(key);
+  else selectedTargetIds.add(key);
+  renderTargets();
+}
+
+function toggleAllVisibleTargets() {
+  const ids = visibleTargetIdsForSelection();
+  const allSelected = ids.length > 0 && ids.every((id) => selectedTargetIds.has(id));
+  for (const id of ids) {
+    if (allSelected) selectedTargetIds.delete(id);
+    else selectedTargetIds.add(id);
+  }
+  renderTargets();
+}
+
+async function bulkDeleteSelectedTargets() {
+  const ids = [...selectedTargetIds];
+  if (!ids.length) return;
+
+  if (!confirm(`Delete ${ids.length} selected target${ids.length === 1 ? "" : "s"}?`)) {
+    return;
+  }
+
+  const button = document.getElementById("deleteSelectedTargets");
+  button.disabled = true;
+  button.textContent = "Deleting…";
+
+  try {
+    await api("/api/targets/bulk-delete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, target_ids: ids })
+    });
+
+    selectedTargetIds.clear();
+    targetSelectionMode = false;
+    await load();
+    activateTab("targets", false);
+  } catch (error) {
+    alert(error.message);
+    syncTargetSelectionUi();
+  }
+}
+
 function renderTargets() {
   targetById =
     new Map(
@@ -5230,6 +5346,8 @@ function renderTargets() {
     filteredTargets(
       matchingTargets
     );
+
+  syncTargetSelectionUi(list);
 
   document.getElementById(
     "targetFilterSummary"
@@ -6320,8 +6438,8 @@ async function saveTarget() {
     });
 
     status.textContent = "Saved ✓";
-    await load();
     closeTargetModal();
+    await load();
     activateTab("targets", false);
   } catch (error) {
     status.textContent = error.message;
@@ -6782,6 +6900,14 @@ document.getElementById("saveDailyBudgetOverride").addEventListener("click", sav
 document.getElementById("clearDailyBudgetOverride").addEventListener("click", clearDailyBudgetOverride);
 
 document.getElementById("openAddTarget").addEventListener("click", () => openTargetModal());
+document.getElementById("toggleTargetSelection").addEventListener("click", toggleTargetSelectionMode);
+document.getElementById("cancelTargetSelection").addEventListener("click", () => {
+  targetSelectionMode = false;
+  selectedTargetIds.clear();
+  renderTargets();
+});
+document.getElementById("selectAllVisibleTargets").addEventListener("click", toggleAllVisibleTargets);
+document.getElementById("deleteSelectedTargets").addEventListener("click", bulkDeleteSelectedTargets);
 
 document
   .getElementById("pokemonName")
@@ -6805,6 +6931,12 @@ document.addEventListener("keydown", event => {
 });
 
 document.getElementById("targets").addEventListener("click", event => {
+  const select = event.target.closest("[data-select-target]");
+  if (select) {
+    toggleTargetSelected(select.dataset.selectTarget);
+    return;
+  }
+
   const edit = event.target.closest("[data-edit-target]");
   if (edit) {
     const target = targetById.get(String(edit.dataset.editTarget));
