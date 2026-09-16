@@ -15,15 +15,16 @@ Create a planner with your timezone, save its private management link, and then 
 ## Features
 
 - Personalized raid recommendations based on event availability, shared meta scores, user-defined weights, targets, progress, and priority.
+- Type-specific PvE raid-attacker rankings calculated from Pokémon GO API/GameMaster-backed stats and moves, with optimal move pairings and form-aware comparisons.
 - Remote Raid planning that treats official limits and an optional personal budget as ceilings, not spending targets.
 - Local and Remote Raid logging, recent activity, undo support, Remote Raid usage tracking, and optional target-progress updates.
-- Targets for Mega Energy, raid counts, Candy XL, Candy, and custom goals, with priority, progress, notes, completion state, search, filters, and card/list views.
+- Targets for Mega Energy, raid counts, Candy XL, Candy, and custom goals, with priority, progress, notes, completion state, search, filters, card/list views, and bulk deletion.
 - A Hundo CP calculator for the loaded Pokémon GO Pokédex, common encounter levels, and custom levels.
 - A live month calendar and private ICS feed with user-selectable event categories.
 - GO Calendar data, higher-priority official Pokémon GO schedule supplements, and suppression rules.
 - Automated PvPoke Master League data and Pokémon GO API-based analytical inputs, with visible source precedence and freshness.
 - Responsive desktop and mobile interfaces.
-- Administration views for synchronization, official raid supplements, Remote Raid limits, suppressions, and raid assessments.
+- Administration views for synchronization, official raid supplements, Remote Raid limits, suppressions, meta assessments, and raid-ranking refreshes.
 - Capability-link access without a conventional email/password account.
 
 The project is independent and is not affiliated with Niantic, The Pokémon Company, Nintendo, or GAME FREAK.
@@ -48,10 +49,14 @@ The **Raid Plan** tab combines today's limits, activity, recommendations, and fu
 - **Today's planning capacity** divides capacity into **Used**, **Recommended**, and **Left unused**. Unused capacity is intentional when available bosses do not meet the configured value threshold.
 - **Paid Raid Budget Forecast** previews recommended paid-raid budgets for the next seven days and recalculates as targets or progress change.
 - **Today's Raid Activity** separates Remote, Local, and total logged raids.
-- **What to raid now** displays current raid recommendations. Each card can include its score and label, Remote Raid allocation, source, weaknesses, 100% IV encounter CP, battle details, and a **Why?** explanation.
+- **What to raid now** displays current raid recommendations. Each card can include its score and label, Remote Raid allocation, source, weaknesses, 100% IV encounter CP, battle details, type-specific PvE attacker ranking, optimal fast + charged move pairing, and a **Why?** explanation.
 - The first recommendations appear directly; **More raid recommendations** expands the rest. **Bosses receiving 0 Remote Raids** explains exclusions from paid allocation.
 
 Recommendations combine current event availability with PvE, PvP, rarity/collection, and Mega utility inputs, plus personal targets and saved preference weights. A high recommendation score is evidence for consideration, not an instruction to spend a pass. The allocation badge is specifically for Remote Raids; Local raids are logged and counted separately.
+
+Raid-attacker rankings are computed by the planner from current Pokémon GO API/GameMaster-backed stats and moves rather than copied from an editorial tier list. Battle-distinct forms are compared deliberately, regional forms are not silently substituted into unrelated form families, and explicit Shadow targets remain Shadow-specific. Cached ranking profiles carry a methodology version; outdated or malformed profiles are hidden and queued for regeneration rather than shown as current data.
+
+Expired raid events are defensively excluded from current recommendations even if an already-imported event row remains stored, so past rotations do not stay in **What to raid now** after their availability window ends.
 
 ### Remote Raid planning
 
@@ -90,7 +95,9 @@ Use the status controls to switch among **Active**, **Completed**, and **All**. 
 
 Active targets that are high priority or **Available now** appear under **NEEDS ATTENTION — Available now or high priority**. Other active goals appear under **TRACKING — Other active goals**. Finished goals appear under the collapsible **COMPLETED — Finished goals** group.
 
-Each target card shows progress, availability, priority/completion, and expected progress per raid when present. Use **Edit** to change values or set **Completed?** to Yes. Completed targets stay visible through **Completed** or **All** and receive zero paid Remote Raid allocations. The overflow menu provides **Delete target**.
+Each target card shows progress, availability, priority/completion, expected progress per raid when present, and its available PvE raid-attacker ranking where applicable. Use **Edit** to change values or set **Completed?** to Yes. Completed targets stay visible through **Completed** or **All** and receive zero paid Remote Raid allocations. The overflow menu provides **Delete target**.
+
+For bulk cleanup, select **Select** to enter multi-select mode, choose individual targets or **Select all shown**, then use **Delete selected**. **Select all shown** respects the current search and non-status filters, and **Cancel** exits selection mode without deleting anything. The Targets navigation badge shows the **Active** target count only rather than Active + Completed targets.
 
 ### Raid logging
 
@@ -143,9 +150,9 @@ Select **Save preferences** after making changes. These settings can make the pl
 
 The management dashboard is accessed through each planner's private capability link. It controls that planner's Raid Plan, targets, logs, preferences, and calendar; it is not a public account profile.
 
-The separate **Planner Admin** interface is for authorized maintainers. It can run and inspect event, official-schedule, Remote-limit, suppression, and raid-assessment synchronization. Its data actions require the configured admin credential. Never share that credential or include it in a URL, README, issue, log, commit, or chat.
+The separate **Planner Admin** interface is for authorized maintainers. It can run and inspect event, official-schedule, Remote-limit, suppression, meta-assessment, and raid-ranking synchronization. Its data actions require the configured admin credential. Never share that credential or include it in a URL, README, issue, log, commit, or chat.
 
-The public **Data Sources & Precedence** page explains why explicit official schedules take priority over suppression/replacement notices and general GO Calendar data, and identifies the analytical inputs used for raid value.
+The public **Data Sources & Precedence** page explains why explicit official schedules take priority over suppression/replacement notices and general GO Calendar data, and identifies the analytical inputs and versioned computation used for raid value and attacker rankings.
 
 ### Typical user workflow
 
@@ -165,6 +172,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 - Mobile uses a fixed bottom navigation for **Raid Plan**, **Targets**, **Hundo CP**, **Calendar**, and **More**. **Preferences** and **Data sources** are in the **More options** sheet.
 - Mobile provides a floating **+ Log raid** action, presents the raid logger as a bottom sheet, and moves advanced Target filters into the **Organize targets** drawer.
 - On mobile, **More levels** expands the additional Hundo benchmarks, and Calendar day details flow beneath the month view.
+- The public landing page, Data Sources page, and Planner Admin page collapse their multi-column layouts for narrow browsers, keep long URLs/text wrapped, and use touch-friendly controls without reserving space for the Planner-only bottom navigation.
 
 ## Technology and architecture
 
@@ -172,7 +180,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 - **Cloudflare D1** stores planners, targets, events, meta data, Remote Raid usage, and limit overrides.
 - **Static frontend files** in `public/` provide the landing page, planner, administration, data-source, and responsive UI.
 - **Worker code** in `src/index.js` implements APIs, private routes, scheduled synchronization, recommendations, and asset routing.
-- **Cron Triggers** run separate event, official Remote Raid limit, and automatic meta synchronization jobs every six hours.
+- **Cron Triggers** run separate event, official Remote Raid limit, and automatic meta synchronization jobs every six hours; the meta sync also refreshes versioned raid-ranking profiles.
 - **GitHub and Cloudflare** provide the production path: feature branch → PR → `main` → the existing Cloudflare deployment pipeline.
 - **VS Code Dev Containers** provide the development toolchain while source remains on Windows.
 
@@ -489,6 +497,7 @@ Smoke-test checklist:
 
 - The landing page loads.
 - The data-source page at `/sources` loads.
+- The admin page at `/admin` loads without horizontal overflow at desktop and narrow viewport widths.
 - Static styling responds at desktop and narrow viewport widths.
 - Developer tools show no unexpected request or JavaScript errors.
 

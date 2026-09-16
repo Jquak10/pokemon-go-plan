@@ -5,7 +5,23 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>Pokémon GO Planner Admin</title>
-  <link rel="stylesheet" href="/styles.css?v=14">
+  <link rel="stylesheet" href="/styles.css?v=30">
+  <style>
+    @media (max-width: 700px) {
+      body.portal-page {
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+      }
+
+      .portal-hero {
+        min-height: 0;
+      }
+
+      .portal-page button,
+      .portal-page .button {
+        min-height: 44px;
+      }
+    }
+  </style>
 </head>
 
 <body class="manage-page portal-page admin-page">
@@ -24,7 +40,7 @@
 
         <p>
           Inspect event synchronization, official raid supplements,
-          temporary Remote Raid rules, and automatic raid assessments.
+          temporary Remote Raid rules, meta assessments, and raid-attacker rankings.
         </p>
       </div>
 
@@ -55,7 +71,7 @@
         <span class="metric-icon metric-icon-green" aria-hidden="true">⚡</span>
         <div>
           <strong>Raid intelligence</strong>
-          <small>Temporary limits and automatic meta scoring.</small>
+          <small>Temporary limits, meta scoring, and versioned raid-attacker rankings.</small>
         </div>
       </article>
     </section>
@@ -104,7 +120,7 @@
         <article class="sync-stage" data-stage="meta">
           <span>3</span>
           <div>
-            <strong>Raid assessments</strong>
+            <strong>Meta & raid rankings</strong>
             <small>Waiting</small>
           </div>
         </article>
@@ -120,7 +136,7 @@
       <button type="button" data-admin-section="official">Official raids</button>
       <button type="button" data-admin-section="overrides">Overrides</button>
       <button type="button" data-admin-section="limits">Remote limits</button>
-      <button type="button" data-admin-section="meta">Assessments</button>
+      <button type="button" data-admin-section="meta">Meta & rankings</button>
     </nav>
 
     <section id="adminOfficial" class="dashboard-card admin-data-section">
@@ -187,9 +203,9 @@
       <div class="section-heading-row">
         <div>
           <span class="section-eyebrow">AUTOMATIC META</span>
-          <h2>Raid assessments</h2>
+          <h2>Meta assessments & raid rankings</h2>
           <p class="section-subtitle">
-            Transparent PvE, PvP, rarity, and Mega utility inputs used by personal recommendations.
+            Transparent PvE, PvP, rarity, and Mega utility inputs plus versioned raid-attacker ranking profiles used by personal recommendations.
           </p>
         </div>
 
@@ -404,7 +420,7 @@ document
           "meta",
           "automatic_meta",
           "/api/admin/sync/meta",
-          "Updating scores…"
+          "Updating assessments & rankings…"
         );
 
         await Promise.all([

@@ -5,7 +5,23 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=16">
+  <link rel="stylesheet" href="/styles.css?v=30">
+  <style>
+    @media (max-width: 700px) {
+      body.portal-page {
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+      }
+
+      .portal-hero {
+        min-height: 0;
+      }
+
+      .portal-page button,
+      .portal-page .button {
+        min-height: 44px;
+      }
+    }
+  </style>
 </head>
 
 <body class="manage-page portal-page">
@@ -23,8 +39,9 @@
         <h1>Pokémon GO Raid Planner</h1>
 
         <p>
-          Build a private calendar that combines current Pokémon GO events,
-          raid value, your personal targets, and Remote Raid planning.
+          Build a private Pokémon GO planner combining current events,
+          raid-attacker rankings, personal targets, raid logging, Hundo CP,
+          and Remote Raid planning.
         </p>
       </div>
 
@@ -46,8 +63,8 @@
       <article class="portal-feature">
         <span class="metric-icon metric-icon-green" aria-hidden="true">⚔</span>
         <div>
-          <strong>Raid strategy</strong>
-          <small>Internet/meta value combined with your goals.</small>
+          <strong>Raid intelligence</strong>
+          <small>Type-specific attacker rankings, current raid value, exact forms, and your personal goals.</small>
         </div>
       </article>
 

@@ -5,7 +5,23 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>Data Sources · Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=14">
+  <link rel="stylesheet" href="/styles.css?v=30">
+  <style>
+    @media (max-width: 700px) {
+      body.portal-page {
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+      }
+
+      .portal-hero {
+        min-height: 0;
+      }
+
+      .portal-page button,
+      .portal-page .button {
+        min-height: 44px;
+      }
+    }
+  </style>
 </head>
 <body class="manage-page portal-page">
   <div class="ambient-orb ambient-orb-one" aria-hidden="true"></div>
@@ -92,11 +108,13 @@
 
       <article class="dashboard-card source-info-card">
         <span class="source-confidence-badge source-meta">Pokémon GO API</span>
-        <h2>Stats and moves</h2>
+        <h2>Stats, moves & raid rankings</h2>
         <p>
-          Species data, GO stats, types, and moves used by the transparent PvE-value proxy.
+          GameMaster-backed species stats, typing, fast moves, and charged moves are used
+          to calculate type-specific PvE raid-attacker rankings and optimal move pairings.
+          Comparisons are form-aware so battle-distinct forms are not silently substituted.
         </p>
-        <strong>Role: analytical input</strong>
+        <strong>Role: analytical input and computed PvE rankings</strong>
       </article>
 
       <article class="dashboard-card source-info-card">
@@ -106,6 +124,18 @@
           Ranking information used when a user's personal profile gives PvP meaningful weight.
         </p>
         <strong>Role: analytical input</strong>
+      </article>
+
+      <article class="dashboard-card source-info-card">
+        <span class="source-confidence-badge source-meta">Planner computation</span>
+        <h2>Versioned ranking profiles</h2>
+        <p>
+          Raid-attacker rankings are calculated by the planner rather than copied from an
+          editorial tier list. Cached profiles carry a ranking-method version; outdated or
+          malformed profiles are hidden and queued for regeneration instead of being shown
+          as current data.
+        </p>
+        <strong>Role: freshness and methodology control</strong>
       </article>
     </section>
 
