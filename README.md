@@ -707,3 +707,4 @@ Save understood work, inspect `git status --short`, then press `Ctrl+Shift+P` an
 - [ ] Run `npm ci`.
 - [ ] Run `npm run dev`.
 - [ ] Confirm [localhost:8787](http://localhost:8787) works.
+- [ ] Ready for normal Codex-assisted development.
