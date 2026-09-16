@@ -1,0 +1,66 @@
+name: Fix Targets All view
+
+on:
+  push:
+    branches:
+      - fix/targets-all-completed-visible
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/targets-all-completed-visible
+          fetch-depth: 0
+
+      - name: Apply focused fix
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('public/manage.html')
+          text = path.read_text(encoding='utf-8')
+
+          old = '${targetFilterState.status === "completed" ? "open" : ""}'
+          new = '${targetFilterState.status === "completed" || targetFilterState.status === "all" ? "open" : ""}'
+
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one completed-group open condition, found {count}')
+
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Validate
+        shell: bash
+        run: |
+          git diff --check
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          html = Path('public/manage.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script>([\s\S]*?)</script>', html)
+          if len(scripts) != 1:
+              raise SystemExit(f'Expected one inline script, found {len(scripts)}')
+          Path('/tmp/manage-inline.js').write_text(scripts[0], encoding='utf-8')
+          PY
+          node --check /tmp/manage-inline.js
+          grep -Fq 'targetFilterState.status === "completed" || targetFilterState.status === "all" ? "open" : ""' public/manage.html
+
+      - name: Commit implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f .github/workflows/fix-targets-all-view.yml
+          git add public/manage.html
+          git diff --cached --check
+          git diff --cached --name-only
+          git commit -m "fix: show completed targets in all view"
+          git push origin HEAD:fix/targets-all-completed-visible
