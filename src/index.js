@@ -1137,6 +1137,12 @@ function raidRankingsJsonForPokemonName(
     return exact.raid_rankings_json;
   }
 
+  // A Shadow target must never inherit a normal-form comparison profile.
+  // It will appear once the exact Shadow raid form has been assessed.
+  if (normalized.startsWith("shadow ")) {
+    return null;
+  }
+
   const familyKey =
     value =>
       normalizeName(value)
