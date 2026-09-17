@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Battle Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=35">
+  <link rel="stylesheet" href="/styles.css?v=36">
 </head>
 
 <body class="manage-page">
@@ -65,7 +65,7 @@
           <div>
             <span class="hero-metric-label">Recommended</span>
             <strong id="heroRecommended">—</strong>
-            <small>Additional Remote Raids</small>
+            <small>Additional worthwhile Remote Pass uses</small>
           </div>
         </article>
 
@@ -192,29 +192,29 @@
       <!-- =======================================================
            TAB NAVIGATION
            ======================================================= -->
-      <nav class="tab-nav" aria-label="Planner sections">
-        <button class="tab-button active" type="button" data-tab="plan" aria-selected="true">
+      <nav class="tab-nav" aria-label="Planner sections" role="tablist">
+        <button class="tab-button active" type="button" data-tab="plan" aria-selected="true" role="tab" aria-controls="panel-plan">
           <span class="tab-icon" aria-hidden="true">⚔</span>
           <span class="nav-label-desktop">Battle Plan</span><span class="nav-label-mobile">Plan</span>
         </button>
 
-        <button class="tab-button" type="button" data-tab="targets" aria-selected="false">
+        <button class="tab-button" type="button" data-tab="targets" aria-selected="false" role="tab" aria-controls="panel-targets">
           <span class="tab-icon" aria-hidden="true">◎</span>
           <span>Targets</span>
           <span id="targetTabCount" class="tab-count">0</span>
         </button>
 
-        <button class="tab-button" type="button" data-tab="hundo" aria-selected="false">
+        <button class="tab-button" type="button" data-tab="hundo" aria-selected="false" role="tab" aria-controls="panel-hundo">
           <span class="tab-icon tab-icon-iv" aria-hidden="true">IV</span>
           <span>Hundo CP</span>
         </button>
 
-        <button class="tab-button" type="button" data-tab="preferences" aria-selected="false">
+        <button class="tab-button" type="button" data-tab="preferences" aria-selected="false" role="tab" aria-controls="panel-preferences">
           <span class="tab-icon" aria-hidden="true">⚙</span>
           <span>Preferences</span>
         </button>
 
-        <button class="tab-button" type="button" data-tab="calendar" aria-selected="false">
+        <button class="tab-button" type="button" data-tab="calendar" aria-selected="false" role="tab" aria-controls="panel-calendar">
           <span class="tab-icon" aria-hidden="true">▦</span>
           <span>Calendar</span>
           <span id="calendarTabCount" class="tab-count">0</span>
@@ -244,7 +244,7 @@
       <!-- =======================================================
            TAB: BATTLE PLAN
            ======================================================= -->
-      <section class="tab-panel active" data-panel="plan">
+      <section id="panel-plan" class="tab-panel active" data-panel="plan" role="tabpanel">
 
         <div class="plan-layout">
 
@@ -413,7 +413,7 @@
                   </p>
                 </div>
 
-                <span id="allocationTotalBadge" class="status-badge badge-green">0 raids</span>
+                <span id="allocationTotalBadge" class="status-badge badge-green">0 Remote Passes</span>
               </div>
 
               <div class="battle-plan-filter" role="group" aria-label="Battle type">
@@ -506,7 +506,7 @@
       <!-- =======================================================
            TAB: TARGETS
            ======================================================= -->
-      <section class="tab-panel" data-panel="targets">
+      <section id="panel-targets" class="tab-panel" data-panel="targets" role="tabpanel">
         <section class="dashboard-card target-organizer-card">
           <div class="section-heading-row target-heading">
             <div>
@@ -653,7 +653,7 @@
       <!-- =======================================================
            TAB: HUNDO CP
            ======================================================= -->
-      <section class="tab-panel" data-panel="hundo">
+      <section id="panel-hundo" class="tab-panel" data-panel="hundo" role="tabpanel">
         <div class="hundo-workspace">
           <section class="dashboard-card hundo-search-card">
           <div class="section-heading-row">
@@ -754,7 +754,7 @@
       <!-- =======================================================
            TAB: PREFERENCES
            ======================================================= -->
-      <section class="tab-panel" data-panel="preferences">
+      <section id="panel-preferences" class="tab-panel" data-panel="preferences" role="tabpanel">
         <div class="settings-layout">
 
           <section class="dashboard-card">
@@ -816,7 +816,7 @@
             <span class="section-eyebrow">REMOTE PASS RULES</span>
             <h2>Pass Spending Preferences</h2>
             <p class="section-subtitle">
-              The personal ceiling is shared by ordinary Remote Raids and Remote Max Battles. The official Remote Raid participation limit remains a separate Raid-only rule.
+              Your personal Remote Pass ceiling and the official daily Remote participation limit both apply across ordinary Remote Raids and Remote Max Battles. Event increases or unlimited periods apply to that same shared counter.
             </p>
 
             <div class="form-grid">
@@ -861,7 +861,7 @@
       <!-- =======================================================
            TAB: CALENDAR
            ======================================================= -->
-      <section class="tab-panel" data-panel="calendar">
+      <section id="panel-calendar" class="tab-panel" data-panel="calendar" role="tabpanel">
 
         <section class="dashboard-card calendar-subscription-card">
           <div class="calendar-subscription-head">
@@ -1256,7 +1256,7 @@
               <input id="battleLogPasses" type="number" min="0" max="99" step="1" inputmode="numeric" value="1">
             </div>
             <p class="field-help">MP is spent only on wins. Remote Passes are consumed when a battle starts; retries against the same boss can reuse a pass. Count attempts, then correct wins and passes. Exclude lobbies left before starting.</p>
-            <p class="field-help">Remote Max usage is recorded separately. Its daily participation cap is not verified here; check the in-game limit.</p>
+            <p class="field-help">Remote Raids and Remote Max Battles share the same official daily Remote participation limit. This log updates that shared counter automatically when a Remote Pass is consumed.</p>
           </div>
 
           <div>
@@ -1439,6 +1439,8 @@ let targetFilterLockedScrollY = 0;
 let modalLockedScrollY = 0;
 let modalPageLocked = false;
 let modalTouchStartY = 0;
+let mobileMoreLockedScrollY = 0;
+let mobileMorePageLocked = false;
 let desktopQuickRailFrame = 0;
 
 let pokemonCatalog = null;
@@ -2799,42 +2801,69 @@ function isDesktopLayout() {
   ).matches;
 }
 
-function closeMobileMoreSheet() {
-  document
-    .getElementById(
-      "mobileMoreBackdrop"
-    )
-    ?.classList.add(
-      "hidden"
-    );
+function lockPageForMobileMore() {
+  if (mobileMorePageLocked) return;
 
-  document
-    .getElementById(
-      "mobileMoreButton"
-    )
-    ?.setAttribute(
-      "aria-expanded",
-      "false"
-    );
+  mobileMorePageLocked = true;
+  mobileMoreLockedScrollY = window.scrollY || window.pageYOffset || 0;
+
+  document.documentElement.classList.add("mobile-more-open");
+  document.body.classList.add("mobile-more-open");
+  document.body.style.position = "fixed";
+  document.body.style.top = `-${mobileMoreLockedScrollY}px`;
+  document.body.style.left = "0";
+  document.body.style.right = "0";
+  document.body.style.width = "100%";
+  setForegroundSheetOpen(true);
+}
+
+function unlockPageForMobileMore() {
+  if (!mobileMorePageLocked) return;
+
+  const restoreY = mobileMoreLockedScrollY;
+  mobileMorePageLocked = false;
+
+  document.documentElement.classList.remove("mobile-more-open");
+  document.body.classList.remove("mobile-more-open");
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  document.body.style.width = "";
+  setForegroundSheetOpen(false);
+  window.scrollTo(0, restoreY);
+}
+
+function closeMobileMoreSheet() {
+  const backdrop = document.getElementById("mobileMoreBackdrop");
+  const wasOpen = backdrop && !backdrop.classList.contains("hidden");
+
+  backdrop?.classList.add("hidden");
+
+  const button = document.getElementById("mobileMoreButton");
+  button?.setAttribute("aria-expanded", "false");
+
+  if (wasOpen) {
+    unlockPageForMobileMore();
+    setTimeout(() => button?.focus(), 0);
+  }
 }
 
 function openMobileMoreSheet() {
-  document
-    .getElementById(
-      "mobileMoreBackdrop"
-    )
-    ?.classList.remove(
-      "hidden"
-    );
+  const backdrop = document.getElementById("mobileMoreBackdrop");
+  if (!backdrop || !backdrop.classList.contains("hidden")) return;
+
+  lockPageForMobileMore();
+  backdrop.classList.remove("hidden");
 
   document
-    .getElementById(
-      "mobileMoreButton"
-    )
-    ?.setAttribute(
-      "aria-expanded",
-      "true"
-    );
+    .getElementById("mobileMoreButton")
+    ?.setAttribute("aria-expanded", "true");
+
+  setTimeout(
+    () => document.getElementById("closeMobileMore")?.focus(),
+    0
+  );
 }
 
 function mountTargetFilterDrawerForMobile() {
@@ -3181,6 +3210,9 @@ function renderDesktopQuickRail() {
     "desktopRailRecommended"
   ).textContent =
     formatNumber(
+      state.battle_resource_plan
+        ?.remote_passes
+        ?.recommended_additional ??
       state.remote_raid_plan
         ?.recommended_raids ??
       state.remote_raid_plan
@@ -3312,11 +3344,16 @@ function commandEntries() {
     const rec of
     state.recommendations || []
   ) {
+    const recBattleLabel = battleLogLabel({
+      battle_system: rec.battle_system || "raid",
+      battle_variant: rec.battle_variant || null
+    });
+
     entries.push({
       label:
         rec.pokemon_name,
       meta:
-        "Raid recommendation",
+        `${recBattleLabel} recommendation`,
       action: () => {
         activateTab(
           "plan"
@@ -3341,12 +3378,14 @@ function commandEntries() {
 
     entries.push({
       label:
-        `Log ${rec.pokemon_name} raid`,
+        `Log ${rec.pokemon_name} ${recBattleLabel}`,
       meta:
         "Quick action",
       action: () =>
         openRaidLogModal(
-          rec.pokemon_name
+          rec.pokemon_name,
+          rec.target?.id || null,
+          rec
         )
     });
   }
@@ -3714,6 +3753,7 @@ function scheduleDesktopQuickRailAffix() {
 
 function renderHero() {
   const plan = state.remote_raid_plan;
+  const sharedPassPlan = state.battle_resource_plan?.remote_passes || {};
   const rule = plan.official_rule;
   const activeTargets = state.targets.filter(target => !Number(target.completed)).length;
 
@@ -3726,7 +3766,7 @@ function renderHero() {
   document.getElementById("heroUsed").textContent = formatNumber(
     plan.remote_limit_used ?? plan.raids_used
   );
-  document.getElementById("heroRecommended").textContent = formatNumber(plan.recommended_total);
+  document.getElementById("heroRecommended").textContent = formatNumber(sharedPassPlan.recommended_additional ?? plan.recommended_total);
   document.getElementById("heroTargets").textContent = formatNumber(activeTargets);
 
   document.getElementById("targetTabCount").textContent = activeTargets;

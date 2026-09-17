@@ -93,3 +93,6 @@ assert.match(manage,/unlockPageForModal\(\)/);
 assert.match(manage,/Today's Battle Activity/);
 assert.match(manage,/Recent battle logs/);
 console.log('Battle logger UI prefills, editable progress, unknown costs and form contracts passed');
+
+assert.match(manage,/Remote Raids and Remote Max Battles share the same official daily Remote participation limit/i);
+assert.doesNotMatch(manage,/check the in-game limit/i);
