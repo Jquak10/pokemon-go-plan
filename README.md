@@ -12,12 +12,38 @@ The planner brings the decisions that normally live in several places into one d
 
 Create a planner with your timezone, save its private management link, and then tailor its Targets, recommendation weights, Remote Raid limits, and event filters. The Raid Plan updates from those choices and from the raids you log.
 
+## Part 4: unified Battle logging
+
+The Battle logger records ordinary Raids, Dynamax and Gigantamax separately. Recommendations prefill battle identity, participation eligibility and confidently known MP costs. Unknown or estimated costs remain blank and must be supplied for wins. Actual target progress stays editable. For Max Battles, enter attempts, wins and actual Remote Passes consumed; same-boss retries can use fewer passes than attempts. Log groups with different MP costs separately.
+
+Official rules checked on 17 September 2026:
+
+- [Niantic: Joining Battles Remotely](https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/2487-joining-battles-remotely/) confirms Remote Max Battles use a Remote Raid Pass plus the same MP cost as local participation. The pass is consumed when battle starts, including a loss; eligible retries against the same boss do not consume another pass.
+- [Pokémon GO: Max Battles](https://pokemongo.com/max-pokemon-battle) confirms MP is spent only after defeating the boss. The logger therefore deducts MP for wins and records pass consumption separately.
+- The official help page states a normal limit of 10 Remote Raids per day, with event exceptions, but does not clearly establish a numeric Remote Max cap or how it relates to that Raid cap. Part 4 retains Part 3's separate Remote Max usage accounting, does not increment ordinary Remote Raid usage for Max logs, and does not invent a Max participation cap. The logger explicitly asks players to check in-game eligibility. Separate accounting is a conservative application choice, not a claim that unlimited Remote Max participation is officially confirmed.
+
+### Required D1 migration
+
+`migrations/0002_battle_logging.sql` is required because aggregate Part 3 resource counters cannot preserve each transaction's battle identity, pass/MP deltas and reversible target progress. It adds a durable `battle_log` table, an index, atomic apply/Undo triggers and a unified history view. It reuses `battle_resource_state`, `battle_resource_daily` and ordinary `remote_raid_usage`. `schema.sql` includes the same additions for fresh databases.
+
+The migration uses `CREATE IF NOT EXISTS` and does not replay history or attach triggers to the historical `raid_log` table. Historical Undo imports and reverses one old row in a single D1 batch. New Undo reverses the original deltas and original usage date atomically; repeated requests are harmless. Conflicting manual corrections or deleted targets reject the entire Undo rather than partially refunding resources. MP refunds are not clamped, so later collection cannot cause a lossy Undo.
+
+After merge, an authorized operator must apply **only** the new migration to production using the existing binding:
+
+```bash
+npx wrangler d1 execute DB --remote --file=migrations/0002_battle_logging.sql
+```
+
+This command is a manual production step, not part of tests or this PR's execution. Part 3 migration `0001_battle_resources.sql` must already be applied. The additive migration is compatible with the old Worker; if the new Worker arrives first, logging returns an actionable migration-required error until the migration is applied. Do not initialize production with the full `schema.sql`.
+
+`/api/battle-log` and `/api/battle-log/undo` serve the unified logger; the existing `/api/raid-log` paths remain aliases. No Worker deployment settings change. CSS references are bumped to v33 on all four public pages. The deterministic suite includes actual SQLite transaction tests (Node 22.13+ or Node 24), API compatibility, resource/Undo regressions, UI contracts and inline JavaScript syntax checks.
+
 ## Features
 
 - Personalized raid recommendations based on event availability, shared meta scores, user-defined weights, targets, progress, and priority.
 - Type-specific PvE raid-attacker rankings calculated from Pokémon GO API/GameMaster-backed stats and moves, with optimal move pairings and form-aware comparisons.
 - Remote Raid planning that treats official limits and an optional personal budget as ceilings, not spending targets.
-- Local and Remote Raid logging, recent activity, undo support, Remote Raid usage tracking, and optional target-progress updates.
+- Unified Local/Remote Raid, Dynamax and Gigantamax logging, recent activity, reversible resource accounting, and editable target-progress updates.
 - Targets for Mega Energy, raid counts, Candy XL, Candy, and custom goals, with priority, progress, notes, completion state, search, filters, card/list views, and bulk deletion.
 - A Hundo CP calculator for the loaded Pokémon GO Pokédex, common encounter levels, and custom levels.
 - A live month calendar and private ICS feed with user-selectable event categories.
