@@ -38,6 +38,32 @@ This command is a manual production step, not part of tests or this PR's executi
 
 `/api/battle-log` and `/api/battle-log/undo` serve the unified logger; the existing `/api/raid-log` paths remain aliases. No Worker deployment settings change. CSS references are bumped to v33 on all four public pages. The deterministic suite includes actual SQLite transaction tests (Node 22.13+ or Node 24), API compatibility, resource/Undo regressions, UI contracts and inline JavaScript syntax checks.
 
+## Part 5: Targets integration
+
+Targets now distinguish ordinary Raids, Dynamax and Gigantamax. Add a target from a recommendation, or choose its battle type in the editor. Max goals default to battles won; Candy, Candy XL and editable custom progress remain supported. A matching existing recommendation target opens Edit. The logger offers a goal selector when several goals match the same battle.
+
+Matching uses the exact Pokémon/form plus battle identity across recommendations, current/upcoming availability, calendar personalization and logging. A Raid target never automatically receives Max progress. Explicitly named legacy Max targets retain that identity; otherwise historical targets remain Raid targets. New Max targets use capability-prefixed names (for example, Gigantamax Gengar) so separate goals coexist under the existing per-user/name/goal uniqueness rule. No existing name, ID or progress is rewritten.
+
+When several goals match, recommendations prioritize active targets, then personal priority, with a stable goal/ID tie-break. The logger initially selects that target, but the user can select another matching goal and edit actual progress. Completed/Skip goals retain their planning exclusions. Battle-count goals use wins, not failed attempts. The planner does not automatically mark targets complete.
+
+Battle and availability filters participate in the existing Active/Completed/All counts. Max Target cards omit ordinary Raid attacker information and never substitute a base sprite for a missing exact form. The Target editor and logger retain visible actions at narrow mobile sizes; CSS references are v34.
+
+### Part 5 migration and rollout
+
+`migrations/0003_target_battle_kind.sql` adds one nullable, constrained `targets.battle_kind` column. It preserves Target IDs and historical Raid foreign keys without rebuilding tables. It does not change Part 4 logs or resource tables. `schema.sql` includes the column for fresh databases.
+
+Apply the migration **once**, after merge and production authorization, with the existing binding:
+
+```bash
+npx wrangler d1 execute DB --remote --file=migrations/0003_target_battle_kind.sql
+```
+
+Unlike the CREATE-based Part 4 migration, SQLite ADD COLUMN is not repeatable. Check `PRAGMA table_info(targets)` first if application status is uncertain. Do not apply it again to a database already containing `battle_kind`, including a fresh database initialized with the new schema. Before migration, reads retain legacy identity inference and Target saves return an actionable 503.
+
+Editing preserves a target's Pokémon/battle/goal identity and its ID; use Add target for a different identity. Duplicate creation reports an error rather than resetting existing progress. Progress, desired amount, expected progress, priority, completion and notes remain editable.
+
+The Part 5 suite covers migration/FK preservation, separate same-species goals, CRUD/authentication, duplicate protection, form matching, recommendations, suppression-aware availability, allocation caps, editable progress and Undo, and filtered UI counts. No production migration, merge or deployment is part of Part 5 PR preparation.
+
 ## Features
 
 - Personalized raid recommendations based on event availability, shared meta scores, user-defined weights, targets, progress, and priority.

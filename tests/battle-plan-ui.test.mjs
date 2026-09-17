@@ -52,7 +52,7 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=33/);
+  assert.match(read(page), /styles\.css\?v=34/);
 }
 
 assert.match(worker, /BATTLE_SOURCE_TYPES/);

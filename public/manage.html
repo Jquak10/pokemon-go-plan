@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Battle Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=33">
+  <link rel="stylesheet" href="/styles.css?v=34">
 </head>
 
 <body class="manage-page">
@@ -585,10 +585,20 @@
                 <option value="candy">Candy</option>
                 <option value="candy_xl">Candy XL</option>
                 <option value="raids">Raids</option>
-                <option value="other">Other</option>
+                <option value="battles">Battles won</option>
+                <option value="custom">Custom progress</option>
               </select>
             </label>
 
+            <label>
+              <span>Battle</span>
+              <select id="targetBattleFilter">
+                <option value="all">All battles</option>
+                <option value="raid">Raids</option>
+                <option value="dynamax">Dynamax</option>
+                <option value="gigantamax">Gigantamax</option>
+              </select>
+            </label>
             <label>
               <span>Priority</span>
               <select id="targetPriorityFilter">
@@ -601,12 +611,12 @@
             </label>
 
             <label>
-              <span>Raid availability</span>
+              <span>Battle availability</span>
               <select id="targetAvailabilityFilter">
                 <option value="all">All</option>
                 <option value="now">Available now</option>
                 <option value="upcoming">Upcoming</option>
-                <option value="not_raiding">Not currently raiding</option>
+                <option value="not_raiding">No known battle window</option>
               </select>
             </label>
 
@@ -1242,11 +1252,15 @@
             <p class="field-help">Remote Max usage is recorded separately. Its daily participation cap is not verified here; check the in-game limit.</p>
           </div>
 
+          <div>
+            <label for="battleLogTarget">Target to update</label>
+            <select id="battleLogTarget"></select>
+          </div>
           <label class="raid-update-target-row">
             <input id="raidLogUpdateTarget" type="checkbox" checked>
             <span>
               <strong>Update matching target progress</strong>
-              <small id="raidLogTargetHint">The expected progress per raid is used as the starting estimate.</small>
+              <small id="raidLogTargetHint">Expected progress per battle is used as the starting estimate.</small>
             </span>
           </label>
 
@@ -1293,16 +1307,26 @@
             </div>
 
             <p class="field-help">
-              The dropdown prioritizes Pokémon available now, then known raid targets in the next 30 days.
+              The dropdown prioritizes Pokémon available now, then known battle targets in the next 30 days.
               Choose <strong>Other / custom Pokémon…</strong> if the target you want is not listed.
             </p>
           </div>
 
           <div>
+            <label for="targetBattleKind">Battle</label>
+            <select id="targetBattleKind">
+              <option value="raid">Ordinary Raid</option>
+              <option value="dynamax">Dynamax Max Battle</option>
+              <option value="gigantamax">Gigantamax Max Battle</option>
+            </select>
+            <p class="field-help">Each battle type tracks its own goal. Existing targets keep their Pokémon, battle and goal identity; create another target for a different goal.</p>
+          </div>
+          <div>
             <label for="targetType">Target type</label>
             <select id="targetType">
               <option value="mega_energy">Mega Energy</option>
               <option value="raids">Number of raids</option>
+              <option value="battles">Battles won</option>
               <option value="candy_xl">Candy XL</option>
               <option value="candy">Candy</option>
               <option value="custom">Custom progress</option>
@@ -1320,10 +1344,10 @@
           </div>
 
           <div>
-            <label for="expectedProgressPerRaid">Expected progress per raid</label>
+            <label for="expectedProgressPerRaid">Expected progress per battle</label>
             <input id="expectedProgressPerRaid" type="number" min="0" step="1" placeholder="Optional">
             <p class="field-help">
-              Useful for estimating raids remaining. Leave blank if the reward varies too much.
+              Useful for estimating battles remaining. Leave blank if the reward varies too much.
             </p>
           </div>
 
@@ -1336,7 +1360,7 @@
               <option value="skip">Skip</option>
             </select>
             <p class="field-help">
-              Skip means the paid Remote Raid planner recommends 0 for this target.
+              Skip means the paid battle planner recommends 0 for this target.
             </p>
           </div>
 
@@ -1347,7 +1371,7 @@
               <option value="1">Yes</option>
             </select>
             <p class="field-help">
-              Completed targets receive 0 paid Remote Raid allocations.
+              Completed targets receive 0 paid battle allocations.
             </p>
           </div>
 
@@ -1366,6 +1390,7 @@
     </section>
   </div>
 
+<script src="/battle-targets.js?v=1"></script>
 <script>
 const token = location.pathname.split("/").filter(Boolean)[1];
 const app = document.getElementById("app");
@@ -1377,6 +1402,7 @@ let battlePlanFilter =
   )
     ? sessionStorage.getItem("battle-plan-filter")
     : "all";
+let editingTargetId = null;
 let targetById = new Map();
 let targetSelectionMode = false;
 const selectedTargetIds = new Set();
@@ -1385,6 +1411,7 @@ let targetFilterState = {
   status: "active",
   search: "",
   type: "all",
+  battle: "all",
   priority: "all",
   availability: "all",
   sort: "priority"
@@ -1461,6 +1488,7 @@ const sourceIcons = {
 const targetTypeLabels = {
   mega_energy: "Mega Energy",
   raids: "Raids",
+  battles: "Battles won",
   candy_xl: "Candy XL",
   candy: "Candy",
   custom: "Custom"
@@ -2082,34 +2110,9 @@ async function saveBattleResources() {
   }
 }
 
-function raidLogMatchingTarget(
-  pokemonName,
-  explicitTargetId = null
-) {
-  if (explicitTargetId) {
-    const exactById =
-      state.targets.find(
-        target =>
-          String(target.id) ===
-          String(explicitTargetId)
-      );
-
-    if (exactById) {
-      return exactById;
-    }
-  }
-
-  const wanted =
-    normalizePickerName(
-      pokemonName
-    );
-
-  return state.targets.find(
-    target =>
-      normalizePickerName(
-        target.pokemon_name
-      ) === wanted
-  ) || null;
+function raidLogMatchingTarget(pokemonName, explicitTargetId = null) {
+  const matches = BattleTargets.orderedMatches(state.targets || [],{pokemon_name:pokemonName,...battleLogSelection()});
+  return (explicitTargetId ? matches.find(t => String(t.id) === String(explicitTargetId)) : matches[0]) || null;
 }
 
 function raidLogPokemonNames() {
@@ -2191,8 +2194,7 @@ function raidLogDefaultProgress(
   }
 
   if (
-    target.target_type ===
-    "raids"
+    ["raids","battles"].includes(target.target_type)
   ) {
     return count;
   }
@@ -2247,7 +2249,7 @@ function populateRaidLogPokemon(
               `<option value="${esc(name)}">${esc(name)}</option>`
           )
           .join("")
-      : `<option value="">No raid Pokémon available</option>`;
+      : `<option value="">No battle Pokémon available</option>`;
 
   if (selectedName) {
     const matched =
@@ -2341,7 +2343,12 @@ function updateRaidLogPreview() {
   const spent = isMax && mpText !== "" ? Number(mpText) * wins : 0;
   const passes = raidLogType === "remote" ? (isMax ? Number(document.getElementById("battleLogPasses").value) : count) : 0;
   const progress = Number(document.getElementById("raidLogProgress").value || 0);
+  const targetMatches = BattleTargets.orderedMatches(state.targets || [],{pokemon_name:name,...selection});
+  const targetSelect = document.getElementById("battleLogTarget");
+  targetSelect.innerHTML = targetMatches.length ? targetMatches.map(t => `<option value="${esc(t.id)}">${esc(targetTypeLabels[t.target_type] || t.target_type)} · ${formatNumber(t.current_value || 0)}${Number(t.completed) ? " · Completed" : ""}</option>`).join("") : '<option value="">No matching target</option>';
   const target = raidLogMatchingTarget(name, raidLogExplicitTargetId);
+  targetSelect.value = target?.id || "";
+  targetSelect.disabled = !targetMatches.length;
   const checkbox = document.getElementById("raidLogUpdateTarget");
   checkbox.disabled = !target;
   if (!target) checkbox.checked = false;
@@ -2366,7 +2373,7 @@ function updateRaidLogPreview() {
 }
 
 function openRaidLogModal(pokemonName = "", targetId = null, recommendation = null) {
-  raidLogExplicitTargetId = targetId || null;
+  raidLogExplicitTargetId = targetId || recommendation?.target?.id || null;
   raidLogProgressDirty = false;
   battleLogWinsDirty = false;
   battleLogPassesDirty = false;
@@ -2376,7 +2383,9 @@ function openRaidLogModal(pokemonName = "", targetId = null, recommendation = nu
   document.getElementById("raidLogUpdateTarget").checked = true;
   document.getElementById("raidLogStatus").textContent = "";
   raidLogType = localStorage.getItem("pogo-last-raid-type") === "local" ? "local" : "remote";
-  prefillBattleLog(recommendation);
+  const explicitTarget = (state.targets || []).find(t => String(t.id) === String(targetId));
+  const matchingRec = explicitTarget && (state.recommendations || []).find(r => BattleTargets.matches(explicitTarget,r));
+  prefillBattleLog(recommendation || matchingRec || (explicitTarget ? {...explicitTarget,...BattleTargets.metadata(explicitTarget)} : null));
   syncRaidLogProgressDefault();
   updateRaidLogPreview();
   document.getElementById("raidLogModal").classList.remove("hidden");
@@ -2982,6 +2991,7 @@ function openTargetFilterDrawer() {
 
 function activeTargetFilterCount() {
   return [
+    targetFilterState.battle !== "all",
     targetFilterState.type !==
       "all",
     targetFilterState.priority !==
@@ -5155,6 +5165,7 @@ function renderRecommendationCard(
           data-log-battle-key="${esc([rec.battle_system || "raid", rec.battle_variant || "", rec.pokemon_name].join("|"))}">
           + Log battle
         </button>
+        <button type="button" class="secondary small-button" ${rec.target ? `data-edit-battle-target="${esc(rec.target.id)}"` : `data-add-battle-target="${esc(BattleTargets.key(rec))}"`}>${rec.target ? "Edit target" : "+ Add target"}</button>
       </div>
     </article>
   `;
@@ -5240,7 +5251,7 @@ function renderRecommendations() {
     new Map(
       sharedAllocations.map(
         allocation => [
-          `${allocation.battle_system || "raid"}|${normalizePickerName(allocation.pokemon_name)}`,
+          BattleTargets.key(allocation),
           allocation
         ]
       )
@@ -5279,7 +5290,7 @@ function renderRecommendations() {
     rec => {
       const shared =
         sharedAllocationByKey.get(
-          `${rec.battle_system || "raid"}|${normalizePickerName(rec.pokemon_name)}`
+          BattleTargets.key(rec)
         );
 
       const legacy =
@@ -5348,45 +5359,8 @@ function targetProgress(target) {
 }
 
 function targetAvailability(target) {
-  const name =
-    normalizePickerName(
-      target.pokemon_name
-    );
-
-  const currentNames =
-    new Set(
-      (
-        state.target_options
-          ?.current || []
-      ).map(
-        item =>
-          normalizePickerName(
-            item.name
-          )
-      )
-    );
-
-  const upcomingNames =
-    new Set(
-      (
-        state.target_options
-          ?.upcoming || []
-      ).map(
-        item =>
-          normalizePickerName(
-            item.name
-          )
-      )
-    );
-
-  if (currentNames.has(name)) {
-    return "now";
-  }
-
-  if (upcomingNames.has(name)) {
-    return "upcoming";
-  }
-
+  if ((state.target_options?.current || []).some(item => BattleTargets.matches(target,item))) return "now";
+  if ((state.target_options?.upcoming || []).some(item => BattleTargets.matches(target,item))) return "upcoming";
   return "not_raiding";
 }
 
@@ -5428,7 +5402,7 @@ function targetCardHtml(target) {
   const availabilityLabel = {
     now: "Available now",
     upcoming: "Upcoming",
-    not_raiding: "Not in current raid window"
+    not_raiding: "No known battle window"
   }[availability];
 
   return `
@@ -5445,7 +5419,7 @@ function targetCardHtml(target) {
           )}
 
           <div>
-            <span class="target-type-label">${esc(targetTypeLabels[target.target_type] || target.target_type)}</span>
+            <span class="target-type-label">${esc(BattleTargets.label(target))} · ${esc(targetTypeLabels[target.target_type] || target.target_type)}</span>
             <h3>${esc(target.pokemon_name)}</h3>
           </div>
         </div>
@@ -5474,11 +5448,11 @@ function targetCardHtml(target) {
         ${
           target.expected_progress_per_raid == null
             ? ""
-            : `<span>≈ ${formatNumber(target.expected_progress_per_raid)} / raid</span>`
+            : `<span>≈ ${formatNumber(target.expected_progress_per_raid)} / battle</span>`
         }
       </div>
 
-      ${raidRankingsHtml(target.raid_rankings_json)}
+      ${BattleTargets.kind(target) === "raid" ? raidRankingsHtml(target.raid_rankings_json) : ""}
 
       <div class="target-actions compact-target-actions">
         ${targetSelectionMode ? `
@@ -5555,6 +5529,8 @@ function targetsMatchingNonStatusFilters() {
         ) {
           return false;
         }
+
+        if (targetFilterState.battle !== "all" && BattleTargets.kind(target) !== targetFilterState.battle) return false;
 
         if (
           targetFilterState.type !==
@@ -5885,7 +5861,7 @@ function renderTargets() {
       <div class="empty-state target-empty">
         <span aria-hidden="true">◎</span>
         <strong>No targets yet.</strong>
-        <p>Add a goal to make the raid plan respond to your personal progress.</p>
+        <p>Add a goal to make the battle plan respond to your personal progress.</p>
         <button type="button" class="button" data-empty-add-target>+ Add your first target</button>
       </div>
     `;
@@ -6735,7 +6711,7 @@ function allTargetOptionNames() {
     ...(options.current || []),
     ...(options.upcoming || []),
     ...(options.existing || [])
-  ].map(option => option.name);
+  ].map(option => BattleTargets.canonicalName(option.name,BattleTargets.kind(option)));
 }
 
 function renderTargetPokemonOptions(selectedName = "") {
@@ -6757,7 +6733,7 @@ function renderTargetPokemonOptions(selectedName = "") {
       items: targetOptions.current || []
     },
     {
-      label: `Upcoming raids · next ${targetOptions.horizon_days || 30} days`,
+      label: `Upcoming battles · next ${targetOptions.horizon_days || 30} days`,
       items: targetOptions.upcoming || []
     },
     {
@@ -6778,7 +6754,7 @@ function renderTargetPokemonOptions(selectedName = "") {
     html += group.items
       .map(
         option =>
-          `<option value="${esc(option.name)}">${esc(option.name)}</option>`
+          `<option value="${esc(BattleTargets.canonicalName(option.name,BattleTargets.kind(option)))}">${esc(BattleTargets.canonicalName(option.name,BattleTargets.kind(option)))}</option>`
       )
       .join("");
 
@@ -6879,7 +6855,16 @@ function updateCustomPokemonVisibility() {
 }
 
 
+function syncTargetBattleForm() {
+  const isMax = document.getElementById("targetBattleKind").value !== "raid";
+  const type = document.getElementById("targetType");
+  for (const option of type.options) option.disabled = isMax && option.value === "mega_energy";
+  if (!editingTargetId && isMax && ["mega_energy","raids"].includes(type.value)) type.value = "battles";
+}
 function clearTargetForm() {
+  editingTargetId = null;
+  for (const id of ["pokemonName","customPokemonName","targetBattleKind","targetType"]) document.getElementById(id).disabled = false;
+  document.getElementById("targetBattleKind").value = "raid";
   renderTargetPokemonOptions("");
   document.getElementById("customPokemonName").value = "";
   document.getElementById("customPokemonWrap").classList.add("hidden");
@@ -6893,10 +6878,13 @@ function clearTargetForm() {
   document.getElementById("targetStatus").textContent = "";
 }
 
-function openTargetModal(target = null) {
+function openTargetModal(target = null, recommendation = null) {
   clearTargetForm();
 
   if (target) {
+    editingTargetId = target.id;
+    document.getElementById("targetBattleKind").value = BattleTargets.kind(target);
+    for (const id of ["pokemonName","customPokemonName","targetBattleKind","targetType"]) document.getElementById(id).disabled = true;
     document.getElementById("targetModalTitle").textContent = `Edit ${target.pokemon_name}`;
     renderTargetPokemonOptions(target.pokemon_name);
     document.getElementById("targetType").value = target.target_type;
@@ -6910,6 +6898,12 @@ function openTargetModal(target = null) {
     document.getElementById("targetModalTitle").textContent = "Add target";
   }
 
+  if (recommendation) {
+    document.getElementById("targetBattleKind").value = BattleTargets.kind(recommendation) === "max" ? "" : BattleTargets.kind(recommendation);
+    renderTargetPokemonOptions(BattleTargets.canonicalName(recommendation.pokemon_name,BattleTargets.kind(recommendation)));
+    document.getElementById("targetType").value = recommendation.battle_system === "max" ? "battles" : "raids";
+  }
+  syncTargetBattleForm();
   const modal = document.getElementById("targetModal");
   modal.classList.remove("hidden");
   lockPageForModal();
@@ -6931,6 +6925,7 @@ async function saveTarget() {
     return;
   }
 
+  if (!document.getElementById("targetBattleKind").value) { status.textContent = "Choose Dynamax or Gigantamax."; return; }
   status.textContent = "Saving…";
 
   try {
@@ -6939,6 +6934,8 @@ async function saveTarget() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         token,
+        id: editingTargetId,
+        battle_kind: document.getElementById("targetBattleKind").value,
         pokemon_name: pokemonName,
         target_type: document.getElementById("targetType").value,
         current_value: document.getElementById("currentValue").value,
@@ -7429,7 +7426,16 @@ document.addEventListener(
   }
 );
 
+document.getElementById("battleLogTarget").addEventListener("change", event => {
+  raidLogExplicitTargetId = event.target.value || null;
+  raidLogProgressDirty = false;
+  document.getElementById("raidLogUpdateTarget").checked = true;
+  syncRaidLogProgressDefault();
+  updateRaidLogPreview();
+});
 document.getElementById("battleLogKind").addEventListener("change", () => {
+  raidLogExplicitTargetId = null;
+  document.getElementById("raidLogUpdateTarget").checked = true;
   battleLogRecommendation = null;
   document.querySelector('[data-raid-type="remote"]').disabled = false;
   document.getElementById("battleLogMp").value = "";
@@ -7451,6 +7457,24 @@ document.getElementById("battleLogMp").addEventListener("input", updateRaidLogPr
 document.getElementById("saveDailyBudgetOverride").addEventListener("click", saveDailyBudgetOverride);
 document.getElementById("clearDailyBudgetOverride").addEventListener("click", clearDailyBudgetOverride);
 
+document.getElementById("targetBattleKind").addEventListener("change", () => {
+  const name = selectedTargetPokemonName();
+  if (name) renderTargetPokemonOptions(BattleTargets.canonicalName(BattleTargets.formName(name,"max"),document.getElementById("targetBattleKind").value));
+  syncTargetBattleForm();
+});
+document.getElementById("pokemonName").addEventListener("change", () => {
+  const name = selectedTargetPokemonName();
+  if (name) document.getElementById("targetBattleKind").value = BattleTargets.namedKind(name) || "raid";
+  syncTargetBattleForm();
+});
+document.addEventListener("click", event => {
+  const edit = event.target.closest("[data-edit-battle-target]");
+  if (edit) { const target = state.targets.find(t => String(t.id) === edit.dataset.editBattleTarget); if (target) openTargetModal(target); return; }
+  const button = event.target.closest("[data-add-battle-target]");
+  if (!button) return;
+  const rec = (state.recommendations || []).find(rec => BattleTargets.key(rec) === button.dataset.addBattleTarget);
+  if (rec) openTargetModal(null,rec);
+});
 document.getElementById("openAddTarget").addEventListener("click", () => openTargetModal());
 document.getElementById("toggleTargetSelection").addEventListener("click", toggleTargetSelectionMode);
 document.getElementById("cancelTargetSelection").addEventListener("click", () => {
@@ -7531,6 +7555,7 @@ function clearTargetFilters() {
     status: "active",
     search: "",
     type: "all",
+  battle: "all",
     priority: "all",
     availability: "all",
     sort: "priority"
@@ -7538,6 +7563,7 @@ function clearTargetFilters() {
 
   document.getElementById("targetSearch").value = "";
   document.getElementById("targetTypeFilter").value = "all";
+  document.getElementById("targetBattleFilter").value = "all";
   document.getElementById("targetPriorityFilter").value = "all";
   document.getElementById("targetAvailabilityFilter").value = "all";
   document.getElementById("targetSort").value = "priority";
@@ -7564,6 +7590,11 @@ document
 
 document.getElementById("targetSearch").addEventListener("input", event => {
   targetFilterState.search = event.target.value;
+  renderTargets();
+});
+
+document.getElementById("targetBattleFilter").addEventListener("change", event => {
+  targetFilterState.battle = event.target.value;
   renderTargets();
 });
 
