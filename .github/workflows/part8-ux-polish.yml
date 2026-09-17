@@ -1,0 +1,81 @@
+name: Part 8 UX polish integration
+
+on:
+  push:
+    branches:
+      - feat/part-8-ux-regression
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/part-8-ux-regression
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Repair temporary helper quoting
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/part8-ux-polish.py')
+          lines = path.read_text().splitlines()
+          out = []
+          replaced = False
+          for line in lines:
+              if "old = f'class=\"tab-button{" in line:
+                  out.extend([
+                      "    active_class = ' active' if tab == 'plan' else ''",
+                      "    selected = 'true' if tab == 'plan' else 'false'",
+                      "    old = f'class=\"tab-button{active_class}\" type=\"button\" data-tab=\"{tab}\" aria-selected=\"{selected}\"'",
+                  ])
+                  replaced = True
+              else:
+                  out.append(line)
+          if not replaced:
+              raise SystemExit('temporary helper line not found')
+          path.write_text('\n'.join(out) + '\n')
+          PY
+
+      - name: Apply Part 8 patch
+        run: python3 scripts/part8-ux-polish.py
+
+      - name: Check JavaScript and inline scripts
+        run: |
+          node --check src/index.js
+          node --check tests/battle-plan-ui.test.mjs
+          node --check tests/battle-logging-ui.test.mjs
+          node - <<'NODE'
+          const fs = require('fs');
+          const vm = require('vm');
+          const html = fs.readFileSync('public/manage.html','utf8');
+          for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+            new vm.Script(match[1]);
+          }
+          NODE
+
+      - name: Run deterministic suite
+        run: npm test
+
+      - name: Check diff
+        run: git diff --check
+
+      - name: Commit validated Part 8 changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/manage.html public/styles.css public/index.html public/admin.html public/sources.html tests/battle-plan-ui.test.mjs tests/battle-logging-ui.test.mjs
+          if git diff --cached --quiet; then
+            echo "No product changes to commit."
+            exit 0
+          fi
+          git commit -m "feat: polish Battle Plan UX and harden regressions"
+          git push origin HEAD:feat/part-8-ux-regression
