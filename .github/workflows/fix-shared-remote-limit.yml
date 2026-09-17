@@ -1,0 +1,58 @@
+name: Fix shared Remote daily limit
+
+on:
+  push:
+    branches:
+      - fix/shared-remote-limit-max-log
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/shared-remote-limit-max-log
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply guarded fix
+        run: python3 scripts/fix-shared-remote-limit.py
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check src/index.js
+          node --check src/resource-planning.js
+          node --check tests/battle-logging.test.mjs
+          node --check tests/resource-planning.test.mjs
+          node --check tests/battle-logging-ui.test.mjs
+          node - <<'NODE'
+          const fs = require('fs');
+          const vm = require('vm');
+          const html = fs.readFileSync('public/manage.html','utf8');
+          for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
+          NODE
+
+      - name: Run deterministic tests
+        run: npm test
+
+      - name: Check diff
+        run: git diff --check
+
+      - name: Commit validated fix
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/index.js src/resource-planning.js public/manage.html tests/battle-logging.test.mjs tests/resource-planning.test.mjs tests/battle-logging-ui.test.mjs
+          git commit -m "fix: share Remote daily limit across battle systems"
+          git push origin HEAD:fix/shared-remote-limit-max-log
