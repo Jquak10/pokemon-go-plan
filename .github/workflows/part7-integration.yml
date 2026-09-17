@@ -30,14 +30,17 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           path = Path("tests/max-ranking-integration.test.mjs")
-          text = path.read_text()
-          old = r'/max_rankings_json: targetBattleKind\(target\) === "raid" \? null/'
-          old = old.replace('\\\\', '\\')
-          new = r'/max_rankings_json:\s*targetBattleKind\(target\)\s*===\s*"raid"\s*\?\s*null/'
-          new = new.replace('\\\\', '\\')
-          if old not in text:
-              raise SystemExit("Expected generated assertion not found")
-          path.write_text(text.replace(old, new, 1))
+          lines = path.read_text().splitlines()
+          replacement = r'assert.match(index, /max_rankings_json:\s*targetBattleKind\(target\)\s*===\s*"raid"\s*\?\s*null/);'
+          matched = False
+          for index, line in enumerate(lines):
+              if line.startswith("assert.match(index, /max_rankings_json:") and "targetBattleKind" in line:
+                  lines[index] = replacement
+                  matched = True
+                  break
+          if not matched:
+              raise SystemExit("Expected generated assertion line not found")
+          path.write_text("\n".join(lines) + "\n")
           PY
 
       - name: Check JavaScript syntax
