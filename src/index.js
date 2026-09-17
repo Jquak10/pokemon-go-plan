@@ -14,10 +14,12 @@ import {
 import {
   BATTLE_SOURCE_TYPES,
   MAX_BATTLE_SOURCE_TYPES,
+  MAX_ROTATION_SOURCE_TYPE,
   battleOpportunityMetadata,
   battleOpportunityPresentation,
   maxBattleVariantFromText,
-  maxBattleVariantForEvent
+  maxBattleVariantForEvent,
+  maxRotationEventFromMaxMonday
 } from "./battle-opportunities.js";
 import {
   STANDARD_MAX_PARTICLE_DAILY_LIMIT,
@@ -456,6 +458,99 @@ async function syncOneSource(env, sourceType, url) {
   return parsed.length;
 }
 
+async function syncDerivedMaxRotations(env) {
+  const today = todayUtc();
+  const windowStart = addDaysIso(today, -42);
+  const windowEnd = addDaysIso(today, 70);
+
+  const { results: maxMondays } = await env.DB.prepare(`
+    SELECT *
+    FROM events
+    WHERE source_type = 'max_mondays'
+      AND status = 'active'
+      AND start_date IS NOT NULL
+      AND start_date >= ?
+      AND start_date <= ?
+    ORDER BY start_date, summary
+  `).bind(windowStart, windowEnd).all();
+
+  const derived = (maxMondays || [])
+    .map(event => maxRotationEventFromMaxMonday(event))
+    .filter(Boolean);
+
+  // Preserve last-known derived data if the upstream schedule window is
+  // temporarily empty instead of erasing otherwise valid availability.
+  if (!derived.length) return 0;
+
+  const timestamp = nowIso();
+  const statements = [
+    env.DB.prepare(`
+      UPDATE events
+      SET status = 'stale',
+          sequence = sequence + 1,
+          updated_at = ?
+      WHERE source_type = ?
+        AND status = 'active'
+        AND COALESCE(end_date, start_date, '9999-12-31') >= ?
+    `).bind(timestamp, MAX_ROTATION_SOURCE_TYPE, today)
+  ];
+
+  for (const event of derived) {
+    const identity = event.source_uid ||
+      event.summary + "|" + event.dtstart_line + "|" + (event.dtend_line || "");
+    const id = await sha256Hex(MAX_ROTATION_SOURCE_TYPE + "|" + identity);
+    const contentHash = await sha256Hex(JSON.stringify(event));
+
+    statements.push(
+      env.DB.prepare(`
+        INSERT INTO events (
+          id, source_type, source_uid, summary, description,
+          dtstart_line, dtend_line, other_lines,
+          start_date, end_date, source_url, content_hash,
+          sequence, status, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?)
+        ON CONFLICT(id) DO UPDATE SET
+          source_uid = excluded.source_uid,
+          summary = excluded.summary,
+          description = excluded.description,
+          dtstart_line = excluded.dtstart_line,
+          dtend_line = excluded.dtend_line,
+          other_lines = excluded.other_lines,
+          start_date = excluded.start_date,
+          end_date = excluded.end_date,
+          source_url = excluded.source_url,
+          sequence = CASE
+            WHEN events.content_hash != excluded.content_hash
+              OR events.status != 'active'
+            THEN events.sequence + 1
+            ELSE events.sequence
+          END,
+          content_hash = excluded.content_hash,
+          status = 'active',
+          updated_at = excluded.updated_at
+      `).bind(
+        id,
+        MAX_ROTATION_SOURCE_TYPE,
+        event.source_uid,
+        event.summary,
+        event.description,
+        event.dtstart_line,
+        event.dtend_line,
+        event.other_lines,
+        event.start_date,
+        event.end_date,
+        event.source_url,
+        contentHash,
+        timestamp
+      )
+    );
+  }
+
+  await env.DB.batch(statements);
+  return derived.length;
+}
+
 async function syncAllEvents(env) {
   const results = [];
   for (const [sourceType, url] of Object.entries(SOURCES)) {
@@ -466,6 +561,19 @@ async function syncAllEvents(env) {
       results.push({ source: sourceType, ok: false, error: String(error.message || error) });
     }
   }
+
+  try {
+    const count = await syncDerivedMaxRotations(env);
+    results.push({ source: MAX_ROTATION_SOURCE_TYPE, ok: true, count, derived: true });
+  } catch (error) {
+    results.push({
+      source: MAX_ROTATION_SOURCE_TYPE,
+      ok: false,
+      derived: true,
+      error: String(error.message || error)
+    });
+  }
+
   return results;
 }
 
@@ -2896,11 +3004,15 @@ export async function recommendationsForDate(
         source_kind:
           officialSource
             ? "official"
-            : "calendar",
+            : event.source_type === MAX_ROTATION_SOURCE_TYPE
+              ? "derived"
+              : "calendar",
         source_label:
           officialSource
             ? "Official Pokémon GO"
-            : "GO Calendar",
+            : event.source_type === MAX_ROTATION_SOURCE_TYPE
+              ? "Weekly Max rotation"
+              : "GO Calendar",
         start_date: event.start_date,
         end_date: event.end_date,
         remote_eligible: remoteEligible

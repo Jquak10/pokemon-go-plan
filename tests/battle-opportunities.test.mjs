@@ -6,6 +6,7 @@ import {
   BATTLE_SYSTEM,
   BATTLE_VARIANT,
   MAX_BATTLE_SOURCE_TYPES,
+  MAX_ROTATION_SOURCE_TYPE,
   RAID_SOURCE_TYPES,
   REMOTE_PASS_SOURCE_TYPES,
   battleOpportunityMetadata,
@@ -17,7 +18,8 @@ import {
   battleVariantLabel,
   encounterNameForMaxPokemon,
   maxBattleVariantForEvent,
-  maxBattleVariantFromText
+  maxBattleVariantFromText,
+  maxRotationEventFromMaxMonday
 } from "../src/battle-opportunities.js";
 
 assert.equal(
@@ -44,6 +46,8 @@ assert.equal(BATTLE_SOURCE_TYPES.has("raid_hour"), true);
 assert.equal(REMOTE_PASS_SOURCE_TYPES.has("raid_battles"), true);
 assert.equal(REMOTE_PASS_SOURCE_TYPES.has("max_battles"), true);
 assert.equal(REMOTE_PASS_SOURCE_TYPES.has("max_mondays"), true);
+assert.equal(BATTLE_SOURCE_TYPES.has(MAX_ROTATION_SOURCE_TYPE), true);
+assert.equal(REMOTE_PASS_SOURCE_TYPES.has(MAX_ROTATION_SOURCE_TYPE), true);
 
 assert.equal(
   maxBattleVariantFromText("Gigantamax Gengar"),
@@ -58,6 +62,44 @@ assert.equal(
   BATTLE_VARIANT.DYNAMAX
 );
 assert.equal(maxBattleVariantFromText("Beldum"), null);
+
+const rhyhornRotation = maxRotationEventFromMaxMonday({
+  source_type: "max_mondays",
+  source_uid: "max-mondays-2026-09-14",
+  summary: "[MM] Dynamax Rhyhorn during Max Monday",
+  description: "Power Spots refresh more frequently.",
+  start_date: "2026-09-14",
+  end_date: "2026-09-14",
+  source_url: "https://leekduck.com/events/max-mondays-2026-09-14/"
+});
+assert.equal(rhyhornRotation.source_type, MAX_ROTATION_SOURCE_TYPE);
+assert.equal(rhyhornRotation.start_date, "2026-09-14");
+assert.equal(rhyhornRotation.end_date, "2026-09-20");
+assert.equal(rhyhornRotation.dtend_line, "DTEND;VALUE=DATE:20260921");
+assert.equal(rhyhornRotation.summary, "[MR] Dynamax Rhyhorn in Max Battles");
+assert.equal(maxBattleVariantForEvent(rhyhornRotation, "Rhyhorn"), BATTLE_VARIANT.DYNAMAX);
+
+const birdRotation = maxRotationEventFromMaxMonday({
+  source_type: "max_mondays",
+  source_uid: "max-mondays-2026-09-21",
+  summary: "[MM] Dynamax Articuno, Zapdos, and Moltres during Max Monday",
+  start_date: "2026-09-21",
+  source_url: "https://leekduck.com/events/max-mondays-2026-09-21/"
+});
+assert.equal(birdRotation.end_date, "2026-09-27");
+assert.match(birdRotation.summary, /Articuno, Zapdos, and Moltres/);
+assert.equal(maxBattleVariantForEvent(birdRotation, "Zapdos"), BATTLE_VARIANT.DYNAMAX);
+
+assert.equal(maxRotationEventFromMaxMonday({
+  source_type: "max_mondays",
+  summary: "[MM] Gigantamax Gengar during Max Monday",
+  start_date: "2026-10-05"
+}), null);
+assert.equal(maxRotationEventFromMaxMonday({
+  source_type: "max_battles",
+  summary: "[MB] Gigantamax Cinderace Max Battle Day",
+  start_date: "2026-10-03"
+}), null);
 
 assert.equal(
   maxBattleVariantForEvent({
@@ -250,6 +292,13 @@ assert.match(
 assert.match(
   workerSource,
   /const DEFAULT_SOURCES = \[[\s\S]*"max_battles"[\s\S]*"max_mondays"[\s\S]*\];/
+);
+assert.match(workerSource, /async function syncDerivedMaxRotations\(env\)/);
+assert.match(workerSource, /source_type = 'max_mondays'/);
+assert.match(workerSource, /source: MAX_ROTATION_SOURCE_TYPE, ok: true, count, derived: true/);
+assert.doesNotMatch(
+  workerSource.match(/const SOURCES = \{[\s\S]*?\n\};/)?.[0] || "",
+  /max_rotation\s*:/
 );
 
 console.log("battle opportunity foundation tests passed");

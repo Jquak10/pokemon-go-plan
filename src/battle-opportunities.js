@@ -20,9 +20,12 @@ export const RAID_SOURCE_TYPES = new Set([
   "raid_hour"
 ]);
 
+export const MAX_ROTATION_SOURCE_TYPE = "max_rotation";
+
 export const MAX_BATTLE_SOURCE_TYPES = new Set([
   "max_battles",
-  "max_mondays"
+  "max_mondays",
+  MAX_ROTATION_SOURCE_TYPE
 ]);
 
 export const BATTLE_SOURCE_TYPES = new Set([
@@ -86,6 +89,78 @@ export function maxBattleVariantForEvent(event, pokemonName = null) {
     maxBattleVariantFromText(event?.description) ||
     BATTLE_VARIANT.DYNAMAX
   );
+}
+
+function maxRotationDateOffset(dateValue, days) {
+  const match = String(dateValue || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const date = new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  );
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function compactMaxRotationDate(dateValue) {
+  return String(dateValue || "").replace(/-/g, "");
+}
+
+export function maxRotationEventFromMaxMonday(event) {
+  if (String(event?.source_type || "").trim() !== "max_mondays") {
+    return null;
+  }
+
+  const summary = String(event?.summary || "").trim();
+  const description = String(event?.description || "").trim();
+  const startDate = String(event?.start_date || "").trim();
+
+  if (!summary || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    return null;
+  }
+
+  // Gigantamax/G-Max Mondays are special events. Never stretch them into
+  // a week-long standard Power Spot rotation.
+  if (
+    maxBattleVariantFromText(summary) === BATTLE_VARIANT.GIGANTAMAX ||
+    maxBattleVariantFromText(description) === BATTLE_VARIANT.GIGANTAMAX
+  ) {
+    return null;
+  }
+
+  const endDate = maxRotationDateOffset(startDate, 6);
+  const exclusiveEndDate = maxRotationDateOffset(startDate, 7);
+  if (!endDate || !exclusiveEndDate) return null;
+
+  let featured = summary
+    .replace(/^\[(?:MM|MB)\]\s*/i, "")
+    .replace(/\s+during\s+Max\s+Monday\b.*$/i, "")
+    .replace(/\s+Max\s+Monday\b.*$/i, "")
+    .trim();
+
+  if (!featured) return null;
+  if (!/\bdynamax\b/i.test(featured)) {
+    featured = "Dynamax " + featured;
+  }
+
+  const identity = String(event?.source_uid || "").trim() ||
+    startDate + ":" + featured;
+
+  return {
+    source_type: MAX_ROTATION_SOURCE_TYPE,
+    source_uid: "derived-max-rotation:" + identity,
+    summary: "[MR] " + featured + " in Max Battles",
+    description:
+      "Weekly Max Battle rotation derived from the Max Monday schedule. Original event: " + summary,
+    dtstart_line:
+      "DTSTART;VALUE=DATE:" + compactMaxRotationDate(startDate),
+    dtend_line:
+      "DTEND;VALUE=DATE:" + compactMaxRotationDate(exclusiveEndDate),
+    other_lines: "X-PG-DERIVED-FROM:max_mondays",
+    start_date: startDate,
+    end_date: endDate,
+    source_url: event?.source_url || null
+  };
 }
 
 export function encounterNameForMaxPokemon(value) {
