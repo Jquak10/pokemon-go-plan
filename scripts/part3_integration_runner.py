@@ -11,17 +11,23 @@ if not match:
     raise SystemExit("Could not extract original guarded patch script")
 
 script = textwrap.dedent(match.group("body"))
-label = '    "particle cost inference"\n)'
-label_index = script.find(label)
-if label_index < 0:
-    raise SystemExit("Could not locate particle cost inference block")
 
-block_start = script.rfind("replace_once(", 0, label_index)
-if block_start < 0:
-    raise SystemExit("Could not locate start of particle cost inference block")
-block_end = label_index + len(label)
 
-replacement = """sub_once(
+def replace_labeled_call(source, label, replacement):
+    marker = f'    "{label}"\n)'
+    marker_index = source.find(marker)
+    if marker_index < 0:
+        raise SystemExit(f"Could not locate {label} block")
+
+    block_start = source.rfind("replace_once(", 0, marker_index)
+    if block_start < 0:
+        raise SystemExit(f"Could not locate start of {label} block")
+
+    block_end = marker_index + len(marker)
+    return source[:block_start] + replacement + source[block_end:]
+
+
+particle_replacement = """sub_once(
     index,
     r'(      const battlePresentation =\\n        battleOpportunityPresentation\\(\\n          battleMetadata\\n        \\);\\n)(\\n      const key = \\[)',
     r'''\\1
@@ -38,6 +44,28 @@ replacement = """sub_once(
 \\2''',
     "particle cost inference"
 )"""
+script = replace_labeled_call(
+    script,
+    "particle cost inference",
+    particle_replacement,
+)
 
-script = script[:block_start] + replacement + script[block_end:]
+metadata_replacement = """sub_once(
+    index,
+    r'(        battle_presentation:\\n          battlePresentation,\\n)(        sprite_exact_form:)',
+    r'''\\1        max_particle_cost:
+          maxParticleCost.cost,
+        max_particle_cost_source:
+          maxParticleCost.basis,
+        event_description:
+          event.description || "",
+\\2''',
+    "recommendation resource metadata"
+)"""
+script = replace_labeled_call(
+    script,
+    "recommendation resource metadata",
+    metadata_replacement,
+)
+
 exec(compile(script, "part3-integrate.py", "exec"), {})
