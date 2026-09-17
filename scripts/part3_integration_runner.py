@@ -104,11 +104,9 @@ script = replace_labeled_call(
     route_replacement,
 )
 
-# The manage page intentionally contains two "Planner budget" labels.
-# Only the Today command metric becomes the cross-system Remote Pass plan;
-# the Remote Raid rules summary remains Raid-specific. Remove the two
-# broad dictionary substitutions regardless of indentation, then add one
-# exact replacement scoped to the Today card.
+# These labels occur in both the cross-system Today card and Raid-only
+# summaries. Remove the broad substitutions and re-add exact replacements
+# scoped to the Today card so Raid-specific terminology stays intact.
 for pattern, label in (
     (
         r"^[ \t]*'<span>Planner budget</span>': '<span>Remote Pass plan</span>',\n",
@@ -117,6 +115,10 @@ for pattern, label in (
     (
         r"^[ \t]*'<small>Worthwhile paid raids</small>': '<small>Recommended additional passes</small>',\n",
         "Worthwhile paid raids generic UI replacement",
+    ),
+    (
+        r"^[ \t]*'<span>Today\\'s ceiling</span>': '<span>Remote Pass ceiling</span>',\n",
+        "Today's ceiling generic UI replacement",
     ),
 ):
     script, count = re.subn(
@@ -139,6 +141,17 @@ ui_scope_insert = '''replace_once(
             <strong id="todayPlannerBudget">—</strong>
             <small>Recommended additional passes</small>''' + "'''" + ''',
     "Today Remote Pass plan copy"
+)
+
+replace_once(
+    manage,
+    ''' + "'''" + '''            <span>Today's ceiling</span>
+            <strong id="todayEffectiveBudget">—</strong>
+            <small>After preference / override</small>''' + "'''" + ''',
+    ''' + "'''" + '''            <span>Remote Pass ceiling</span>
+            <strong id="todayEffectiveBudget">—</strong>
+            <small>After preference / override</small>''' + "'''" + ''',
+    "Today Remote Pass ceiling copy"
 )
 
 replacements = {
