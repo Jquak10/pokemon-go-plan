@@ -22,6 +22,19 @@ jobs:
         with:
           node-version: 22
 
+      - name: Normalize helper quoting
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/fix-max-battle-plan.mjs')
+          text = path.read_text()
+          old = "assert.equal(T.canonicalName(match.name,T.kind(metadata)),`Dynamax ${match.name}`);"
+          new = "assert.equal(T.canonicalName(match.name,T.kind(metadata)),'Dynamax '+match.name);"
+          if old not in text:
+              raise SystemExit('Expected nested template assertion not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
       - name: Apply guarded fix
         run: node scripts/fix-max-battle-plan.mjs
 
