@@ -32,5 +32,11 @@ assert.equal(await remoteBattleUsageForDate(env,'user',correctionDate),correctio
 '''
 if text.count(old) != 1:
     raise RuntimeError(f'expected generated correction block once, found {text.count(old)}')
-path.write_text(text.replace(old,new,1))
-print('date-aware shared correction regression applied')
+text = text.replace(old,new,1)
+old_api = "assert.equal(apiMaxBody.remote_limit_used, await remoteBattleUsageForDate(env,'user','2026-09-17'));"
+new_api = "assert.equal(apiMaxBody.remote_limit_used, await remoteBattleUsageForDate(env,'user',apiMaxBody.local_date));"
+if text.count(old_api) != 1:
+    raise RuntimeError(f'expected generated API date assertion once, found {text.count(old_api)}')
+text = text.replace(old_api,new_api,1)
+path.write_text(text)
+print('date-aware shared correction and API regressions applied')
