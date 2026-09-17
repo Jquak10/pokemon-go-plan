@@ -76,10 +76,15 @@ export function maxBattleVariantForEvent(event, pokemonName = null) {
     return null;
   }
 
+  // GO Calendar's standard Max Battle/Max Monday feeds do not always repeat
+  // the word "Dynamax" in every event title. Gigantamax is the exceptional
+  // form and is explicitly named when present; otherwise a Max-source battle
+  // is a standard Dynamax battle.
   return (
     maxBattleVariantFromText(pokemonName) ||
     maxBattleVariantFromText(event?.summary) ||
-    maxBattleVariantFromText(event?.description)
+    maxBattleVariantFromText(event?.description) ||
+    BATTLE_VARIANT.DYNAMAX
   );
 }
 
