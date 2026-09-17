@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS targets (
   user_id TEXT NOT NULL,
   pokemon_name TEXT NOT NULL,
   target_type TEXT NOT NULL DEFAULT 'mega_energy',
+  battle_kind TEXT CHECK (battle_kind IN ('raid', 'dynamax', 'gigantamax')),
   target_value REAL,
   current_value REAL NOT NULL DEFAULT 0,
   expected_progress_per_raid REAL,

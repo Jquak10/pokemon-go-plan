@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import '../public/battle-targets.js';
 import { inferMaxParticleCost } from '../src/resource-planning.js';
 
 const manage = readFileSync(new URL('../public/manage.html',import.meta.url),'utf8');
@@ -13,11 +14,12 @@ function element(id) {
   return elements.get(id);
 }
 const context = vm.createContext({
+  BattleTargets:globalThis.BattleTargets, targetTypeLabels:{candy:'Candy'},
   document:{getElementById:element,querySelector:element,querySelectorAll:()=>[]},
   localStorage:{setItem(){},getItem(){return 'remote';}}, crypto:{randomUUID(){return 'test-request-id-12345';}},
   setTimeout(){},lockPageForModal(){},unlockPageForModal(){},
   normalizePickerName:value=>String(value).trim().toLowerCase(),esc:String,formatNumber:String,
-  state:{targets:[{id:'t',pokemon_name:'Gengar',target_type:'candy',current_value:10,expected_progress_per_raid:3}],recommendations:[],battle_resource_plan:{state:{max_particles_held:1500}}},
+  state:{targets:[{id:'t',pokemon_name:'Gigantamax Gengar',battle_kind:'gigantamax',target_type:'candy',current_value:10,expected_progress_per_raid:3}],recommendations:[],battle_resource_plan:{state:{max_particles_held:1500}}},
   raidLogType:'remote',raidLogProgressDirty:false,raidLogExplicitTargetId:null,
   battleLogRecommendation:null,battleLogRequestId:null,battleLogBusy:false,battleLogWinsDirty:false,battleLogPassesDirty:false
 });

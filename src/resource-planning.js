@@ -322,7 +322,7 @@ function targetCap(target) {
   }
 
   if (
-    target.target_type === "raids"
+    ["raids", "battles"].includes(target.target_type)
   ) {
     return Math.max(
       0,

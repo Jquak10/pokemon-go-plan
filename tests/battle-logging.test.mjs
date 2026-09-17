@@ -43,8 +43,12 @@ const env = { DB: db };
 const target = () => sql.prepare('SELECT * FROM targets WHERE id = ?').get('target');
 const held = () => sql.prepare('SELECT max_particles_held AS n FROM battle_resource_state WHERE user_id = ?').get('user').n;
 const usage = (table, col, date = '2026-09-17') => sql.prepare(`SELECT ${col} AS n FROM ${table} WHERE user_id = ? AND local_date = ?`).get('user', date)?.n || 0;
+sql.exec(`INSERT INTO targets(id,user_id,pokemon_name,target_type,battle_kind,current_value,created_at,updated_at)
+  VALUES('dyn','user','Dynamax Gengar','candy','dynamax',0,'now','now'),
+        ('gmax','user','Gigantamax Gengar','candy','gigantamax',0,'now','now');`);
+const maxTarget = id => sql.prepare('SELECT * FROM targets WHERE id = ?').get(id);
 let seq = 0;
-const log = async (body, date = '2026-09-17') => createBattleLog(db, 'user', date, '2026-09-17T00:00:00Z', `test-${++seq}`, normalizeBattleLog({pokemon_name:'Gengar', raid_type:'local', raid_count:1, ...body}, [target()].filter(Boolean)));
+const log = async (body, date = '2026-09-17') => createBattleLog(db, 'user', date, '2026-09-17T00:00:00Z', `test-${++seq}`, normalizeBattleLog({pokemon_name:'Gengar', raid_type:'local', raid_count:1, ...body}, sql.prepare('SELECT * FROM targets').all()));
 const snapshot = () => JSON.stringify(['targets','battle_resource_state','battle_resource_daily','remote_raid_usage','battle_log','raid_log']
   .map(table => sql.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()));
 const request = body => new Request('http://localhost/api/battle-log', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({token,...body})});
@@ -67,7 +71,9 @@ assert.equal(held(),200);
 assert.equal(usage('battle_resource_daily','remote_max_passes_used'),1);
 assert.equal(usage('remote_raid_usage','raids_used'),2);
 assert.equal(usage('battle_resource_daily','max_particles_collected'),0);
-assert.equal(target().current_value,35);
+assert.equal(target().current_value,22);
+assert.equal(maxTarget('dyn').current_value,9);
+assert.equal(maxTarget('gmax').current_value,4);
 
 // Unknown/invalid cost, variant/form mismatch and invalid counts cause no writes.
 const beforeInvalid = snapshot();
@@ -99,7 +105,7 @@ assert.equal(free.max_particles_spent,0);
 
 // Out-of-order and repeated Undo must restore deltas exactly, on the original date.
 await undoBattleLog(db,'user',local.id,'2026-09-18T00:00:00Z');
-assert.equal(target().current_value,29);
+assert.equal(target().current_value,15);
 const afterUndo = snapshot();
 await Promise.all([undoBattleLog(db,'user',local.id,'later'),undoBattleLog(db,'user',local.id,'later')]);
 assert.equal(snapshot(),afterUndo);
@@ -124,11 +130,11 @@ assert.equal(target().current_value,18);
 
 // A manual correction which makes reversal impossible fails the ENTIRE transaction.
 const conflict = await log({battle_system:'max',battle_variant:'dynamax',raid_type:'remote',max_particle_cost:250,progress_gained:20});
-sql.exec("UPDATE targets SET current_value = 1 WHERE id = 'target'");
+sql.exec("UPDATE targets SET current_value = 1 WHERE id = 'dyn'");
 const targetConflict = snapshot();
 await assert.rejects(() => undoBattleLog(db,'user',conflict.id,'later'), /Nothing was undone/);
 assert.equal(snapshot(),targetConflict);
-sql.exec("UPDATE targets SET current_value = 38 WHERE id = 'target'; UPDATE battle_resource_daily SET remote_max_passes_used = 0");
+sql.exec("UPDATE targets SET current_value = 20 WHERE id = 'dyn'; UPDATE battle_resource_daily SET remote_max_passes_used = 0");
 const passConflict = snapshot();
 await assert.rejects(() => undoBattleLog(db,'user',conflict.id,'later'), /Nothing was undone/);
 assert.equal(snapshot(),passConflict);

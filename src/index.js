@@ -1,3 +1,4 @@
+import { targetBattleKind, targetBattleMetadata, targetBattleKey, matchingBattleTargets, canonicalTargetName, namedTargetKind } from "./battle-targets.js";
 import { BattleLogError, normalizeBattleLog, createBattleLog, undoBattleLog, battleStorageError } from "./battle-logging.js";
 import {
   RAID_RANK_METHOD_VERSION,
@@ -1159,6 +1160,11 @@ export function spriteAssetsForDisplayName(
   };
 }
 
+export function targetSpriteUrl(target, metas) {
+  const kind = targetBattleKind(target);
+  return metas.find(meta => normalizeName(meta.pokemon_name) === normalizeName(target.pokemon_name)
+    && (kind !== "gigantamax" || namedTargetKind(meta.pokemon_name) === "gigantamax"))?.sprite_url || null;
+}
 function spriteUrlForPokemonName(
   name,
   metas
@@ -2136,7 +2142,7 @@ async function getMeta(env) {
 }));
 }
 
-function findMatches(summary, targets, metas) {
+export function findMatches(summary, targets, metas, event = null) {
   const haystack = normalizeName(summary);
   const candidates = [];
 
@@ -2148,7 +2154,8 @@ function findMatches(summary, targets, metas) {
   }
 
   for (const target of targets) {
-    const needle = normalizeName(target.pokemon_name);
+    const targetName = targetBattleKind(target) === 'raid' ? target.pokemon_name : globalThis.BattleTargets.formName(target.pokemon_name, targetBattleKind(target));
+    const needle = normalizeName(targetName);
     if (!needle || !haystack.includes(needle)) continue;
 
     const existing = candidates.find(
@@ -2159,7 +2166,7 @@ function findMatches(summary, targets, metas) {
       existing.target = target;
     } else {
       candidates.push({
-        name: target.pokemon_name,
+        name: targetName,
         meta: null,
         target,
         length: needle.length
@@ -2214,7 +2221,12 @@ function findMatches(summary, targets, metas) {
     );
   }
 
-  return selected;
+  // Select by exact form AND battle context after event identity is known.
+  // Never transfer a base-form target to a more specific form just by substring.
+  return selected.map(candidate => ({...candidate, target: matchingBattleTargets(targets, {
+    pokemon_name:candidate.name,
+    ...(event ? battleOpportunityMetadata(event,{pokemonName:candidate.name}) : {battle_system:'raid'})
+  })[0] || null}));
 }
 
 function weightedInternetScore(meta, user) {
@@ -2347,7 +2359,7 @@ function recommendationFor(name, meta, target, user) {
   };
 }
 
-async function recommendationsForDate(
+export async function recommendationsForDate(
   env,
   user,
   targets,
@@ -2404,7 +2416,8 @@ async function recommendationsForDate(
       findMatches(
         event.summary,
         targets,
-        metas
+        metas,
+        event
       );
 
     for (const match of matches) {
@@ -5426,7 +5439,7 @@ function remoteTargetCap(target) {
     return Infinity;
   }
 
-  if (target.target_type === "raids") {
+  if (["raids", "battles"].includes(target.target_type)) {
     return Math.max(0, Math.ceil(remaining));
   }
 
@@ -6204,8 +6217,7 @@ export async function logRaidApi(request, env) {
       const rec = recs.find(item => [
         item.battle_system || "raid", item.battle_variant || "", item.pokemon_name
       ].join("|") === body.recommendation_key);
-      if (rec && (rec.pokemon_name !== input.pokemon_name ||
-          rec.battle_system !== input.battle_system || (rec.battle_variant || null) !== input.battle_variant)) {
+      if (rec && targetBattleKey(rec) !== targetBattleKey(input)) {
         throw new BattleLogError("Battle selection no longer matches its recommendation.");
       }
       if (rec?.logging_remote_eligible === false && input.participation === "remote") {
@@ -6285,7 +6297,7 @@ async function updateRemoteRaidUsage(request, env) {
 }
 
 
-async function targetOptionsForUser(
+export async function targetOptionsForUser(
   env,
   user,
   targets,
@@ -6332,12 +6344,14 @@ async function targetOptionsForUser(
     const clean = String(name || "").trim();
     if (!clean) return;
 
-    const key = normalizeName(clean);
+    const identity = targetBattleMetadata({...extra,pokemon_name:clean});
+    const key = targetBattleKey({...identity,pokemon_name:clean});
 
     if (!map.has(key)) {
       map.set(key, {
         name: clean,
-        ...extra
+        ...extra,
+        ...identity
       });
     }
   };
@@ -6347,6 +6361,7 @@ async function targetOptionsForUser(
       current,
       recommendation.pokemon_name,
       {
+        ...targetBattleMetadata(recommendation),
         source: "current_recommendation"
       }
     );
@@ -6367,7 +6382,8 @@ async function targetOptionsForUser(
       findMatches(
         event.summary,
         targets,
-        metas
+        metas,
+        event
       );
 
     for (const match of matches) {
@@ -6383,6 +6399,7 @@ async function targetOptionsForUser(
           current,
           match.name,
           {
+            ...battleOpportunityMetadata(event,{pokemonName:match.name}),
             source: "current_event"
           }
         );
@@ -6391,6 +6408,7 @@ async function targetOptionsForUser(
           upcoming,
           match.name,
           {
+            ...battleOpportunityMetadata(event,{pokemonName:match.name}),
             source: "upcoming_event"
           }
         );
@@ -6403,6 +6421,7 @@ async function targetOptionsForUser(
       existing,
       target.pokemon_name,
       {
+        ...targetBattleMetadata(target),
         source: "existing_target"
       }
     );
@@ -7066,12 +7085,13 @@ async function getMe(request, env) {
       targets.map(
         target => ({
           ...target,
+          ...targetBattleMetadata(target),
           sprite_url:
-            spriteUrlForPokemonName(
-              target.pokemon_name,
+            targetSpriteUrl(
+              target,
               metas
             ),
-          raid_rankings_json:
+          raid_rankings_json: targetBattleKind(target) !== "raid" ? null :
             raidRankingsJsonForPokemonName(
               target.pokemon_name,
               metas
@@ -7147,83 +7167,57 @@ async function updateSettings(request, env) {
   return json({ ok: true });
 }
 
-async function upsertTarget(request, env) {
+export async function upsertTarget(request, env) {
   const body = await request.json();
   const user = await userByManageToken(env, body.token);
   if (!user) return bad("Invalid management link.", 401);
-
-  const pokemonName = String(body.pokemon_name || "").trim();
-  if (!pokemonName) return bad("Pokémon name is required.");
-
-  const targetType = String(body.target_type || "mega_energy").slice(0, 40);
-  const priority = ["high", "medium", "low", "skip"].includes(body.priority)
-    ? body.priority
-    : "medium";
-
-  const targetValue =
-    body.target_value === "" || body.target_value == null
-      ? null
-      : Number(body.target_value);
-
-  const currentValue =
-    body.current_value === "" || body.current_value == null
-      ? 0
-      : Number(body.current_value);
-
-  const expectedProgressPerRaid =
-    body.expected_progress_per_raid === "" || body.expected_progress_per_raid == null
-      ? null
-      : Number(body.expected_progress_per_raid);
-
-  if (targetValue != null && !Number.isFinite(targetValue)) {
-    return bad("Target value must be a number.");
+  const name = String(body.pokemon_name || "").trim();
+  if (!name || name.length > 200) return bad("Pokémon/form name is required (up to 200 characters).");
+  const kind = body.battle_kind ?? namedTargetKind(name) ?? "raid";
+  if (!["raid","dynamax","gigantamax"].includes(kind) || (namedTargetKind(name) && namedTargetKind(name) !== kind)) {
+    return bad("Choose the battle type matching this Pokémon/form.");
   }
-  if (!Number.isFinite(currentValue)) {
-    return bad("Current value must be a number.");
+  if (!globalThis.BattleTargets.formName(name,kind)) return bad("Enter a Pokémon name as well as its battle type.");
+  const targetType = String(body.target_type || (kind === "raid" ? "mega_energy" : "battles"));
+  if (!["mega_energy","raids","battles","candy_xl","candy","custom"].includes(targetType)) return bad("Choose a supported goal type.");
+  if (kind !== "raid" && targetType === "mega_energy") return bad("Mega Energy goals require an ordinary Raid target.");
+  const targetValue = body.target_value === "" || body.target_value == null ? null : Number(body.target_value);
+  const currentValue = body.current_value === "" || body.current_value == null ? 0 : Number(body.current_value);
+  const expected = body.expected_progress_per_raid === "" || body.expected_progress_per_raid == null ? null : Number(body.expected_progress_per_raid);
+  if ((targetValue != null && (!Number.isFinite(targetValue) || targetValue < 0)) || !Number.isFinite(currentValue) || currentValue < 0) return bad("Progress and desired target must be non-negative numbers.");
+  if (expected != null && (!Number.isFinite(expected) || expected <= 0)) return bad("Expected progress per battle must be blank or greater than 0.");
+  const priority = ["high","medium","low","skip"].includes(body.priority) ? body.priority : "medium";
+  const targets = await getTargets(env,user.id);
+  const identity = {pokemon_name:name,battle_kind:kind};
+  const existing = body.id ? targets.find(t => t.id === String(body.id))
+    : matchingBattleTargets(targets,identity).find(t => t.target_type === targetType);
+  if (body.id && !existing) return bad("Target not found.",404);
+  if (!body.id && body.battle_kind != null && existing) return bad("This target already exists. Use Edit to change its progress or settings.",409);
+  if (existing && (targetBattleKey(existing) !== targetBattleKey(identity) || existing.target_type !== targetType)) {
+    return bad("Pokémon, battle type and goal identify a target. Create a new target for a different identity.");
   }
-  if (
-    expectedProgressPerRaid != null &&
-    (!Number.isFinite(expectedProgressPerRaid) || expectedProgressPerRaid <= 0)
-  ) {
-    return bad("Expected progress per raid must be blank or a number greater than 0.");
-  }
-
-  const id = await sha256Hex(
-    `${user.id}|${normalizeName(pokemonName)}|${targetType}`
-  );
+  // Existing IDs and names stay intact so historical Undo retains its target.
+  const pokemonName = existing?.pokemon_name || canonicalTargetName(name,kind);
+  const id = existing?.id || await sha256Hex(`${user.id}|${normalizeName(pokemonName)}|${targetType}`);
   const timestamp = nowIso();
-
-  await env.DB.prepare(`
-    INSERT INTO targets (
-      id, user_id, pokemon_name, target_type,
-      target_value, current_value, expected_progress_per_raid, priority,
-      completed, notes, created_at, updated_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(user_id, pokemon_name, target_type) DO UPDATE SET
-      target_value = excluded.target_value,
-      current_value = excluded.current_value,
-      expected_progress_per_raid = excluded.expected_progress_per_raid,
-      priority = excluded.priority,
-      completed = excluded.completed,
-      notes = excluded.notes,
-      updated_at = excluded.updated_at
-  `).bind(
-    id,
-    user.id,
-    pokemonName,
-    targetType,
-    targetValue,
-    currentValue,
-    expectedProgressPerRaid,
-    priority,
-    body.completed ? 1 : 0,
-    String(body.notes || "").slice(0, 2000),
-    timestamp,
-    timestamp
-  ).run();
-
-  return json({ ok: true });
+  try {
+    const saved = await env.DB.prepare(`
+      INSERT INTO targets (id,user_id,pokemon_name,target_type,battle_kind,target_value,
+        current_value,expected_progress_per_raid,priority,completed,notes,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET target_value=excluded.target_value,current_value=excluded.current_value,
+        battle_kind=excluded.battle_kind,expected_progress_per_raid=excluded.expected_progress_per_raid,
+        priority=excluded.priority,completed=excluded.completed,notes=excluded.notes,updated_at=excluded.updated_at
+        WHERE targets.user_id=excluded.user_id AND ?
+    `).bind(id,user.id,pokemonName,targetType,kind,targetValue,currentValue,expected,priority,
+      body.completed === true || body.completed === 1 || body.completed === "1" ? 1 : 0,
+      String(body.notes || "").slice(0,2000),existing?.created_at || timestamp,timestamp,existing ? 1 : 0).run();
+    if (!saved.meta?.changes) return bad("This target already exists. Use Edit to change it.",409);
+  } catch (error) {
+    if (/no column named battle_kind|no such column:.*battle_kind/i.test(String(error.message))) return bad("Targets need migrations/0003_target_battle_kind.sql. No changes were saved.",503);
+    throw error;
+  }
+  return json({ok:true,id});
 }
 
 async function deleteTarget(request, env) {
@@ -7281,6 +7275,7 @@ function targetTypeLabel(type) {
   return {
     mega_energy: "Mega Energy",
     raids: "Raids",
+    battles: "Battles won",
     candy_xl: "Candy XL",
     candy: "Candy",
     custom: "Progress"
@@ -7290,7 +7285,7 @@ function targetTypeLabel(type) {
 
 function calendarEventDedupeKey(event, targets, metas) {
   if (event.source_type === "raid_battles") {
-    const matches = findMatches(event.summary, targets, metas);
+    const matches = findMatches(event.summary, targets, metas, event);
 
     if (matches.length) {
       return [
@@ -7579,7 +7574,7 @@ function eventForVisibleSegment(
 
 
 function personalizeEvent(event, user, targets, metas) {
-  const matches = findMatches(event.summary, targets, metas);
+  const matches = findMatches(event.summary, targets, metas, event);
   const recommendations = matches.map((match) =>
     recommendationFor(match.name, match.meta, match.target, user)
   );

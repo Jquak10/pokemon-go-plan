@@ -1,3 +1,4 @@
+import { targetMatchesBattle, matchingBattleTargets } from './battle-targets.js';
 import { maxBattleVariantFromText } from './battle-opportunities.js';
 
 export class BattleLogError extends Error {
@@ -39,18 +40,18 @@ export function normalizeBattleLog(body, targets = []) {
   if (system === 'raid' && participation === 'remote' && passes !== count) {
     throw new BattleLogError('Each completed Remote Raid consumes one Remote Raid Pass.');
   }
-  const key = value => String(value).trim().toLowerCase();
+  const battle = {pokemon_name:name,battle_system:system,battle_variant:variant};
   let target = null;
   if (body.update_target !== false) {
     target = body.target_id
       ? targets.find(t => String(t.id) === String(body.target_id))
-      : targets.find(t => key(t.pokemon_name) === key(name));
-    if (body.target_id && (!target || key(target.pokemon_name) !== key(name))) {
-      throw new BattleLogError('The selected target does not match this Pokémon/form.');
+      : matchingBattleTargets(targets,battle)[0];
+    if (body.target_id && (!target || !targetMatchesBattle(target,battle))) {
+      throw new BattleLogError('The selected target does not match this Pokémon/form and battle type.');
     }
   }
   const progress = Number(body.progress_gained == null || body.progress_gained === ''
-    ? (target?.target_type === 'raids' ? wins : 0) : body.progress_gained);
+    ? (['raids','battles'].includes(target?.target_type) ? wins : 0) : body.progress_gained);
   if (!Number.isFinite(progress) || progress < 0 || progress > 1000000) {
     throw new BattleLogError('Progress gained must be between 0 and 1,000,000.');
   }

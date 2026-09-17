@@ -7041,26 +7041,35 @@ body.modal-open {
   opacity: 0.68;
 }
 
-/* Unified Battle logging — v33. Reserve header/footer space at every height. */
-#raidLogModal .raid-log-modal {
+/* Battle logger and Targets editor — v34. Reserve header/footer space at every height. */
+#raidLogModal .raid-log-modal,
+#targetModal .target-modal {
   display: flex;
   flex-direction: column;
   max-height: min(92dvh, 820px);
 }
 
+#targetModal .modal-header,
+#targetModal .modal-footer,
+#targetModal .target-modal::before,
 #raidLogModal .modal-header,
 #raidLogModal .modal-footer,
 #raidLogModal .raid-log-modal::before {
   flex-shrink: 0;
 }
 
-#raidLogModal .modal-body {
+#raidLogModal .modal-body,
+#targetModal .modal-body {
   min-height: 0;
   max-height: none;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
+#targetModal button,
+#targetModal select,
+#targetModal input,
+#targetBattleFilter,
 #raidLogModal button,
 #raidLogModal select,
 #raidLogModal input:not([type="checkbox"]) {
@@ -7068,11 +7077,13 @@ body.modal-open {
   min-width: 44px;
 }
 
-#raidLogModal .modal-footer {
+#raidLogModal .modal-footer,
+#targetModal .modal-footer {
   padding-bottom: calc(18px + env(safe-area-inset-bottom));
 }
 
-#raidLogStatus:empty {
+#raidLogStatus:empty,
+#targetStatus:empty {
   display: none;
 }
 
