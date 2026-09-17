@@ -28,6 +28,9 @@ import {
   inferMaxParticleCost,
   maxBattleRemotePassEligible
 } from "./resource-planning.js";
+import {
+  remoteRaidRuleApplicability
+} from "./remote-raid-rules.js";
 
 const SOURCE_BASE =
   "https://github.com/othyn/go-calendar/releases/latest/download/";
@@ -4673,8 +4676,20 @@ function localDateForTimezone(timezone) {
   }
 }
 
-async function remoteRaidLimitForDate(env, localDate) {
-  const override = await env.DB.prepare(`
+async function remoteRaidLimitForDate(
+  env,
+  localDate,
+  timezone = "UTC",
+  referenceInstant = null
+) {
+  // Official announcements often express temporary Remote limits in PDT/PST.
+  // Search one source-calendar day either side, then let the exact timestamp
+  // parser project that window into the user's timezone. This prevents a PDT
+  // Sep 18 start from incorrectly becoming a full Sep 18 override in UTC+8.
+  const searchStart = addDaysIso(localDate, -1) || localDate;
+  const searchEnd = addDaysIso(localDate, 1) || localDate;
+
+  const { results } = await env.DB.prepare(`
     SELECT
       event_name,
       start_date,
@@ -4693,16 +4708,32 @@ async function remoteRaidLimitForDate(env, localDate) {
       COALESCE(is_unlimited, 0) DESC,
       remote_raid_limit DESC,
       updated_at DESC
-    LIMIT 1
-  `).bind(localDate, localDate).first();
+    LIMIT 20
+  `).bind(searchEnd, searchStart).all();
 
-  if (override) {
+  for (const override of results || []) {
+    const timing = remoteRaidRuleApplicability(
+      override,
+      {
+        localDate,
+        timezone,
+        referenceInstant
+      }
+    );
+
+    if (!timing.applies) continue;
+
     return {
       limit: Number(override.remote_raid_limit || 0),
       is_unlimited: Boolean(Number(override.is_unlimited || 0)),
       label: override.event_name,
       start_date: override.start_date,
       end_date: override.end_date,
+      start_at: timing.start_at,
+      end_at: timing.end_at,
+      start_local_date: timing.start_local_date,
+      end_local_date: timing.end_local_date,
+      timing_precision: timing.precision,
       source_url: override.source_url,
       source_excerpt: override.source_excerpt || null,
       detected_at: override.detected_at || null,
@@ -4717,6 +4748,11 @@ async function remoteRaidLimitForDate(env, localDate) {
     label: "Standard daily Remote Raid limit",
     start_date: null,
     end_date: null,
+    start_at: null,
+    end_at: null,
+    start_local_date: null,
+    end_local_date: null,
+    timing_precision: "standard",
     source_url: DEFAULT_REMOTE_RAID_LIMIT_SOURCE,
     source_excerpt: null,
     detected_at: null,
@@ -5479,6 +5515,9 @@ async function buildRemoteRaidBudgetForecast(
       user.timezone
     );
 
+  const currentInstant =
+    nowIso();
+
   const threshold =
     clamp(
       Number(
@@ -5516,7 +5555,11 @@ async function buildRemoteRaidBudgetForecast(
         ),
         remoteRaidLimitForDate(
           env,
-          date
+          date,
+          user.timezone,
+          date === today
+            ? currentInstant
+            : null
         )
       ]);
 
@@ -6180,7 +6223,9 @@ async function remoteRaidPlanForUser(
     await Promise.all([
       remoteRaidLimitForDate(
         env,
-        localDate
+        localDate,
+        user.timezone,
+        nowIso()
       ),
       remoteBattleUsageForDate(
         env,
