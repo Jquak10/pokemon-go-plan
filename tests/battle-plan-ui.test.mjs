@@ -53,7 +53,7 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=34/);
+  assert.match(read(page), /styles\.css\?v=35/);
 }
 
 assert.match(worker, /BATTLE_SOURCE_TYPES/);
@@ -89,3 +89,7 @@ assert.match(worker, /battle_resource_plan/);
 assert.match(worker, /battleResourcePlanForUser/);
 assert.match(worker, /updateBattleResourcesApi/);
 assert.match(worker, /max_particle_cost/);
+
+assert.match(styles, /Battle Plan compact desktop polish — v35/);
+assert.match(styles, /grid-template-areas:[\s\S]*today-main resources[\s\S]*today-metrics resources/);
+assert.match(styles, /battle-resource-panel[\s\S]*border-left:/);

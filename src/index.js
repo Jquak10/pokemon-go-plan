@@ -16,7 +16,8 @@ import {
   MAX_BATTLE_SOURCE_TYPES,
   battleOpportunityMetadata,
   battleOpportunityPresentation,
-  maxBattleVariantFromText
+  maxBattleVariantFromText,
+  maxBattleVariantForEvent
 } from "./battle-opportunities.js";
 import {
   STANDARD_MAX_PARTICLE_DAILY_LIMIT,
@@ -95,6 +96,52 @@ const PVPOKE_MASTER_LEAGUE =
 
 const POGO_API_POKEDEX =
   "https://pokemon-go-api.github.io/pokemon-go-api/api/pokedex.json";
+
+const BATTLE_MATCH_POKEDEX_TTL_MS = 6 * 60 * 60 * 1000;
+let battleMatchPokedex = [];
+let battleMatchPokedexLoadedAt = 0;
+let battleMatchPokedexPending = null;
+
+async function currentBattleMatchPokedex() {
+  const now = Date.now();
+
+  if (
+    battleMatchPokedex.length &&
+    now - battleMatchPokedexLoadedAt < BATTLE_MATCH_POKEDEX_TTL_MS
+  ) {
+    return battleMatchPokedex;
+  }
+
+  if (battleMatchPokedexPending) {
+    return battleMatchPokedexPending;
+  }
+
+  battleMatchPokedexPending = (async () => {
+    try {
+      const response = await fetch(POGO_API_POKEDEX, {
+        headers: { "user-agent": "PokemonGoPersonalCalendar/1.0" },
+        redirect: "follow"
+      });
+
+      if (!response.ok) return battleMatchPokedex;
+
+      const value = await response.json();
+      if (Array.isArray(value) && value.length) {
+        battleMatchPokedex = value;
+        battleMatchPokedexLoadedAt = Date.now();
+      }
+    } catch {
+      // Meta/target matching remains a safe fallback if the upstream catalog
+      // is temporarily unavailable. A catalog failure must not break /api/me.
+    } finally {
+      battleMatchPokedexPending = null;
+    }
+
+    return battleMatchPokedex;
+  })();
+
+  return battleMatchPokedexPending;
+}
 
 const AUTO_META_METHOD_VERSION = "auto-meta-v5-max-ranks";
 const RAID_RANK_SOURCE_NAME = "Raid attacker rankings";
@@ -2451,7 +2498,7 @@ async function getMeta(env) {
   }));
 }
 
-export function findMatches(summary, targets, metas, event = null) {
+export function findMatches(summary, targets, metas, event = null, pokedex = []) {
   const haystack = normalizeName(summary);
   const candidates = [];
 
@@ -2481,6 +2528,42 @@ export function findMatches(summary, targets, metas, event = null) {
         length: needle.length
       });
     }
+  }
+
+  // Battle availability is authoritative even before automatic meta backfill.
+  // Resolve bosses from the current Pokédex so a newly scheduled Max Pokémon
+  // cannot disappear merely because pokemon_meta has not caught up yet.
+  for (const match of findPokemonMatchesInSummary(summary, pokedex)) {
+    const maxVariant = event
+      ? maxBattleVariantForEvent(event, match.name)
+      : null;
+
+    const displayName = displayNameForMatch(
+      match.name,
+      maxVariant === "gigantamax" ? "gigantamax" : "normal",
+      summary,
+      match.pokemon
+    );
+
+    const needle = normalizeName(displayName);
+    if (!needle) continue;
+
+    const existing = candidates.find(candidate =>
+      normalizeName(candidate.name) === needle
+    );
+
+    if (existing) continue;
+
+    const exactMeta = metas.find(meta =>
+      normalizeName(meta.pokemon_name) === needle
+    ) || null;
+
+    candidates.push({
+      name: displayName,
+      meta: exactMeta,
+      target: null,
+      length: needle.length
+    });
   }
 
   candidates.sort(
@@ -2673,8 +2756,13 @@ export async function recommendationsForDate(
   user,
   targets,
   metas,
-  day
+  day,
+  pokedex = null
 ) {
+  const battlePokedex = Array.isArray(pokedex)
+    ? pokedex
+    : await currentBattleMatchPokedex();
+
   const placeholders = [...RAID_SOURCE_TYPES].map(() => "?").join(",");
 
   const { results: events } = await env.DB.prepare(`
@@ -2726,7 +2814,8 @@ export async function recommendationsForDate(
         event.summary,
         targets,
         metas,
-        event
+        event,
+        battlePokedex
       );
 
     for (const match of matches) {
@@ -6611,8 +6700,13 @@ export async function targetOptionsForUser(
   user,
   targets,
   metas,
-  recommendations
+  recommendations,
+  pokedex = null
 ) {
+  const battlePokedex = Array.isArray(pokedex)
+    ? pokedex
+    : await currentBattleMatchPokedex();
+
   const today = localDateForTimezone(user.timezone);
   const horizon = addDaysIso(today, 30);
   const raidTypes = [...RAID_SOURCE_TYPES];
@@ -6692,7 +6786,8 @@ export async function targetOptionsForUser(
         event.summary,
         targets,
         metas,
-        event
+        event,
+        battlePokedex
       );
 
     for (const match of matches) {

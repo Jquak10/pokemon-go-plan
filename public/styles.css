@@ -7111,3 +7111,129 @@ body.modal-open {
     padding: 10px 11px;
   }
 }
+
+
+/* ============================================================
+   Battle Plan compact desktop polish — v35
+   Keep the decision summary useful without burying battle cards.
+   ============================================================ */
+@media (min-width: 900px) {
+  .today-command-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(340px, .8fr);
+    grid-template-areas:
+      "today-main resources"
+      "today-metrics resources"
+      "freshness resources";
+    align-items: stretch;
+  }
+
+  .today-command-main {
+    grid-area: today-main;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px 16px 8px;
+  }
+
+  .today-command-main h2 {
+    font-size: clamp(1.15rem, 1.8vw, 1.55rem);
+  }
+
+  .today-spend-signal {
+    margin-top: 7px;
+    padding: 9px 11px;
+  }
+
+  .today-spend-signal strong {
+    font-size: .84rem;
+  }
+
+  .today-spend-signal small {
+    font-size: .7rem;
+    line-height: 1.3;
+  }
+
+  .today-command-grid {
+    grid-area: today-metrics;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-bottom: 0;
+  }
+
+  .today-command-grid article {
+    padding: 9px 13px;
+  }
+
+  .today-command-grid strong {
+    font-size: 1rem;
+  }
+
+  .today-next-change strong {
+    font-size: .84rem;
+  }
+
+  .freshness-strip {
+    grid-area: freshness;
+    min-height: 36px;
+  }
+
+  .battle-resource-panel {
+    grid-area: resources;
+    min-width: 0;
+    margin: 0;
+    padding: 13px 14px;
+    border-top: 0;
+    border-left: 1px solid #e2eaf2;
+    background: rgba(248, 251, 255, .66);
+  }
+
+  .battle-resource-panel-head {
+    margin-bottom: 7px;
+  }
+
+  .battle-resource-panel-head h3 {
+    font-size: 1rem;
+  }
+
+  .battle-resource-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .battle-resource-grid article {
+    padding: 8px 9px;
+  }
+
+  .battle-resource-grid span {
+    font-size: .68rem;
+  }
+
+  .battle-resource-grid strong {
+    margin: 2px 0;
+    font-size: .94rem;
+  }
+
+  .battle-resource-grid small {
+    font-size: .68rem;
+    line-height: 1.25;
+  }
+
+  .battle-resource-advice {
+    display: -webkit-box;
+    margin-top: 7px;
+    padding: 7px 9px;
+    overflow: hidden;
+    font-size: .75rem;
+    line-height: 1.3;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .battle-resource-editor {
+    margin-top: 6px;
+  }
+
+  .battle-resource-editor > summary {
+    min-height: 38px;
+    padding: 7px 9px;
+  }
+}
