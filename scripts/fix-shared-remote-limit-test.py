@@ -39,4 +39,29 @@ if text.count(old_api) != 1:
     raise RuntimeError(f'expected generated API date assertion once, found {text.count(old_api)}')
 text = text.replace(old_api,new_api,1)
 path.write_text(text)
-print('date-aware shared correction and API regressions applied')
+
+ui_path = Path('tests/battle-logging-ui.test.mjs')
+ui = ui_path.read_text()
+old_ui = '''assert.equal(element('battleLogMp').value,'','Estimates must not silently become confirmed cost');
+assert.match(element('battleLogCostHint').textContent,/suggests 400 MP/);
+element('battleLogMp').value='400';
+context.syncBattleLogParticleCostControl();
+assert.match(element('raidLogPreview').innerHTML,/400 MP spent/);
+assert.equal(context.raidLogType,'local');
+assert.equal(element('[data-raid-type="remote"]').disabled,true);
+assert.equal(element('confirmRaidLog').disabled,true);
+element('battleLogWins').value='0';'''
+new_ui = '''assert.equal(element('battleLogMp').value,'','Estimates must not silently become confirmed cost');
+assert.match(element('battleLogCostHint').textContent,/suggests 400 MP/);
+assert.equal(context.raidLogType,'local');
+assert.equal(element('[data-raid-type="remote"]').disabled,true);
+assert.equal(element('confirmRaidLog').disabled,true,'Unconfirmed standard tier must not be saved');
+element('battleLogMp').value='400';
+context.syncBattleLogParticleCostControl();
+assert.match(element('raidLogPreview').innerHTML,/400 MP spent/);
+assert.equal(element('confirmRaidLog').disabled,false,'Confirmed tier cost enables a valid Max log');
+element('battleLogWins').value='0';'''
+if ui.count(old_ui) != 1:
+    raise RuntimeError(f'expected generated UI tier block once, found {ui.count(old_ui)}')
+ui_path.write_text(ui.replace(old_ui,new_ui,1))
+print('date-aware shared usage and Max dropdown regressions applied')
