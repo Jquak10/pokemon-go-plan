@@ -8,6 +8,12 @@ export const BATTLE_VARIANT = Object.freeze({
   GIGANTAMAX: "gigantamax"
 });
 
+export const BATTLE_PLAN_FILTER = Object.freeze({
+  ALL: "all",
+  RAIDS: "raid",
+  MAX_BATTLES: "max"
+});
+
 export const RAID_SOURCE_TYPES = new Set([
   "raid_battles",
   "raid_day",
@@ -88,6 +94,92 @@ export function encounterNameForMaxPokemon(value) {
     .trim();
 
   return name || null;
+}
+
+export function battleSystemLabel(system) {
+  if (system === BATTLE_SYSTEM.RAID) return "Raid";
+  if (system === BATTLE_SYSTEM.MAX) return "Max Battle";
+  return "Battle";
+}
+
+export function battleVariantLabel(variant) {
+  if (variant === BATTLE_VARIANT.DYNAMAX) return "Dynamax";
+  if (variant === BATTLE_VARIANT.GIGANTAMAX) return "Gigantamax";
+  return null;
+}
+
+export function battlePlanFilterMatches(filter, battleSystem) {
+  const selected = String(filter || BATTLE_PLAN_FILTER.ALL).trim();
+
+  if (selected === BATTLE_PLAN_FILTER.ALL) return true;
+  if (selected === BATTLE_PLAN_FILTER.RAIDS) {
+    return battleSystem === BATTLE_SYSTEM.RAID;
+  }
+  if (selected === BATTLE_PLAN_FILTER.MAX_BATTLES) {
+    return battleSystem === BATTLE_SYSTEM.MAX;
+  }
+
+  return true;
+}
+
+export function battleSpritePolicy(metadata) {
+  if (!metadata) {
+    return {
+      identity: null,
+      requires_exact_form: false,
+      badge: null
+    };
+  }
+
+  if (
+    metadata.battle_system === BATTLE_SYSTEM.MAX &&
+    metadata.battle_variant === BATTLE_VARIANT.GIGANTAMAX
+  ) {
+    return {
+      identity: metadata.boss_name || null,
+      requires_exact_form: true,
+      badge: "GMAX"
+    };
+  }
+
+  if (
+    metadata.battle_system === BATTLE_SYSTEM.MAX &&
+    metadata.battle_variant === BATTLE_VARIANT.DYNAMAX
+  ) {
+    return {
+      identity:
+        metadata.encounter_name ||
+        metadata.boss_name ||
+        null,
+      requires_exact_form: false,
+      badge: "DYNAMAX"
+    };
+  }
+
+  return {
+    identity: metadata.boss_name || null,
+    requires_exact_form: false,
+    badge: null
+  };
+}
+
+export function battleOpportunityPresentation(metadata) {
+  if (!metadata) return null;
+
+  return {
+    system_label:
+      battleSystemLabel(
+        metadata.battle_system
+      ),
+    variant_label:
+      battleVariantLabel(
+        metadata.battle_variant
+      ),
+    filter_key:
+      metadata.battle_system,
+    sprite_policy:
+      battleSpritePolicy(metadata)
+  };
 }
 
 export function battleOpportunityMetadata(
