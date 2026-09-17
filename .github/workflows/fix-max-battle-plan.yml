@@ -38,6 +38,19 @@ jobs:
       - name: Apply guarded fix
         run: node scripts/fix-max-battle-plan.mjs
 
+      - name: Add Max variant matcher import
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/index.js')
+          text = path.read_text()
+          old = '  battleOpportunityPresentation,\n  maxBattleVariantFromText\n} from "./battle-opportunities.js";'
+          new = '  battleOpportunityPresentation,\n  maxBattleVariantFromText,\n  maxBattleVariantForEvent\n} from "./battle-opportunities.js";'
+          if old not in text:
+              raise SystemExit('Expected battle-opportunities import anchor not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
       - name: Check JavaScript syntax
         run: |
           node --check src/battle-opportunities.js
