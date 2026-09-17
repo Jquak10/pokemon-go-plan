@@ -23,7 +23,9 @@ jobs:
           node-version: 22
 
       - name: Apply guarded fix
-        run: python3 scripts/fix-shared-remote-limit.py
+        run: |
+          python3 scripts/fix-shared-remote-limit.py
+          python3 scripts/fix-shared-remote-limit-test.py
 
       - name: Check JavaScript syntax
         run: |
@@ -40,9 +42,7 @@ jobs:
           NODE
 
       - name: Run deterministic tests
-        run: |
-          nl -ba tests/battle-logging.test.mjs | sed -n '76,90p'
-          npm test
+        run: npm test
 
       - name: Check diff
         run: git diff --check
