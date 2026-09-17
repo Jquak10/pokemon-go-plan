@@ -35,7 +35,8 @@ assert.match(manage, />Weak to</);
 assert.match(manage, /Battle form:/);
 assert.match(manage, /Encounter form:/);
 
-assert.match(manage, /!isMax \? raidRankingsHtml/);
+assert.match(manage, /function maxRankingsHtml/);
+assert.match(manage, /isMax \? maxRankingsHtml\(rec\.meta\?\.max_rankings_json\)/);
 assert.match(manage, /rec\.battle_system === "max"\s*\? null/);
 assert.doesNotMatch(manage, /battle-plan-ui\.js/);
 
