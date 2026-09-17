@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Battle Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=31">
+  <link rel="stylesheet" href="/styles.css?v=32">
 </head>
 
 <body class="manage-page">
@@ -91,7 +91,7 @@
           </div>
 
           <div id="todaySpendSignal" class="today-spend-signal">
-            <span>PAID RAID GUIDANCE</span>
+            <span>PAID BATTLE GUIDANCE</span>
             <strong>Calculating…</strong>
             <small></small>
           </div>
@@ -99,25 +99,94 @@
 
         <div class="today-command-grid">
           <article>
-            <span>Planner budget</span>
+            <span>Remote Pass plan</span>
             <strong id="todayPlannerBudget">—</strong>
-            <small>Worthwhile paid raids</small>
+            <small>Recommended additional passes</small>
           </article>
 
           <article>
-            <span>Today's ceiling</span>
+            <span>Remote Pass ceiling</span>
             <strong id="todayEffectiveBudget">—</strong>
             <small>After preference / override</small>
           </article>
 
           <article class="today-next-change">
-            <span>Next raid plan change</span>
+            <span>Next plan change</span>
             <strong id="todayNextChange">—</strong>
             <small id="todayNextChangeDetail">Checking the next few days…</small>
           </article>
         </div>
 
         <div id="freshnessStrip" class="freshness-strip"></div>
+
+      <section class="battle-resource-panel" aria-label="Battle resources">
+        <div class="battle-resource-panel-head">
+          <div>
+            <span class="section-eyebrow">BATTLE RESOURCES</span>
+            <h3>Remote Passes & Max Particles</h3>
+          </div>
+          <span id="battleResourceAdviceBadge" class="status-badge badge-blue">Planning</span>
+        </div>
+
+        <div class="battle-resource-grid">
+          <article>
+            <span>Remote Passes</span>
+            <strong id="resourceRemotePasses">—</strong>
+            <small id="resourceRemotePassDetail">Raid + Remote Max</small>
+          </article>
+          <article>
+            <span>Max Particles</span>
+            <strong id="resourceMaxParticles">—</strong>
+            <small id="resourceMaxParticleDetail">—</small>
+          </article>
+          <article>
+            <span>Collected today</span>
+            <strong id="resourceCollectedToday">—</strong>
+            <small id="resourceCollectionDetail">—</small>
+          </article>
+          <article>
+            <span>Planned MP spend</span>
+            <strong id="resourcePlannedMp">—</strong>
+            <small id="resourceAfterPlan">—</small>
+          </article>
+        </div>
+
+        <div id="battleResourceAdvice" class="battle-resource-advice"></div>
+
+        <details class="battle-resource-editor">
+          <summary>
+            <span>Update Max resources</span>
+            <span class="details-chevron" aria-hidden="true">⌄</span>
+          </summary>
+
+          <div class="battle-resource-editor-grid">
+            <label>
+              <span>Max Particles held</span>
+              <input id="maxParticlesHeld" type="number" min="0" step="1" inputmode="numeric">
+            </label>
+
+            <label>
+              <span>Max Particles collected today</span>
+              <input id="maxParticlesCollectedToday" type="number" min="0" step="1" inputmode="numeric">
+            </label>
+
+            <label>
+              <span>Remote Max Passes used today</span>
+              <input id="remoteMaxPassesUsed" type="number" min="0" step="1" inputmode="numeric">
+            </label>
+          </div>
+
+          <p class="field-help battle-resource-help">
+            Ordinary Remote Raids are already counted automatically. Until unified battle logging arrives, enter only Remote Max Battle pass usage here. Max Particle limits can change during events; explicit event limits override the standard 800 collected / 1,500 held rules when the calendar supplies them.
+          </p>
+
+          <div class="save-row battle-resource-save-row">
+            <button id="saveBattleResources" type="button">Save resources</button>
+            <span id="battleResourceStatus" class="save-status"></span>
+          </div>
+        </details>
+      </section>
+
       </section>
 
       <!-- =======================================================
@@ -252,9 +321,9 @@
                 <div class="planner-controls-body">
               <div class="daily-budget-override">
                 <div>
-                  <label for="dailyBudgetOverride">Today's budget override</label>
+                  <label for="dailyBudgetOverride">Today's Remote Pass ceiling override</label>
                   <p class="field-help">
-                    Optional. Leave Auto to follow the planner. A one-day override can raise or lower today's ceiling, but the planner still refuses raids below your value threshold.
+                    Optional. Leave Auto to follow the planner. This shared ceiling covers ordinary Remote Raids and Remote Max Battles, while the official Remote Raid participation limit remains separate.
                   </p>
                 </div>
 
@@ -340,7 +409,7 @@
                   <span class="section-eyebrow">BATTLE OPPORTUNITIES</span>
                   <h2>What to battle now</h2>
                   <p class="section-subtitle">
-                    Raids and Max Battles in one decision view. Max Battle resource allocation is added separately from the existing Raid allocator.
+                    Raids and Max Battles compete for the same personal Remote Pass ceiling, while Max Battles also respect your Max Particle budget.
                   </p>
                 </div>
 
@@ -734,30 +803,30 @@
           </section>
 
           <section class="dashboard-card">
-            <span class="section-eyebrow">REMOTE RAID RULES</span>
+            <span class="section-eyebrow">REMOTE PASS RULES</span>
             <h2>Pass Spending Preferences</h2>
             <p class="section-subtitle">
-              These settings are intentionally conservative. They can reduce your plan but never raise the official game limit.
+              The personal ceiling is shared by ordinary Remote Raids and Remote Max Battles. The official Remote Raid participation limit remains a separate Raid-only rule.
             </p>
 
             <div class="form-grid">
               <div>
-                <label for="remoteRaidBudget">Usual personal ceiling</label>
+                <label for="remoteRaidBudget">Usual Remote Pass ceiling</label>
                 <input id="remoteRaidBudget" type="number" min="0" step="1" placeholder="Optional">
                 <p class="field-help">
-                  This is your normal maximum on ordinary days. The planner still calculates its own recommended budget first. You can override this ceiling for a single day from the Raid Plan tab.
+                  Optional daily ceiling for paid remote battles across both Raids and Max Battles. Leave blank for Auto. A one-day override from the Battle Plan applies to this shared pass ceiling.
                 </p>
               </div>
 
               <div>
                 <div class="setting-label-row">
-                  <label for="remoteRaidMinScore">Minimum Remote Raid score</label>
+                  <label for="remoteRaidMinScore">Minimum paid-battle score</label>
                   <output id="remoteRaidMinScoreOutput" for="remoteRaidMinScore">60</output>
                 </div>
                 <input id="remoteRaidMinScore" type="range" min="0" max="100" step="1">
                 <div class="range-labels"><span>Permissive</span><span>60 default</span><span>Strict</span></div>
                 <p class="field-help">
-                  Once a boss's marginal value falls below this score, the planner stops allocating paid Remote Raids to it.
+                  Once an opportunity's marginal value falls below this score, the planner stops allocating paid Remote Passes to it.
                 </p>
               </div>
 
@@ -765,7 +834,7 @@
                 <label for="timezone">Timezone</label>
                 <input id="timezone" autocomplete="off" placeholder="Asia/Singapore">
                 <p class="field-help">
-                  Controls local event dates and when the daily Remote Raid usage counter rolls over.
+                  Controls local event dates and when daily Raid, Remote Max, and Max Particle counters roll over.
                 </p>
               </div>
             </div>
@@ -1615,7 +1684,7 @@ function renderTodayBriefing() {
 
   const leaderTitle =
     leaderNames.length === 0
-      ? "No urgent paid raid target"
+      ? "No urgent paid battle target"
       : (
           leaderNames.length === 1
             ? `${topPick.emoji || ""} ${leaderNames[0]}`.trim()
@@ -1697,7 +1766,11 @@ function renderTodayBriefing() {
           <span class="status-badge badge-neutral">SAVE / REVIEW LATER</span>
         `;
 
+  const sharedPlan =
+    state.battle_resource_plan || null;
+
   const advice =
+    sharedPlan?.advice ||
     dashboard.paid_raid_guidance || {};
 
   const spend =
@@ -1715,12 +1788,34 @@ function renderTodayBriefing() {
   document
     .getElementById("todayPlannerBudget")
     .textContent =
-      formatNumber(dashboard.planner_budget);
+      sharedPlan
+        ? formatNumber(
+            sharedPlan
+              .remote_passes
+              ?.recommended_additional || 0
+          )
+        : formatNumber(
+            dashboard.planner_budget
+          );
 
   document
     .getElementById("todayEffectiveBudget")
     .textContent =
-      formatNumber(dashboard.effective_budget);
+      sharedPlan
+        ? (
+            sharedPlan
+              .remote_passes
+              ?.personal_daily_ceiling == null
+              ? "Auto"
+              : formatNumber(
+                  sharedPlan
+                    .remote_passes
+                    .personal_daily_ceiling
+                )
+          )
+        : formatNumber(
+            dashboard.effective_budget
+          );
 
   const next =
     dashboard.next_change;
@@ -1784,6 +1879,173 @@ function renderTodayBriefing() {
 }
 
 
+
+
+function renderBattleResources() {
+  const plan =
+    state.battle_resource_plan || null;
+
+  if (!plan) return;
+
+  const passes =
+    plan.remote_passes || {};
+  const particles =
+    plan.max_particles || {};
+  const resourceState =
+    plan.state || {};
+  const rule =
+    plan.particle_rule || {};
+
+  document.getElementById(
+    "resourceRemotePasses"
+  ).textContent =
+    `${formatNumber(passes.used_total || 0)} used · +${formatNumber(passes.recommended_additional || 0)} plan`;
+
+  document.getElementById(
+    "resourceRemotePassDetail"
+  ).textContent =
+    passes.personal_daily_ceiling == null
+      ? "Shared pass ceiling: Auto"
+      : `Shared ceiling: ${formatNumber(passes.personal_daily_ceiling)}`;
+
+  document.getElementById(
+    "resourceMaxParticles"
+  ).textContent =
+    formatNumber(particles.held || 0);
+
+  document.getElementById(
+    "resourceMaxParticleDetail"
+  ).textContent =
+    `${formatNumber(particles.storage_limit || 0)} storage limit · ${esc(rule.label || "standard rules")}`;
+
+  document.getElementById(
+    "resourceCollectedToday"
+  ).textContent =
+    `${formatNumber(particles.collected_today || 0)} / ${formatNumber(particles.daily_limit || 0)}`;
+
+  document.getElementById(
+    "resourceCollectionDetail"
+  ).textContent =
+    `${formatNumber(particles.daily_collection_remaining || 0)} collection capacity remains today`;
+
+  document.getElementById(
+    "resourcePlannedMp"
+  ).textContent =
+    formatNumber(particles.planned_spend || 0);
+
+  document.getElementById(
+    "resourceAfterPlan"
+  ).textContent =
+    `${formatNumber(particles.projected_after_plan || 0)} projected available after plan`;
+
+  const advice =
+    plan.advice || {};
+
+  const adviceBadge =
+    document.getElementById(
+      "battleResourceAdviceBadge"
+    );
+
+  adviceBadge.textContent =
+    advice.code === "save"
+      ? "Save"
+      : advice.code === "reserve"
+        ? "Reserve"
+        : "Selective";
+
+  adviceBadge.className =
+    `status-badge ${advice.code === "save" ? "badge-neutral" : advice.code === "reserve" ? "badge-blue" : "badge-green"}`;
+
+  document.getElementById(
+    "battleResourceAdvice"
+  ).innerHTML = `
+    <strong>${esc(advice.headline || "Use resources selectively.")}</strong>
+    <span>${esc(advice.detail || "")}</span>
+  `;
+
+  document.getElementById(
+    "maxParticlesHeld"
+  ).value =
+    resourceState.max_particles_held ?? 0;
+
+  document.getElementById(
+    "maxParticlesCollectedToday"
+  ).value =
+    resourceState.max_particles_collected_today ?? 0;
+
+  document.getElementById(
+    "remoteMaxPassesUsed"
+  ).value =
+    resourceState.remote_max_passes_used ?? 0;
+
+  const status =
+    document.getElementById(
+      "battleResourceStatus"
+    );
+
+  if (
+    resourceState.migration_ready === false
+  ) {
+    status.textContent =
+      "D1 migration required before saving.";
+  }
+}
+
+async function saveBattleResources() {
+  const status =
+    document.getElementById(
+      "battleResourceStatus"
+    );
+
+  status.textContent =
+    "Saving…";
+
+  try {
+    await api(
+      "/api/battle-resources",
+      {
+        method: "POST",
+        headers: {
+          "content-type":
+            "application/json"
+        },
+        body: JSON.stringify({
+          token,
+          max_particles_held:
+            Number(
+              document.getElementById(
+                "maxParticlesHeld"
+              ).value || 0
+            ),
+          max_particles_collected_today:
+            Number(
+              document.getElementById(
+                "maxParticlesCollectedToday"
+              ).value || 0
+            ),
+          remote_max_passes_used:
+            Number(
+              document.getElementById(
+                "remoteMaxPassesUsed"
+              ).value || 0
+            )
+        })
+      }
+    );
+
+    status.textContent =
+      "Saved ✓";
+
+    await load();
+    activateTab(
+      "plan",
+      false
+    );
+  } catch (error) {
+    status.textContent =
+      error.message;
+  }
+}
 
 function raidLogMatchingTarget(
   pokemonName,
@@ -3655,8 +3917,15 @@ function renderRemoteRaidPlan() {
       ? `${formatNumber(plan.recommended_total)} worthwhile now`
       : `${formatNumber(plan.raids_used + plan.recommended_total)} / ${formatNumber(plan.effective_budget_cap)}`;
 
+  const sharedRecommendedPasses =
+    state.battle_resource_plan
+      ?.remote_passes
+      ?.recommended_additional;
+
   document.getElementById("allocationTotalBadge").textContent =
-    `${formatNumber(plan.recommended_total)} raid${Number(plan.recommended_total) === 1 ? "" : "s"}`;
+    sharedRecommendedPasses == null
+      ? `${formatNumber(plan.recommended_total)} raid${Number(plan.recommended_total) === 1 ? "" : "s"}`
+      : `${formatNumber(sharedRecommendedPasses)} Remote Pass${Number(sharedRecommendedPasses) === 1 ? "" : "es"}`;
 
   // Allocation counts are displayed directly on recommendation cards.
 
@@ -4844,8 +5113,17 @@ function renderRecommendationCard(
 
   const allocated =
     Number(
-      allocation?.allocated || 0
+      allocation?.count ??
+      allocation?.allocated ??
+      0
     );
+
+  const maxParticleCost =
+    isMax
+      ? Number(
+          rec.max_particle_cost || 0
+        )
+      : 0;
 
   const allocationClass =
     allocated > 0
@@ -4888,7 +5166,22 @@ function renderRecommendationCard(
                 }
               </span>
             `
-            : ""
+            : `
+                  <span class="allocation-inline-badge ${allocationClass}">
+                    ${
+                      allocated > 0
+                        ? `${formatNumber(allocated)} Remote Max battle${allocated === 1 ? "" : "s"}`
+                        : "0 Remote Max battles"
+                    }
+                  </span>
+                  <span class="max-particle-cost-badge ${maxParticleCost ? "" : "cost-unknown"}">
+                    ${
+                      maxParticleCost
+                        ? `${formatNumber(maxParticleCost)} MP each`
+                        : "MP cost unknown"
+                    }
+                  </span>
+                `
         }
 
         ${
@@ -5005,6 +5298,20 @@ function renderRecommendations() {
       )
     );
 
+  const sharedAllocations =
+    state.battle_resource_plan
+      ?.allocations || [];
+
+  const sharedAllocationByKey =
+    new Map(
+      sharedAllocations.map(
+        allocation => [
+          `${allocation.battle_system || "raid"}|${normalizePickerName(allocation.pokemon_name)}`,
+          allocation
+        ]
+      )
+    );
+
   if (!recommendations.length) {
     const emptyLabel =
       battlePlanFilter === "max"
@@ -5035,17 +5342,26 @@ function renderRecommendations() {
     );
 
   const renderCard =
-    rec =>
-      renderRecommendationCard(
-        rec,
+    rec => {
+      const shared =
+        sharedAllocationByKey.get(
+          `${rec.battle_system || "raid"}|${normalizePickerName(rec.pokemon_name)}`
+        );
+
+      const legacy =
         rec.battle_system === "max"
           ? null
           : allocationByName.get(
               normalizePickerName(
                 rec.pokemon_name
               )
-            )
+            );
+
+      return renderRecommendationCard(
+        rec,
+        shared || legacy
       );
+    };
 
   container.innerHTML = `
     ${primary
@@ -6327,6 +6643,7 @@ function renderPreferences() {
 function render() {
   renderHero();
   renderTodayBriefing();
+  renderBattleResources();
   renderRemoteRaidPlan();
   renderRaidActivity();
   renderRecommendations();
@@ -6736,6 +7053,7 @@ updateSliderOutput("collectorWeight", "collectorWeightOutput", 1);
 updateSliderOutput("remoteRaidMinScore", "remoteRaidMinScoreOutput", 0);
 
 document.getElementById("saveSettings").addEventListener("click", savePreferences);
+document.getElementById("saveBattleResources").addEventListener("click", saveBattleResources);
 document.getElementById("saveCalendar").addEventListener("click", saveCalendarFilters);
 document
   .getElementById(
