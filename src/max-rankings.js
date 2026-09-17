@@ -1,4 +1,4 @@
-export const MAX_RANK_METHOD_VERSION = "max-rank-v1-fast-type-bulk";
+export const MAX_RANK_METHOD_VERSION = "max-rank-v2-event-eligibility-bulk";
 
 const DEFAULT_TOP_N = 6;
 
@@ -10,6 +10,13 @@ function normalize(value) {
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
     .toLowerCase();
+}
+
+export function canonicalMaxPokemonName(value) {
+  return normalize(value)
+    .replace(/^(?:dynamax|gigantamax|g max)\s+/, "")
+    .replace(/\s+(?:dynamax|gigantamax|g max)$/, "")
+    .trim();
 }
 
 function objectValues(value) {
@@ -58,18 +65,35 @@ function pokemonTypes(pokemon) {
   ].filter(Boolean);
 }
 
+function mergedMoves(...sources) {
+  const map = new Map();
+
+  for (const source of sources) {
+    for (const move of objectValues(source)) {
+      const key = String(
+        move?.id ||
+        moveName(move) ||
+        JSON.stringify(move)
+      );
+      if (!map.has(key)) map.set(key, move);
+    }
+  }
+
+  return [...map.values()];
+}
+
 function quickMoves(pokemon) {
-  return [
-    ...objectValues(pokemon?.quickMoves),
-    ...objectValues(pokemon?.eliteQuickMoves)
-  ];
+  return mergedMoves(
+    pokemon?.quickMoves,
+    pokemon?.eliteQuickMoves
+  );
 }
 
 function chargedMoves(pokemon) {
-  return [
-    ...objectValues(pokemon?.cinematicMoves),
-    ...objectValues(pokemon?.eliteCinematicMoves)
-  ];
+  return mergedMoves(
+    pokemon?.cinematicMoves,
+    pokemon?.eliteCinematicMoves
+  );
 }
 
 function titleCase(value) {
@@ -95,28 +119,45 @@ function fallbackFormName(baseName, formId) {
 
 function candidateForms(pokedex) {
   const forms = [];
+  const seen = new Set();
+
+  const push = (name, pokemon, formId, formKind) => {
+    if (!name || !pokemon?.stats) return;
+    const key = [
+      canonicalMaxPokemonName(name),
+      String(formId || ""),
+      Number(pokemon?.stats?.attack || 0),
+      Number(pokemon?.stats?.defense || 0),
+      Number(pokemon?.stats?.stamina || 0)
+    ].join("|");
+    if (seen.has(key)) return;
+    seen.add(key);
+    forms.push({
+      name,
+      pokemon,
+      form_id: formId || null,
+      form_kind: formKind
+    });
+  };
 
   for (const pokemon of Array.isArray(pokedex) ? pokedex : []) {
     const baseName = englishName(pokemon);
     if (!baseName || !pokemon?.stats) continue;
 
-    forms.push({
-      name: baseName,
+    push(
+      baseName,
       pokemon,
-      form_id: pokemon?.formId || pokemon?.id || null,
-      form_kind: "base"
-    });
+      pokemon?.formId || pokemon?.id || null,
+      "base"
+    );
 
     for (const [formId, region] of Object.entries(pokemon?.regionForms || {})) {
-      if (!region?.stats) continue;
-      forms.push({
-        name:
-          englishName(region) ||
-          fallbackFormName(baseName, formId),
-        pokemon: region,
-        form_id: formId,
-        form_kind: "regional"
-      });
+      push(
+        englishName(region) || fallbackFormName(baseName, formId),
+        region,
+        formId,
+        "regional"
+      );
     }
   }
 
@@ -131,8 +172,16 @@ function eligibilityMatcher(maxEligibleNames) {
         ? maxEligibleNames
         : [];
 
-  const exact = new Set(values.map(normalize).filter(Boolean));
-  return name => exact.has(normalize(name));
+  const exact = new Set(
+    values
+      .map(canonicalMaxPokemonName)
+      .filter(Boolean)
+  );
+
+  return name =>
+    exact.has(
+      canonicalMaxPokemonName(name)
+    );
 }
 
 function fastMoveMetrics(move, pokemon) {
@@ -155,12 +204,20 @@ function bestStandardCycle(pokemon, fast) {
 
   for (const charged of chargedMoves(pokemon)) {
     const cost = Math.max(1, Math.abs(Number(charged?.energy || 50)));
-    const count = Math.max(1, Math.ceil(cost / Math.max(1, Number(fast?.energy || 1))));
+    const fastEnergy = Math.max(1, Number(fast?.energy || 1));
+    const count = Math.max(1, Math.ceil(cost / fastEnergy));
     const fastSeconds = Math.max(0.1, Number(fast?.durationMs || 1000) / 1000);
     const chargedSeconds = Math.max(0.1, Number(charged?.durationMs || 2000) / 1000);
-    const fastDamage = count * Math.max(0, Number(fast?.power || 0)) * (types.has(moveType(fast)) ? 1.2 : 1);
-    const chargedDamage = Math.max(0, Number(charged?.power || 0)) * (types.has(moveType(charged)) ? 1.2 : 1);
-    const dps = (fastDamage + chargedDamage) / (count * fastSeconds + chargedSeconds);
+    const fastDamage =
+      count *
+      Math.max(0, Number(fast?.power || 0)) *
+      (types.has(moveType(fast)) ? 1.2 : 1);
+    const chargedDamage =
+      Math.max(0, Number(charged?.power || 0)) *
+      (types.has(moveType(charged)) ? 1.2 : 1);
+    const dps =
+      (fastDamage + chargedDamage) /
+      (count * fastSeconds + chargedSeconds);
 
     if (!best || dps > best.dps) {
       best = {
@@ -182,22 +239,29 @@ function bestStandardCycle(pokemon, fast) {
   };
 }
 
-function rawMaxScore(pokemon, fast, cycle) {
+function maxCombatMetrics(pokemon, cycle) {
   const stats = pokemon?.stats || {};
   const attack = Math.max(1, Number(stats.attack || 1));
   const defense = Math.max(1, Number(stats.defense || 1));
   const stamina = Math.max(1, Number(stats.stamina || 1));
   const bulk = Math.sqrt(defense * stamina);
-  const maxPressure = attack * (1 + Math.min(0.35, cycle.fast_eps / 100));
-  const standardPressure = attack * Math.max(1, cycle.dps) / 10;
+  const maxPressure =
+    attack *
+    (1 + Math.min(0.35, cycle.fast_eps / 100));
+  const standardPressure =
+    attack *
+    Math.max(1, cycle.dps) /
+    10;
 
-  // Max Battles reward both damage and staying power: once the whole party
-  // faints, the trainer cannot select a new party and rejoin mid-attempt.
-  return (
-    maxPressure * 0.38 +
-    standardPressure * 0.27 +
-    bulk * 0.35
-  );
+  return {
+    raw_score:
+      maxPressure * 0.38 +
+      standardPressure * 0.27 +
+      bulk * 0.35,
+    max_pressure: maxPressure,
+    standard_pressure: standardPressure,
+    bulk
+  };
 }
 
 export function maxAttackTypeForFastMove(move) {
@@ -218,6 +282,7 @@ export function maxAttackerCandidates(
       const attackType = maxAttackTypeForFastMove(fast);
       if (!attackType) continue;
       const cycle = bestStandardCycle(form.pokemon, fast);
+      const combat = maxCombatMetrics(form.pokemon, cycle);
 
       output.push({
         pokemon_name: form.name,
@@ -228,7 +293,10 @@ export function maxAttackerCandidates(
         fast_move: moveName(fast),
         charged_move: cycle.charged_move,
         charged_type: cycle.charged_type,
-        raw_score: rawMaxScore(form.pokemon, fast, cycle),
+        raw_score: combat.raw_score,
+        max_pressure: combat.max_pressure,
+        standard_pressure: combat.standard_pressure,
+        bulk: combat.bulk,
         attack: Number(form.pokemon?.stats?.attack || 0),
         defense: Number(form.pokemon?.stats?.defense || 0),
         stamina: Number(form.pokemon?.stats?.stamina || 0),
@@ -248,6 +316,10 @@ export function buildMaxAttackerRankCatalog(
 ) {
   const candidates = maxAttackerCandidates(pokedex, { maxEligibleNames });
   const byType = new Map();
+  const globalBestRaw = Math.max(
+    1,
+    ...candidates.map(candidate => candidate.raw_score)
+  );
 
   for (const candidate of candidates) {
     if (!byType.has(candidate.attack_type)) {
@@ -261,7 +333,7 @@ export function buildMaxAttackerRankCatalog(
   for (const [attackType, entries] of byType.entries()) {
     const bestByPokemon = new Map();
     for (const entry of entries) {
-      const key = normalize(entry.pokemon_name);
+      const key = canonicalMaxPokemonName(entry.pokemon_name);
       const existing = bestByPokemon.get(key);
       if (!existing || entry.raw_score > existing.raw_score) {
         bestByPokemon.set(key, entry);
@@ -269,8 +341,11 @@ export function buildMaxAttackerRankCatalog(
     }
 
     const sorted = [...bestByPokemon.values()]
-      .sort((a, b) => b.raw_score - a.raw_score || a.pokemon_name.localeCompare(b.pokemon_name));
-    const bestRaw = sorted[0]?.raw_score || 1;
+      .sort((a, b) =>
+        b.raw_score - a.raw_score ||
+        a.pokemon_name.localeCompare(b.pokemon_name)
+      );
+    const bestRawForType = sorted[0]?.raw_score || 1;
 
     rankings[attackType] = sorted
       .slice(0, Math.max(1, Number(topN) || DEFAULT_TOP_N))
@@ -279,7 +354,8 @@ export function buildMaxAttackerRankCatalog(
         pokemon_name: entry.pokemon_name,
         form_id: entry.form_id,
         form_kind: entry.form_kind,
-        score: Math.round((entry.raw_score / bestRaw) * 100),
+        score: Math.round((entry.raw_score / bestRawForType) * 100),
+        utility_score: Math.round((entry.raw_score / globalBestRaw) * 100),
         fast_move: entry.fast_move,
         charged_move: entry.charged_move,
         charged_type: entry.charged_type,
@@ -291,24 +367,42 @@ export function buildMaxAttackerRankCatalog(
 
   return {
     method_version: MAX_RANK_METHOD_VERSION,
-    method: "Max Battle attacker ranking using Max-eligible forms only; Max Attack typing follows the selected Fast Attack for Dynamax candidates. Composite value weights attack pressure, normal-phase move cycle, and bulk. G-Max move power/type is not invented when the source data does not provide it.",
-    eligibility_basis: "explicit_max_availability",
+    method:
+      "Max Battle attacker ranking using only Pokémon/forms with explicit Max Battle availability evidence. Dynamax Max Attack typing follows the selected Fast Attack. Composite value weights Max-phase attack pressure, normal-phase Fast/Charged pressure, and survivability. G-Max move type or power is not invented when the source data does not provide it.",
+    eligibility_basis: "max_battle_event_history",
+    eligible_pokemon_count:
+      new Set(
+        candidates.map(candidate =>
+          canonicalMaxPokemonName(candidate.pokemon_name)
+        )
+      ).size,
+    candidate_count: candidates.length,
     rankings
   };
 }
 
 export function maxRankProfileForName(catalog, pokemonName) {
-  const key = normalize(pokemonName);
+  const key = canonicalMaxPokemonName(pokemonName);
   if (!key || !catalog?.rankings) return null;
 
   const by_type = {};
   let best = null;
 
   for (const [attackType, entries] of Object.entries(catalog.rankings)) {
-    const entry = (entries || []).find(item => normalize(item.pokemon_name) === key);
+    const entry = (entries || []).find(
+      item =>
+        canonicalMaxPokemonName(item.pokemon_name) === key
+    );
     if (!entry) continue;
     by_type[attackType] = entry;
-    if (!best || entry.score > best.score || (entry.score === best.score && entry.rank < best.rank)) {
+    if (
+      !best ||
+      Number(entry.utility_score || 0) > Number(best.utility_score || 0) ||
+      (
+        Number(entry.utility_score || 0) === Number(best.utility_score || 0) &&
+        entry.rank < best.rank
+      )
+    ) {
       best = entry;
     }
   }
@@ -319,6 +413,8 @@ export function maxRankProfileForName(catalog, pokemonName) {
     method_version: catalog.method_version,
     method: catalog.method,
     eligibility_basis: catalog.eligibility_basis,
+    utility_score: Number(best.utility_score || 0),
+    coverage_types: Object.keys(by_type).sort(),
     best,
     by_type
   };
