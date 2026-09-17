@@ -22,32 +22,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Apply guarded integration patch
+      - name: Apply guarded finalization patch
         run: node scripts/part7-integrate.mjs
-
-      - name: Normalize generated integration assertions
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path("tests/max-ranking-integration.test.mjs")
-          lines = path.read_text().splitlines()
-          found_target = False
-          found_rec_ui = False
-          found_target_ui = False
-          for index, line in enumerate(lines):
-              if line.startswith("assert.match(index, /max_rankings_json:") and "targetBattleKind" in line:
-                  lines[index] = r'assert.match(index, /max_rankings_json:\s*targetBattleKind\(target\)\s*===\s*"raid"\s*\?\s*null/);'
-                  found_target = True
-              elif line.startswith("assert.match(manage, /isMax") and "maxRankingsHtml" in line:
-                  lines[index] = 'assert.ok(manage.includes("isMax ? maxRankingsHtml(rec.meta?.max_rankings_json)"));'
-                  found_rec_ui = True
-              elif line.startswith("assert.match(manage, /maxRankingsHtml") and "target" in line:
-                  lines[index] = 'assert.ok(manage.includes("maxRankingsHtml(target.max_rankings_json)"));'
-                  found_target_ui = True
-          if not (found_target and found_rec_ui and found_target_ui):
-              raise SystemExit(f"Expected generated assertions not found: target={found_target} rec={found_rec_ui} targetUi={found_target_ui}")
-          path.write_text("\n".join(lines) + "\n")
-          PY
 
       - name: Check JavaScript syntax
         run: |
@@ -61,14 +37,14 @@ jobs:
       - name: Check diff
         run: git diff --check
 
-      - name: Commit validated integration
+      - name: Commit validated finalization
         run: |
           if git diff --quiet; then
-            echo "No integration changes to commit."
+            echo "No finalization changes to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/index.js src/resource-planning.js public/manage.html package.json tests/max-ranking-integration.test.mjs
-          git commit -m "feat: integrate Max attacker intelligence"
+          git add src/index.js src/resource-planning.js tests/recommendation-engine.test.mjs tests/max-ranking-integration.test.mjs
+          git commit -m "fix: preserve exact Max forms and ranking fallback"
           git push origin HEAD:feat/max-attacker-intelligence
