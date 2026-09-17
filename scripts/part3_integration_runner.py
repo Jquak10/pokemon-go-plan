@@ -104,4 +104,36 @@ script = replace_labeled_call(
     route_replacement,
 )
 
+# The manage page intentionally contains two "Planner budget" labels.
+# Only the Today command metric becomes the cross-system Remote Pass plan;
+# the Remote Raid rules summary remains Raid-specific.
+script = script.replace(
+    "              '<span>Planner budget</span>': '<span>Remote Pass plan</span>',\n",
+    "",
+    1,
+)
+ui_scope_marker = "replacements = {\n"
+ui_scope_insert = '''replace_once(
+    manage,
+    ''' + "'''" + '''            <span>Planner budget</span>
+            <strong id="todayPlannerBudget">—</strong>
+            <small>Worthwhile paid raids</small>''' + "'''" + ''',
+    ''' + "'''" + '''            <span>Remote Pass plan</span>
+            <strong id="todayPlannerBudget">—</strong>
+            <small>Recommended additional passes</small>''' + "'''" + ''',
+    "Today Remote Pass plan copy"
+)
+
+replacements = {
+'''
+if script.count(ui_scope_marker) != 1:
+    raise SystemExit(
+        f"Could not scope manage UI replacements; found {script.count(ui_scope_marker)} replacement maps"
+    )
+script = script.replace(
+    ui_scope_marker,
+    ui_scope_insert,
+    1,
+)
+
 exec(compile(script, "part3-integrate.py", "exec"), {})
