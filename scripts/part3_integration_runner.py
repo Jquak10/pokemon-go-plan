@@ -88,8 +88,6 @@ route_replacement = """sub_once(
 )"""
 script = replace_labeled_call(script, "battle resource route", route_replacement)
 
-# The generic allocation patch already adds maxParticleCost. Use a callable
-# replacement here so regex group references can never become control bytes.
 max_card_replacement = """def max_badge_repl(match):
     return match.group(1) + '''`
                   <span class="allocation-inline-badge ${allocationClass}">
@@ -143,9 +141,6 @@ shared_cards_replacement = """sub_once(
 )"""
 script = replace_labeled_call(script, "shared allocation cards", shared_cards_replacement)
 
-# These labels occur in both the cross-system Today card and Raid-only
-# summaries. Remove the broad substitutions and re-add exact replacements
-# scoped to the Today card so Raid-specific terminology stays intact.
 for pattern, label in (
     (r"^[ \t]*'<span>Planner budget</span>': '<span>Remote Pass plan</span>',\n", "Planner budget generic UI replacement"),
     (r"^[ \t]*'<small>Worthwhile paid raids</small>': '<small>Recommended additional passes</small>',\n", "Worthwhile paid raids generic UI replacement"),
@@ -183,5 +178,35 @@ replacements = {
 if script.count(ui_scope_marker) != 1:
     raise SystemExit(f"Could not scope manage UI replacements; found {script.count(ui_scope_marker)} replacement maps")
 script = script.replace(ui_scope_marker, ui_scope_insert, 1)
+
+# Fix the resource-planning helper before running the integration. Named Max
+# tiers (for example, "Tier 3 Max Battle") are authoritative enough for the
+# standard tier-cost table even when the title does not also say "3-star".
+resource_path = Path("src/resource-planning.js")
+resource_text = resource_path.read_text()
+old_tier_block = '''  const tierMatch =
+    text.match(
+      /(?:\\b(?:tier|difficulty)\\s*)?\\b([1-6])\\s*(?:-?\\s*star|★)/i
+    );
+'''
+new_tier_block = '''  const namedTierMatch =
+    text.match(
+      /\\b(?:tier|difficulty)\\s*([1-6])\\b/i
+    );
+
+  const starTierMatch =
+    text.match(
+      /\\b([1-6])\\s*(?:-?\\s*star|★)/i
+    );
+
+  const tierMatch =
+    namedTierMatch ||
+    starTierMatch;
+'''
+if resource_text.count(old_tier_block) != 1:
+    raise SystemExit(
+        f"Max tier inference patch expected one match, found {resource_text.count(old_tier_block)}"
+    )
+resource_path.write_text(resource_text.replace(old_tier_block, new_tier_block, 1))
 
 exec(compile(script, "part3-integrate.py", "exec"), {})
