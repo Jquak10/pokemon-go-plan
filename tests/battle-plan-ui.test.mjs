@@ -111,3 +111,7 @@ assert.match(styles, /\.battle-card-max[\s\S]*border-top-color/);
 assert.match(styles, /recommendation-footer-row[\s\S]*grid-template-columns/);
 assert.doesNotMatch(manage, /daily participation cap is not verified here/i);
 assert.doesNotMatch(manage, /separate Raid-only rule/i);
+
+// Part 8 mobile actions remain 44px+ and only real tabs receive tab state.
+assert.match(styles, /recommendation-footer-row \.log-raid-button,[\s\S]*min-height:\s*44px/);
+assert.match(manage, /querySelectorAll\("\.tab-button\[data-tab\]"\)/);

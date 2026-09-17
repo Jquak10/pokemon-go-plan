@@ -1566,7 +1566,7 @@ function activateTab(name, scroll = true) {
   const valid = ["plan", "targets", "hundo", "preferences", "calendar"];
   if (!valid.includes(name)) name = "plan";
 
-  document.querySelectorAll(".tab-button").forEach(button => {
+  document.querySelectorAll(".tab-button[data-tab]").forEach(button => {
     const active = button.dataset.tab === name;
     button.classList.toggle("active", active);
     button.setAttribute("aria-selected", active ? "true" : "false");
