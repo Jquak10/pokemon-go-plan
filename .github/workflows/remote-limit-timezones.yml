@@ -21,7 +21,9 @@ jobs:
         with:
           node-version: 22
       - name: Apply guarded fix
-        run: python3 scripts/fix-remote-limit-timezones.py
+        run: |
+          python3 scripts/fix-remote-limit-timezones.py
+          python3 scripts/fix-remote-limit-parser-regex.py
       - name: Check syntax
         run: |
           node --check src/remote-raid-rules.js
