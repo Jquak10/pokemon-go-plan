@@ -66,8 +66,9 @@ const DEFAULT_SOURCES = [
 // remains stable while the UI migrates to the shared battle model.
 const RAID_SOURCE_TYPES = BATTLE_SOURCE_TYPES;
 
-// Only ordinary Raid events participate in the legacy Raid limit allocator.
-// Remote Max Pass usage is recorded separately in battle_resource_daily.
+// Only ordinary Raid events are candidates for the legacy Raid allocator.
+// Daily Remote participation usage is shared with Remote Max Battles and is
+// summed from the two existing ledgers before applying the official limit.
 const REMOTE_RAID_SOURCE_TYPES = new Set([
   "raid_battles",
   "raid_day",
@@ -4734,6 +4735,34 @@ async function remoteRaidUsageForDate(env, userId, localDate) {
   return row ? Math.max(0, Number(row.raids_used || 0)) : 0;
 }
 
+async function remoteMaxPassUsageForDate(env, userId, localDate) {
+  try {
+    const row = await env.DB.prepare(`
+      SELECT remote_max_passes_used
+      FROM battle_resource_daily
+      WHERE user_id = ? AND local_date = ?
+    `).bind(userId, localDate).first();
+
+    return row
+      ? Math.max(0, Number(row.remote_max_passes_used || 0))
+      : 0;
+  } catch (error) {
+    if (/no such table/i.test(String(error?.message || error))) {
+      return 0;
+    }
+    throw error;
+  }
+}
+
+export async function remoteBattleUsageForDate(env, userId, localDate) {
+  const [remoteRaids, remoteMax] = await Promise.all([
+    remoteRaidUsageForDate(env, userId, localDate),
+    remoteMaxPassUsageForDate(env, userId, localDate)
+  ]);
+
+  return remoteRaids + remoteMax;
+}
+
 
 const DEFAULT_MAX_PARTICLE_RULE_SOURCE =
   "https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/4797-collecting-max-particles-and-dynamaxing-or-gigantamaxing-pokemon-1729887059/";
@@ -6153,7 +6182,7 @@ async function remoteRaidPlanForUser(
         env,
         localDate
       ),
-      remoteRaidUsageForDate(
+      remoteBattleUsageForDate(
         env,
         user.id,
         localDate
@@ -6240,6 +6269,11 @@ async function remoteRaidPlanForUser(
       localDate,
 
     ...plan,
+
+    // Legacy `raids_used` remains for API compatibility; this alias makes the
+    // shared Remote Raid + Remote Max daily-limit meaning explicit.
+    remote_limit_used:
+      plan.raids_used,
 
     system_recommended_budget:
       systemRecommendedBudget,
@@ -6656,7 +6690,11 @@ async function updateRemoteRaidBudgetOverride(
 
 export async function raidActivityForUser(env, user, metas) {
   const localDate = localDateForTimezone(user.timezone);
-  const remoteUsage = await remoteRaidUsageForDate(env, user.id, localDate);
+  const [remoteRaidUsage, remoteMaxPassUsage] = await Promise.all([
+    remoteRaidUsageForDate(env, user.id, localDate),
+    remoteMaxPassUsageForDate(env, user.id, localDate)
+  ]);
+  const remoteLimitUsage = remoteRaidUsage + remoteMaxPassUsage;
   let rows;
   let totals;
   let migrationReady = true;
@@ -6696,12 +6734,14 @@ export async function raidActivityForUser(env, user, metas) {
   const localMax = totals.local_max;
   return {
     local_date: localDate, migration_ready: migrationReady,
-    remote_raids: remoteUsage, local_raids: local, total_raids: remoteUsage + local,
+    remote_raids: remoteRaidUsage, local_raids: local, total_raids: remoteRaidUsage + local,
+    remote_max_passes_used: remoteMaxPassUsage,
+    remote_limit_used: remoteLimitUsage,
     local_max_battles: localMax, remote_max_battles: remoteMax,
-    total_battles: remoteUsage + local + localMax + remoteMax,
+    total_battles: remoteRaidUsage + local + localMax + remoteMax,
     max_particles_spent: totals.mp_spent,
     logged_remote_raids: totals.logged_remote_raids,
-    manual_remote_adjustment: remoteUsage - totals.logged_remote_raids,
+    manual_remote_adjustment: remoteRaidUsage - totals.logged_remote_raids,
     recent: rows.slice(0, 8).map(row => ({
       ...row,
       // Exact identity only. In particular, a base Gengar asset is not a GMAX asset.
@@ -6737,11 +6777,16 @@ export async function logRaidApi(request, env) {
     const id = body.request_id == null ? crypto.randomUUID() : String(body.request_id);
     if (!/^[a-zA-Z0-9_-]{16,80}$/.test(id)) throw new BattleLogError("Invalid battle request ID.");
     const row = await createBattleLog(env.DB, user.id, localDateForTimezone(user.timezone), nowIso(), id, input);
+    const remoteLimitUsed = row.participation === "remote"
+      ? await remoteBattleUsageForDate(env, user.id, row.local_date)
+      : null;
     return json({
       ok: true, ...row, log_id: row.id, raid_type: row.participation,
       raid_count: row.battle_count, target_updated: Boolean(row.target_id),
       remote_raids_used: row.participation === "remote" && row.battle_system === "raid"
-        ? await remoteRaidUsageForDate(env, user.id, row.local_date) : null
+        ? await remoteRaidUsageForDate(env, user.id, row.local_date) : null,
+      remote_battles_used: remoteLimitUsed,
+      remote_limit_used: remoteLimitUsed
     });
   } catch (error) {
     const mapped = battleStorageError(error);
@@ -6775,18 +6820,46 @@ export async function undoRaidLogApi(request, env) {
   }
 }
 
-async function updateRemoteRaidUsage(request, env) {
+export async function updateRemoteRaidUsage(request, env) {
   const body = await request.json();
   const user = await userByManageToken(env, body.token);
   if (!user) return bad("Invalid management link.", 401);
 
-  const raidsUsed = Number(body.raids_used);
-  if (!Number.isFinite(raidsUsed) || raidsUsed < 0 || raidsUsed > 999) {
-    return bad("Remote Raids used must be a number between 0 and 999.");
+  const sharedCorrection = body.remote_battles_used != null;
+  const requested = Number(
+    sharedCorrection
+      ? body.remote_battles_used
+      : body.raids_used
+  );
+
+  if (!Number.isFinite(requested) || requested < 0 || requested > 999) {
+    return bad(
+      `${sharedCorrection ? "Remote battles" : "Remote Raids"} used must be a number between 0 and 999.`
+    );
   }
 
   const localDate = localDateForTimezone(user.timezone);
   const timestamp = nowIso();
+  const remoteMaxUsed = await remoteMaxPassUsageForDate(
+    env,
+    user.id,
+    localDate
+  );
+
+  const requestedWhole = Math.floor(requested);
+
+  if (sharedCorrection && requestedWhole < remoteMaxUsed) {
+    return bad(
+      `Shared Remote usage cannot be lower than the ${remoteMaxUsed} Remote Max Pass${remoteMaxUsed === 1 ? "" : "es"} already recorded today. Correct Remote Max usage first.`
+    );
+  }
+
+  // Keep the existing ordinary-Raid ledger backward compatible. A shared
+  // correction stores only the ordinary-Raid remainder after recorded Remote
+  // Max usage; reads add the two ledgers back together for the official cap.
+  const ordinaryRaidsUsed = sharedCorrection
+    ? requestedWhole - remoteMaxUsed
+    : requestedWhole;
 
   await env.DB.prepare(`
     INSERT INTO remote_raid_usage (
@@ -6799,11 +6872,20 @@ async function updateRemoteRaidUsage(request, env) {
   `).bind(
     user.id,
     localDate,
-    Math.floor(raidsUsed),
+    ordinaryRaidsUsed,
     timestamp
   ).run();
 
-  return json({ ok: true, local_date: localDate, raids_used: Math.floor(raidsUsed) });
+  const remoteLimitUsed = ordinaryRaidsUsed + remoteMaxUsed;
+
+  return json({
+    ok: true,
+    local_date: localDate,
+    raids_used: ordinaryRaidsUsed,
+    remote_max_passes_used: remoteMaxUsed,
+    remote_battles_used: remoteLimitUsed,
+    remote_limit_used: remoteLimitUsed
+  });
 }
 
 
