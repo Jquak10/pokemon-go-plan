@@ -52,7 +52,7 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=31/);
+  assert.match(read(page), /styles\.css\?v=32/);
 }
 
 assert.match(worker, /BATTLE_SOURCE_TYPES/);
@@ -72,3 +72,19 @@ for (const [index, script] of inlineScripts.entries()) {
 }
 
 console.log("Battle Plan UI integration tests passed");
+
+
+assert.match(manage, /BATTLE RESOURCES/);
+assert.match(manage, /Remote Passes & Max Particles/);
+assert.match(manage, /maxParticlesHeld/);
+assert.match(manage, /maxParticlesCollectedToday/);
+assert.match(manage, /remoteMaxPassesUsed/);
+assert.match(manage, /saveBattleResources/);
+assert.match(manage, /\/api\/battle-resources/);
+assert.match(manage, /MP cost unknown/);
+assert.match(manage, /Remote Max battle/);
+assert.match(styles, /Battle resource planning — v32/);
+assert.match(worker, /battle_resource_plan/);
+assert.match(worker, /battleResourcePlanForUser/);
+assert.match(worker, /updateBattleResourcesApi/);
+assert.match(worker, /max_particle_cost/);

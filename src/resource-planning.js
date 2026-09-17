@@ -101,10 +101,19 @@ export function inferMaxParticleCost(recommendation) {
     }
   }
 
-  const tierMatch =
+  const namedTierMatch =
     text.match(
-      /(?:\b(?:tier|difficulty)\s*)?\b([1-6])\s*(?:-?\s*star|★)/i
+      /\b(?:tier|difficulty)\s*([1-6])\b/i
     );
+
+  const starTierMatch =
+    text.match(
+      /\b([1-6])\s*(?:-?\s*star|★)/i
+    );
+
+  const tierMatch =
+    namedTierMatch ||
+    starTierMatch;
 
   if (tierMatch) {
     const tier =

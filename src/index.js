@@ -9,6 +9,12 @@ import {
   battleOpportunityPresentation,
   maxBattleVariantFromText
 } from "./battle-opportunities.js";
+import {
+  STANDARD_MAX_PARTICLE_DAILY_LIMIT,
+  STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
+  buildBattleResourcePlan,
+  inferMaxParticleCost
+} from "./resource-planning.js";
 
 const SOURCE_BASE =
   "https://github.com/othyn/go-calendar/releases/latest/download/";
@@ -2430,6 +2436,17 @@ async function recommendationsForDate(
           battleMetadata
         );
 
+      const maxParticleCost =
+        inferMaxParticleCost({
+          ...battleMetadata,
+          pokemon_name:
+            match.name,
+          event_title:
+            event.summary,
+          event_description:
+            event.description || ""
+        });
+
       const key = [
         battleMetadata?.battle_system || "raid",
         battleMetadata?.battle_variant || "",
@@ -2446,6 +2463,12 @@ async function recommendationsForDate(
         ...battleMetadata,
         battle_presentation:
           battlePresentation,
+        max_particle_cost:
+          maxParticleCost.cost,
+        max_particle_cost_source:
+          maxParticleCost.basis,
+        event_description:
+          event.description || "",
         sprite_exact_form:
           battleMetadata?.battle_variant === "gigantamax"
             ? maxBattleVariantFromText(match.name) === "gigantamax"
@@ -4180,6 +4203,495 @@ async function remoteRaidUsageForDate(env, userId, localDate) {
   `).bind(userId, localDate).first();
 
   return row ? Math.max(0, Number(row.raids_used || 0)) : 0;
+}
+
+
+const DEFAULT_MAX_PARTICLE_RULE_SOURCE =
+  "https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/4797-collecting-max-particles-and-dynamaxing-or-gigantamaxing-pokemon-1729887059/";
+
+function parseParticleLimitNumber(value) {
+  const number = Number(
+    String(value || "")
+      .replace(/,/g, "")
+  );
+
+  return Number.isFinite(number) &&
+    number > 0
+      ? Math.floor(number)
+      : null;
+}
+
+function explicitMaxParticleLimitsFromText(value) {
+  const text =
+    String(value || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  if (!text) {
+    return {
+      daily_limit: null,
+      storage_limit: null
+    };
+  }
+
+  const dailyPatterns = [
+    /(?:maximum number of Max Particles you can collect|Max Particle collection limit|daily Max Particle limit)[^0-9]{0,80}(?:increased to|raised to|set to|is|of)?\s*([\d,]{3,7})/i,
+    /(?:collect|earn|receive)[^.]{0,100}?up to\s*([\d,]{3,7})\s*(?:Max Particles|MP)[^.]{0,40}?(?:per day|daily|each day)/i
+  ];
+
+  const storagePatterns = [
+    /(?:maximum number of Max Particles you can hold|Max Particle storage limit|Max Particle storage capacity)[^0-9]{0,80}(?:increased to|raised to|set to|is|of)?\s*([\d,]{3,7})/i,
+    /(?:hold|store|carry)[^.]{0,100}?up to\s*([\d,]{3,7})\s*(?:Max Particles|MP)/i
+  ];
+
+  const matchValue =
+    patterns => {
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+        const parsed =
+          parseParticleLimitNumber(
+            match?.[1]
+          );
+
+        if (parsed) return parsed;
+      }
+
+      return null;
+    };
+
+  return {
+    daily_limit:
+      matchValue(dailyPatterns),
+    storage_limit:
+      matchValue(storagePatterns)
+  };
+}
+
+async function maxParticleRuleForDate(
+  env,
+  localDate
+) {
+  const standard = {
+    daily_limit:
+      STANDARD_MAX_PARTICLE_DAILY_LIMIT,
+    storage_limit:
+      STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
+    label:
+      "Standard Max Particle rules",
+    source_url:
+      DEFAULT_MAX_PARTICLE_RULE_SOURCE,
+    source_kind:
+      "official",
+    is_override:
+      false
+  };
+
+  let rows = [];
+
+  try {
+    const result =
+      await env.DB.prepare(`
+        SELECT
+          summary,
+          description,
+          source_url,
+          source_uid,
+          source_type,
+          updated_at
+        FROM events
+        WHERE status = 'active'
+          AND source_type IN (
+            'event',
+            'max_battles',
+            'max_mondays'
+          )
+          AND COALESCE(
+            start_date,
+            '0000-01-01'
+          ) <= ?
+          AND COALESCE(
+            end_date,
+            start_date,
+            '9999-12-31'
+          ) >= ?
+        ORDER BY
+          CASE
+            WHEN source_uid LIKE
+              'official-supplement:%'
+            THEN 0
+            ELSE 1
+          END,
+          updated_at DESC
+        LIMIT 100
+      `).bind(
+        localDate,
+        localDate
+      ).all();
+
+    rows =
+      result.results || [];
+  } catch {
+    return standard;
+  }
+
+  let daily =
+    standard.daily_limit;
+  let storage =
+    standard.storage_limit;
+  let source = null;
+
+  for (const row of rows) {
+    const parsed =
+      explicitMaxParticleLimitsFromText(
+        `${row.summary || ""} ${row.description || ""}`
+      );
+
+    if (
+      parsed.daily_limit != null &&
+      parsed.daily_limit > daily
+    ) {
+      daily =
+        parsed.daily_limit;
+      source = row;
+    }
+
+    if (
+      parsed.storage_limit != null &&
+      parsed.storage_limit > storage
+    ) {
+      storage =
+        parsed.storage_limit;
+      source = source || row;
+    }
+  }
+
+  if (!source) {
+    return standard;
+  }
+
+  return {
+    daily_limit:
+      daily,
+    storage_limit:
+      storage,
+    label:
+      source.summary ||
+      "Event Max Particle rules",
+    source_url:
+      source.source_url || null,
+    source_kind:
+      String(
+        source.source_uid || ""
+      ).startsWith(
+        "official-supplement:"
+      )
+        ? "official"
+        : "calendar",
+    is_override:
+      true
+  };
+}
+
+async function battleResourceStateForDate(
+  env,
+  userId,
+  localDate
+) {
+  try {
+    const [
+      persistent,
+      daily
+    ] =
+      await Promise.all([
+        env.DB.prepare(`
+          SELECT
+            max_particles_held
+          FROM battle_resource_state
+          WHERE user_id = ?
+        `).bind(
+          userId
+        ).first(),
+        env.DB.prepare(`
+          SELECT
+            max_particles_collected,
+            remote_max_passes_used
+          FROM battle_resource_daily
+          WHERE user_id = ?
+            AND local_date = ?
+        `).bind(
+          userId,
+          localDate
+        ).first()
+      ]);
+
+    return {
+      max_particles_held:
+        Math.max(
+          0,
+          Number(
+            persistent
+              ?.max_particles_held || 0
+          )
+        ),
+      max_particles_collected_today:
+        Math.max(
+          0,
+          Number(
+            daily
+              ?.max_particles_collected || 0
+          )
+        ),
+      remote_max_passes_used:
+        Math.max(
+          0,
+          Number(
+            daily
+              ?.remote_max_passes_used || 0
+          )
+        ),
+      migration_ready:
+        true
+    };
+  } catch (error) {
+    if (
+      /no such table/i.test(
+        String(
+          error?.message || error
+        )
+      )
+    ) {
+      return {
+        max_particles_held: 0,
+        max_particles_collected_today: 0,
+        remote_max_passes_used: 0,
+        migration_ready:
+          false
+      };
+    }
+
+    throw error;
+  }
+}
+
+async function battleResourcePlanForUser(
+  env,
+  user,
+  recommendations,
+  remoteRaidPlan
+) {
+  const localDate =
+    localDateForTimezone(
+      user.timezone
+    );
+
+  const [
+    resourceState,
+    particleRule
+  ] =
+    await Promise.all([
+      battleResourceStateForDate(
+        env,
+        user.id,
+        localDate
+      ),
+      maxParticleRuleForDate(
+        env,
+        localDate
+      )
+    ]);
+
+  const sharedCeiling =
+    remoteRaidPlan
+      .daily_budget_override != null
+      ? remoteRaidPlan
+          .daily_budget_override
+      : user.remote_raid_budget;
+
+  const plan =
+    buildBattleResourcePlan({
+      recommendations,
+      remoteRaidPlan,
+      resourceState,
+      personalRemotePassCeiling:
+        sharedCeiling,
+      minScore:
+        user.remote_raid_min_score,
+      maxParticleDailyLimit:
+        particleRule.daily_limit,
+      maxParticleStorageLimit:
+        particleRule.storage_limit,
+      futureForecast:
+        remoteRaidPlan
+          .budget_forecast || []
+    });
+
+  return {
+    local_date:
+      localDate,
+    state:
+      resourceState,
+    particle_rule:
+      particleRule,
+    ...plan
+  };
+}
+
+async function updateBattleResourcesApi(
+  request,
+  env
+) {
+  const body =
+    await request.json();
+
+  const user =
+    await userByManageToken(
+      env,
+      body.token
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  const validateWhole = (
+    value,
+    label,
+    max
+  ) => {
+    const number =
+      Number(value);
+
+    if (
+      !Number.isInteger(number) ||
+      number < 0 ||
+      number > max
+    ) {
+      throw new Error(
+        `${label} must be a whole number between 0 and ${max.toLocaleString()}.`
+      );
+    }
+
+    return number;
+  };
+
+  let held;
+  let collected;
+  let remoteMaxPasses;
+
+  try {
+    held =
+      validateWhole(
+        body.max_particles_held ?? 0,
+        "Max Particles held",
+        100000
+      );
+
+    collected =
+      validateWhole(
+        body.max_particles_collected_today ?? 0,
+        "Max Particles collected today",
+        100000
+      );
+
+    remoteMaxPasses =
+      validateWhole(
+        body.remote_max_passes_used ?? 0,
+        "Remote Max Passes used",
+        999
+      );
+  } catch (error) {
+    return bad(
+      error.message
+    );
+  }
+
+  const localDate =
+    localDateForTimezone(
+      user.timezone
+    );
+
+  const timestamp =
+    nowIso();
+
+  try {
+    await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO battle_resource_state (
+          user_id,
+          max_particles_held,
+          updated_at
+        )
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id)
+        DO UPDATE SET
+          max_particles_held =
+            excluded.max_particles_held,
+          updated_at =
+            excluded.updated_at
+      `).bind(
+        user.id,
+        held,
+        timestamp
+      ),
+      env.DB.prepare(`
+        INSERT INTO battle_resource_daily (
+          user_id,
+          local_date,
+          max_particles_collected,
+          remote_max_passes_used,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(
+          user_id,
+          local_date
+        )
+        DO UPDATE SET
+          max_particles_collected =
+            excluded.max_particles_collected,
+          remote_max_passes_used =
+            excluded.remote_max_passes_used,
+          updated_at =
+            excluded.updated_at
+      `).bind(
+        user.id,
+        localDate,
+        collected,
+        remoteMaxPasses,
+        timestamp
+      )
+    ]);
+  } catch (error) {
+    if (
+      /no such table/i.test(
+        String(
+          error?.message || error
+        )
+      )
+    ) {
+      return bad(
+        "Battle resource storage is not ready yet. Apply migrations/0001_battle_resources.sql to D1 first.",
+        503
+      );
+    }
+
+    throw error;
+  }
+
+  return json({
+    ok: true,
+    local_date:
+      localDate,
+    max_particles_held:
+      held,
+    max_particles_collected_today:
+      collected,
+    remote_max_passes_used:
+      remoteMaxPasses
+  });
 }
 
 
@@ -6471,6 +6983,12 @@ function recommendationCoLeaders(
         rec.source_kind,
       source_label:
         rec.source_label,
+      battle_system:
+        rec.battle_system || "raid",
+      battle_variant:
+        rec.battle_variant || null,
+      max_particle_cost:
+        rec.max_particle_cost ?? null,
       sprite_url:
         rec.sprite_url ||
         rec.meta?.sprite_url ||
@@ -6979,6 +7497,14 @@ async function getMe(request, env) {
     targets,
     metas
   );
+  const battleResourcePlan =
+    await battleResourcePlanForUser(
+      env,
+      user,
+      recommendations,
+      remoteRaidPlan
+    );
+
   const targetOptions = await targetOptionsForUser(
     env,
     user,
@@ -7034,6 +7560,8 @@ async function getMe(request, env) {
       ),
     recommendations,
     remote_raid_plan: remoteRaidPlan,
+    battle_resource_plan:
+      battleResourcePlan,
     raid_activity:
       raidActivity,
     target_options: targetOptions,
@@ -8022,6 +8550,16 @@ async function handleFetch(request, env) {
 
     if (request.method === "POST" && path === "/api/remote-raid-usage") {
       return updateRemoteRaidUsage(request, env);
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/battle-resources"
+    ) {
+      return updateBattleResourcesApi(
+        request,
+        env
+      );
     }
 
     if (

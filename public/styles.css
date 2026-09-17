@@ -6919,3 +6919,145 @@ body.modal-open {
     font-size: 0.67rem;
   }
 }
+
+
+/* Battle resource planning — v32 */
+.battle-resource-panel {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.battle-resource-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.battle-resource-panel-head h3 {
+  margin: 3px 0 0;
+}
+
+.battle-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.battle-resource-grid article {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(127, 127, 127, 0.06);
+}
+
+.battle-resource-grid span,
+.battle-resource-grid small {
+  display: block;
+}
+
+.battle-resource-grid span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  opacity: 0.74;
+}
+
+.battle-resource-grid strong {
+  display: block;
+  margin: 4px 0;
+  font-size: 1.08rem;
+}
+
+.battle-resource-grid small {
+  line-height: 1.35;
+  opacity: 0.72;
+}
+
+.battle-resource-advice {
+  display: grid;
+  gap: 3px;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: rgba(127, 127, 127, 0.07);
+}
+
+.battle-resource-advice span {
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+.battle-resource-editor {
+  margin-top: 10px;
+}
+
+.battle-resource-editor > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.battle-resource-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.battle-resource-editor-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.battle-resource-editor-grid input,
+.battle-resource-save-row button {
+  min-height: 44px;
+}
+
+.battle-resource-help {
+  margin-top: 10px;
+}
+
+.max-particle-cost-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.max-particle-cost-badge.cost-unknown {
+  opacity: 0.68;
+}
+
+@media (max-width: 900px) {
+  .battle-resource-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .battle-resource-panel-head {
+    align-items: center;
+  }
+
+  .battle-resource-grid,
+  .battle-resource-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-resource-grid article {
+    padding: 10px 11px;
+  }
+}
