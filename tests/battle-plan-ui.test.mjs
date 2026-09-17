@@ -53,7 +53,7 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=35/);
+  assert.match(read(page), /styles\.css\?v=36/);
 }
 
 assert.match(worker, /BATTLE_SOURCE_TYPES/);
@@ -93,3 +93,25 @@ assert.match(worker, /max_particle_cost/);
 assert.match(styles, /Battle Plan compact desktop polish — v35/);
 assert.match(styles, /grid-template-areas:[\s\S]*today-main resources[\s\S]*today-metrics resources/);
 assert.match(styles, /battle-resource-panel[\s\S]*border-left:/);
+
+
+// Part 8: shared-resource UX must stay battle-system aware.
+assert.match(manage, /Additional worthwhile Remote Pass uses/);
+assert.match(manage, /sharedPassPlan\.recommended_additional \?\? plan\.recommended_total/);
+assert.match(manage, /battle_resource_plan[\s\S]*remote_passes[\s\S]*recommended_additional/);
+assert.match(manage, /`\$\{recBattleLabel\} recommendation`/);
+assert.match(manage, /openRaidLogModal\([\s\S]*rec\.pokemon_name,[\s\S]*rec\.target\?\.id \|\| null,[\s\S]*rec/);
+assert.match(manage, /role="tablist"/);
+assert.match(manage, /role="tabpanel"/);
+assert.match(manage, /function lockPageForMobileMore/);
+assert.match(manage, /function unlockPageForMobileMore/);
+assert.match(styles, /PART 8 UX POLISH \+ REGRESSION HARDENING · v36/);
+assert.match(styles, /html\.mobile-more-open/);
+assert.match(styles, /\.battle-card-max[\s\S]*border-top-color/);
+assert.match(styles, /recommendation-footer-row[\s\S]*grid-template-columns/);
+assert.doesNotMatch(manage, /daily participation cap is not verified here/i);
+assert.doesNotMatch(manage, /separate Raid-only rule/i);
+
+// Part 8 mobile actions remain 44px+ and only real tabs receive tab state.
+assert.match(styles, /recommendation-footer-row \.log-raid-button,[\s\S]*min-height:\s*44px/);
+assert.match(manage, /querySelectorAll\("\.tab-button\[data-tab\]"\)/);

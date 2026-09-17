@@ -7237,3 +7237,137 @@ body.modal-open {
     padding: 7px 9px;
   }
 }
+
+
+
+/* ============================================================
+   PART 8 UX POLISH + REGRESSION HARDENING · v36
+   ============================================================ */
+
+/* Make the battle-type chooser read as a compact segmented control. */
+.battle-plan-filter {
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  border: 1px solid #dfe7f0;
+  border-radius: 14px;
+  background: #f4f7fb;
+}
+
+.battle-filter-button {
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #65788d;
+  box-shadow: none;
+}
+
+.battle-filter-button:hover {
+  transform: none;
+  background: rgba(255,255,255,.7);
+  box-shadow: none;
+}
+
+.battle-filter-button.active {
+  border-color: #d4e2ef;
+  background: #fff;
+  color: #225f9b;
+  box-shadow: 0 3px 10px rgba(39,78,116,.08);
+}
+
+.battle-filter-button[data-battle-filter="max"].active {
+  color: #6248b7;
+  border-color: #ddd5f6;
+  background: #faf8ff;
+}
+
+/* Keep score priority on the left edge while making battle system scannable. */
+.battle-card {
+  border-top-width: 3px;
+}
+
+.battle-card-raid {
+  border-top-color: #b9d7f5;
+}
+
+.battle-card-max {
+  border-top-color: #cfc2f6;
+  background: linear-gradient(180deg, #fdfcff 0, #fff 86px);
+}
+
+.battle-card-max .battle-system-badge,
+.battle-card-max .max-capability-badge {
+  color: #6047aa;
+  border-color: #ddd4f5;
+  background: #f4f0ff;
+}
+
+.battle-card-max .max-capability-gigantamax {
+  color: #8a4e18;
+  border-color: #f0d4ad;
+  background: #fff7e9;
+}
+
+/* Details get the flexible column; primary actions stay aligned and tappable. */
+.recommendation-footer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.recommendation-footer-row .log-raid-button,
+.recommendation-footer-row .small-button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+/* The More sheet is a foreground surface: only it may scroll while open. */
+@media (max-width: 760px) {
+  html.mobile-more-open,
+  body.mobile-more-open {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+  }
+
+  body.mobile-more-open {
+    height: 100%;
+    touch-action: none;
+  }
+
+  .mobile-more-backdrop:not(.hidden) {
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+
+  .mobile-more-sheet {
+    max-height: min(82dvh, 680px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .battle-plan-filter {
+    width: 100%;
+  }
+
+  .recommendation-footer-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .recommendation-footer-row .compact-details {
+    grid-column: 1 / -1;
+  }
+
+  .recommendation-footer-row .log-raid-button,
+  .recommendation-footer-row .small-button {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+  }
+}
