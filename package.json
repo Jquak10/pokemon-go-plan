@@ -5,7 +5,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "test": "node tests/raid-rankings.test.mjs && node tests/battle-opportunities.test.mjs",
+    "test": "node tests/raid-rankings.test.mjs && node tests/battle-opportunities.test.mjs && node --check public/battle-plan-ui.js && node tests/battle-plan-ui.test.mjs",
     "test:live": "node tests/raid-rankings-live.mjs"
   },
   "devDependencies": {
