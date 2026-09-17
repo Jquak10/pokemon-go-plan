@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
-  <title>My Pokémon GO Raid Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=30">
+  <title>My Pokémon GO Battle Planner</title>
+  <link rel="stylesheet" href="/styles.css?v=31">
 </head>
 
 <body class="manage-page">
@@ -21,12 +21,12 @@
       <div class="hero-copy">
         <div class="brand-kicker">
           <span class="brand-mark" aria-hidden="true">⚡</span>
-          PERSONAL RAID STRATEGY
+          PERSONAL BATTLE STRATEGY
         </div>
-        <h1>Pokémon GO Raid Planner</h1>
+        <h1>Pokémon GO Battle Planner</h1>
         <p>
-          A live, personalized raid plan using current raid value,
-          your goals, and your Remote Raid preferences.
+          A live, personalized Battle Plan for Raids and Max Battles,
+          using current value, your goals, and your resource preferences.
         </p>
       </div>
 
@@ -126,7 +126,7 @@
       <nav class="tab-nav" aria-label="Planner sections">
         <button class="tab-button active" type="button" data-tab="plan" aria-selected="true">
           <span class="tab-icon" aria-hidden="true">⚔</span>
-          <span>Raid Plan</span>
+          <span class="nav-label-desktop">Battle Plan</span><span class="nav-label-mobile">Plan</span>
         </button>
 
         <button class="tab-button" type="button" data-tab="targets" aria-selected="false">
@@ -173,7 +173,7 @@
       </button>
 
       <!-- =======================================================
-           TAB: RAID PLAN
+           TAB: BATTLE PLAN
            ======================================================= -->
       <section class="tab-panel active" data-panel="plan">
 
@@ -337,20 +337,32 @@
             <section class="dashboard-card raid-recommendations-card">
               <div class="section-heading-row">
                 <div>
-                  <span class="section-eyebrow">RAID RECOMMENDATIONS</span>
-                  <h2>What to raid now</h2>
+                  <span class="section-eyebrow">BATTLE OPPORTUNITIES</span>
+                  <h2>What to battle now</h2>
                   <p class="section-subtitle">
-                    Meta value, personal targets, battle intel, and Remote Raid allocation in one place.
+                    Raids and Max Battles in one decision view. Max Battle resource allocation is added separately from the existing Raid allocator.
                   </p>
                 </div>
 
                 <span id="allocationTotalBadge" class="status-badge badge-green">0 raids</span>
               </div>
 
-              <div id="recommendations" class="recommendation-grid compact-recommendation-grid"></div>
+              <div class="battle-plan-filter" role="group" aria-label="Battle type">
+      <button type="button" class="battle-filter-button active" data-battle-filter="all" aria-pressed="true">
+        All <span id="battleFilterAllCount">0</span>
+      </button>
+      <button type="button" class="battle-filter-button" data-battle-filter="raid" aria-pressed="false">
+        Raids <span id="battleFilterRaidCount">0</span>
+      </button>
+      <button type="button" class="battle-filter-button" data-battle-filter="max" aria-pressed="false">
+        Max Battles <span id="battleFilterMaxCount">0</span>
+      </button>
+    </div>
 
-              <details class="compact-details zero-raid-details">
-                <summary>Bosses receiving 0 Remote Raids</summary>
+    <div id="recommendations" class="recommendation-grid compact-recommendation-grid"></div>
+
+              <details id="remoteRaidZeroDetails" class="compact-details zero-raid-details">
+                <summary>Raid bosses receiving 0 Remote Raids</summary>
                 <div id="remoteRaidZero" class="zero-raid-list"></div>
               </details>
             </section>
@@ -1260,6 +1272,12 @@ const token = location.pathname.split("/").filter(Boolean)[1];
 const app = document.getElementById("app");
 const loadStatus = document.getElementById("loadStatus");
 let state = null;
+let battlePlanFilter =
+  ["all", "raid", "max"].includes(
+    sessionStorage.getItem("battle-plan-filter")
+  )
+    ? sessionStorage.getItem("battle-plan-filter")
+    : "all";
 let targetById = new Map();
 let targetSelectionMode = false;
 const selectedTargetIds = new Set();
@@ -3930,10 +3948,17 @@ function raidIntelForRecommendation(rec) {
 
   const boss =
     catalogEntryByName(
+      rec.boss_name ||
+      rec.pokemon_name
+    ) ||
+    catalogEntryByName(
       rec.pokemon_name
     );
 
   const encounter =
+    catalogEntryByName(
+      rec.encounter_name
+    ) ||
     raidEncounterEntry(
       rec.pokemon_name
     ) || boss;
@@ -4042,7 +4067,7 @@ function raidIntelHtml(rec) {
       </div>
 
       ${
-        intel.normalCp && intel.boostedCp
+        rec.battle_system !== "max" && intel.normalCp && intel.boostedCp
           ? `
             <div class="raid-hundo-cp">
               <span class="raid-intel-label">100% IV CP</span>
@@ -4076,8 +4101,8 @@ function raidIntelHtml(rec) {
               catalogKey(intel.boss.name)
               ? `
                 <div class="battle-catch-note">
-                  Raid battle form: <strong>${esc(intel.boss.name)}</strong><br>
-                  Catch encounter used for hundo CP: <strong>${esc(intel.encounter.name)}</strong>
+                  Battle form: <strong>${esc(intel.boss.name)}</strong><br>
+                  Encounter form: <strong>${esc(intel.encounter.name)}</strong>
                 </div>
               `
               : ""
@@ -4765,10 +4790,58 @@ function raidRankingsHtml(value) {
   `;
 }
 
+function recommendationSpriteUrl(rec) {
+  const policy =
+    rec.battle_presentation
+      ?.sprite_policy || null;
+
+  if (
+    policy?.requires_exact_form &&
+    !rec.sprite_exact_form
+  ) {
+    return null;
+  }
+
+  return (
+    rec.sprite_url ||
+    rec.meta?.sprite_url ||
+    null
+  );
+}
+
+function battleSystemBadgeHtml(rec) {
+  const presentation =
+    rec.battle_presentation || {};
+
+  const systemLabel =
+    presentation.system_label ||
+    (rec.battle_system === "max"
+      ? "Max Battle"
+      : "Raid");
+
+  const variantLabel =
+    presentation.variant_label ||
+    null;
+
+  return `
+    <span class="battle-system-badge battle-system-${esc(rec.battle_system || "raid")}">
+      ${esc(systemLabel)}
+    </span>
+    ${
+      variantLabel
+        ? `<span class="max-capability-badge max-capability-${esc(rec.battle_variant || "max")}">${esc(variantLabel)}</span>`
+        : ""
+    }
+  `;
+}
+
 function renderRecommendationCard(
   rec,
   allocation
 ) {
+  const isMax =
+    rec.battle_system === "max";
+
   const allocated =
     Number(
       allocation?.allocated || 0
@@ -4780,17 +4853,20 @@ function renderRecommendationCard(
       : "no-allocation";
 
   return `
-    <article class="recommendation-card compact-recommendation-card ${scoreTone(rec.score)}">
+    <article class="recommendation-card compact-recommendation-card ${scoreTone(rec.score)} battle-card battle-card-${esc(rec.battle_system || "raid")}">
       <div class="recommendation-card-head">
         <div class="recommendation-pokemon">
           ${spriteImg(
-            rec.sprite_url || rec.meta?.sprite_url,
-            rec.pokemon_name,
+            recommendationSpriteUrl(rec),
+            rec.boss_name || rec.pokemon_name,
             "pokemon-sprite recommendation-sprite"
           )}
 
           <div>
-            <span class="section-eyebrow" title="${esc(rec.source_label ? `Source: ${rec.source_label}` : "")}">${esc(rec.event_title || "ACTIVE RAID")}</span>
+            <div class="battle-card-kicker">
+              ${battleSystemBadgeHtml(rec)}
+            </div>
+            <span class="section-eyebrow" title="${esc(rec.source_label ? `Source: ${rec.source_label}` : "")}">${esc(rec.event_title || "ACTIVE BATTLE")}</span>
             <h3>${esc(rec.emoji)} ${esc(rec.pokemon_name)}</h3>
           </div>
         </div>
@@ -4801,13 +4877,19 @@ function renderRecommendationCard(
       <div class="recommendation-card-meta">
         <span class="status-badge ${scoreTone(rec.score)}">${esc(rec.label)}</span>
 
-        <span class="allocation-inline-badge ${allocationClass}">
-          ${
-            allocated > 0
-              ? `${formatNumber(allocated)} Remote raid${allocated === 1 ? "" : "s"}`
-              : "0 Remote raids"
-          }
-        </span>
+        ${
+          !isMax
+            ? `
+              <span class="allocation-inline-badge ${allocationClass}">
+                ${
+                  allocated > 0
+                    ? `${formatNumber(allocated)} Remote raid${allocated === 1 ? "" : "s"}`
+                    : "0 Remote raids"
+                }
+              </span>
+            `
+            : ""
+        }
 
         ${
           rec.source_label &&
@@ -4821,7 +4903,7 @@ function renderRecommendationCard(
         }
       </div>
 
-      ${raidRankingsHtml(rec.meta?.raid_rankings_json)}
+      ${!isMax ? raidRankingsHtml(rec.meta?.raid_rankings_json) : ""}
 
       ${raidIntelHtml(rec)}
 
@@ -4833,16 +4915,36 @@ function renderRecommendationCard(
           </ul>
         </details>
 
-        <button
-          type="button"
-          class="log-raid-button"
-          data-log-raid="${esc(rec.pokemon_name)}"
-        >
-          + Log raid
-        </button>
+        ${
+          !isMax
+            ? `
+              <button
+                type="button"
+                class="log-raid-button"
+                data-log-raid="${esc(rec.pokemon_name)}"
+              >
+                + Log raid
+              </button>
+            `
+            : ""
+        }
       </div>
     </article>
   `;
+}
+
+function setBattlePlanFilter(value) {
+  battlePlanFilter =
+    ["all", "raid", "max"].includes(value)
+      ? value
+      : "all";
+
+  sessionStorage.setItem(
+    "battle-plan-filter",
+    battlePlanFilter
+  );
+
+  renderRecommendations();
 }
 
 function renderRecommendations() {
@@ -4851,8 +4953,41 @@ function renderRecommendations() {
       "recommendations"
     );
 
-  const recommendations =
+  const allRecommendations =
     state.recommendations || [];
+
+  const counts = {
+    all: allRecommendations.length,
+    raid: allRecommendations.filter(rec => (rec.battle_system || "raid") === "raid").length,
+    max: allRecommendations.filter(rec => rec.battle_system === "max").length
+  };
+
+  document.getElementById("battleFilterAllCount").textContent = formatNumber(counts.all);
+  document.getElementById("battleFilterRaidCount").textContent = formatNumber(counts.raid);
+  document.getElementById("battleFilterMaxCount").textContent = formatNumber(counts.max);
+
+  document
+    .querySelectorAll("[data-battle-filter]")
+    .forEach(button => {
+      const active =
+        button.dataset.battleFilter ===
+        battlePlanFilter;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+
+  const recommendations =
+    allRecommendations.filter(rec =>
+      battlePlanFilter === "all" ||
+      (rec.battle_system || "raid") === battlePlanFilter
+    );
+
+  document
+    .getElementById("remoteRaidZeroDetails")
+    ?.classList.toggle(
+      "hidden",
+      battlePlanFilter === "max"
+    );
 
   const allocations =
     state.remote_raid_plan
@@ -4871,11 +5006,18 @@ function renderRecommendations() {
     );
 
   if (!recommendations.length) {
+    const emptyLabel =
+      battlePlanFilter === "max"
+        ? "Max Battle"
+        : battlePlanFilter === "raid"
+          ? "Raid"
+          : "battle";
+
     container.innerHTML = `
       <div class="empty-state">
         <span aria-hidden="true">⌕</span>
-        <strong>No matching active raid recommendations yet.</strong>
-        <p>Recommendations appear after current raid data and automatic assessments are available.</p>
+        <strong>No matching active ${esc(emptyLabel)} opportunities yet.</strong>
+        <p>Current opportunities appear after event data and automatic assessments are available.</p>
       </div>
     `;
     return;
@@ -4896,11 +5038,13 @@ function renderRecommendations() {
     rec =>
       renderRecommendationCard(
         rec,
-        allocationByName.get(
-          normalizePickerName(
-            rec.pokemon_name
-          )
-        )
+        rec.battle_system === "max"
+          ? null
+          : allocationByName.get(
+              normalizePickerName(
+                rec.pokemon_name
+              )
+            )
       );
 
   container.innerHTML = `
@@ -4914,7 +5058,7 @@ function renderRecommendations() {
           <details class="more-recommendations">
             <summary>
               <span>
-                More raid recommendations
+                More battle opportunities
                 <strong>${formatNumber(additional.length)}</strong>
               </span>
               <span class="details-chevron" aria-hidden="true">⌄</span>
@@ -6987,6 +7131,18 @@ document
 document.addEventListener(
   "click",
   event => {
+    const battleFilterButton =
+      event.target.closest(
+        "[data-battle-filter]"
+      );
+
+    if (battleFilterButton) {
+      setBattlePlanFilter(
+        battleFilterButton.dataset.battleFilter
+      );
+      return;
+    }
+
     const logButton =
       event.target.closest(
         "[data-log-raid]"

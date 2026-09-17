@@ -3,6 +3,12 @@ import {
   buildRaidAttackerRankCatalog,
   raidRankProfileForName
 } from "./raid-rankings.js";
+import {
+  BATTLE_SOURCE_TYPES,
+  battleOpportunityMetadata,
+  battleOpportunityPresentation,
+  maxBattleVariantFromText
+} from "./battle-opportunities.js";
 
 const SOURCE_BASE =
   "https://github.com/othyn/go-calendar/releases/latest/download/";
@@ -36,13 +42,10 @@ const DEFAULT_SOURCES = [
   "research"
 ];
 
-const RAID_SOURCE_TYPES = new Set([
-  "raid_battles",
-  "raid_day",
-  "raid_hour",
-  "max_battles",
-  "max_mondays"
-]);
+// Battle recommendations include standard Raids plus Max Battles.
+// Keep the legacy constant name here so the existing meta/calendar plumbing
+// remains stable while the UI migrates to the shared battle model.
+const RAID_SOURCE_TYPES = BATTLE_SOURCE_TYPES;
 
 // Only these event classes can consume a Remote Raid Pass.
 // Max Battles / Max Mondays are deliberately excluded.
@@ -2397,8 +2400,6 @@ async function recommendationsForDate(
       );
 
     for (const match of matches) {
-      const key = normalizeName(match.name);
-
       const rec =
         recommendationFor(
           match.name,
@@ -2407,17 +2408,48 @@ async function recommendationsForDate(
           user
         );
 
-      const existing = map.get(key);
+      // Part 2 keeps the existing Raid allocator unchanged. Max Battles are
+      // exposed to the Battle Plan UI now, but shared Remote Pass allocation
+      // is intentionally deferred to the resource-planning part.
       const remoteEligible =
         REMOTE_RAID_SOURCE_TYPES.has(
           event.source_type
         );
+
+      const battleMetadata =
+        battleOpportunityMetadata(
+          event,
+          {
+            pokemonName: match.name,
+            remoteEligible
+          }
+        );
+
+      const battlePresentation =
+        battleOpportunityPresentation(
+          battleMetadata
+        );
+
+      const key = [
+        battleMetadata?.battle_system || "raid",
+        battleMetadata?.battle_variant || "",
+        normalizeName(match.name)
+      ].join("|");
+
+      const existing = map.get(key);
 
       const officialSource =
         isOfficialSupplementEvent(event);
 
       const occurrence = {
         ...rec,
+        ...battleMetadata,
+        battle_presentation:
+          battlePresentation,
+        sprite_exact_form:
+          battleMetadata?.battle_variant === "gigantamax"
+            ? maxBattleVariantFromText(match.name) === "gigantamax"
+            : true,
         event_title: event.summary,
         source_type: event.source_type,
         source_url: event.source_url || null,
