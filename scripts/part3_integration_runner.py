@@ -107,11 +107,16 @@ script = replace_labeled_call(
 # The manage page intentionally contains two "Planner budget" labels.
 # Only the Today command metric becomes the cross-system Remote Pass plan;
 # the Remote Raid rules summary remains Raid-specific.
-script = script.replace(
+for redundant in (
     "              '<span>Planner budget</span>': '<span>Remote Pass plan</span>',\n",
-    "",
-    1,
-)
+    "              '<small>Worthwhile paid raids</small>': '<small>Recommended additional passes</small>',\n",
+):
+    script = script.replace(
+        redundant,
+        "",
+        1,
+    )
+
 ui_scope_marker = "replacements = {\n"
 ui_scope_insert = '''replace_once(
     manage,
