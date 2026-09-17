@@ -42,7 +42,9 @@ jobs:
           NODE
 
       - name: Run deterministic tests
-        run: npm test
+        run: |
+          nl -ba tests/battle-logging.test.mjs | sed -n '188,206p'
+          npm test
 
       - name: Check diff
         run: git diff --check
