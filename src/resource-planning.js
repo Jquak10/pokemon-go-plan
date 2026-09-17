@@ -1,3 +1,5 @@
+import { MAX_RANK_METHOD_VERSION } from "./max-rankings.js";
+
 export const STANDARD_MAX_PARTICLE_DAILY_LIMIT = 800;
 export const STANDARD_MAX_PARTICLE_STORAGE_LIMIT = 1500;
 export const DEFAULT_PAID_BATTLE_MIN_SCORE = 60;
@@ -324,12 +326,44 @@ export function maxParticleAvailability({
  * Resource-planning value for one opportunity.
  *
  * Raid opportunities retain the existing personalized recommendation score.
- * Max opportunities deliberately use a separate provisional method so a
- * normal Raid attacker ranking is never presented as Max Battle performance.
- * Until Part 7 supplies Max-attacker intelligence, the Max planning score is
- * based on the existing general/personal value signal, rarity/availability,
- * and the distinct value of the Max capability itself.
+ * Max opportunities deliberately use a separate method so a normal Raid
+ * attacker ranking is never presented as Max Battle performance. Current
+ * Max-specific profiles are used when available; otherwise the planner falls
+ * back to the provisional general/personal value, rarity/availability, and
+ * Max-capability signal from Part 6.
  */
+function maxRankProfileForRecommendation(
+  recommendation
+) {
+  const raw =
+    recommendation?.max_rank_profile ||
+    recommendation?.meta
+      ?.max_rankings_json ||
+    null;
+
+  if (!raw) return null;
+
+  try {
+    const profile =
+      typeof raw === "string"
+        ? JSON.parse(raw)
+        : raw;
+
+    if (
+      !profile ||
+      typeof profile !== "object" ||
+      profile.method_version !==
+        MAX_RANK_METHOD_VERSION
+    ) {
+      return null;
+    }
+
+    return profile;
+  } catch {
+    return null;
+  }
+}
+
 export function planningValueForRecommendation(
   recommendation
 ) {
@@ -379,6 +413,53 @@ export function planningValueForRecommendation(
   const capability =
     MAX_CAPABILITY_VALUE[variant] ??
     MAX_CAPABILITY_VALUE.default;
+
+  const maxProfile =
+    maxRankProfileForRecommendation(
+      recommendation
+    );
+
+  const maxUtility =
+    scoreOrNull(
+      maxProfile?.utility_score
+    );
+
+  if (maxUtility != null) {
+    const score =
+      clamp(
+        recommendationScore * 0.40 +
+        rarity * 0.15 +
+        capability * 0.15 +
+        maxUtility * 0.30,
+        0,
+        100
+      );
+
+    return {
+      score:
+        Math.round(score),
+      basis:
+        MAX_RANK_METHOD_VERSION,
+      method_version:
+        MAX_RANK_METHOD_VERSION,
+      max_performance_ranked:
+        true,
+      components: {
+        general_personal_value:
+          Math.round(
+            recommendationScore
+          ),
+        rarity_availability:
+          Math.round(rarity),
+        max_capability:
+          capability,
+        max_attacker_utility:
+          Math.round(maxUtility)
+      },
+      note:
+        "Uses the current Max-specific attacker profile; normal Raid attacker rankings are not used as Max performance."
+    };
+  }
 
   const score =
     clamp(

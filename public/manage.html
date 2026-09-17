@@ -5011,6 +5011,91 @@ function raidRankingsHtml(value) {
   `;
 }
 
+function maxRankingsHtml(value) {
+  const profile =
+    parseRaidRankProfile(value);
+
+  const entries =
+    Object.entries(
+      profile?.by_type || {}
+    )
+      .map(([type, item]) => ({
+        type,
+        ...item
+      }))
+      .sort((a, b) =>
+        Number(a.rank || 9999) -
+          Number(b.rank || 9999) ||
+        Number(b.utility_score || 0) -
+          Number(a.utility_score || 0) ||
+        a.type.localeCompare(b.type)
+      );
+
+  if (!entries.length) return "";
+
+  const best =
+    profile?.best ||
+    entries[0];
+
+  const summaryType =
+    String(
+      best.max_attack_type ||
+      entries[0].type ||
+      "Max"
+    );
+
+  const moveLine =
+    entry => {
+      const normal =
+        [
+          entry.fast_move,
+          entry.charged_move
+        ]
+          .filter(Boolean)
+          .join(" + ");
+
+      return [
+        entry.fast_move
+          ? `${entry.fast_move} → Max ${entry.max_attack_type || entry.type}`
+          : null,
+        normal
+          ? `normal phase: ${normal}`
+          : null
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    };
+
+  return `
+    <details class="raid-rank-details max-rank-details">
+      <summary>
+        <span class="raid-rank-summary-label">Max attacker</span>
+        <strong class="raid-rank-summary-value">
+          Max ${esc(summaryType)} · #${formatNumber(best.rank)} · ${formatNumber(profile.utility_score)} utility
+        </strong>
+        <span class="details-chevron" aria-hidden="true">⌄</span>
+      </summary>
+
+      <div class="raid-rank-list">
+        ${entries.slice(0, 4).map(entry => `
+          <div class="raid-rank-variant">
+            <div>
+              <strong>Max ${esc(entry.max_attack_type || entry.type)}</strong>
+              ${entry.has_gigantamax_evolution ? `<small class="raid-rank-current">Gigantamax capable</small>` : ""}
+            </div>
+            <span class="raid-rank-values">#${formatNumber(entry.rank)} · ${formatNumber(entry.utility_score)} utility</span>
+            <small class="raid-rank-moves">${esc(moveLine(entry))}</small>
+          </div>
+        `).join("")}
+
+        <small class="raid-rank-method">
+          Planner Max · Max-eligible Pokémon only · survivability-aware · Max Attack type follows Fast Attack. G-Max move power/type is not guessed.
+        </small>
+      </div>
+    </details>
+  `;
+}
+
 function recommendationSpriteUrl(rec) {
   const policy =
     rec.battle_presentation
@@ -5148,7 +5233,7 @@ function renderRecommendationCard(
         }
       </div>
 
-      ${!isMax ? raidRankingsHtml(rec.meta?.raid_rankings_json) : ""}
+      ${isMax ? maxRankingsHtml(rec.meta?.max_rankings_json) : raidRankingsHtml(rec.meta?.raid_rankings_json)}
 
       ${raidIntelHtml(rec)}
 
@@ -5452,7 +5537,7 @@ function targetCardHtml(target) {
         }
       </div>
 
-      ${BattleTargets.kind(target) === "raid" ? raidRankingsHtml(target.raid_rankings_json) : ""}
+      ${BattleTargets.kind(target) === "raid" ? raidRankingsHtml(target.raid_rankings_json) : maxRankingsHtml(target.max_rankings_json)}
 
       <div class="target-actions compact-target-actions">
         ${targetSelectionMode ? `

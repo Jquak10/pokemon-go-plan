@@ -6,7 +6,14 @@ import {
   raidRankProfileForName
 } from "./raid-rankings.js";
 import {
+  MAX_RANK_METHOD_VERSION,
+  buildMaxAttackerRankCatalog,
+  canonicalMaxPokemonName,
+  maxRankProfileForName
+} from "./max-rankings.js";
+import {
   BATTLE_SOURCE_TYPES,
+  MAX_BATTLE_SOURCE_TYPES,
   battleOpportunityMetadata,
   battleOpportunityPresentation,
   maxBattleVariantFromText
@@ -89,10 +96,12 @@ const PVPOKE_MASTER_LEAGUE =
 const POGO_API_POKEDEX =
   "https://pokemon-go-api.github.io/pokemon-go-api/api/pokedex.json";
 
-const AUTO_META_METHOD_VERSION = "auto-meta-v4-raid-ranks";
+const AUTO_META_METHOD_VERSION = "auto-meta-v5-max-ranks";
 const RAID_RANK_SOURCE_NAME = "Raid attacker rankings";
+const MAX_RANK_SOURCE_NAME = "Max attacker rankings";
 const MAX_META_POKEMON_PER_SYNC = 20;
 const MAX_RAID_RANK_BACKFILLS_PER_SYNC = 80;
+const MAX_MAX_RANK_BACKFILLS_PER_SYNC = 80;
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -633,11 +642,11 @@ function displayNameForMatch(
   }
 
   if (kind === "gigantamax") {
-    return `Gigantamax ${pokemonName}`;
+    return `Gigantamax ${exactRegionForm || pokemonName}`;
   }
 
   if (kind === "dynamax") {
-    return `Dynamax ${pokemonName}`;
+    return `Dynamax ${exactRegionForm || pokemonName}`;
   }
 
   if (exactRegionForm) {
@@ -1239,6 +1248,55 @@ function currentRaidRankingsJson(value) {
     : null;
 }
 
+export function maxRankProfileJsonIsCurrent(value) {
+  if (!value) return false;
+
+  try {
+    const profile =
+      typeof value === "string"
+        ? JSON.parse(value)
+        : value;
+
+    return (
+      profile &&
+      typeof profile === "object" &&
+      profile.method_version ===
+        MAX_RANK_METHOD_VERSION
+    );
+  } catch {
+    return false;
+  }
+}
+
+function currentMaxRankingsJson(value) {
+  return maxRankProfileJsonIsCurrent(value)
+    ? value
+    : null;
+}
+
+function maxRankingsJsonForPokemonName(
+  name,
+  metas
+) {
+  const key =
+    canonicalMaxPokemonName(name);
+
+  if (!key) return null;
+
+  const match =
+    metas.find(
+      meta =>
+        canonicalMaxPokemonName(
+          meta.pokemon_name
+        ) === key &&
+        meta.max_rankings_json
+    );
+
+  return currentMaxRankingsJson(
+    match?.max_rankings_json
+  );
+}
+
 function raidRankingsJsonForPokemonName(
   name,
   metas
@@ -1366,6 +1424,64 @@ async function raidEventsForMeta(env) {
   );
 }
 
+async function maxEligibilityEventsForMeta(env) {
+  const placeholders =
+    [...MAX_BATTLE_SOURCE_TYPES]
+      .map(() => "?")
+      .join(",");
+
+  const { results } =
+    await env.DB.prepare(`
+      SELECT
+        summary,
+        source_type,
+        start_date,
+        end_date,
+        updated_at
+      FROM events
+      WHERE source_type IN (${placeholders})
+        AND status IN ('active', 'stale')
+      ORDER BY updated_at DESC
+      LIMIT 1500
+    `).bind(
+      ...MAX_BATTLE_SOURCE_TYPES
+    ).all();
+
+  return results || [];
+}
+
+function maxEligibleNamesFromEvents(
+  events,
+  pokedex
+) {
+  const names = new Set();
+
+  for (const event of events || []) {
+    for (const match of
+      findPokemonMatchesInSummary(
+        event.summary,
+        pokedex
+      )) {
+      const kind =
+        eventKindForMatch(
+          event.summary,
+          match.name
+        );
+
+      names.add(
+        displayNameForMatch(
+          match.name,
+          kind,
+          event.summary,
+          match.pokemon
+        )
+      );
+    }
+  }
+
+  return [...names];
+}
+
 function findPokemonMatchesInSummary(summary, pokedex) {
   const haystack = normalizeName(summary);
   const matches = [];
@@ -1407,10 +1523,16 @@ function findPokemonMatchesInSummary(summary, pokedex) {
 }
 
 async function syncAutomaticMeta(env) {
-  const [pokedexRaw, pvpRankings, raidEvents] = await Promise.all([
+  const [
+    pokedexRaw,
+    pvpRankings,
+    raidEvents,
+    maxEligibilityEvents
+  ] = await Promise.all([
     fetchJson(POGO_API_POKEDEX, "Pokémon GO API"),
     fetchJson(PVPOKE_MASTER_LEAGUE, "PvPoke"),
-    raidEventsForMeta(env)
+    raidEventsForMeta(env),
+    maxEligibilityEventsForMeta(env)
   ]);
 
   const pokedex = Array.isArray(pokedexRaw) ? pokedexRaw : [];
@@ -1426,6 +1548,20 @@ async function syncAutomaticMeta(env) {
   const raidRankCatalog =
     buildRaidAttackerRankCatalog(
       pokedex
+    );
+
+  const maxEligibleNames =
+    maxEligibleNamesFromEvents(
+      maxEligibilityEvents,
+      pokedex
+    );
+
+  const maxRankCatalog =
+    buildMaxAttackerRankCatalog(
+      pokedex,
+      {
+        maxEligibleNames
+      }
     );
 
   const pvpMap = new Map();
@@ -1508,6 +1644,11 @@ async function syncAutomaticMeta(env) {
             displayName,
             raidRankCatalog
           ),
+        maxRankProfile:
+          maxRankProfileForName(
+            maxRankCatalog,
+            displayName
+          ),
         ...spriteAssets
       };
 
@@ -1534,19 +1675,35 @@ async function syncAutomaticMeta(env) {
           WHERE ms.pokemon_name = pm.pokemon_name
             AND ms.source_name = ?
         ) AS raid_rank_updated_at,
-    (
-      SELECT ms.note
-      FROM meta_sources ms
-      WHERE ms.pokemon_name = pm.pokemon_name
-        AND ms.source_name = ?
-      ORDER BY ms.updated_at DESC
-      LIMIT 1
-    ) AS raid_rankings_json
-  FROM pokemon_meta pm
-`).bind(
-  RAID_RANK_SOURCE_NAME,
-  RAID_RANK_SOURCE_NAME
-).all();
+        (
+          SELECT ms.note
+          FROM meta_sources ms
+          WHERE ms.pokemon_name = pm.pokemon_name
+            AND ms.source_name = ?
+          ORDER BY ms.updated_at DESC
+          LIMIT 1
+        ) AS raid_rankings_json,
+        (
+          SELECT MAX(ms.updated_at)
+          FROM meta_sources ms
+          WHERE ms.pokemon_name = pm.pokemon_name
+            AND ms.source_name = ?
+        ) AS max_rank_updated_at,
+        (
+          SELECT ms.note
+          FROM meta_sources ms
+          WHERE ms.pokemon_name = pm.pokemon_name
+            AND ms.source_name = ?
+          ORDER BY ms.updated_at DESC
+          LIMIT 1
+        ) AS max_rankings_json
+      FROM pokemon_meta pm
+    `).bind(
+      RAID_RANK_SOURCE_NAME,
+      RAID_RANK_SOURCE_NAME,
+      MAX_RANK_SOURCE_NAME,
+      MAX_RANK_SOURCE_NAME
+    ).all();
 
   const existingMetaMap =
     new Map(
@@ -1633,6 +1790,24 @@ async function syncAutomaticMeta(env) {
           )
         );
 
+
+        const maxRankRefresh =
+          Boolean(
+            candidate.maxRankProfile
+          ) &&
+          (
+            !existing?.max_rank_updated_at ||
+            existing.max_rank_updated_at <
+              raidRankStaleBefore ||
+            (
+              Boolean(
+                existing?.max_rankings_json
+              ) &&
+              !maxRankProfileJsonIsCurrent(
+                existing.max_rankings_json
+              )
+            )
+          );
         const priorityBucket =
           missingRecord
             ? 0
@@ -1642,7 +1817,10 @@ async function syncAutomaticMeta(env) {
                 ? 2
                 : activeToday
                   ? 3
-                  : raidRankRefresh
+                  : (
+                      raidRankRefresh ||
+                      maxRankRefresh
+                    )
                     ? 4
                     : 5;
 
@@ -1652,6 +1830,7 @@ async function syncAutomaticMeta(env) {
           spriteBackfill,
           spriteCorrection,
           raidRankRefresh,
+          maxRankRefresh,
           activeToday,
           priorityBucket,
           startDate
@@ -1843,6 +2022,35 @@ async function syncAutomaticMeta(env) {
         )
       );
     }
+
+    if (candidate.maxRankProfile) {
+      const maxRankSourceId =
+        await sha256Hex(
+          `${normalizeName(candidate.displayName)}|max-attacker-rankings`
+        );
+
+      statements.push(
+        env.DB.prepare(`
+          INSERT INTO meta_sources (
+            id, pokemon_name, source_name, source_url, note, updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            source_url = excluded.source_url,
+            note = excluded.note,
+            updated_at = excluded.updated_at
+        `).bind(
+          maxRankSourceId,
+          candidate.displayName,
+          MAX_RANK_SOURCE_NAME,
+          POGO_API_POKEDEX,
+          JSON.stringify(
+            candidate.maxRankProfile
+          ),
+          timestamp
+        )
+      );
+    }
   }
 
   const raidRankBackfillRows =
@@ -1933,6 +2141,88 @@ async function syncAutomaticMeta(env) {
     raidRankBackfills += 1;
   }
 
+  const maxRankBackfillRows =
+    (existingMetaRows || [])
+      .map(row => ({
+        row,
+        profile:
+          maxRankProfileForName(
+            maxRankCatalog,
+            row.pokemon_name
+          )
+      }))
+      .filter(item =>
+        item.profile &&
+        !selectedKeys.has(
+          normalizeName(
+            item.row.pokemon_name
+          )
+        ) &&
+        (
+          !item.row.max_rank_updated_at ||
+          item.row.max_rank_updated_at <
+            raidRankStaleBefore ||
+          (
+            Boolean(
+              item.row.max_rankings_json
+            ) &&
+            !maxRankProfileJsonIsCurrent(
+              item.row.max_rankings_json
+            )
+          )
+        )
+      )
+      .sort((a, b) =>
+        String(
+          a.row.max_rank_updated_at || ""
+        ).localeCompare(
+          String(
+            b.row.max_rank_updated_at || ""
+          )
+        ) ||
+        a.row.pokemon_name.localeCompare(
+          b.row.pokemon_name
+        )
+      )
+      .slice(
+        0,
+        MAX_MAX_RANK_BACKFILLS_PER_SYNC
+      );
+
+  let maxRankBackfills = 0;
+
+  for (const {
+    row,
+    profile
+  } of maxRankBackfillRows) {
+    const maxRankSourceId =
+      await sha256Hex(
+        `${normalizeName(row.pokemon_name)}|max-attacker-rankings`
+      );
+
+    statements.push(
+      env.DB.prepare(`
+        INSERT INTO meta_sources (
+          id, pokemon_name, source_name, source_url, note, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          source_url = excluded.source_url,
+          note = excluded.note,
+          updated_at = excluded.updated_at
+      `).bind(
+        maxRankSourceId,
+        row.pokemon_name,
+        MAX_RANK_SOURCE_NAME,
+        POGO_API_POKEDEX,
+        JSON.stringify(profile),
+        timestamp
+      )
+    );
+
+    maxRankBackfills += 1;
+  }
+
   for (
     let offset = 0;
     offset < statements.length;
@@ -1967,6 +2257,12 @@ async function syncAutomaticMeta(env) {
       RAID_RANK_METHOD_VERSION,
     raid_rank_backfills:
       raidRankBackfills,
+    max_rank_method:
+      MAX_RANK_METHOD_VERSION,
+    max_rank_eligible_names:
+      maxEligibleNames.length,
+    max_rank_backfills:
+      maxRankBackfills,
     write_statements:
       statements.length,
     truncated:
@@ -2127,19 +2423,32 @@ async function getMeta(env) {
           AND ms.source_name = ?
         ORDER BY ms.updated_at DESC
         LIMIT 1
-      ) AS raid_rankings_json
+      ) AS raid_rankings_json,
+      (
+        SELECT ms.note
+        FROM meta_sources ms
+        WHERE ms.pokemon_name = pm.pokemon_name
+          AND ms.source_name = ?
+        ORDER BY ms.updated_at DESC
+        LIMIT 1
+      ) AS max_rankings_json
     FROM pokemon_meta pm
     ORDER BY pm.pokemon_name
   `).bind(
-    RAID_RANK_SOURCE_NAME
+    RAID_RANK_SOURCE_NAME,
+    MAX_RANK_SOURCE_NAME
   ).all();
   return (results || []).map(row => ({
-  ...row,
-  raid_rankings_json:
-    currentRaidRankingsJson(
-      row.raid_rankings_json
-    )
-}));
+    ...row,
+    raid_rankings_json:
+      currentRaidRankingsJson(
+        row.raid_rankings_json
+      ),
+    max_rankings_json:
+      currentMaxRankingsJson(
+        row.max_rankings_json
+      )
+  }));
 }
 
 export function findMatches(summary, targets, metas, event = null) {
@@ -7093,6 +7402,11 @@ async function getMe(request, env) {
             ),
           raid_rankings_json: targetBattleKind(target) !== "raid" ? null :
             raidRankingsJsonForPokemonName(
+              target.pokemon_name,
+              metas
+            ),
+          max_rankings_json: targetBattleKind(target) === "raid" ? null :
+            maxRankingsJsonForPokemonName(
               target.pokemon_name,
               metas
             )
