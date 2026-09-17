@@ -7041,6 +7041,45 @@ body.modal-open {
   opacity: 0.68;
 }
 
+/* Unified Battle logging — v33. Reserve header/footer space at every height. */
+#raidLogModal .raid-log-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: min(92dvh, 820px);
+}
+
+#raidLogModal .modal-header,
+#raidLogModal .modal-footer,
+#raidLogModal .raid-log-modal::before {
+  flex-shrink: 0;
+}
+
+#raidLogModal .modal-body {
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#raidLogModal button,
+#raidLogModal select,
+#raidLogModal input:not([type="checkbox"]) {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+#raidLogModal .modal-footer {
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+}
+
+#raidLogStatus:empty {
+  display: none;
+}
+
+#battleLogMaxFields > .field-help {
+  margin: 10px 0;
+}
+
 @media (max-width: 900px) {
   .battle-resource-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -78,7 +78,7 @@ export function inferMaxParticleCost(recommendation) {
 
   const explicitMatch =
     text.match(
-      /\b(\d{2,4})\s*(?:Max\s*Particles?|MP)\b/i
+      /\b(?:requires?|costs?|cost(?:s)?(?:\s+(?:of|is))?|entry\s+cost(?:\s+(?:of|is))?)\s*:?\s*(\d{2,5})\s*(?:Max\s*Particles?|MP)\b/i
     );
 
   if (explicitMatch) {

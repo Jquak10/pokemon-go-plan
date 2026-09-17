@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Battle Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=32">
+  <link rel="stylesheet" href="/styles.css?v=33">
 </head>
 
 <body class="manage-page">
@@ -177,7 +177,7 @@
           </div>
 
           <p class="field-help battle-resource-help">
-            Ordinary Remote Raids are already counted automatically. Until unified battle logging arrives, enter only Remote Max Battle pass usage here. Max Particle limits can change during events; explicit event limits override the standard 800 collected / 1,500 held rules when the calendar supplies them.
+            Battle logs update Remote Raid and Remote Max pass usage automatically. Use these fields for corrections or activity not yet logged. Max Particle limits can change during events; explicit event limits override the standard 800 collected / 1,500 held rules when the calendar supplies them.
           </p>
 
           <div class="save-row battle-resource-save-row">
@@ -236,9 +236,9 @@
         id="mobileQuickLog"
         type="button"
         class="mobile-quick-log"
-        aria-label="Log a raid"
+        aria-label="Log a battle"
       >
-        + Log raid
+        + Log battle
       </button>
 
       <!-- =======================================================
@@ -351,7 +351,7 @@
                 <div>
                   <label for="raidsUsedToday">Remote Raids used today · manual correction</label>
                   <p class="field-help">
-                    Logging a Remote Raid below updates this automatically. Use this field only to correct the total or enter raids you did before using the raid logger.
+                    Logging a Remote Raid below updates this automatically. Use this field only to correct the total or enter raids you did before using the battle logger.
                   </p>
                 </div>
 
@@ -373,14 +373,14 @@
               <div class="section-heading-row">
                 <div>
                   <span class="section-eyebrow">QUICK LOG</span>
-                  <h2>Today's Raid Activity</h2>
+                  <h2>Today's Battle Activity</h2>
                   <p class="section-subtitle">
-                    Log Remote or Local raids here. Remote raids update the official-cap counter automatically; Local raids are tracked separately.
+                    Log Raids, Dynamax and Gigantamax battles. Pass usage, Max Particles and actual target progress update together.
                   </p>
                 </div>
 
                 <button id="openRaidLog" type="button" class="button">
-                  + Log raid
+                  + Log battle
                 </button>
               </div>
 
@@ -389,14 +389,14 @@
               <details class="recent-raid-log-wrap compact-log-details">
                 <summary class="mini-section-heading recent-log-summary">
                   <div>
-                    <strong>Recent raid logs</strong>
-                    <span id="recentRaidLogSummary">No raids logged yet</span>
+                    <strong>Recent battle logs</strong>
+                    <span id="recentRaidLogSummary">No battles logged yet</span>
                   </div>
                   <span class="details-chevron" aria-hidden="true">⌄</span>
                 </summary>
 
                 <div class="recent-log-body">
-                  <span class="recent-log-help">Showing up to 5 recent entries. Use Undo if you tapped the wrong raid.</span>
+                  <span class="recent-log-help">Showing up to 5 recent entries. Use Undo if you tapped the wrong battle.</span>
                   <div id="recentRaidLogs" class="recent-raid-log"></div>
                 </div>
               </details>
@@ -477,7 +477,7 @@
                   <strong id="desktopRailLocal">—</strong>
                 </article>
                 <article>
-                  <span>Total raids</span>
+                  <span>Total battles</span>
                   <strong id="desktopRailTotal">—</strong>
                 </article>
               </div>
@@ -487,7 +487,7 @@
                 type="button"
                 class="button full-width"
               >
-                + Log raid
+                + Log battle
               </button>
 
               <button
@@ -1160,10 +1160,10 @@
     <section class="target-modal raid-log-modal">
       <div class="modal-header">
         <div>
-          <span class="section-eyebrow">QUICK RAID UPDATE</span>
-          <h2 id="raidLogModalTitle">Log raid</h2>
+          <span class="section-eyebrow">QUICK BATTLE UPDATE</span>
+          <h2 id="raidLogModalTitle">Log battle</h2>
         </div>
-        <button id="closeRaidLogModal" type="button" class="icon-button" aria-label="Close raid logger">×</button>
+        <button id="closeRaidLogModal" type="button" class="icon-button" aria-label="Close battle logger">×</button>
       </div>
 
       <div class="modal-body">
@@ -1174,8 +1174,18 @@
           </div>
 
           <div>
-            <label>Raid type</label>
-            <div class="raid-type-toggle" role="group" aria-label="Raid type">
+            <label for="battleLogKind">Battle</label>
+            <select id="battleLogKind">
+              <option value="raid">Ordinary Raid</option>
+              <option value="dynamax">Dynamax Max Battle</option>
+              <option value="gigantamax">Gigantamax Max Battle</option>
+              <option value="max">Max Battle — choose form</option>
+            </select>
+          </div>
+
+          <div>
+            <label>Participation</label>
+            <div class="raid-type-toggle" role="group" aria-label="Participation">
               <button type="button" data-raid-type="remote" class="active">
                 Remote
               </button>
@@ -1212,6 +1222,26 @@
             </div>
           </div>
 
+          <div id="battleLogMaxFields" class="hidden">
+            <div class="raid-log-two-col">
+              <div>
+                <label for="battleLogWins">Battles won</label>
+                <input id="battleLogWins" type="number" min="0" max="99" step="1" inputmode="numeric" value="1">
+              </div>
+              <div>
+                <label for="battleLogMp">Max Particles per win</label>
+                <input id="battleLogMp" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="Enter cost">
+              </div>
+            </div>
+            <p id="battleLogCostHint" class="field-help"></p>
+            <div id="battleLogPassField">
+              <label for="battleLogPasses">Remote Passes actually consumed</label>
+              <input id="battleLogPasses" type="number" min="0" max="99" step="1" inputmode="numeric" value="1">
+            </div>
+            <p class="field-help">MP is spent only on wins. Remote Passes are consumed when a battle starts; retries against the same boss can reuse a pass. Count attempts, then correct wins and passes. Exclude lobbies left before starting.</p>
+            <p class="field-help">Remote Max usage is recorded separately. Its daily participation cap is not verified here; check the in-game limit.</p>
+          </div>
+
           <label class="raid-update-target-row">
             <input id="raidLogUpdateTarget" type="checkbox" checked>
             <span>
@@ -1227,7 +1257,7 @@
       <div class="modal-footer">
         <span id="raidLogStatus" class="save-status"></span>
         <button id="cancelRaidLog" type="button" class="secondary">Cancel</button>
-        <button id="confirmRaidLog" type="button">Confirm raid log</button>
+        <button id="confirmRaidLog" type="button">Confirm battle log</button>
       </div>
     </section>
   </div>
@@ -1382,6 +1412,11 @@ let pokemonCatalogPromise = null;
 let selectedHundoPokemon = null;
 
 let raidLogType = "remote";
+let battleLogRecommendation = null;
+let battleLogRequestId = null;
+let battleLogBusy = false;
+let battleLogWinsDirty = false;
+let battleLogPassesDirty = false;
 let raidLogProgressDirty = false;
 let raidLogExplicitTargetId = null;
 
@@ -2264,202 +2299,93 @@ function syncRaidLogProgressDefault() {
   ).value =
     raidLogDefaultProgress(
       target,
-      count
+      battleLogSelection().battle_system === "max" ? Number(document.getElementById("battleLogWins").value) : count
     );
+}
+
+function battleLogSelection() {
+  const kind = document.getElementById("battleLogKind").value;
+  return { battle_system: kind === "raid" ? "raid" : "max",
+    battle_variant: kind === "raid" || kind === "max" ? null : kind };
+}
+
+function battleLogLabel(item) {
+  return item.battle_system === "max"
+    ? (item.battle_variant === "gigantamax" ? "Gigantamax" : item.battle_variant === "dynamax" ? "Dynamax" : "Max Battle")
+    : "Raid";
+}
+
+function prefillBattleLog(rec = null) {
+  const name = document.getElementById("raidLogPokemon").value;
+  battleLogRecommendation = rec;
+  const variant = rec?.battle_variant || (/gigantamax|g[ -]?max/i.test(name) ? "gigantamax" : /dynamax/i.test(name) ? "dynamax" : null);
+  document.getElementById("battleLogKind").value = variant || (rec?.battle_system === "max" ? "max" : "raid");
+  const knownCost = rec?.max_particle_cost_confidence === "known";
+  document.getElementById("battleLogMp").value = knownCost && rec?.max_particle_cost != null ? rec.max_particle_cost : "";
+  document.getElementById("battleLogCostHint").textContent = knownCost
+    ? "Cost from the recommendation. Correct it if an event changes the cost."
+    : "MP cost is not confirmed. Enter the actual cost per win, including any event discount.";
+  const remoteButton = document.querySelector('[data-raid-type="remote"]');
+  remoteButton.disabled = rec?.logging_remote_eligible === false;
+  if (remoteButton.disabled) raidLogType = "local";
+  setRaidLogType(raidLogType);
 }
 
 function updateRaidLogPreview() {
-  const pokemonName =
-    document.getElementById(
-      "raidLogPokemon"
-    ).value;
-
-  const count =
-    Math.max(
-      1,
-      Number(
-        document.getElementById(
-          "raidLogCount"
-        ).value || 1
-      )
-    );
-
-  const progress =
-    Math.max(
-      0,
-      Number(
-        document.getElementById(
-          "raidLogProgress"
-        ).value || 0
-      )
-    );
-
-  const target =
-    raidLogMatchingTarget(
-      pokemonName,
-      raidLogExplicitTargetId
-    );
-
-  const updateCheckbox =
-    document.getElementById(
-      "raidLogUpdateTarget"
-    );
-
-  const hint =
-    document.getElementById(
-      "raidLogTargetHint"
-    );
-
-  if (!target) {
-    updateCheckbox.checked = false;
-    updateCheckbox.disabled = true;
-
-    hint.textContent =
-      "No matching target. The raid count will still be logged.";
-
-    document.getElementById(
-      "raidLogPreview"
-    ).innerHTML = `
-      <span class="mini-label">AFTER CONFIRMING</span>
-      <strong>
-        ${formatNumber(count)}
-        ${raidLogType === "remote" ? "Remote" : "Local"}
-        raid${count === 1 ? "" : "s"} logged
-      </strong>
-      <small>No target progress will be changed.</small>
-    `;
-
-    return;
-  }
-
-  updateCheckbox.disabled = false;
-
-  const current =
-    Number(
-      target.current_value || 0
-    );
-
-  const after =
-    current + progress;
-
-  const unit =
-    targetTypeLabels[
-      target.target_type
-    ] ||
-    "Progress";
-
-  const expected =
-    Number(
-      target
-        .expected_progress_per_raid
-    );
-
-  hint.textContent =
-    target.target_type === "raids"
-      ? "Raid-count targets default to +1 progress per raid."
-      : (
-          Number.isFinite(expected) &&
-          expected > 0
-            ? `Starting estimate: ${formatNumber(expected)} ${unit} per raid. You can edit the total.`
-            : "No expected progress is saved. Enter the total gained from these raids."
-        );
-
-  const willUpdate =
-    updateCheckbox.checked;
-
-  document.getElementById(
-    "raidLogPreview"
-  ).innerHTML = `
+  const selection = battleLogSelection();
+  const isMax = selection.battle_system === "max";
+  const name = document.getElementById("raidLogPokemon").value;
+  const count = Number(document.getElementById("raidLogCount").value);
+  const wins = isMax ? Number(document.getElementById("battleLogWins").value) : count;
+  const mpText = document.getElementById("battleLogMp").value;
+  const spent = isMax && mpText !== "" ? Number(mpText) * wins : 0;
+  const passes = raidLogType === "remote" ? (isMax ? Number(document.getElementById("battleLogPasses").value) : count) : 0;
+  const progress = Number(document.getElementById("raidLogProgress").value || 0);
+  const target = raidLogMatchingTarget(name, raidLogExplicitTargetId);
+  const checkbox = document.getElementById("raidLogUpdateTarget");
+  checkbox.disabled = !target;
+  if (!target) checkbox.checked = false;
+  document.getElementById("battleLogMaxFields").classList.toggle("hidden", !isMax);
+  document.getElementById("battleLogPassField").classList.toggle("hidden", raidLogType !== "remote");
+  document.querySelector('label[for="raidLogCount"]').textContent = isMax ? "Battle attempts" : "Raids completed";
+  document.getElementById("battleLogWins").max = count;
+  document.getElementById("battleLogPasses").max = count;
+  document.getElementById("raidLogTargetHint").textContent = target
+    ? "Expected progress is a starting estimate. Enter your actual total gained."
+    : "No matching target. Activity and resources will still be logged.";
+  const held = Number(state.battle_resource_plan?.state?.max_particles_held || 0);
+  const mpUnknown = isMax && wins > 0 && mpText === "";
+  document.getElementById("raidLogPreview").innerHTML = `
     <span class="mini-label">AFTER CONFIRMING</span>
-    <strong>
-      ${formatNumber(count)}
-      ${raidLogType === "remote" ? "Remote" : "Local"}
-      raid${count === 1 ? "" : "s"} logged
-    </strong>
-
-    ${
-      willUpdate
-        ? `
-          <small>
-            ${esc(target.pokemon_name)}:
-            ${formatNumber(current)}
-            → ${formatNumber(after)}
-            ${esc(unit)}
-          </small>
-        `
-        : `
-          <small>
-            Target progress will not be changed.
-          </small>
-        `
-    }
+    <strong>${formatNumber(count)} ${esc(raidLogType)} ${esc(battleLogLabel(selection))} logged</strong>
+    <small>${formatNumber(passes)} Remote Passes consumed${isMax ? ` · ${formatNumber(wins)} won` : ""}</small>
+    ${isMax ? `<small>${mpUnknown ? "Enter MP cost before confirming." : `${formatNumber(spent)} MP spent · held ${formatNumber(held)} → ${formatNumber(held - spent)}`}</small>` : ""}
+    <small>${target && checkbox.checked ? `${esc(target.pokemon_name)} progress: ${formatNumber(target.current_value)} → ${formatNumber(Number(target.current_value || 0) + progress)}` : "Target progress will not change."}</small>
   `;
+  document.getElementById("confirmRaidLog").disabled = battleLogBusy || mpUnknown || (isMax && !selection.battle_variant);
 }
 
-function openRaidLogModal(
-  pokemonName = "",
-  targetId = null
-) {
-  raidLogExplicitTargetId =
-    targetId || null;
-
-  raidLogProgressDirty =
-    false;
-
-  populateRaidLogPokemon(
-    pokemonName
-  );
-
-  document.getElementById(
-    "raidLogCount"
-  ).value = "1";
-
-  document.getElementById(
-    "raidLogUpdateTarget"
-  ).checked = true;
-
-  document.getElementById(
-    "raidLogStatus"
-  ).textContent = "";
-
-  const savedType =
-    localStorage.getItem(
-      "pogo-last-raid-type"
-    );
-
-  raidLogType =
-    savedType === "local"
-      ? "local"
-      : "remote";
-
+function openRaidLogModal(pokemonName = "", targetId = null, recommendation = null) {
+  raidLogExplicitTargetId = targetId || null;
+  raidLogProgressDirty = false;
+  battleLogWinsDirty = false;
+  battleLogPassesDirty = false;
+  battleLogRequestId = crypto.randomUUID();
+  populateRaidLogPokemon(pokemonName);
+  for (const id of ["raidLogCount", "battleLogWins", "battleLogPasses"]) document.getElementById(id).value = "1";
+  document.getElementById("raidLogUpdateTarget").checked = true;
+  document.getElementById("raidLogStatus").textContent = "";
+  raidLogType = localStorage.getItem("pogo-last-raid-type") === "local" ? "local" : "remote";
+  prefillBattleLog(recommendation);
   syncRaidLogProgressDefault();
-  setRaidLogType(
-    raidLogType
-  );
-
-  const modal =
-    document.getElementById(
-      "raidLogModal"
-    );
-
-  modal.classList.remove(
-    "hidden"
-  );
-
+  updateRaidLogPreview();
+  document.getElementById("raidLogModal").classList.remove("hidden");
   lockPageForModal();
-
-  setTimeout(
-    () =>
-      document
-        .getElementById(
-          "raidLogCount"
-        )
-        .focus(),
-    30
-  );
+  setTimeout(() => document.getElementById("raidLogCount").focus(), 30);
 }
 
 function closeRaidLogModal() {
+  if (battleLogBusy) return;
   document
     .getElementById(
       "raidLogModal"
@@ -2475,6 +2401,7 @@ function closeRaidLogModal() {
 }
 
 async function confirmRaidLog() {
+  if (battleLogBusy) return;
   const status =
     document.getElementById(
       "raidLogStatus"
@@ -2510,13 +2437,15 @@ async function confirmRaidLog() {
       raidLogExplicitTargetId
     );
 
+  battleLogBusy = true;
+  updateRaidLogPreview();
   status.textContent =
     "Logging…";
 
   try {
     const result =
       await api(
-        "/api/raid-log",
+        "/api/battle-log",
         {
           method: "POST",
           headers: {
@@ -2526,6 +2455,12 @@ async function confirmRaidLog() {
           body:
             JSON.stringify({
               token,
+              request_id: battleLogRequestId,
+              ...battleLogSelection(),
+              wins: battleLogSelection().battle_system === "max" ? Number(document.getElementById("battleLogWins").value) : count,
+              max_particle_cost: document.getElementById("battleLogMp").value,
+              remote_passes_used: battleLogSelection().battle_system === "max" ? Number(document.getElementById("battleLogPasses").value) : count,
+              recommendation_key: battleLogRecommendation ? [battleLogRecommendation.battle_system || "raid", battleLogRecommendation.battle_variant || "", battleLogRecommendation.pokemon_name].join("|") : null,
               pokemon_name:
                 pokemonName,
               raid_type:
@@ -2542,6 +2477,7 @@ async function confirmRaidLog() {
         }
       );
 
+    battleLogBusy = false;
     closeRaidLogModal();
 
     await load();
@@ -2554,19 +2490,22 @@ async function confirmRaidLog() {
     document.getElementById(
       "raidActivityStatus"
     ).textContent =
-      `✓ ${formatNumber(result.raid_count)} ${result.raid_type} raid${Number(result.raid_count) === 1 ? "" : "s"} logged for ${result.pokemon_name}${targetMessage}`;
+      `✓ ${formatNumber(result.raid_count)} ${result.raid_type} ${battleLogLabel(result)} logged for ${result.pokemon_name}${targetMessage}`;
   } catch (error) {
-    status.textContent =
-      error.message;
+    status.textContent = error.message;
+  } finally {
+    battleLogBusy = false;
+    updateRaidLogPreview();
   }
 }
 
 async function undoRaidLog(
-  logId
+  logId,
+  logSource = "battle"
 ) {
   const confirmed =
     window.confirm(
-      "Undo this raid log? Target progress and the Remote Raid counter will be reversed where applicable."
+      "Undo this battle log? Activity, target progress, Remote Pass usage and Max Particles will all be reversed."
     );
 
   if (!confirmed) {
@@ -2583,7 +2522,7 @@ async function undoRaidLog(
 
   try {
     await api(
-      "/api/raid-log/undo",
+      "/api/battle-log/undo",
       {
         method: "POST",
         headers: {
@@ -2593,6 +2532,7 @@ async function undoRaidLog(
         body:
           JSON.stringify({
             token,
+            log_source: logSource,
             log_id:
               logId
           })
@@ -2604,7 +2544,7 @@ async function undoRaidLog(
     document.getElementById(
       "raidActivityStatus"
     ).textContent =
-      "Raid log undone ✓";
+      "Battle log undone ✓";
   } catch (error) {
     status.textContent =
       error.message;
@@ -2638,7 +2578,7 @@ function raidLogTimeLabel(
 
 function renderRaidActivity() {
   const activity =
-    state.raid_activity || {
+    state.battle_activity || state.raid_activity || {
       remote_raids:
         state.remote_raid_plan
           ?.raids_used || 0,
@@ -2653,21 +2593,21 @@ function renderRaidActivity() {
     "raidActivitySummary"
   ).innerHTML = `
     <article>
-      <span>Remote</span>
+      <span>Remote Raids</span>
       <strong>${formatNumber(activity.remote_raids)}</strong>
       <small>Counts toward the game's Remote Raid limit</small>
     </article>
 
     <article>
-      <span>Local</span>
+      <span>Local Raids</span>
       <strong>${formatNumber(activity.local_raids)}</strong>
       <small>In-person raids logged today</small>
     </article>
 
     <article>
-      <span>Total raids</span>
-      <strong>${formatNumber(activity.total_raids)}</strong>
-      <small>Remote + Local today</small>
+      <span>Max Battles</span>
+      <strong>${formatNumber((activity.local_max_battles || 0) + (activity.remote_max_battles || 0))}</strong>
+      <small>${formatNumber(activity.local_max_battles || 0)} Local · ${formatNumber(activity.remote_max_battles || 0)} Remote · ${formatNumber(activity.max_particles_spent || 0)} MP</small>
     </article>
   `;
 
@@ -2693,8 +2633,8 @@ function renderRaidActivity() {
     "recentRaidLogSummary"
   ).textContent =
     latest
-      ? `${formatNumber(recent.length)} recent · latest ${latest.pokemon_name} ${latest.raid_type === "remote" ? "Remote" : "Local"} ×${formatNumber(latest.raid_count)}`
-      : "No raids logged yet";
+      ? `${formatNumber(recent.length)} recent · latest ${latest.pokemon_name} ${battleLogLabel(latest)} ${latest.raid_type === "remote" ? "Remote" : "Local"} ×${formatNumber(latest.raid_count)}`
+      : "No battles logged yet";
 
   document.getElementById(
     "recentRaidLogs"
@@ -2706,7 +2646,7 @@ function renderRaidActivity() {
             ? `
               <div class="raid-log-adjustment-note">
                 Remote total includes a ${manualAdjustment > 0 ? "+" : ""}${formatNumber(manualAdjustment)}
-                manual correction outside the raid log.
+                manual correction outside the battle log.
               </div>
             `
             : ""
@@ -2727,8 +2667,9 @@ function renderRaidActivity() {
                     <strong>${esc(item.pokemon_name)}</strong>
                     <small>
                       ${esc(raidLogTimeLabel(item.created_at))}
-                      · ${esc(item.raid_type === "remote" ? "Remote" : "Local")}
+                      · ${esc(battleLogLabel(item))} · ${esc(item.raid_type === "remote" ? "Remote" : "Local")}
                       ×${formatNumber(item.raid_count)}
+                      ${item.battle_system === "max" ? ` · ${formatNumber(item.wins)} won · ${formatNumber(item.max_particles_spent)} MP · ${formatNumber(item.remote_passes_used)} passes` : ""}
                       ${
                         Number(item.progress_gained || 0) > 0
                           ? ` · +${formatNumber(item.progress_gained)} progress`
@@ -2742,6 +2683,7 @@ function renderRaidActivity() {
                   type="button"
                   class="secondary small-button"
                   data-undo-raid="${esc(item.id)}"
+                  data-log-source="${esc(item.log_source || "legacy")}"
                 >
                   Undo
                 </button>
@@ -2752,8 +2694,8 @@ function renderRaidActivity() {
       `
       : `
         <div class="empty-state compact-empty">
-          <strong>No raids logged yet today.</strong>
-          <p>Use “Log raid” after a Remote or Local raid.</p>
+          <strong>No battles logged yet today.</strong>
+          <p>Use “Log battle” after a Raid or Max Battle.</p>
         </div>
       `;
 
@@ -3187,7 +3129,7 @@ function renderDesktopQuickRail() {
     "desktopRailTotal"
   ).textContent =
     formatNumber(
-      activity.total_raids || 0
+      activity.total_battles ?? activity.total_raids ?? 0
     );
 }
 
@@ -3230,7 +3172,7 @@ function commandEntries() {
 
   const entries = [
     {
-      label: "Log a raid",
+      label: "Log a battle",
       meta: "Quick action",
       action: () =>
         openRaidLogModal()
@@ -5208,19 +5150,11 @@ function renderRecommendationCard(
           </ul>
         </details>
 
-        ${
-          !isMax
-            ? `
-              <button
-                type="button"
-                class="log-raid-button"
-                data-log-raid="${esc(rec.pokemon_name)}"
-              >
-                + Log raid
-              </button>
-            `
-            : ""
-        }
+        <button type="button" class="log-raid-button"
+          data-log-raid="${esc(rec.pokemon_name)}"
+          data-log-battle-key="${esc([rec.battle_system || "raid", rec.battle_variant || "", rec.pokemon_name].join("|"))}">
+          + Log battle
+        </button>
       </div>
     </article>
   `;
@@ -5562,7 +5496,7 @@ function targetCardHtml(target) {
           data-log-raid="${esc(target.pokemon_name)}"
           data-log-target-id="${esc(target.id)}"
         >
-          + Log raid
+          + Log battle
         </button>
 
         <button
@@ -7391,6 +7325,8 @@ document
         null;
       raidLogProgressDirty =
         false;
+      const matches = (state.recommendations || []).filter(rec => rec.pokemon_name === document.getElementById("raidLogPokemon").value);
+      prefillBattleLog(matches.length === 1 ? matches[0] : null);
       syncRaidLogProgressDefault();
       updateRaidLogPreview();
     }
@@ -7403,6 +7339,9 @@ document
   .addEventListener(
     "input",
     () => {
+      const count = document.getElementById("raidLogCount").value;
+      if (!battleLogWinsDirty) document.getElementById("battleLogWins").value = count;
+      if (!battleLogPassesDirty) document.getElementById("battleLogPasses").value = count;
       syncRaidLogProgressDefault();
       updateRaidLogPreview();
     }
@@ -7470,7 +7409,8 @@ document.addEventListener(
       openRaidLogModal(
         logButton.dataset.logRaid,
         logButton.dataset.logTargetId ||
-          null
+          null,
+        (state.recommendations || []).find(rec => [rec.battle_system || "raid", rec.battle_variant || "", rec.pokemon_name].join("|") === logButton.dataset.logBattleKey) || null
       );
       return;
     }
@@ -7482,11 +7422,31 @@ document.addEventListener(
 
     if (undoButton) {
       undoRaidLog(
-        undoButton.dataset.undoRaid
+        undoButton.dataset.undoRaid,
+        undoButton.dataset.logSource
       );
     }
   }
 );
+
+document.getElementById("battleLogKind").addEventListener("change", () => {
+  battleLogRecommendation = null;
+  document.querySelector('[data-raid-type="remote"]').disabled = false;
+  document.getElementById("battleLogMp").value = "";
+  document.getElementById("battleLogCostHint").textContent = "Enter the actual MP cost per win.";
+  syncRaidLogProgressDefault();
+  updateRaidLogPreview();
+});
+document.getElementById("battleLogWins").addEventListener("input", () => {
+  battleLogWinsDirty = true;
+  syncRaidLogProgressDefault();
+  updateRaidLogPreview();
+});
+document.getElementById("battleLogPasses").addEventListener("input", () => {
+  battleLogPassesDirty = true;
+  updateRaidLogPreview();
+});
+document.getElementById("battleLogMp").addEventListener("input", updateRaidLogPreview);
 
 document.getElementById("saveDailyBudgetOverride").addEventListener("click", saveDailyBudgetOverride);
 document.getElementById("clearDailyBudgetOverride").addEventListener("click", clearDailyBudgetOverride);

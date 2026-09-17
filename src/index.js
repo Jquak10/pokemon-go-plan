@@ -1,3 +1,4 @@
+import { BattleLogError, normalizeBattleLog, createBattleLog, undoBattleLog, battleStorageError } from "./battle-logging.js";
 import {
   RAID_RANK_METHOD_VERSION,
   buildRaidAttackerRankCatalog,
@@ -13,7 +14,8 @@ import {
   STANDARD_MAX_PARTICLE_DAILY_LIMIT,
   STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
   buildBattleResourcePlan,
-  inferMaxParticleCost
+  inferMaxParticleCost,
+  maxBattleRemotePassEligible
 } from "./resource-planning.js";
 
 const SOURCE_BASE =
@@ -53,8 +55,8 @@ const DEFAULT_SOURCES = [
 // remains stable while the UI migrates to the shared battle model.
 const RAID_SOURCE_TYPES = BATTLE_SOURCE_TYPES;
 
-// Only these event classes can consume a Remote Raid Pass.
-// Max Battles / Max Mondays are deliberately excluded.
+// Only ordinary Raid events participate in the legacy Raid limit allocator.
+// Remote Max Pass usage is recorded separately in battle_resource_daily.
 const REMOTE_RAID_SOURCE_TYPES = new Set([
   "raid_battles",
   "raid_day",
@@ -2467,6 +2469,10 @@ async function recommendationsForDate(
           maxParticleCost.cost,
         max_particle_cost_source:
           maxParticleCost.basis,
+        max_particle_cost_confidence: maxParticleCost.confidence,
+        logging_remote_eligible: battleMetadata?.battle_system === "max"
+          ? maxBattleRemotePassEligible({ ...battleMetadata, event_description: event.description, event_title: event.summary })
+          : remoteEligible && !/(?:local|in[- ]person)[ -]?only|cannot be joined remotely/i.test(event.description || ""),
         event_description:
           event.description || "",
         sprite_exact_form:
@@ -6125,613 +6131,127 @@ async function updateRemoteRaidBudgetOverride(
 }
 
 
-async function raidActivityForUser(
-  env,
-  user,
-  metas
-) {
-  const localDate =
-    localDateForTimezone(
-      user.timezone
-    );
-
-  const remoteUsage =
-    await remoteRaidUsageForDate(
-      env,
-      user.id,
-      localDate
-    );
-
-  const totals =
-    await env.DB.prepare(`
-      SELECT
-        COALESCE(
-          SUM(
-            CASE
-              WHEN raid_type = 'local'
-              THEN raid_count
-              ELSE 0
-            END
-          ),
-          0
-        ) AS local_raids,
-        COALESCE(
-          SUM(
-            CASE
-              WHEN raid_type = 'remote'
-              THEN raid_count
-              ELSE 0
-            END
-          ),
-          0
-        ) AS logged_remote_raids
-      FROM raid_log
-      WHERE user_id = ?
-        AND local_date = ?
-        AND undone_at IS NULL
-    `).bind(
-      user.id,
-      localDate
-    ).first();
-
-  const {
-    results: recentRows
-  } =
-    await env.DB.prepare(`
-      SELECT
-        id,
-        pokemon_name,
-        raid_type,
-        raid_count,
-        progress_gained,
-        target_id,
-        target_before_value,
-        target_after_value,
-        local_date,
-        created_at
-      FROM raid_log
-      WHERE user_id = ?
-        AND undone_at IS NULL
-      ORDER BY created_at DESC
-      LIMIT 8
-    `).bind(
-      user.id
-    ).all();
-
-  const localRaids =
-    Math.max(
-      0,
-      Number(
-        totals?.local_raids || 0
-      )
-    );
-
-  const loggedRemoteRaids =
-    Math.max(
-      0,
-      Number(
-        totals
-          ?.logged_remote_raids || 0
-      )
-    );
-
-  const manualRemoteAdjustment =
-    remoteUsage -
-    loggedRemoteRaids;
-
+export async function raidActivityForUser(env, user, metas) {
+  const localDate = localDateForTimezone(user.timezone);
+  const remoteUsage = await remoteRaidUsageForDate(env, user.id, localDate);
+  let rows;
+  let totals;
+  let migrationReady = true;
+  const readActivity = async (table, system, participation, count, mp) => {
+    const [recent, summary] = await Promise.all([
+      env.DB.prepare(table === "unified_battle_log" ? `
+        SELECT *, participation AS raid_type, battle_count AS raid_count
+        FROM unified_battle_log WHERE user_id = ? AND undone_at IS NULL
+        ORDER BY created_at DESC, id DESC LIMIT 8
+      ` : `
+        SELECT *, 'raid' AS battle_system, 'legacy' AS log_source,
+          raid_count AS battle_count, raid_type AS participation, 0 AS max_particles_spent
+        FROM raid_log WHERE user_id = ? AND undone_at IS NULL
+        ORDER BY created_at DESC, id DESC LIMIT 8
+      `).bind(user.id).all(),
+      env.DB.prepare(`
+        SELECT
+          COALESCE(SUM(CASE WHEN ${system} = 'raid' AND ${participation} = 'local' THEN ${count} ELSE 0 END), 0) AS local_raids,
+          COALESCE(SUM(CASE WHEN ${system} = 'raid' AND ${participation} = 'remote' THEN ${count} ELSE 0 END), 0) AS logged_remote_raids,
+          COALESCE(SUM(CASE WHEN ${system} = 'max' AND ${participation} = 'local' THEN ${count} ELSE 0 END), 0) AS local_max,
+          COALESCE(SUM(CASE WHEN ${system} = 'max' AND ${participation} = 'remote' THEN ${count} ELSE 0 END), 0) AS remote_max,
+          COALESCE(SUM(${mp}), 0) AS mp_spent
+        FROM ${table} WHERE user_id = ? AND local_date = ? AND undone_at IS NULL
+      `).bind(user.id, localDate).first()
+    ]);
+    return [recent.results || [], summary];
+  };
+  try {
+    [rows, totals] = await readActivity("unified_battle_log", "battle_system", "participation", "battle_count", "max_particles_spent");
+  } catch (error) {
+    if (!/no such (table|view)/i.test(String(error?.message))) throw error;
+    migrationReady = false;
+    [rows, totals] = await readActivity("raid_log", "'raid'", "raid_type", "raid_count", "0");
+  }
+  const local = totals.local_raids;
+  const remoteMax = totals.remote_max;
+  const localMax = totals.local_max;
   return {
-    local_date:
-      localDate,
-    remote_raids:
-      remoteUsage,
-    local_raids:
-      localRaids,
-    total_raids:
-      remoteUsage + localRaids,
-    logged_remote_raids:
-      loggedRemoteRaids,
-    manual_remote_adjustment:
-      manualRemoteAdjustment,
-    recent:
-      (recentRows || [])
-        .map(
-          row => ({
-            ...row,
-            sprite_url:
-              spriteUrlForPokemonName(
-                row.pokemon_name,
-                metas
-              )
-          })
-        )
+    local_date: localDate, migration_ready: migrationReady,
+    remote_raids: remoteUsage, local_raids: local, total_raids: remoteUsage + local,
+    local_max_battles: localMax, remote_max_battles: remoteMax,
+    total_battles: remoteUsage + local + localMax + remoteMax,
+    max_particles_spent: totals.mp_spent,
+    logged_remote_raids: totals.logged_remote_raids,
+    manual_remote_adjustment: remoteUsage - totals.logged_remote_raids,
+    recent: rows.slice(0, 8).map(row => ({
+      ...row,
+      // Exact identity only. In particular, a base Gengar asset is not a GMAX asset.
+      sprite_url: row.battle_variant === "gigantamax" && maxBattleVariantFromText(row.pokemon_name) !== "gigantamax"
+        ? null
+        : metas.find(meta => normalizeName(meta.pokemon_name) === normalizeName(row.pokemon_name))?.sprite_url || null
+    }))
   };
 }
 
-
-async function logRaidApi(
-  request,
-  env
-) {
-  const body =
-    await request.json();
-
-  const user =
-    await userByManageToken(
-      env,
-      body.token
-    );
-
-  if (!user) {
-    return bad(
-      "Invalid management link.",
-      401
-    );
-  }
-
-  const pokemonName =
-    String(
-      body.pokemon_name || ""
-    ).trim();
-
-  if (!pokemonName) {
-    return bad(
-      "Pokémon name is required."
-    );
-  }
-
-  const raidType =
-    String(
-      body.raid_type || ""
-    ).toLowerCase();
-
-  if (
-    ![
-      "remote",
-      "local"
-    ].includes(
-      raidType
-    )
-  ) {
-    return bad(
-      "Raid type must be remote or local."
-    );
-  }
-
-  const raidCount =
-    Number(
-      body.raid_count
-    );
-
-  if (
-    !Number.isInteger(
-      raidCount
-    ) ||
-    raidCount < 1 ||
-    raidCount > 99
-  ) {
-    return bad(
-      "Raid count must be a whole number between 1 and 99."
-    );
-  }
-
-  let progressGained =
-    Number(
-      body.progress_gained ?? 0
-    );
-
-  if (
-    !Number.isFinite(
-      progressGained
-    ) ||
-    progressGained < 0 ||
-    progressGained > 1000000
-  ) {
-    return bad(
-      "Progress gained must be a number between 0 and 1,000,000."
-    );
-  }
-
-  const targets =
-    await getTargets(
-      env,
-      user.id
-    );
-
-  let target = null;
-
-  if (body.target_id) {
-    target =
-      targets.find(
-        item =>
-          String(item.id) ===
-          String(
-            body.target_id
-          )
-      ) || null;
-  }
-
-  if (!target) {
-    const wanted =
-      normalizeName(
-        pokemonName
-      );
-
-    target =
-      targets.find(
-        item =>
-          normalizeName(
-            item.pokemon_name
-          ) === wanted
-      ) || null;
-  }
-
-  const updateTarget =
-    Boolean(target) &&
-    body.update_target !== false;
-
-  if (
-    updateTarget &&
-    target.target_type ===
-      "raids" &&
-    (
-      body.progress_gained == null ||
-      body.progress_gained === ""
-    )
-  ) {
-    progressGained =
-      raidCount;
-  }
-
-  const targetBeforeValue =
-    updateTarget
-      ? Number(
-          target.current_value || 0
-        )
-      : null;
-
-  const targetAfterValue =
-    updateTarget
-      ? (
-          targetBeforeValue +
-          progressGained
-        )
-      : null;
-
-  const localDate =
-    localDateForTimezone(
-      user.timezone
-    );
-
-  const timestamp =
-    nowIso();
-
-  const logId =
-    randomToken(18);
-
-  const statements = [
-    env.DB.prepare(`
-      INSERT INTO raid_log (
-        id,
-        user_id,
-        pokemon_name,
-        raid_type,
-        raid_count,
-        progress_gained,
-        target_id,
-        target_before_value,
-        target_after_value,
-        local_date,
-        created_at,
-        undone_at
-      )
-      VALUES (
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, NULL
-      )
-    `).bind(
-      logId,
-      user.id,
-      pokemonName,
-      raidType,
-      raidCount,
-      updateTarget
-        ? progressGained
-        : 0,
-      updateTarget
-        ? target.id
-        : null,
-      targetBeforeValue,
-      targetAfterValue,
-      localDate,
-      timestamp
-    )
-  ];
-
-  if (updateTarget) {
-    statements.push(
-      env.DB.prepare(`
-        UPDATE targets
-        SET
-          current_value = ?,
-          updated_at = ?
-        WHERE id = ?
-          AND user_id = ?
-      `).bind(
-        targetAfterValue,
-        timestamp,
-        target.id,
-        user.id
-      )
-    );
-  }
-
-  let newRemoteUsage = null;
-
-  if (raidType === "remote") {
-    const currentRemoteUsage =
-      await remoteRaidUsageForDate(
-        env,
-        user.id,
-        localDate
-      );
-
-    newRemoteUsage =
-      currentRemoteUsage +
-      raidCount;
-
-    statements.push(
-      env.DB.prepare(`
-        INSERT INTO remote_raid_usage (
-          user_id,
-          local_date,
-          raids_used,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(
-          user_id,
-          local_date
-        )
-        DO UPDATE SET
-          raids_used =
-            excluded.raids_used,
-          updated_at =
-            excluded.updated_at
-      `).bind(
-        user.id,
-        localDate,
-        newRemoteUsage,
-        timestamp
-      )
-    );
-  }
-
-  await env.DB.batch(
-    statements
-  );
-
-  return json({
-    ok: true,
-    log_id:
-      logId,
-    pokemon_name:
-      pokemonName,
-    raid_type:
-      raidType,
-    raid_count:
-      raidCount,
-    progress_gained:
-      updateTarget
-        ? progressGained
-        : 0,
-    target_updated:
-      updateTarget,
-    target_before_value:
-      targetBeforeValue,
-    target_after_value:
-      targetAfterValue,
-    remote_raids_used:
-      newRemoteUsage,
-    local_date:
-      localDate
-  });
-}
-
-
-async function undoRaidLogApi(
-  request,
-  env
-) {
-  const body =
-    await request.json();
-
-  const user =
-    await userByManageToken(
-      env,
-      body.token
-    );
-
-  if (!user) {
-    return bad(
-      "Invalid management link.",
-      401
-    );
-  }
-
-  const logId =
-    String(
-      body.log_id || ""
-    );
-
-  if (!logId) {
-    return bad(
-      "Raid log id is required."
-    );
-  }
-
-  const log =
-    await env.DB.prepare(`
-      SELECT *
-      FROM raid_log
-      WHERE id = ?
-        AND user_id = ?
-        AND undone_at IS NULL
-    `).bind(
-      logId,
-      user.id
-    ).first();
-
-  if (!log) {
-    return bad(
-      "Raid log entry was not found or was already undone.",
-      404
-    );
-  }
-
-  const timestamp =
-    nowIso();
-
-  const statements = [];
-
-  if (
-    log.target_id &&
-    log.target_before_value != null
-  ) {
-    const target =
-      await env.DB.prepare(`
-        SELECT *
-        FROM targets
-        WHERE id = ?
-          AND user_id = ?
-      `).bind(
-        log.target_id,
-        user.id
-      ).first();
-
-    if (target) {
-      const currentValue =
-        Number(
-          target.current_value || 0
-        );
-
-      const recordedAfter =
-        Number(
-          log.target_after_value
-        );
-
-      const progress =
-        Number(
-          log.progress_gained || 0
-        );
-
-      const restoredValue =
-        Number.isFinite(
-          recordedAfter
-        ) &&
-        Math.abs(
-          currentValue -
-          recordedAfter
-        ) < 0.000001
-          ? Number(
-              log.target_before_value
-            )
-          : Math.max(
-              0,
-              currentValue -
-              progress
-            );
-
-      statements.push(
-        env.DB.prepare(`
-          UPDATE targets
-          SET
-            current_value = ?,
-            updated_at = ?
-          WHERE id = ?
-            AND user_id = ?
-        `).bind(
-          restoredValue,
-          timestamp,
-          target.id,
-          user.id
-        )
-      );
+export async function logRaidApi(request, env) {
+  const body = await request.json();
+  const user = await userByManageToken(env, body.token);
+  if (!user) return bad("Invalid management link.", 401);
+  try {
+    const targets = await getTargets(env, user.id);
+    const input = normalizeBattleLog(body, targets);
+    // Recommendations retain an ordinary-Raid allocator flag. Do not mistake
+    // that legacy false flag for a prohibition on Remote Max participation.
+    if (body.recommendation_key) {
+      const metas = await getMeta(env);
+      const recs = await currentRecommendations(env, user, targets, metas);
+      const rec = recs.find(item => [
+        item.battle_system || "raid", item.battle_variant || "", item.pokemon_name
+      ].join("|") === body.recommendation_key);
+      if (rec && (rec.pokemon_name !== input.pokemon_name ||
+          rec.battle_system !== input.battle_system || (rec.battle_variant || null) !== input.battle_variant)) {
+        throw new BattleLogError("Battle selection no longer matches its recommendation.");
+      }
+      if (rec?.logging_remote_eligible === false && input.participation === "remote") {
+        throw new BattleLogError("This recommendation is local-only.");
+      }
     }
+    const id = body.request_id == null ? crypto.randomUUID() : String(body.request_id);
+    if (!/^[a-zA-Z0-9_-]{16,80}$/.test(id)) throw new BattleLogError("Invalid battle request ID.");
+    const row = await createBattleLog(env.DB, user.id, localDateForTimezone(user.timezone), nowIso(), id, input);
+    return json({
+      ok: true, ...row, log_id: row.id, raid_type: row.participation,
+      raid_count: row.battle_count, target_updated: Boolean(row.target_id),
+      remote_raids_used: row.participation === "remote" && row.battle_system === "raid"
+        ? await remoteRaidUsageForDate(env, user.id, row.local_date) : null
+    });
+  } catch (error) {
+    const mapped = battleStorageError(error);
+    if (mapped instanceof BattleLogError) return bad(mapped.message, mapped.status);
+    throw error;
   }
-
-  if (
-    log.raid_type ===
-    "remote"
-  ) {
-    const currentRemoteUsage =
-      await remoteRaidUsageForDate(
-        env,
-        user.id,
-        log.local_date
-      );
-
-    const restoredRemoteUsage =
-      Math.max(
-        0,
-        currentRemoteUsage -
-        Number(
-          log.raid_count || 0
-        )
-      );
-
-    statements.push(
-      env.DB.prepare(`
-        INSERT INTO remote_raid_usage (
-          user_id,
-          local_date,
-          raids_used,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(
-          user_id,
-          local_date
-        )
-        DO UPDATE SET
-          raids_used =
-            excluded.raids_used,
-          updated_at =
-            excluded.updated_at
-      `).bind(
-        user.id,
-        log.local_date,
-        restoredRemoteUsage,
-        timestamp
-      )
-    );
-  }
-
-  statements.push(
-    env.DB.prepare(`
-      UPDATE raid_log
-      SET undone_at = ?
-      WHERE id = ?
-        AND user_id = ?
-        AND undone_at IS NULL
-    `).bind(
-      timestamp,
-      logId,
-      user.id
-    )
-  );
-
-  await env.DB.batch(
-    statements
-  );
-
-  return json({
-    ok: true,
-    log_id:
-      logId
-  });
 }
 
-
+export async function undoRaidLogApi(request, env) {
+  const body = await request.json();
+  const user = await userByManageToken(env, body.token);
+  if (!user) return bad("Invalid management link.", 401);
+  if (!body.log_id) return bad("Battle log ID is required.");
+  try {
+    let source = body.log_source;
+    if (!source) {
+      // Compatibility with callers of the old /api/raid-log/undo endpoint.
+      const row = await env.DB.prepare("SELECT log_source FROM unified_battle_log WHERE id = ? AND user_id = ?")
+        .bind(String(body.log_id), user.id).first();
+      const legacy = !row && await env.DB.prepare("SELECT id FROM raid_log WHERE id = ? AND user_id = ?")
+        .bind(String(body.log_id), user.id).first();
+      source = row?.log_source || (legacy ? "legacy" : "battle");
+    }
+    if (!["battle", "legacy"].includes(source)) return bad("Invalid log source.");
+    await undoBattleLog(env.DB, user.id, String(body.log_id), nowIso(), source);
+    return json({ ok: true, log_id: body.log_id });
+  } catch (error) {
+    const mapped = battleStorageError(error);
+    if (mapped instanceof BattleLogError) return bad(mapped.message, mapped.status);
+    throw error;
+  }
+}
 
 async function updateRemoteRaidUsage(request, env) {
   const body = await request.json();
@@ -7562,6 +7082,7 @@ async function getMe(request, env) {
     remote_raid_plan: remoteRaidPlan,
     battle_resource_plan:
       battleResourcePlan,
+    battle_activity: raidActivity,
     raid_activity:
       raidActivity,
     target_options: targetOptions,
@@ -8564,7 +8085,7 @@ async function handleFetch(request, env) {
 
     if (
       request.method === "POST" &&
-      path === "/api/raid-log"
+      (path === "/api/raid-log" || path === "/api/battle-log")
     ) {
       return logRaidApi(
         request,
@@ -8574,7 +8095,7 @@ async function handleFetch(request, env) {
 
     if (
       request.method === "POST" &&
-      path === "/api/raid-log/undo"
+      (path === "/api/raid-log/undo" || path === "/api/battle-log/undo")
     ) {
       return undoRaidLogApi(
         request,
