@@ -104,73 +104,27 @@ script = replace_labeled_call(
     route_replacement,
 )
 
-max_card_replacement = '''replace_once(
+# The immediately preceding "generic allocation count" patch already
+# inserts maxParticleCost. Replace only the brittle Max-side badge block.
+max_card_replacement = '''sub_once(
     manage,
-    """  const allocated =
-    Number(
-      allocation?.allocated || 0
-    );
-
-  const allocationClass =""",
-    """  const allocated =
-    Number(
-      allocation?.allocated || 0
-    );
-
-  const maxParticleCost =
-    isMax
-      ? Number(
-          rec.max_particle_cost || 0
-        )
-      : 0;
-
-  const allocationClass =""",
-    "Max allocation particle cost"
-)
-
-replace_once(
-    manage,
-    """        ${
-          !isMax
-            ? `
-              <span class=\"allocation-inline-badge ${allocationClass}\">
-                ${
-                  allocated > 0
-                    ? `${formatNumber(allocated)} Remote raid${allocated === 1 ? \"\" : \"s\"}`
-                    : \"0 Remote raids\"
-                }
-              </span>
-            `
-            : \"\"
-        }""",
-    """        ${
-          !isMax
-            ? `
-              <span class=\"allocation-inline-badge ${allocationClass}\">
-                ${
-                  allocated > 0
-                    ? `${formatNumber(allocated)} Remote raid${allocated === 1 ? \"\" : \"s\"}`
-                    : \"0 Remote raids\"
-                }
-              </span>
-            `
-            : `
-              <span class=\"allocation-inline-badge ${allocationClass}\">
-                ${
-                  allocated > 0
-                    ? `${formatNumber(allocated)} Remote Max battle${allocated === 1 ? \"\" : \"s\"}`
-                    : \"0 Remote Max battles\"
-                }
-              </span>
-              <span class=\"max-particle-cost-badge ${maxParticleCost ? \"\" : \"cost-unknown\"}\">
-                ${
-                  maxParticleCost
-                    ? `${formatNumber(maxParticleCost)} MP each`
-                    : \"MP cost unknown\"
-                }
-              </span>
-            `
-        }""",
+    r''' + "'''" + '''(: "0 Remote raids"\n\s+}\n\s+</span>\n\s+`\n\s+: )""(\n\s+})''' + "'''" + ''',
+    r''' + "'''" + '''\1`
+                  <span class="allocation-inline-badge ${allocationClass}">
+                    ${
+                      allocated > 0
+                        ? `${formatNumber(allocated)} Remote Max battle${allocated === 1 ? "" : "s"}`
+                        : "0 Remote Max battles"
+                    }
+                  </span>
+                  <span class="max-particle-cost-badge ${maxParticleCost ? "" : "cost-unknown"}">
+                    ${
+                      maxParticleCost
+                        ? `${formatNumber(maxParticleCost)} MP each`
+                        : "MP cost unknown"
+                    }
+                  </span>
+                `\2''' + "'''" + ''',
     "Max allocation badges"
 )'''
 script = replace_labeled_call(
