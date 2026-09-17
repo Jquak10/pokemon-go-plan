@@ -82,4 +82,26 @@ script = replace_labeled_call(
     response_replacement,
 )
 
+route_replacement = """sub_once(
+    index,
+    r'(    if \\(request\\.method === "POST" && path === "/api/remote-raid-usage"\\) \\{\\n      return updateRemoteRaidUsage\\(request, env\\);\\n    \\}\\n)',
+    r'''\\1
+    if (
+      request.method === "POST" &&
+      path === "/api/battle-resources"
+    ) {
+      return updateBattleResourcesApi(
+        request,
+        env
+      );
+    }
+''',
+    "battle resource route"
+)"""
+script = replace_labeled_call(
+    script,
+    "battle resource route",
+    route_replacement,
+)
+
 exec(compile(script, "part3-integrate.py", "exec"), {})
