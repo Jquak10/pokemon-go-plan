@@ -106,16 +106,28 @@ script = replace_labeled_call(
 
 # The manage page intentionally contains two "Planner budget" labels.
 # Only the Today command metric becomes the cross-system Remote Pass plan;
-# the Remote Raid rules summary remains Raid-specific.
-for redundant in (
-    "              '<span>Planner budget</span>': '<span>Remote Pass plan</span>',\n",
-    "              '<small>Worthwhile paid raids</small>': '<small>Recommended additional passes</small>',\n",
+# the Remote Raid rules summary remains Raid-specific. Remove the two
+# broad dictionary substitutions regardless of indentation, then add one
+# exact replacement scoped to the Today card.
+for pattern, label in (
+    (
+        r"^[ \t]*'<span>Planner budget</span>': '<span>Remote Pass plan</span>',\n",
+        "Planner budget generic UI replacement",
+    ),
+    (
+        r"^[ \t]*'<small>Worthwhile paid raids</small>': '<small>Recommended additional passes</small>',\n",
+        "Worthwhile paid raids generic UI replacement",
+    ),
 ):
-    script = script.replace(
-        redundant,
+    script, count = re.subn(
+        pattern,
         "",
-        1,
+        script,
+        count=1,
+        flags=re.M,
     )
+    if count != 1:
+        raise SystemExit(f"Could not remove {label}; found {count}")
 
 ui_scope_marker = "replacements = {\n"
 ui_scope_insert = '''replace_once(
