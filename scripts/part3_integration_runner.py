@@ -68,4 +68,18 @@ script = replace_labeled_call(
     metadata_replacement,
 )
 
+response_replacement = """sub_once(
+    index,
+    r'(    recommendations,\\n    remote_raid_plan: remoteRaidPlan,\\n)(    raid_activity:)',
+    r'''\\1    battle_resource_plan:
+      battleResourcePlan,
+\\2''',
+    "getMe resource response"
+)"""
+script = replace_labeled_call(
+    script,
+    "getMe resource response",
+    response_replacement,
+)
+
 exec(compile(script, "part3-integrate.py", "exec"), {})
