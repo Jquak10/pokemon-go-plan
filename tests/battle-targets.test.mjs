@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import {upsertTarget,findMatches,targetOptionsForUser,targetSpriteUrl,recommendationsForDate} from '../src/index.js';
 import {normalizeBattleLog,createBattleLog,undoBattleLog} from '../src/battle-logging.js';
 import {buildBattleResourcePlan} from '../src/resource-planning.js';
+import {battleOpportunityMetadata} from '../src/battle-opportunities.js';
 const T = globalThis.BattleTargets;
 const read = path => readFileSync(new URL(path,import.meta.url),'utf8');
 const sql = new DatabaseSync(':memory:');
@@ -53,6 +54,25 @@ assert.equal(T.kind({pokemon_name:'Gigantamax Gengar',battle_kind:null}),'gigant
 assert.equal(targetSpriteUrl({pokemon_name:'Gigantamax Gengar',battle_kind:'gigantamax'},metas.slice(0,1)),null);
 assert.equal(targetSpriteUrl({pokemon_name:'Gigantamax Gengar',battle_kind:'gigantamax'},metas),'gmax.png');
 
+// A battle boss must be discoverable before pokemon_meta catches up. Multi-boss
+// Max feeds also inherit standard Dynamax capability consistently.
+const maxFallbackPokedex=[
+  {dexNr:111,names:{English:'Rhyhorn'},regionForms:{}},
+  {dexNr:144,names:{English:'Articuno'},regionForms:{}},
+  {dexNr:145,names:{English:'Zapdos'},regionForms:{}},
+  {dexNr:146,names:{English:'Moltres'},regionForms:{}}
+];
+const birdsEvent={source_type:'max_battles',summary:'Articuno, Zapdos & Moltres Max Battles'};
+const birdMatches=findMatches(birdsEvent.summary,[],[],birdsEvent,maxFallbackPokedex);
+assert.deepEqual(birdMatches.map(match=>match.name).sort(),['Articuno','Moltres','Zapdos']);
+for(const match of birdMatches){
+  const metadata=battleOpportunityMetadata(birdsEvent,{pokemonName:match.name});
+  assert.equal(metadata.battle_variant,'dynamax');
+  assert.equal(T.canonicalName(match.name,T.kind(metadata)),'Dynamax '+match.name);
+}
+const rhyhornEvent={source_type:'max_battles',summary:'Rhyhorn Max Battles'};
+assert.equal(findMatches(rhyhornEvent.summary,[],[],rhyhornEvent,maxFallbackPokedex)[0].name,'Rhyhorn');
+
 // Explicit and automatic target matching update only the chosen system/goal.
 sql.exec("INSERT INTO battle_resource_state VALUES('u',1500,'now')");
 const input=normalizeBattleLog({pokemon_name:'Gengar',battle_system:'max',battle_variant:'gigantamax',participation:'remote',battle_count:2,max_particle_cost:250,target_id:gmax.id,progress_gained:7},all());
@@ -77,6 +97,12 @@ insertEvent.run('raid','raid_battles','Gengar Raids',today,today,'1');
 insertEvent.run('gmax','max_battles','Gigantamax Gengar Max Battles',today,today,'2');
 insertEvent.run('dyn','max_battles','Dynamax Gengar Max Battles',future,future,'3');
 const user={id:'u',timezone:'Asia/Singapore',pve_weight:1,pvp_weight:0,collector_weight:0};
+insertEvent.run('rhyhorn-max','max_battles','Rhyhorn Max Battles',today,today,'4');
+const fallbackRecs=await recommendationsForDate(env,user,all(),metas,today,maxFallbackPokedex);
+const rhyhornRec=fallbackRecs.find(r=>r.battle_system==='max'&&r.pokemon_name==='Rhyhorn');
+assert.ok(rhyhornRec,'Current Max boss without pokemon_meta must still render as a recommendation');
+assert.equal(rhyhornRec.battle_variant,'dynamax');
+sql.prepare("DELETE FROM events WHERE id='rhyhorn-max'").run();
 const recs=await recommendationsForDate(env,user,all(),metas,today);
 assert.equal(recs.find(r=>r.battle_system==='raid').target.id,raid.id);
 assert.equal(recs.find(r=>r.battle_variant==='gigantamax').target.id,counts.id);

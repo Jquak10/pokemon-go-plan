@@ -73,6 +73,20 @@ assert.equal(
   }),
   null
 );
+assert.equal(
+  maxBattleVariantForEvent({
+    source_type: "max_battles",
+    summary: "Articuno, Zapdos & Moltres Max Battles"
+  }),
+  BATTLE_VARIANT.DYNAMAX
+);
+assert.equal(
+  maxBattleVariantForEvent({
+    source_type: "max_mondays",
+    summary: "Rhyhorn"
+  }),
+  BATTLE_VARIANT.DYNAMAX
+);
 
 assert.equal(
   encounterNameForMaxPokemon("Gigantamax Charizard"),
