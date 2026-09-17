@@ -1,0 +1,61 @@
+name: Fix Part 3 patch anchor
+
+on:
+  push:
+    branches:
+      - feat/max-battle-resources
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: contains(github.event.head_commit.message, '[part3-patch-fix]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/max-battle-resources
+          fetch-depth: 0
+
+      - name: Replace brittle recommendation anchor
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('.github/workflows/part3-resource-patch.yml')
+          text = path.read_text()
+          pattern = re.compile(
+              r'''          replace_once\(\n              index,\n              ''' + "'''" + r'''      const battlePresentation =[\s\S]*?              "particle cost inference"\n          \)'''
+          )
+          replacement = """          replace_once(
+              index,
+              '      const key = [\\n',
+              '''      const maxParticleCost =
+                inferMaxParticleCost({
+                  ...battleMetadata,
+                  pokemon_name:
+                    match.name,
+                  event_title:
+                    event.summary,
+                  event_description:
+                    event.description || ""
+                });
+
+              const key = [
+''',
+              "particle cost inference"
+          )"""
+          updated, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected one workflow anchor block, found {count}')
+          path.write_text(updated)
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/part3-resource-patch.yml
+          git commit -m "chore: fix Part 3 patch anchor [part3-patch]"
+          git push origin HEAD:feat/max-battle-resources
