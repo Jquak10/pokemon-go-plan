@@ -44,11 +44,7 @@ particle_replacement = """sub_once(
 \\2''',
     "particle cost inference"
 )"""
-script = replace_labeled_call(
-    script,
-    "particle cost inference",
-    particle_replacement,
-)
+script = replace_labeled_call(script, "particle cost inference", particle_replacement)
 
 metadata_replacement = """sub_once(
     index,
@@ -62,11 +58,7 @@ metadata_replacement = """sub_once(
 \\2''',
     "recommendation resource metadata"
 )"""
-script = replace_labeled_call(
-    script,
-    "recommendation resource metadata",
-    metadata_replacement,
-)
+script = replace_labeled_call(script, "recommendation resource metadata", metadata_replacement)
 
 response_replacement = """sub_once(
     index,
@@ -76,11 +68,7 @@ response_replacement = """sub_once(
 \\2''',
     "getMe resource response"
 )"""
-script = replace_labeled_call(
-    script,
-    "getMe resource response",
-    response_replacement,
-)
+script = replace_labeled_call(script, "getMe resource response", response_replacement)
 
 route_replacement = """sub_once(
     index,
@@ -98,18 +86,12 @@ route_replacement = """sub_once(
 ''',
     "battle resource route"
 )"""
-script = replace_labeled_call(
-    script,
-    "battle resource route",
-    route_replacement,
-)
+script = replace_labeled_call(script, "battle resource route", route_replacement)
 
-# The immediately preceding "generic allocation count" patch already
-# inserts maxParticleCost. Replace only the brittle Max-side badge block.
-max_card_replacement = '''sub_once(
-    manage,
-    r''' + "'''" + '''(: "0 Remote raids"\n\s+}\n\s+</span>\n\s+`\n\s+: )""(\n\s+})''' + "'''" + ''',
-    r''' + "'''" + '''\1`
+# The generic allocation patch already adds maxParticleCost. Use a callable
+# replacement here so regex group references can never become control bytes.
+max_card_replacement = """def max_badge_repl(match):
+    return match.group(1) + '''`
                   <span class="allocation-inline-badge ${allocationClass}">
                     ${
                       allocated > 0
@@ -124,14 +106,15 @@ max_card_replacement = '''sub_once(
                         : "MP cost unknown"
                     }
                   </span>
-                `\2''' + "'''" + ''',
+                `''' + match.group(2)
+
+sub_once(
+    manage,
+    r'(: "0 Remote raids"\\n\\s+}\\n\\s+</span>\\n\\s+`\\n\\s+: )""(\\n\\s+})',
+    max_badge_repl,
     "Max allocation badges"
-)'''
-script = replace_labeled_call(
-    script,
-    "Max allocation card metadata",
-    max_card_replacement,
-)
+)"""
+script = replace_labeled_call(script, "Max allocation card metadata", max_card_replacement)
 
 shared_cards_replacement = """sub_once(
     manage,
@@ -158,36 +141,17 @@ shared_cards_replacement = """sub_once(
     };''',
     "shared allocation cards"
 )"""
-script = replace_labeled_call(
-    script,
-    "shared allocation cards",
-    shared_cards_replacement,
-)
+script = replace_labeled_call(script, "shared allocation cards", shared_cards_replacement)
 
 # These labels occur in both the cross-system Today card and Raid-only
 # summaries. Remove the broad substitutions and re-add exact replacements
 # scoped to the Today card so Raid-specific terminology stays intact.
 for pattern, label in (
-    (
-        r"^[ \t]*'<span>Planner budget</span>': '<span>Remote Pass plan</span>',\n",
-        "Planner budget generic UI replacement",
-    ),
-    (
-        r"^[ \t]*'<small>Worthwhile paid raids</small>': '<small>Recommended additional passes</small>',\n",
-        "Worthwhile paid raids generic UI replacement",
-    ),
-    (
-        r"^[ \t]*'<span>Today\\'s ceiling</span>': '<span>Remote Pass ceiling</span>',\n",
-        "Today's ceiling generic UI replacement",
-    ),
+    (r"^[ \t]*'<span>Planner budget</span>': '<span>Remote Pass plan</span>',\n", "Planner budget generic UI replacement"),
+    (r"^[ \t]*'<small>Worthwhile paid raids</small>': '<small>Recommended additional passes</small>',\n", "Worthwhile paid raids generic UI replacement"),
+    (r"^[ \t]*'<span>Today\\'s ceiling</span>': '<span>Remote Pass ceiling</span>',\n", "Today's ceiling generic UI replacement"),
 ):
-    script, count = re.subn(
-        pattern,
-        "",
-        script,
-        count=1,
-        flags=re.M,
-    )
+    script, count = re.subn(pattern, "", script, count=1, flags=re.M)
     if count != 1:
         raise SystemExit(f"Could not remove {label}; found {count}")
 
@@ -217,13 +181,7 @@ replace_once(
 replacements = {
 '''
 if script.count(ui_scope_marker) != 1:
-    raise SystemExit(
-        f"Could not scope manage UI replacements; found {script.count(ui_scope_marker)} replacement maps"
-    )
-script = script.replace(
-    ui_scope_marker,
-    ui_scope_insert,
-    1,
-)
+    raise SystemExit(f"Could not scope manage UI replacements; found {script.count(ui_scope_marker)} replacement maps")
+script = script.replace(ui_scope_marker, ui_scope_insert, 1)
 
 exec(compile(script, "part3-integrate.py", "exec"), {})
