@@ -23,7 +23,7 @@ jobs:
           node-version: 22
 
       - name: Apply guarded fix
-        run: node scripts/fix-max-weekly-rotation.mjs
+        run: node scripts/fix-max-weekly-rotation-v2.mjs
 
       - name: Check JavaScript syntax
         run: |
