@@ -1,0 +1,1487 @@
+name: Part 3 resource integration patch
+
+on:
+  push:
+    branches:
+      - feat/max-battle-resources
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: contains(github.event.head_commit.message, '[part3-patch]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/max-battle-resources
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Integrate shared resource planning
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          def read(path):
+              return Path(path).read_text()
+
+          def write(path, text):
+              Path(path).write_text(text)
+
+          def replace_once(path, old, new, label):
+              text = read(path)
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match in {path}, found {count}")
+              write(path, text.replace(old, new, 1))
+
+          def sub_once(path, pattern, repl, label, flags=0):
+              text = read(path)
+              updated, count = re.subn(pattern, repl, text, count=1, flags=flags)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match in {path}, found {count}")
+              write(path, updated)
+
+          index = "src/index.js"
+          manage = "public/manage.html"
+          styles = "public/styles.css"
+          ui_test = "tests/battle-plan-ui.test.mjs"
+
+          replace_once(
+              index,
+              '} from "./battle-opportunities.js";\n',
+              '''} from "./battle-opportunities.js";
+          import {
+            STANDARD_MAX_PARTICLE_DAILY_LIMIT,
+            STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
+            buildBattleResourcePlan,
+            inferMaxParticleCost
+          } from "./resource-planning.js";
+          ''',
+              "resource planning import"
+          )
+
+          replace_once(
+              index,
+              '''      const battlePresentation =
+                battleOpportunityPresentation(
+                  battleMetadata
+                );
+          ''',
+              '''      const battlePresentation =
+                battleOpportunityPresentation(
+                  battleMetadata
+                );
+
+              const maxParticleCost =
+                inferMaxParticleCost({
+                  ...battleMetadata,
+                  pokemon_name:
+                    match.name,
+                  event_title:
+                    event.summary,
+                  event_description:
+                    event.description || ""
+                });
+          ''',
+              "particle cost inference"
+          )
+
+          replace_once(
+              index,
+              '''        battle_presentation:
+                  battlePresentation,
+                sprite_exact_form:
+          ''',
+              '''        battle_presentation:
+                  battlePresentation,
+                max_particle_cost:
+                  maxParticleCost.cost,
+                max_particle_cost_source:
+                  maxParticleCost.basis,
+                event_description:
+                  event.description || "",
+                sprite_exact_form:
+          ''',
+              "recommendation resource metadata"
+          )
+
+          resource_helpers = r'''
+          const DEFAULT_MAX_PARTICLE_RULE_SOURCE =
+            "https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/4797-collecting-max-particles-and-dynamaxing-or-gigantamaxing-pokemon-1729887059/";
+
+          function parseParticleLimitNumber(value) {
+            const number = Number(
+              String(value || "")
+                .replace(/,/g, "")
+            );
+
+            return Number.isFinite(number) &&
+              number > 0
+                ? Math.floor(number)
+                : null;
+          }
+
+          function explicitMaxParticleLimitsFromText(value) {
+            const text =
+              String(value || "")
+                .replace(/\s+/g, " ")
+                .trim();
+
+            if (!text) {
+              return {
+                daily_limit: null,
+                storage_limit: null
+              };
+            }
+
+            const dailyPatterns = [
+              /(?:maximum number of Max Particles you can collect|Max Particle collection limit|daily Max Particle limit)[^0-9]{0,80}(?:increased to|raised to|set to|is|of)?\s*([\d,]{3,7})/i,
+              /(?:collect|earn|receive)[^.]{0,100}?up to\s*([\d,]{3,7})\s*(?:Max Particles|MP)[^.]{0,40}?(?:per day|daily|each day)/i
+            ];
+
+            const storagePatterns = [
+              /(?:maximum number of Max Particles you can hold|Max Particle storage limit|Max Particle storage capacity)[^0-9]{0,80}(?:increased to|raised to|set to|is|of)?\s*([\d,]{3,7})/i,
+              /(?:hold|store|carry)[^.]{0,100}?up to\s*([\d,]{3,7})\s*(?:Max Particles|MP)/i
+            ];
+
+            const matchValue =
+              patterns => {
+                for (const pattern of patterns) {
+                  const match = text.match(pattern);
+                  const parsed =
+                    parseParticleLimitNumber(
+                      match?.[1]
+                    );
+
+                  if (parsed) return parsed;
+                }
+
+                return null;
+              };
+
+            return {
+              daily_limit:
+                matchValue(dailyPatterns),
+              storage_limit:
+                matchValue(storagePatterns)
+            };
+          }
+
+          async function maxParticleRuleForDate(
+            env,
+            localDate
+          ) {
+            const standard = {
+              daily_limit:
+                STANDARD_MAX_PARTICLE_DAILY_LIMIT,
+              storage_limit:
+                STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
+              label:
+                "Standard Max Particle rules",
+              source_url:
+                DEFAULT_MAX_PARTICLE_RULE_SOURCE,
+              source_kind:
+                "official",
+              is_override:
+                false
+            };
+
+            let rows = [];
+
+            try {
+              const result =
+                await env.DB.prepare(`
+                  SELECT
+                    summary,
+                    description,
+                    source_url,
+                    source_uid,
+                    source_type,
+                    updated_at
+                  FROM events
+                  WHERE status = 'active'
+                    AND source_type IN (
+                      'event',
+                      'max_battles',
+                      'max_mondays'
+                    )
+                    AND COALESCE(
+                      start_date,
+                      '0000-01-01'
+                    ) <= ?
+                    AND COALESCE(
+                      end_date,
+                      start_date,
+                      '9999-12-31'
+                    ) >= ?
+                  ORDER BY
+                    CASE
+                      WHEN source_uid LIKE
+                        'official-supplement:%'
+                      THEN 0
+                      ELSE 1
+                    END,
+                    updated_at DESC
+                  LIMIT 100
+                `).bind(
+                  localDate,
+                  localDate
+                ).all();
+
+              rows =
+                result.results || [];
+            } catch {
+              return standard;
+            }
+
+            let daily =
+              standard.daily_limit;
+            let storage =
+              standard.storage_limit;
+            let source = null;
+
+            for (const row of rows) {
+              const parsed =
+                explicitMaxParticleLimitsFromText(
+                  `${row.summary || ""} ${row.description || ""}`
+                );
+
+              if (
+                parsed.daily_limit != null &&
+                parsed.daily_limit > daily
+              ) {
+                daily =
+                  parsed.daily_limit;
+                source = row;
+              }
+
+              if (
+                parsed.storage_limit != null &&
+                parsed.storage_limit > storage
+              ) {
+                storage =
+                  parsed.storage_limit;
+                source = source || row;
+              }
+            }
+
+            if (!source) {
+              return standard;
+            }
+
+            return {
+              daily_limit:
+                daily,
+              storage_limit:
+                storage,
+              label:
+                source.summary ||
+                "Event Max Particle rules",
+              source_url:
+                source.source_url || null,
+              source_kind:
+                String(
+                  source.source_uid || ""
+                ).startsWith(
+                  "official-supplement:"
+                )
+                  ? "official"
+                  : "calendar",
+              is_override:
+                true
+            };
+          }
+
+          async function battleResourceStateForDate(
+            env,
+            userId,
+            localDate
+          ) {
+            try {
+              const [
+                persistent,
+                daily
+              ] =
+                await Promise.all([
+                  env.DB.prepare(`
+                    SELECT
+                      max_particles_held
+                    FROM battle_resource_state
+                    WHERE user_id = ?
+                  `).bind(
+                    userId
+                  ).first(),
+                  env.DB.prepare(`
+                    SELECT
+                      max_particles_collected,
+                      remote_max_passes_used
+                    FROM battle_resource_daily
+                    WHERE user_id = ?
+                      AND local_date = ?
+                  `).bind(
+                    userId,
+                    localDate
+                  ).first()
+                ]);
+
+              return {
+                max_particles_held:
+                  Math.max(
+                    0,
+                    Number(
+                      persistent
+                        ?.max_particles_held || 0
+                    )
+                  ),
+                max_particles_collected_today:
+                  Math.max(
+                    0,
+                    Number(
+                      daily
+                        ?.max_particles_collected || 0
+                    )
+                  ),
+                remote_max_passes_used:
+                  Math.max(
+                    0,
+                    Number(
+                      daily
+                        ?.remote_max_passes_used || 0
+                    )
+                  ),
+                migration_ready:
+                  true
+              };
+            } catch (error) {
+              if (
+                /no such table/i.test(
+                  String(
+                    error?.message || error
+                  )
+                )
+              ) {
+                return {
+                  max_particles_held: 0,
+                  max_particles_collected_today: 0,
+                  remote_max_passes_used: 0,
+                  migration_ready:
+                    false
+                };
+              }
+
+              throw error;
+            }
+          }
+
+          async function battleResourcePlanForUser(
+            env,
+            user,
+            recommendations,
+            remoteRaidPlan
+          ) {
+            const localDate =
+              localDateForTimezone(
+                user.timezone
+              );
+
+            const [
+              resourceState,
+              particleRule
+            ] =
+              await Promise.all([
+                battleResourceStateForDate(
+                  env,
+                  user.id,
+                  localDate
+                ),
+                maxParticleRuleForDate(
+                  env,
+                  localDate
+                )
+              ]);
+
+            const sharedCeiling =
+              remoteRaidPlan
+                .daily_budget_override != null
+                ? remoteRaidPlan
+                    .daily_budget_override
+                : user.remote_raid_budget;
+
+            const plan =
+              buildBattleResourcePlan({
+                recommendations,
+                remoteRaidPlan,
+                resourceState,
+                personalRemotePassCeiling:
+                  sharedCeiling,
+                minScore:
+                  user.remote_raid_min_score,
+                maxParticleDailyLimit:
+                  particleRule.daily_limit,
+                maxParticleStorageLimit:
+                  particleRule.storage_limit,
+                futureForecast:
+                  remoteRaidPlan
+                    .budget_forecast || []
+              });
+
+            return {
+              local_date:
+                localDate,
+              state:
+                resourceState,
+              particle_rule:
+                particleRule,
+              ...plan
+            };
+          }
+
+          async function updateBattleResourcesApi(
+            request,
+            env
+          ) {
+            const body =
+              await request.json();
+
+            const user =
+              await userByManageToken(
+                env,
+                body.token
+              );
+
+            if (!user) {
+              return bad(
+                "Invalid management link.",
+                401
+              );
+            }
+
+            const validateWhole = (
+              value,
+              label,
+              max
+            ) => {
+              const number =
+                Number(value);
+
+              if (
+                !Number.isInteger(number) ||
+                number < 0 ||
+                number > max
+              ) {
+                throw new Error(
+                  `${label} must be a whole number between 0 and ${max.toLocaleString()}.`
+                );
+              }
+
+              return number;
+            };
+
+            let held;
+            let collected;
+            let remoteMaxPasses;
+
+            try {
+              held =
+                validateWhole(
+                  body.max_particles_held ?? 0,
+                  "Max Particles held",
+                  100000
+                );
+
+              collected =
+                validateWhole(
+                  body.max_particles_collected_today ?? 0,
+                  "Max Particles collected today",
+                  100000
+                );
+
+              remoteMaxPasses =
+                validateWhole(
+                  body.remote_max_passes_used ?? 0,
+                  "Remote Max Passes used",
+                  999
+                );
+            } catch (error) {
+              return bad(
+                error.message
+              );
+            }
+
+            const localDate =
+              localDateForTimezone(
+                user.timezone
+              );
+
+            const timestamp =
+              nowIso();
+
+            try {
+              await env.DB.batch([
+                env.DB.prepare(`
+                  INSERT INTO battle_resource_state (
+                    user_id,
+                    max_particles_held,
+                    updated_at
+                  )
+                  VALUES (?, ?, ?)
+                  ON CONFLICT(user_id)
+                  DO UPDATE SET
+                    max_particles_held =
+                      excluded.max_particles_held,
+                    updated_at =
+                      excluded.updated_at
+                `).bind(
+                  user.id,
+                  held,
+                  timestamp
+                ),
+                env.DB.prepare(`
+                  INSERT INTO battle_resource_daily (
+                    user_id,
+                    local_date,
+                    max_particles_collected,
+                    remote_max_passes_used,
+                    updated_at
+                  )
+                  VALUES (?, ?, ?, ?, ?)
+                  ON CONFLICT(
+                    user_id,
+                    local_date
+                  )
+                  DO UPDATE SET
+                    max_particles_collected =
+                      excluded.max_particles_collected,
+                    remote_max_passes_used =
+                      excluded.remote_max_passes_used,
+                    updated_at =
+                      excluded.updated_at
+                `).bind(
+                  user.id,
+                  localDate,
+                  collected,
+                  remoteMaxPasses,
+                  timestamp
+                )
+              ]);
+            } catch (error) {
+              if (
+                /no such table/i.test(
+                  String(
+                    error?.message || error
+                  )
+                )
+              ) {
+                return bad(
+                  "Battle resource storage is not ready yet. Apply migrations/0001_battle_resources.sql to D1 first.",
+                  503
+                );
+              }
+
+              throw error;
+            }
+
+            return json({
+              ok: true,
+              local_date:
+                localDate,
+              max_particles_held:
+                held,
+              max_particles_collected_today:
+                collected,
+              remote_max_passes_used:
+                remoteMaxPasses
+            });
+          }
+
+          '''
+
+          marker = '''
+          async function remoteRaidBudgetOverrideForDate(
+          '''
+          text = read(index)
+          count = text.count(marker)
+          if count != 1:
+              raise SystemExit(f"resource helper insertion: expected one marker, found {count}")
+          write(index, text.replace(marker, resource_helpers + marker, 1))
+
+          replace_once(
+              index,
+              '''    .map(rec => ({
+                pokemon_name:
+                  rec.pokemon_name,
+                score:
+                  rec.score,
+                label:
+                  rec.label,
+                emoji:
+                  rec.emoji,
+                source_kind:
+                  rec.source_kind,
+                source_label:
+                  rec.source_label,
+                sprite_url:
+                  rec.sprite_url ||
+                  rec.meta?.sprite_url ||
+                  null
+              }));
+          ''',
+              '''    .map(rec => ({
+                pokemon_name:
+                  rec.pokemon_name,
+                score:
+                  rec.score,
+                label:
+                  rec.label,
+                emoji:
+                  rec.emoji,
+                source_kind:
+                  rec.source_kind,
+                source_label:
+                  rec.source_label,
+                battle_system:
+                  rec.battle_system || "raid",
+                battle_variant:
+                  rec.battle_variant || null,
+                max_particle_cost:
+                  rec.max_particle_cost ?? null,
+                sprite_url:
+                  rec.sprite_url ||
+                  rec.meta?.sprite_url ||
+                  null
+              }));
+          ''',
+              "forecast battle metadata"
+          )
+
+          replace_once(
+              index,
+              '''  const targetOptions = await targetOptionsForUser(
+              env,
+              user,
+              targets,
+              metas,
+              recommendations
+            );
+          ''',
+              '''  const battleResourcePlan =
+              await battleResourcePlanForUser(
+                env,
+                user,
+                recommendations,
+                remoteRaidPlan
+              );
+
+            const targetOptions = await targetOptionsForUser(
+              env,
+              user,
+              targets,
+              metas,
+              recommendations
+            );
+          ''',
+              "getMe resource plan"
+          )
+
+          replace_once(
+              index,
+              '''    remote_raid_plan: remoteRaidPlan,
+            raid_activity:
+          ''',
+              '''    remote_raid_plan: remoteRaidPlan,
+            battle_resource_plan:
+              battleResourcePlan,
+            raid_activity:
+          ''',
+              "getMe resource response"
+          )
+
+          replace_once(
+              index,
+              '''    if (request.method === "POST" && path === "/api/remote-raid-usage") {
+              return updateRemoteRaidUsage(request, env);
+            }
+          ''',
+              '''    if (request.method === "POST" && path === "/api/remote-raid-usage") {
+              return updateRemoteRaidUsage(request, env);
+            }
+
+            if (
+              request.method === "POST" &&
+              path === "/api/battle-resources"
+            ) {
+              return updateBattleResourcesApi(
+                request,
+                env
+              );
+            }
+          ''',
+              "battle resource route"
+          )
+
+          # ---------------- Planner UI ----------------
+          replace_once(
+              manage,
+              '<link rel="stylesheet" href="/styles.css?v=31">',
+              '<link rel="stylesheet" href="/styles.css?v=32">',
+              "manage css cache"
+          )
+
+          resource_panel = r'''
+
+                <section class="battle-resource-panel" aria-label="Battle resources">
+                  <div class="battle-resource-panel-head">
+                    <div>
+                      <span class="section-eyebrow">BATTLE RESOURCES</span>
+                      <h3>Remote Passes & Max Particles</h3>
+                    </div>
+                    <span id="battleResourceAdviceBadge" class="status-badge badge-blue">Planning</span>
+                  </div>
+
+                  <div class="battle-resource-grid">
+                    <article>
+                      <span>Remote Passes</span>
+                      <strong id="resourceRemotePasses">—</strong>
+                      <small id="resourceRemotePassDetail">Raid + Remote Max</small>
+                    </article>
+                    <article>
+                      <span>Max Particles</span>
+                      <strong id="resourceMaxParticles">—</strong>
+                      <small id="resourceMaxParticleDetail">—</small>
+                    </article>
+                    <article>
+                      <span>Collected today</span>
+                      <strong id="resourceCollectedToday">—</strong>
+                      <small id="resourceCollectionDetail">—</small>
+                    </article>
+                    <article>
+                      <span>Planned MP spend</span>
+                      <strong id="resourcePlannedMp">—</strong>
+                      <small id="resourceAfterPlan">—</small>
+                    </article>
+                  </div>
+
+                  <div id="battleResourceAdvice" class="battle-resource-advice"></div>
+
+                  <details class="battle-resource-editor">
+                    <summary>
+                      <span>Update Max resources</span>
+                      <span class="details-chevron" aria-hidden="true">⌄</span>
+                    </summary>
+
+                    <div class="battle-resource-editor-grid">
+                      <label>
+                        <span>Max Particles held</span>
+                        <input id="maxParticlesHeld" type="number" min="0" step="1" inputmode="numeric">
+                      </label>
+
+                      <label>
+                        <span>Max Particles collected today</span>
+                        <input id="maxParticlesCollectedToday" type="number" min="0" step="1" inputmode="numeric">
+                      </label>
+
+                      <label>
+                        <span>Remote Max Passes used today</span>
+                        <input id="remoteMaxPassesUsed" type="number" min="0" step="1" inputmode="numeric">
+                      </label>
+                    </div>
+
+                    <p class="field-help battle-resource-help">
+                      Ordinary Remote Raids are already counted automatically. Until unified battle logging arrives, enter only Remote Max Battle pass usage here. Max Particle limits can change during events; explicit event limits override the standard 800 collected / 1,500 held rules when the calendar supplies them.
+                    </p>
+
+                    <div class="save-row battle-resource-save-row">
+                      <button id="saveBattleResources" type="button">Save resources</button>
+                      <span id="battleResourceStatus" class="save-status"></span>
+                    </div>
+                  </details>
+                </section>
+          '''
+
+          replace_once(
+              manage,
+              '        <div id="freshnessStrip" class="freshness-strip"></div>\n      </section>',
+              '        <div id="freshnessStrip" class="freshness-strip"></div>' + resource_panel + '\n      </section>',
+              "resource panel markup"
+          )
+
+          replacements = {
+              '<span>PAID RAID GUIDANCE</span>': '<span>PAID BATTLE GUIDANCE</span>',
+              '<span>Planner budget</span>': '<span>Remote Pass plan</span>',
+              '<small>Worthwhile paid raids</small>': '<small>Recommended additional passes</small>',
+              '<span>Today\'s ceiling</span>': '<span>Remote Pass ceiling</span>',
+              '<span>Next raid plan change</span>': '<span>Next plan change</span>',
+              '<span class="section-eyebrow">REMOTE RAID RULES</span>': '<span class="section-eyebrow">REMOTE PASS RULES</span>',
+              'These settings are intentionally conservative. They can reduce your plan but never raise the official game limit.': 'The personal ceiling is shared by ordinary Remote Raids and Remote Max Battles. The official Remote Raid participation limit remains a separate Raid-only rule.',
+              '<label for="remoteRaidBudget">Usual personal ceiling</label>': '<label for="remoteRaidBudget">Usual Remote Pass ceiling</label>',
+              'This is your normal maximum on ordinary days. The planner still calculates its own recommended budget first. You can override this ceiling for a single day from the Raid Plan tab.': 'Optional daily ceiling for paid remote battles across both Raids and Max Battles. Leave blank for Auto. A one-day override from the Battle Plan applies to this shared pass ceiling.',
+              '<label for="remoteRaidMinScore">Minimum Remote Raid score</label>': '<label for="remoteRaidMinScore">Minimum paid-battle score</label>',
+              "Once a boss's marginal value falls below this score, the planner stops allocating paid Remote Raids to it.": "Once an opportunity's marginal value falls below this score, the planner stops allocating paid Remote Passes to it.",
+              'Controls local event dates and when the daily Remote Raid usage counter rolls over.': 'Controls local event dates and when daily Raid, Remote Max, and Max Particle counters roll over.',
+              '<label for="dailyBudgetOverride">Today\'s budget override</label>': '<label for="dailyBudgetOverride">Today\'s Remote Pass ceiling override</label>',
+              "Optional. Leave Auto to follow the planner. A one-day override can raise or lower today's ceiling, but the planner still refuses raids below your value threshold.": "Optional. Leave Auto to follow the planner. This shared ceiling covers ordinary Remote Raids and Remote Max Battles, while the official Remote Raid participation limit remains separate.",
+              'Raids and Max Battles in one decision view. Max Battle resource allocation is added separately from the existing Raid allocator.': 'Raids and Max Battles compete for the same personal Remote Pass ceiling, while Max Battles also respect your Max Particle budget.'
+          }
+          for old, new in replacements.items():
+              replace_once(manage, old, new, f"UI copy: {old[:32]}")
+
+          replace_once(
+              manage,
+              '''  const advice =
+              dashboard.paid_raid_guidance || {};
+          ''',
+              '''  const sharedPlan =
+              state.battle_resource_plan || null;
+
+            const advice =
+              sharedPlan?.advice ||
+              dashboard.paid_raid_guidance || {};
+          ''',
+              "shared today advice"
+          )
+
+          replace_once(
+              manage,
+              '''  document
+              .getElementById("todayPlannerBudget")
+              .textContent =
+                formatNumber(dashboard.planner_budget);
+
+            document
+              .getElementById("todayEffectiveBudget")
+              .textContent =
+                formatNumber(dashboard.effective_budget);
+          ''',
+              '''  document
+              .getElementById("todayPlannerBudget")
+              .textContent =
+                sharedPlan
+                  ? formatNumber(
+                      sharedPlan
+                        .remote_passes
+                        ?.recommended_additional || 0
+                    )
+                  : formatNumber(
+                      dashboard.planner_budget
+                    );
+
+            document
+              .getElementById("todayEffectiveBudget")
+              .textContent =
+                sharedPlan
+                  ? (
+                      sharedPlan
+                        .remote_passes
+                        ?.personal_daily_ceiling == null
+                        ? "Auto"
+                        : formatNumber(
+                            sharedPlan
+                              .remote_passes
+                              .personal_daily_ceiling
+                          )
+                    )
+                  : formatNumber(
+                      dashboard.effective_budget
+                    );
+          ''',
+              "today shared pass metrics"
+          )
+
+          replace_once(
+              manage,
+              '      ? "No urgent paid raid target"',
+              '      ? "No urgent paid battle target"',
+              "today empty copy"
+          )
+
+          resource_renderer = r'''
+
+          function renderBattleResources() {
+            const plan =
+              state.battle_resource_plan || null;
+
+            if (!plan) return;
+
+            const passes =
+              plan.remote_passes || {};
+            const particles =
+              plan.max_particles || {};
+            const resourceState =
+              plan.state || {};
+            const rule =
+              plan.particle_rule || {};
+
+            document.getElementById(
+              "resourceRemotePasses"
+            ).textContent =
+              `${formatNumber(passes.used_total || 0)} used · +${formatNumber(passes.recommended_additional || 0)} plan`;
+
+            document.getElementById(
+              "resourceRemotePassDetail"
+            ).textContent =
+              passes.personal_daily_ceiling == null
+                ? "Shared pass ceiling: Auto"
+                : `Shared ceiling: ${formatNumber(passes.personal_daily_ceiling)}`;
+
+            document.getElementById(
+              "resourceMaxParticles"
+            ).textContent =
+              formatNumber(particles.held || 0);
+
+            document.getElementById(
+              "resourceMaxParticleDetail"
+            ).textContent =
+              `${formatNumber(particles.storage_limit || 0)} storage limit · ${esc(rule.label || "standard rules")}`;
+
+            document.getElementById(
+              "resourceCollectedToday"
+            ).textContent =
+              `${formatNumber(particles.collected_today || 0)} / ${formatNumber(particles.daily_limit || 0)}`;
+
+            document.getElementById(
+              "resourceCollectionDetail"
+            ).textContent =
+              `${formatNumber(particles.daily_collection_remaining || 0)} collection capacity remains today`;
+
+            document.getElementById(
+              "resourcePlannedMp"
+            ).textContent =
+              formatNumber(particles.planned_spend || 0);
+
+            document.getElementById(
+              "resourceAfterPlan"
+            ).textContent =
+              `${formatNumber(particles.projected_after_plan || 0)} projected available after plan`;
+
+            const advice =
+              plan.advice || {};
+
+            const adviceBadge =
+              document.getElementById(
+                "battleResourceAdviceBadge"
+              );
+
+            adviceBadge.textContent =
+              advice.code === "save"
+                ? "Save"
+                : advice.code === "reserve"
+                  ? "Reserve"
+                  : "Selective";
+
+            adviceBadge.className =
+              `status-badge ${advice.code === "save" ? "badge-neutral" : advice.code === "reserve" ? "badge-blue" : "badge-green"}`;
+
+            document.getElementById(
+              "battleResourceAdvice"
+            ).innerHTML = `
+              <strong>${esc(advice.headline || "Use resources selectively.")}</strong>
+              <span>${esc(advice.detail || "")}</span>
+            `;
+
+            document.getElementById(
+              "maxParticlesHeld"
+            ).value =
+              resourceState.max_particles_held ?? 0;
+
+            document.getElementById(
+              "maxParticlesCollectedToday"
+            ).value =
+              resourceState.max_particles_collected_today ?? 0;
+
+            document.getElementById(
+              "remoteMaxPassesUsed"
+            ).value =
+              resourceState.remote_max_passes_used ?? 0;
+
+            const status =
+              document.getElementById(
+                "battleResourceStatus"
+              );
+
+            if (
+              resourceState.migration_ready === false
+            ) {
+              status.textContent =
+                "D1 migration required before saving.";
+            }
+          }
+
+          async function saveBattleResources() {
+            const status =
+              document.getElementById(
+                "battleResourceStatus"
+              );
+
+            status.textContent =
+              "Saving…";
+
+            try {
+              await api(
+                "/api/battle-resources",
+                {
+                  method: "POST",
+                  headers: {
+                    "content-type":
+                      "application/json"
+                  },
+                  body: JSON.stringify({
+                    token,
+                    max_particles_held:
+                      Number(
+                        document.getElementById(
+                          "maxParticlesHeld"
+                        ).value || 0
+                      ),
+                    max_particles_collected_today:
+                      Number(
+                        document.getElementById(
+                          "maxParticlesCollectedToday"
+                        ).value || 0
+                      ),
+                    remote_max_passes_used:
+                      Number(
+                        document.getElementById(
+                          "remoteMaxPassesUsed"
+                        ).value || 0
+                      )
+                  })
+                }
+              );
+
+              status.textContent =
+                "Saved ✓";
+
+              await load();
+              activateTab(
+                "plan",
+                false
+              );
+            } catch (error) {
+              status.textContent =
+                error.message;
+            }
+          }
+          '''
+
+          text = read(manage)
+          marker = '\nfunction raidLogMatchingTarget(\n'
+          count = text.count(marker)
+          if count != 1:
+              raise SystemExit(f"resource renderer insertion: expected one marker, found {count}")
+          write(manage, text.replace(marker, resource_renderer + marker, 1))
+
+          replace_once(
+              manage,
+              '''function render() {
+            renderHero();
+            renderTodayBriefing();
+            renderRemoteRaidPlan();
+          ''',
+              '''function render() {
+            renderHero();
+            renderTodayBriefing();
+            renderBattleResources();
+            renderRemoteRaidPlan();
+          ''',
+              "render resource panel"
+          )
+
+          replace_once(
+              manage,
+              '''document.getElementById("saveSettings").addEventListener("click", savePreferences);
+          ''',
+              '''document.getElementById("saveSettings").addEventListener("click", savePreferences);
+          document.getElementById("saveBattleResources").addEventListener("click", saveBattleResources);
+          ''',
+              "resource save listener"
+          )
+
+          # Show shared allocation and per-battle MP cost on recommendation cards.
+          replace_once(
+              manage,
+              '''  const allocated =
+              Number(
+                allocation?.allocated || 0
+              );
+          ''',
+              '''  const allocated =
+              Number(
+                allocation?.count ??
+                allocation?.allocated ??
+                0
+              );
+
+            const maxParticleCost =
+              isMax
+                ? Number(
+                    rec.max_particle_cost || 0
+                  )
+                : 0;
+          ''',
+              "generic allocation count"
+          )
+
+          replace_once(
+              manage,
+              '''        ${
+              !isMax
+                ? `
+                  <span class="allocation-inline-badge ${allocationClass}">
+                    ${
+                      allocated > 0
+                        ? `${formatNumber(allocated)} Remote raid${allocated === 1 ? "" : "s"}`
+                        : "0 Remote raids"
+                    }
+                  </span>
+                `
+                : ""
+            }
+          ''',
+              '''        ${
+              !isMax
+                ? `
+                  <span class="allocation-inline-badge ${allocationClass}">
+                    ${
+                      allocated > 0
+                        ? `${formatNumber(allocated)} Remote raid${allocated === 1 ? "" : "s"}`
+                        : "0 Remote raids"
+                    }
+                  </span>
+                `
+                : `
+                  <span class="allocation-inline-badge ${allocationClass}">
+                    ${
+                      allocated > 0
+                        ? `${formatNumber(allocated)} Remote Max battle${allocated === 1 ? "" : "s"}`
+                        : "0 Remote Max battles"
+                    }
+                  </span>
+                  <span class="max-particle-cost-badge ${maxParticleCost ? "" : "cost-unknown"}">
+                    ${
+                      maxParticleCost
+                        ? `${formatNumber(maxParticleCost)} MP each`
+                        : "MP cost unknown"
+                    }
+                  </span>
+                `
+            }
+          ''',
+              "Max allocation card metadata"
+          )
+
+          replace_once(
+              manage,
+              '''  const allocations =
+              state.remote_raid_plan
+                ?.allocations || [];
+
+            const allocationByName =
+              new Map(
+                allocations.map(
+                  allocation => [
+                    normalizePickerName(
+                      allocation.pokemon_name
+                    ),
+                    allocation
+                  ]
+                )
+              );
+          ''',
+              '''  const allocations =
+              state.remote_raid_plan
+                ?.allocations || [];
+
+            const allocationByName =
+              new Map(
+                allocations.map(
+                  allocation => [
+                    normalizePickerName(
+                      allocation.pokemon_name
+                    ),
+                    allocation
+                  ]
+                )
+              );
+
+            const sharedAllocations =
+              state.battle_resource_plan
+                ?.allocations || [];
+
+            const sharedAllocationByKey =
+              new Map(
+                sharedAllocations.map(
+                  allocation => [
+                    `${allocation.battle_system || "raid"}|${normalizePickerName(allocation.pokemon_name)}`,
+                    allocation
+                  ]
+                )
+              );
+          ''',
+              "shared allocation map"
+          )
+
+          replace_once(
+              manage,
+              '''    rec =>
+              renderRecommendationCard(
+                rec,
+                rec.battle_system === "max"
+                  ? null
+                  : allocationByName.get(
+                      normalizePickerName(
+                        rec.pokemon_name
+                      )
+                    )
+              );
+          ''',
+              '''    rec => {
+              const shared =
+                sharedAllocationByKey.get(
+                  `${rec.battle_system || "raid"}|${normalizePickerName(rec.pokemon_name)}`
+                );
+
+              const legacy =
+                rec.battle_system === "max"
+                  ? null
+                  : allocationByName.get(
+                      normalizePickerName(
+                        rec.pokemon_name
+                      )
+                    );
+
+              return renderRecommendationCard(
+                rec,
+                shared || legacy
+              );
+            };
+          ''',
+              "shared allocation cards"
+          )
+
+          # Remote-plan badge now reflects the final shared pass plan.
+          replace_once(
+              manage,
+              '''  document.getElementById("allocationTotalBadge").textContent =
+              `${formatNumber(plan.recommended_total)} raid${Number(plan.recommended_total) === 1 ? "" : "s"}`;
+          ''',
+              '''  const sharedRecommendedPasses =
+              state.battle_resource_plan
+                ?.remote_passes
+                ?.recommended_additional;
+
+            document.getElementById("allocationTotalBadge").textContent =
+              sharedRecommendedPasses == null
+                ? `${formatNumber(plan.recommended_total)} raid${Number(plan.recommended_total) === 1 ? "" : "s"}`
+                : `${formatNumber(sharedRecommendedPasses)} Remote Pass${Number(sharedRecommendedPasses) === 1 ? "" : "es"}`;
+          ''',
+              "allocation badge shared plan"
+          )
+
+          # ---------------- Shared CSS ----------------
+          with open(styles, "a") as handle:
+              handle.write(r'''
+
+          /* Battle resource planning — v32 */
+          .battle-resource-panel {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+          }
+
+          .battle-resource-panel-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+          }
+
+          .battle-resource-panel-head h3 {
+            margin: 3px 0 0;
+          }
+
+          .battle-resource-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+          }
+
+          .battle-resource-grid article {
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: rgba(127, 127, 127, 0.06);
+          }
+
+          .battle-resource-grid span,
+          .battle-resource-grid small {
+            display: block;
+          }
+
+          .battle-resource-grid span {
+            font-size: 0.78rem;
+            font-weight: 700;
+            opacity: 0.74;
+          }
+
+          .battle-resource-grid strong {
+            display: block;
+            margin: 4px 0;
+            font-size: 1.08rem;
+          }
+
+          .battle-resource-grid small {
+            line-height: 1.35;
+            opacity: 0.72;
+          }
+
+          .battle-resource-advice {
+            display: grid;
+            gap: 3px;
+            margin-top: 12px;
+            padding: 11px 12px;
+            border-radius: 12px;
+            background: rgba(127, 127, 127, 0.07);
+          }
+
+          .battle-resource-advice span {
+            line-height: 1.4;
+            opacity: 0.8;
+          }
+
+          .battle-resource-editor {
+            margin-top: 10px;
+          }
+
+          .battle-resource-editor > summary {
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            cursor: pointer;
+            font-weight: 750;
+          }
+
+          .battle-resource-editor-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            padding-top: 8px;
+          }
+
+          .battle-resource-editor-grid label {
+            display: grid;
+            gap: 6px;
+          }
+
+          .battle-resource-editor-grid input,
+          .battle-resource-save-row button {
+            min-height: 44px;
+          }
+
+          .battle-resource-help {
+            margin-top: 10px;
+          }
+
+          .max-particle-cost-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 28px;
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 800;
+            background: rgba(127, 127, 127, 0.08);
+          }
+
+          .max-particle-cost-badge.cost-unknown {
+            opacity: 0.68;
+          }
+
+          @media (max-width: 900px) {
+            .battle-resource-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+          }
+
+          @media (max-width: 600px) {
+            .battle-resource-panel-head {
+              align-items: center;
+            }
+
+            .battle-resource-grid,
+            .battle-resource-editor-grid {
+              grid-template-columns: 1fr;
+            }
+
+            .battle-resource-grid article {
+              padding: 10px 11px;
+            }
+          }
+          ''')
+
+          # Every public page sharing styles.css must move to v32.
+          for page in Path("public").glob("*.html"):
+              text = page.read_text()
+              if "styles.css?v=31" in text:
+                  page.write_text(
+                      text.replace(
+                          "styles.css?v=31",
+                          "styles.css?v=32"
+                      )
+                  )
+
+          # Integrated UI regression expectations.
+          test_text = read(ui_test)
+          test_text = test_text.replace(
+              "Battle Plan / Max Battle UI — v31",
+              "Battle Plan / Max Battle UI — v31"
+          )
+          test_text = test_text.replace(
+              r"styles\.css\?v=31",
+              r"styles\.css\?v=32"
+          )
+          test_text += r'''
+
+          assert.match(manage, /BATTLE RESOURCES/);
+          assert.match(manage, /Remote Passes & Max Particles/);
+          assert.match(manage, /maxParticlesHeld/);
+          assert.match(manage, /maxParticlesCollectedToday/);
+          assert.match(manage, /remoteMaxPassesUsed/);
+          assert.match(manage, /saveBattleResources/);
+          assert.match(manage, /\/api\/battle-resources/);
+          assert.match(manage, /MP cost unknown/);
+          assert.match(manage, /Remote Max battle/);
+          assert.match(styles, /Battle resource planning — v32/);
+          assert.match(worker, /battle_resource_plan/);
+          assert.match(worker, /battleResourcePlanForUser/);
+          assert.match(worker, /updateBattleResourcesApi/);
+          assert.match(worker, /max_particle_cost/);
+          '''
+          write(ui_test, test_text)
+
+          # Syntax-check Worker code explicitly too.
+          PY
+
+          node --check src/index.js
+          npm test
+
+      - name: Commit integrated Part 3 changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/index.js public tests package.json schema.sql migrations src/resource-planning.js
+          git commit -m "feat: integrate shared battle resource planning"
+          git push origin HEAD:feat/max-battle-resources
