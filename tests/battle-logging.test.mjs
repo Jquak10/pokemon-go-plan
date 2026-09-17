@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
 import { normalizeBattleLog, createBattleLog, undoBattleLog } from '../src/battle-logging.js';
-import { logRaidApi, undoRaidLogApi, raidActivityForUser } from '../src/index.js';
+import { logRaidApi, undoRaidLogApi, raidActivityForUser, remoteBattleUsageForDate, updateRemoteRaidUsage } from '../src/index.js';
 
 const sql = new DatabaseSync(':memory:');
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -60,6 +60,7 @@ assert.equal(usage('remote_raid_usage','raids_used'),0);
 assert.equal(held(),1500);
 const remote = await log({raid_type:'remote', raid_count:2, progress_gained:5});
 assert.equal(usage('remote_raid_usage','raids_used'),2);
+assert.equal(await remoteBattleUsageForDate(env,'user','2026-09-17'),2);
 assert.equal(target().current_value,22);
 
 // Local Max and Remote Max use the same MP price. Separate usage, shared pass spending.
@@ -69,11 +70,30 @@ assert.equal(usage('remote_raid_usage','raids_used'),2);
 const remoteMax = await log({battle_system:'max',battle_variant:'gigantamax',raid_type:'remote',max_particle_cost:800,progress_gained:4});
 assert.equal(held(),200);
 assert.equal(usage('battle_resource_daily','remote_max_passes_used'),1);
-assert.equal(usage('remote_raid_usage','raids_used'),2);
+assert.equal(usage('remote_raid_usage','raids_used'),2,'ordinary Raid ledger stays separate');
+assert.equal(await remoteBattleUsageForDate(env,'user','2026-09-17'),3,'Remote Raid + Remote Max share one daily limit');
 assert.equal(usage('battle_resource_daily','max_particles_collected'),0);
 assert.equal(target().current_value,22);
 assert.equal(maxTarget('dyn').current_value,9);
 assert.equal(maxTarget('gmax').current_value,4);
+
+// Shared manual correction writes only the ordinary-Raid remainder and keeps
+// the recorded Remote Max portion correlated with the overall daily total.
+// The endpoint always uses the user's current local date, so preserve and
+// restore whatever that day's test state was instead of assuming Sep 17.
+const correctionDate = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0,10);
+const correctionRaidBefore = usage('remote_raid_usage','raids_used',correctionDate);
+const correctionMaxBefore = usage('battle_resource_daily','remote_max_passes_used',correctionDate);
+const correctionSharedBefore = correctionRaidBefore + correctionMaxBefore;
+const correctedShared = await updateRemoteRaidUsage(request({remote_battles_used:5}),env);
+assert.equal(correctedShared.status,200);
+const correctedSharedBody = await correctedShared.json();
+assert.equal(correctedSharedBody.local_date,correctionDate);
+assert.equal(usage('remote_raid_usage','raids_used',correctionDate),5-correctionMaxBefore);
+assert.equal(await remoteBattleUsageForDate(env,'user',correctionDate),5);
+await updateRemoteRaidUsage(request({remote_battles_used:correctionSharedBefore}),env);
+assert.equal(usage('remote_raid_usage','raids_used',correctionDate),correctionRaidBefore);
+assert.equal(await remoteBattleUsageForDate(env,'user',correctionDate),correctionSharedBefore);
 
 // Unknown/invalid cost, variant/form mismatch and invalid counts cause no writes.
 const beforeInvalid = snapshot();
@@ -97,9 +117,11 @@ assert.equal(snapshot(),beforeInvalid);
 const failed = await log({battle_system:'max',battle_variant:'dynamax',raid_type:'remote',raid_count:3,wins:0,remote_passes_used:1,progress_gained:0});
 assert.equal(held(),200);
 assert.equal(usage('battle_resource_daily','remote_max_passes_used'),2);
+assert.equal(await remoteBattleUsageForDate(env,'user','2026-09-17'),4);
 const retry = await log({battle_system:'max',battle_variant:'dynamax',raid_type:'remote',max_particle_cost:100,remote_passes_used:0,progress_gained:1});
 assert.equal(held(),100);
 assert.equal(usage('battle_resource_daily','remote_max_passes_used'),2);
+assert.equal(await remoteBattleUsageForDate(env,'user','2026-09-17'),4,'same-Power-Spot retry with no new pass does not consume another daily slot');
 const free = await log({battle_system:'max',battle_variant:'dynamax',max_particle_cost:0,progress_gained:0});
 assert.equal(free.max_particles_spent,0);
 
@@ -116,6 +138,7 @@ for (const row of [failed, retry, free, localMax, remoteMax]) await undoBattleLo
 assert.equal(held(),1500);
 assert.equal(target().current_value,10);
 assert.equal(usage('battle_resource_daily','remote_max_passes_used'),0);
+assert.equal(await remoteBattleUsageForDate(env,'user','2026-09-17'),0);
 
 // Atomic arithmetic prevents lost updates from concurrent logs; request replay is safe.
 const concurrent = await Promise.all(Array.from({length:6},() => log({raid_type:'remote',progress_gained:1})));
@@ -171,7 +194,9 @@ assert.equal((await logRaidApi(request({token:'invalid'}),env)).status,401);
 assert.equal((await logRaidApi(request({pokemon_name:'Gengar',raid_type:'local',raid_count:2,progress_gained:3}),env)).status,200);
 const apiMax = await logRaidApi(request({pokemon_name:'Gengar',battle_system:'max',battle_variant:'gigantamax',participation:'remote',battle_count:1,max_particle_cost:800,update_target:false,request_id:'api-max-123456789'}),env);
 assert.equal(apiMax.status,200);
-assert.equal((await apiMax.json()).target_updated,false);
+const apiMaxBody = await apiMax.json();
+assert.equal(apiMaxBody.target_updated,false);
+assert.equal(apiMaxBody.remote_limit_used, await remoteBattleUsageForDate(env,'user',apiMaxBody.local_date));
 const activity = await raidActivityForUser(env,{id:'user',timezone:'Asia/Singapore'},[{pokemon_name:'Gengar',sprite_url:'wrong-base.png'}]);
 assert.equal(activity.recent.find(r => r.id === 'api-max-123456789').sprite_url,null);
 assert.equal(activity.migration_ready,true);

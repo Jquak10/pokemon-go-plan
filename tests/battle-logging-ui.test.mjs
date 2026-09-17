@@ -23,7 +23,7 @@ const context = vm.createContext({
   raidLogType:'remote',raidLogProgressDirty:false,raidLogExplicitTargetId:null,
   battleLogRecommendation:null,battleLogRequestId:null,battleLogBusy:false,battleLogWinsDirty:false,battleLogPassesDirty:false
 });
-for (const name of ['raidLogMatchingTarget','raidLogPokemonNames','setRaidLogType','raidLogDefaultProgress','populateRaidLogPokemon','syncRaidLogProgressDefault','battleLogSelection','battleLogLabel','prefillBattleLog','updateRaidLogPreview','openRaidLogModal']) {
+for (const name of ['raidLogMatchingTarget','raidLogPokemonNames','setRaidLogType','raidLogDefaultProgress','populateRaidLogPokemon','syncRaidLogProgressDefault','battleLogSelection','battleLogLabel','battleLogParticleCostValue','setBattleLogParticleCost','syncBattleLogParticleCostControl','prefillBattleLog','updateRaidLogPreview','openRaidLogModal']) {
   const start=script.indexOf(`function ${name}(`);
   assert.ok(start>=0,name);
   const remainder=script.slice(start);
@@ -33,7 +33,7 @@ for (const name of ['raidLogMatchingTarget','raidLogPokemonNames','setRaidLogTyp
 element('raidLogPokemon').value='Gengar';
 context.openRaidLogModal('Gengar','t',{pokemon_name:'Gengar',battle_system:'max',battle_variant:'gigantamax',max_particle_cost:800,max_particle_cost_confidence:'known',logging_remote_eligible:true});
 assert.equal(element('battleLogKind').value,'gigantamax');
-assert.equal(element('battleLogMp').value,800);
+assert.equal(element('battleLogMp').value,'800');
 assert.equal(element('raidLogProgress').value,3);
 assert.match(element('raidLogPreview').innerHTML,/800 MP spent/);
 assert.equal(element('confirmRaidLog').disabled,false);
@@ -50,12 +50,20 @@ assert.equal(element('raidLogProgress').value,6);
 
 context.openRaidLogModal('Gengar',null,{pokemon_name:'Gengar',battle_system:'max',battle_variant:'dynamax',max_particle_cost:400,max_particle_cost_confidence:'standard_tier_cost',logging_remote_eligible:false});
 assert.equal(element('battleLogMp').value,'','Estimates must not silently become confirmed cost');
+assert.match(element('battleLogCostHint').textContent,/suggests 400 MP/);
 assert.equal(context.raidLogType,'local');
 assert.equal(element('[data-raid-type="remote"]').disabled,true);
-assert.equal(element('confirmRaidLog').disabled,true);
+assert.equal(element('confirmRaidLog').disabled,true,'Unconfirmed standard tier must not be saved');
+element('battleLogMp').value='400';
+context.syncBattleLogParticleCostControl();
+assert.match(element('raidLogPreview').innerHTML,/400 MP spent/);
+assert.equal(element('confirmRaidLog').disabled,false,'Confirmed tier cost enables a valid Max log');
 element('battleLogWins').value='0';
 context.updateRaidLogPreview();
 assert.equal(element('confirmRaidLog').disabled,false,'Loss with no MP consumed may be logged');
+context.openRaidLogModal('Gengar',null,{pokemon_name:'Gengar',battle_system:'max',battle_variant:'dynamax',max_particle_cost:600,max_particle_cost_confidence:'known',logging_remote_eligible:true});
+assert.equal(element('battleLogMp').value,'custom');
+assert.equal(element('battleLogMpCustom').value,'600');
 context.openRaidLogModal('Gengar');
 assert.equal(element('battleLogKind').value,'raid');
 assert.equal(element('[data-raid-type="remote"]').disabled,false);
@@ -68,6 +76,13 @@ for (const text of ['Collect 1600 Max Particles during the event.', 'Rewards inc
   assert.equal(inferMaxParticleCost({battle_system:'max',event_description:text}).cost,null);
 }
 assert.equal(inferMaxParticleCost({battle_system:'max',event_description:'This battle requires 250 Max Particles.'}).cost,250);
+assert.match(manage,/<select id="battleLogMp">/);
+assert.match(manage,/Tier 1 · 250 MP/);
+assert.match(manage,/Tier 2–3 · 400 MP/);
+assert.match(manage,/Tier 4–6 \/ Gigantamax · 800 MP/);
+assert.match(manage,/max_particle_cost: battleLogParticleCostValue\(\)/);
+assert.match(manage,/remote_battles_used: Number\(document\.getElementById\("raidsUsedToday"\)\.value\)/);
+assert.match(manage,/official daily Remote limit is shared by ordinary Remote Raids and Remote Max Battles/i);
 assert.match(manage,/data-log-battle-key=/);
 assert.match(manage,/\/api\/battle-log/);
 assert.match(manage,/log_source: logSource/);

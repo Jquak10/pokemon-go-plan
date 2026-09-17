@@ -190,8 +190,10 @@ assert.equal(sharedTwo.remote_raid_limit.recommended_additional_raids, 1);
 const alreadyAtCeiling = buildBattleResourcePlan({
   recommendations: [raid, gmax],
   remoteRaidPlan: {
-    raids_used: 2,
-    official_remaining: 8,
+    // Shared official-limit usage: 2 ordinary Remote Raids + 1 Remote Max.
+    raids_used: 3,
+    remote_limit_used: 3,
+    official_remaining: 7,
     official_is_unlimited: false,
     system_recommended_budget: 4
   },
@@ -204,8 +206,34 @@ const alreadyAtCeiling = buildBattleResourcePlan({
 });
 
 assert.equal(alreadyAtCeiling.remote_passes.used_total, 3);
+assert.equal(alreadyAtCeiling.remote_passes.ordinary_remote_raids_used, 2);
+assert.equal(alreadyAtCeiling.remote_raid_limit.used, 3);
 assert.equal(alreadyAtCeiling.remote_passes.recommended_additional, 0);
 assert.equal(alreadyAtCeiling.allocations.length, 0);
+
+
+const unlimitedSharedLimit = buildBattleResourcePlan({
+  recommendations: [raid],
+  remoteRaidPlan: {
+    // An event has removed the game cap. Five of these 12 shared uses were
+    // Remote Max; they must not be added a second time.
+    raids_used: 12,
+    remote_limit_used: 12,
+    official_remaining: null,
+    official_is_unlimited: true,
+    system_recommended_budget: 20
+  },
+  resourceState: {
+    max_particles_held: 1500,
+    max_particles_collected_today: 0,
+    remote_max_passes_used: 5
+  },
+  personalRemotePassCeiling: 15
+});
+assert.equal(unlimitedSharedLimit.remote_passes.used_total, 12);
+assert.equal(unlimitedSharedLimit.remote_passes.ordinary_remote_raids_used, 7);
+assert.equal(unlimitedSharedLimit.remote_raid_limit.used, 12);
+assert.equal(unlimitedSharedLimit.remote_raid_limit.is_unlimited, true);
 
 const canCollectThenSpend = buildBattleResourcePlan({
   recommendations: [gmax],

@@ -823,17 +823,21 @@ export function buildBattleResourcePlan({
         maxParticleStorageLimit
     });
 
-  const raidLimitUsed =
+  const sharedPassesUsed =
     wholeNonNegative(
+      remoteRaidPlan.remote_limit_used ??
       remoteRaidPlan.raids_used
     );
 
   const remoteMaxPassesUsed =
     state.remote_max_passes_used;
 
-  const sharedPassesUsed =
-    raidLimitUsed +
-    remoteMaxPassesUsed;
+  const ordinaryRemoteRaidsUsed =
+    Math.max(
+      0,
+      sharedPassesUsed -
+      remoteMaxPassesUsed
+    );
 
   const ceilingValue =
     personalRemotePassCeiling == null ||
@@ -875,7 +879,7 @@ export function buildBattleResourcePlan({
       Math.max(
         0,
         systemRaidBudget -
-        raidLimitUsed
+        sharedPassesUsed
       )
     );
 
@@ -1527,7 +1531,7 @@ export function buildBattleResourcePlan({
   return {
     remote_passes: {
       ordinary_remote_raids_used:
-        raidLimitUsed,
+        ordinaryRemoteRaidsUsed,
       remote_max_passes_used:
         remoteMaxPassesUsed,
       used_total:
@@ -1559,7 +1563,7 @@ export function buildBattleResourcePlan({
     },
     remote_raid_limit: {
       used:
-        raidLimitUsed,
+        sharedPassesUsed,
       remaining:
         Number.isFinite(
           officialRaidRemaining

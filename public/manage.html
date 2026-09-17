@@ -56,7 +56,7 @@
           <div>
             <span class="hero-metric-label">Used today</span>
             <strong id="heroUsed">—</strong>
-            <small>Remote Raids logged</small>
+            <small>Raids + Remote Max</small>
           </div>
         </article>
 
@@ -177,7 +177,7 @@
           </div>
 
           <p class="field-help battle-resource-help">
-            Battle logs update Remote Raid and Remote Max pass usage automatically. Use these fields for corrections or activity not yet logged. Max Particle limits can change during events; explicit event limits override the standard 800 collected / 1,500 held rules when the calendar supplies them.
+            Battle logs update ordinary Remote Raid and Remote Max usage automatically. Both count toward the same official daily Remote limit; the Remote Max field is the Max-specific share of that total. Max Particle limits can change during events; explicit event limits override the standard 800 collected / 1,500 held rules when the calendar supplies them.
           </p>
 
           <div class="save-row battle-resource-save-row">
@@ -257,7 +257,7 @@
                   <span class="section-eyebrow">TODAY</span>
                   <h2>Remote Raid Plan</h2>
                   <p class="section-subtitle">
-                    Your limit is a ceiling—not a target. Unused capacity is intentionally left unused when raids are not valuable enough.
+                    The official Remote limit is shared by Remote Raids and Remote Max Battles. It is a ceiling—not a target; unused capacity is intentional.
                   </p>
                 </div>
                 <span id="remoteRuleBadge" class="status-badge badge-blue">Official rule</span>
@@ -276,7 +276,7 @@
                 <div
                   class="capacity-bar"
                   role="progressbar"
-                  aria-label="Remote Raid daily allocation"
+                  aria-label="Shared Remote daily-limit usage and Raid allocation"
                   aria-valuemin="0"
                   aria-valuemax="100"
                   aria-valuenow="0"
@@ -323,7 +323,7 @@
                 <div>
                   <label for="dailyBudgetOverride">Today's Remote Pass ceiling override</label>
                   <p class="field-help">
-                    Optional. Leave Auto to follow the planner. This shared ceiling covers ordinary Remote Raids and Remote Max Battles, while the official Remote Raid participation limit remains separate.
+                    Optional. Leave Auto to follow the planner. The official daily Remote limit is shared by ordinary Remote Raids and Remote Max Battles; event increases or unlimited periods apply to the same counter.
                   </p>
                 </div>
 
@@ -349,9 +349,9 @@
 
               <div class="usage-inline">
                 <div>
-                  <label for="raidsUsedToday">Remote Raids used today · manual correction</label>
+                  <label for="raidsUsedToday">Remote limit used today · manual correction</label>
                   <p class="field-help">
-                    Logging a Remote Raid below updates this automatically. Use this field only to correct the total or enter raids you did before using the battle logger.
+                    Includes ordinary Remote Raids and Remote Max Battles. Logs update this shared total automatically; use this only to correct the overall daily usage.
                   </p>
                 </div>
 
@@ -1240,7 +1240,14 @@
               </div>
               <div>
                 <label for="battleLogMp">Max Particles per win</label>
-                <input id="battleLogMp" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="Enter cost">
+                <select id="battleLogMp">
+                  <option value="">Select tier cost</option>
+                  <option value="250">Tier 1 · 250 MP</option>
+                  <option value="400">Tier 2–3 · 400 MP</option>
+                  <option value="800">Tier 4–6 / Gigantamax · 800 MP</option>
+                  <option value="custom">Event / custom cost…</option>
+                </select>
+                <input id="battleLogMpCustom" class="hidden" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="Custom MP cost" aria-label="Custom Max Particle cost">
               </div>
             </div>
             <p id="battleLogCostHint" class="field-help"></p>
@@ -2317,16 +2324,66 @@ function battleLogLabel(item) {
     : "Raid";
 }
 
+function battleLogParticleCostValue() {
+  const selected = document.getElementById("battleLogMp").value;
+  return selected === "custom"
+    ? document.getElementById("battleLogMpCustom").value
+    : selected;
+}
+
+function setBattleLogParticleCost(value = "", confirmed = false) {
+  const select = document.getElementById("battleLogMp");
+  const custom = document.getElementById("battleLogMpCustom");
+  const normalized = value == null || value === "" ? "" : String(value);
+
+  if (["250", "400", "800"].includes(normalized)) {
+    select.value = normalized;
+    custom.value = "";
+    custom.classList.add("hidden");
+    return;
+  }
+
+  if (confirmed && normalized !== "") {
+    select.value = "custom";
+    custom.value = normalized;
+    custom.classList.remove("hidden");
+    return;
+  }
+
+  select.value = "";
+  custom.value = "";
+  custom.classList.add("hidden");
+}
+
+function syncBattleLogParticleCostControl() {
+  const select = document.getElementById("battleLogMp");
+  const custom = document.getElementById("battleLogMpCustom");
+  custom.classList.toggle("hidden", select.value !== "custom");
+  if (select.value !== "custom") {
+    custom.value = "";
+  }
+  updateRaidLogPreview();
+}
+
 function prefillBattleLog(rec = null) {
   const name = document.getElementById("raidLogPokemon").value;
   battleLogRecommendation = rec;
   const variant = rec?.battle_variant || (/gigantamax|g[ -]?max/i.test(name) ? "gigantamax" : /dynamax/i.test(name) ? "dynamax" : null);
   document.getElementById("battleLogKind").value = variant || (rec?.battle_system === "max" ? "max" : "raid");
-  const knownCost = rec?.max_particle_cost_confidence === "known";
-  document.getElementById("battleLogMp").value = knownCost && rec?.max_particle_cost != null ? rec.max_particle_cost : "";
+  const costConfidence = rec?.max_particle_cost_confidence || "unknown";
+  const knownCost = costConfidence === "known";
+  const suggestedCost = costConfidence === "standard_tier_cost"
+    ? Number(rec?.max_particle_cost || 0)
+    : 0;
+  setBattleLogParticleCost(
+    knownCost && rec?.max_particle_cost != null ? rec.max_particle_cost : "",
+    knownCost
+  );
   document.getElementById("battleLogCostHint").textContent = knownCost
-    ? "Cost from the recommendation. Correct it if an event changes the cost."
-    : "MP cost is not confirmed. Enter the actual cost per win, including any event discount.";
+    ? "Cost from the recommendation. Change the tier if an event changes the cost."
+    : suggestedCost
+      ? `Standard tier suggests ${formatNumber(suggestedCost)} MP. Confirm the actual tier cost; event bonuses may change it.`
+      : "MP cost is not confirmed. Select the actual tier cost, or choose Event / custom cost.";
   const remoteButton = document.querySelector('[data-raid-type="remote"]');
   remoteButton.disabled = rec?.logging_remote_eligible === false;
   if (remoteButton.disabled) raidLogType = "local";
@@ -2339,7 +2396,7 @@ function updateRaidLogPreview() {
   const name = document.getElementById("raidLogPokemon").value;
   const count = Number(document.getElementById("raidLogCount").value);
   const wins = isMax ? Number(document.getElementById("battleLogWins").value) : count;
-  const mpText = document.getElementById("battleLogMp").value;
+  const mpText = battleLogParticleCostValue();
   const spent = isMax && mpText !== "" ? Number(mpText) * wins : 0;
   const passes = raidLogType === "remote" ? (isMax ? Number(document.getElementById("battleLogPasses").value) : count) : 0;
   const progress = Number(document.getElementById("raidLogProgress").value || 0);
@@ -2467,7 +2524,7 @@ async function confirmRaidLog() {
               request_id: battleLogRequestId,
               ...battleLogSelection(),
               wins: battleLogSelection().battle_system === "max" ? Number(document.getElementById("battleLogWins").value) : count,
-              max_particle_cost: document.getElementById("battleLogMp").value,
+              max_particle_cost: battleLogParticleCostValue(),
               remote_passes_used: battleLogSelection().battle_system === "max" ? Number(document.getElementById("battleLogPasses").value) : count,
               recommendation_key: battleLogRecommendation ? [battleLogRecommendation.battle_system || "raid", battleLogRecommendation.battle_variant || "", battleLogRecommendation.pokemon_name].join("|") : null,
               pokemon_name:
@@ -3111,9 +3168,12 @@ function renderDesktopQuickRail() {
     "desktopRailRemoteUsed"
   ).textContent =
     formatNumber(
-      activity.remote_raids ??
+      activity.remote_limit_used ??
+      state.remote_raid_plan
+        ?.remote_limit_used ??
       state.remote_raid_plan
         ?.raids_used ??
+      activity.remote_raids ??
       0
     );
 
@@ -3663,7 +3723,9 @@ function renderHero() {
   document.getElementById("heroRemoteEvent").textContent =
     rule?.label || "Official daily limit";
 
-  document.getElementById("heroUsed").textContent = formatNumber(plan.raids_used);
+  document.getElementById("heroUsed").textContent = formatNumber(
+    plan.remote_limit_used ?? plan.raids_used
+  );
   document.getElementById("heroRecommended").textContent = formatNumber(plan.recommended_total);
   document.getElementById("heroTargets").textContent = formatNumber(activeTargets);
 
@@ -3674,6 +3736,11 @@ function renderHero() {
 function renderRemoteRaidPlan() {
   const plan = state.remote_raid_plan;
   const rule = plan.official_rule;
+  const usedToday = Number(
+    plan.remote_limit_used ??
+    plan.raids_used ??
+    0
+  );
 
   const officialLimitText =
     plan.official_is_unlimited
@@ -3701,7 +3768,7 @@ function renderRemoteRaidPlan() {
       ? "No game cap"
       : formatNumber(plan.official_remaining);
 
-  document.getElementById("raidsUsedToday").value = plan.raids_used;
+  document.getElementById("raidsUsedToday").value = usedToday;
 
   document.getElementById("remoteRaidSummary").innerHTML = `
     <article class="remote-summary-item">
@@ -3725,7 +3792,7 @@ function renderRemoteRaidPlan() {
     <article class="remote-summary-item">
       <span>Official remaining</span>
       <strong>${esc(officialRemainingText)}</strong>
-      <small>${formatNumber(plan.raids_used)} already logged</small>
+      <small>${formatNumber(usedToday)} shared Remote uses logged</small>
     </article>
   `;
 
@@ -3849,10 +3916,10 @@ function renderRemoteRaidPlan() {
   const cap = Math.max(
     1,
     Number(plan.daily_planning_cap || 0),
-    Number(plan.raids_used || 0) + Number(plan.recommended_total || 0)
+    usedToday + Number(plan.recommended_total || 0)
   );
 
-  const usedPct = Math.min(100, (Number(plan.raids_used || 0) / cap) * 100);
+  const usedPct = Math.min(100, (usedToday / cap) * 100);
   const recPct = Math.min(100 - usedPct, (Number(plan.recommended_total || 0) / cap) * 100);
 
   document.getElementById("capacityUsed").style.width = `${usedPct}%`;
@@ -3867,7 +3934,7 @@ function renderRemoteRaidPlan() {
   document.getElementById("capacityText").textContent =
     plan.official_is_unlimited
       ? `${formatNumber(plan.recommended_total)} worthwhile now`
-      : `${formatNumber(plan.raids_used + plan.recommended_total)} / ${formatNumber(plan.effective_budget_cap)}`;
+      : `${formatNumber(usedToday + plan.recommended_total)} / ${formatNumber(plan.effective_budget_cap)}`;
 
   const sharedRecommendedPasses =
     state.battle_resource_plan
@@ -6771,7 +6838,7 @@ async function saveRaidUsage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         token,
-        raids_used: Number(document.getElementById("raidsUsedToday").value)
+        remote_battles_used: Number(document.getElementById("raidsUsedToday").value)
       })
     });
 
@@ -7523,8 +7590,8 @@ document.getElementById("battleLogKind").addEventListener("change", () => {
   document.getElementById("raidLogUpdateTarget").checked = true;
   battleLogRecommendation = null;
   document.querySelector('[data-raid-type="remote"]').disabled = false;
-  document.getElementById("battleLogMp").value = "";
-  document.getElementById("battleLogCostHint").textContent = "Enter the actual MP cost per win.";
+  setBattleLogParticleCost("", false);
+  document.getElementById("battleLogCostHint").textContent = "Select the actual tier cost per win.";
   syncRaidLogProgressDefault();
   updateRaidLogPreview();
 });
@@ -7537,7 +7604,8 @@ document.getElementById("battleLogPasses").addEventListener("input", () => {
   battleLogPassesDirty = true;
   updateRaidLogPreview();
 });
-document.getElementById("battleLogMp").addEventListener("input", updateRaidLogPreview);
+document.getElementById("battleLogMp").addEventListener("change", syncBattleLogParticleCostControl);
+document.getElementById("battleLogMpCustom").addEventListener("input", updateRaidLogPreview);
 
 document.getElementById("saveDailyBudgetOverride").addEventListener("click", saveDailyBudgetOverride);
 document.getElementById("clearDailyBudgetOverride").addEventListener("click", clearDailyBudgetOverride);
