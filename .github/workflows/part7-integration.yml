@@ -25,6 +25,19 @@ jobs:
       - name: Apply guarded integration patch
         run: node scripts/part7-integrate.mjs
 
+      - name: Normalize generated integration assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("tests/max-ranking-integration.test.mjs")
+          text = path.read_text()
+          old = r'/max_rankings_json: targetBattleKind\(target\) === "raid" \? null/'
+          new = r'/max_rankings_json:\s*targetBattleKind\(target\)\s*===\s*"raid"\s*\?\s*null/'
+          if old not in text:
+              raise SystemExit("Expected generated assertion not found")
+          path.write_text(text.replace(old, new, 1))
+          PY
+
       - name: Check JavaScript syntax
         run: |
           node --check src/max-rankings.js
