@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { MAX_RANK_METHOD_VERSION } from "../src/max-rankings.js";
 import {
   DEFAULT_FUTURE_RESERVE_SCORE_GAP,
   MAX_OPPORTUNITY_METHOD_VERSION,
@@ -47,6 +48,53 @@ assert.equal(dynamaxValue.score, 79);
 assert.equal(dynamaxValue.basis, MAX_OPPORTUNITY_METHOD_VERSION);
 assert.equal(dynamaxValue.max_performance_ranked, false);
 assert.match(dynamaxValue.note, /does not use normal Raid attacker rankings/i);
+
+const rankedMaxValue = planningValueForRecommendation({
+  pokemon_name: "Dynamax Ranked",
+  battle_system: "max",
+  battle_variant: "dynamax",
+  score: 80,
+  meta: {
+    rarity_score: 70,
+    raid_rankings_json: JSON.stringify({
+      method: "fake-raid-best",
+      utility_score: 100
+    }),
+    max_rankings_json: JSON.stringify({
+      method_version: MAX_RANK_METHOD_VERSION,
+      utility_score: 90,
+      best: {
+        rank: 1,
+        max_attack_type: "electric"
+      },
+      by_type: {}
+    })
+  }
+});
+
+assert.equal(rankedMaxValue.score, 80);
+assert.equal(rankedMaxValue.basis, MAX_RANK_METHOD_VERSION);
+assert.equal(rankedMaxValue.method_version, MAX_RANK_METHOD_VERSION);
+assert.equal(rankedMaxValue.max_performance_ranked, true);
+assert.equal(rankedMaxValue.components.max_attacker_utility, 90);
+assert.match(rankedMaxValue.note, /normal Raid attacker rankings are not used/i);
+
+const staleMaxValue = planningValueForRecommendation({
+  pokemon_name: "Dynamax Stale",
+  battle_system: "max",
+  battle_variant: "dynamax",
+  score: 80,
+  meta: {
+    rarity_score: 70,
+    max_rankings_json: JSON.stringify({
+      method_version: "old-max-method",
+      utility_score: 100
+    })
+  }
+});
+
+assert.equal(staleMaxValue.basis, MAX_OPPORTUNITY_METHOD_VERSION);
+assert.equal(staleMaxValue.max_performance_ranked, false);
 
 const gigantamaxValue = planningValueForRecommendation({
   pokemon_name: "Gigantamax Example",

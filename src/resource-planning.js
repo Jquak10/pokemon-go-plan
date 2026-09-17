@@ -326,11 +326,11 @@ export function maxParticleAvailability({
  * Resource-planning value for one opportunity.
  *
  * Raid opportunities retain the existing personalized recommendation score.
- * Max opportunities deliberately use a separate provisional method so a
- * normal Raid attacker ranking is never presented as Max Battle performance.
- * Until Part 7 supplies Max-attacker intelligence, the Max planning score is
- * based on the existing general/personal value signal, rarity/availability,
- * and the distinct value of the Max capability itself.
+ * Max opportunities deliberately use a separate method so a normal Raid
+ * attacker ranking is never presented as Max Battle performance. Current
+ * Max-specific profiles are used when available; otherwise the planner falls
+ * back to the provisional general/personal value, rarity/availability, and
+ * Max-capability signal from Part 6.
  */
 function maxRankProfileForRecommendation(
   recommendation

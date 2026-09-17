@@ -642,11 +642,11 @@ function displayNameForMatch(
   }
 
   if (kind === "gigantamax") {
-    return `Gigantamax ${pokemonName}`;
+    return `Gigantamax ${exactRegionForm || pokemonName}`;
   }
 
   if (kind === "dynamax") {
-    return `Dynamax ${pokemonName}`;
+    return `Dynamax ${exactRegionForm || pokemonName}`;
   }
 
   if (exactRegionForm) {

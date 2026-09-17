@@ -14,6 +14,7 @@ assert.match(index, /maxRankProfileForName/);
 assert.match(index, /AS max_rankings_json/);
 assert.match(index, /max_rankings_json:\s*targetBattleKind\(target\)\s*===\s*"raid"\s*\?\s*null/);
 assert.match(index, /max_rank_backfills/);
+assert.equal((index.match(/exactRegionForm \|\| pokemonName/g) || []).length >= 2, true);
 
 assert.match(resource, /maxRankProfileForRecommendation/);
 assert.match(resource, /max_attacker_utility/);
