@@ -1,0 +1,39 @@
+name: Part 3 resource integration v5
+
+on:
+  push:
+    branches:
+      - feat/max-battle-resources
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: contains(github.event.head_commit.message, '[part3-run-v5]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/max-battle-resources
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply guarded integration
+        run: python3 scripts/part3_integration_runner.py
+
+      - name: Validate JavaScript and tests
+        run: |
+          node --check src/index.js
+          npm test
+
+      - name: Commit validated integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/index.js public tests package.json schema.sql migrations src/resource-planning.js
+          git commit -m "feat: integrate shared battle resource planning"
+          git push origin HEAD:feat/max-battle-resources
