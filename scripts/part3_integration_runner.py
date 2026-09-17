@@ -104,6 +104,60 @@ script = replace_labeled_call(
     route_replacement,
 )
 
+max_card_replacement = """sub_once(
+    manage,
+    r'(  const allocated =\\n    Number\\(\\n      allocation\\?\\.allocated \\|\\| 0\\n    \\);\\n)(\\n  const allocationClass =)',
+    r'''\\1
+  const maxParticleCost =
+    isMax
+      ? Number(
+          rec.max_particle_cost || 0
+        )
+      : 0;
+\\2''',
+    "Max allocation particle cost"
+)
+
+sub_once(
+    manage,
+    r'''(        \\$\\{
+          !isMax
+            \\? `
+              <span class=\\"allocation-inline-badge \\$\\{allocationClass\\}\\">
+                \\$\\{
+                  allocated > 0
+                    \\? `\\$\\{formatNumber\\(allocated\\)\\} Remote raid\\$\\{allocated === 1 \\? \\"\\" : \\"s\\"\\}`
+                    : \\"0 Remote raids\\"
+                \\}
+              </span>
+            `
+            : )\\"\\"
+        \\}''',
+    r'''\\1`
+              <span class="allocation-inline-badge ${allocationClass}">
+                ${
+                  allocated > 0
+                    ? `${formatNumber(allocated)} Remote Max battle${allocated === 1 ? "" : "s"}`
+                    : "0 Remote Max battles"
+                }
+              </span>
+              <span class="max-particle-cost-badge ${maxParticleCost ? "" : "cost-unknown"}">
+                ${
+                  maxParticleCost
+                    ? `${formatNumber(maxParticleCost)} MP each`
+                    : "MP cost unknown"
+                }
+              </span>
+            `
+        }''',
+    "Max allocation badges"
+)"""
+script = replace_labeled_call(
+    script,
+    "Max allocation card metadata",
+    max_card_replacement,
+)
+
 # These labels occur in both the cross-system Today card and Raid-only
 # summaries. Remove the broad substitutions and re-add exact replacements
 # scoped to the Today card so Raid-specific terminology stays intact.
