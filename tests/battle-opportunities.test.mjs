@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  BATTLE_PLAN_FILTER,
   BATTLE_SOURCE_TYPES,
   BATTLE_SYSTEM,
   BATTLE_VARIANT,
@@ -8,7 +9,12 @@ import {
   RAID_SOURCE_TYPES,
   REMOTE_PASS_SOURCE_TYPES,
   battleOpportunityMetadata,
+  battleOpportunityPresentation,
+  battlePlanFilterMatches,
+  battleSpritePolicy,
   battleSystemForSourceType,
+  battleSystemLabel,
+  battleVariantLabel,
   encounterNameForMaxPokemon,
   maxBattleVariantForEvent,
   maxBattleVariantFromText
@@ -86,6 +92,30 @@ assert.equal(
 );
 assert.equal(encounterNameForMaxPokemon(""), null);
 
+assert.equal(battleSystemLabel(BATTLE_SYSTEM.RAID), "Raid");
+assert.equal(battleSystemLabel(BATTLE_SYSTEM.MAX), "Max Battle");
+assert.equal(battleSystemLabel("unknown"), "Battle");
+assert.equal(battleVariantLabel(BATTLE_VARIANT.DYNAMAX), "Dynamax");
+assert.equal(battleVariantLabel(BATTLE_VARIANT.GIGANTAMAX), "Gigantamax");
+assert.equal(battleVariantLabel(null), null);
+
+assert.equal(
+  battlePlanFilterMatches(BATTLE_PLAN_FILTER.ALL, BATTLE_SYSTEM.RAID),
+  true
+);
+assert.equal(
+  battlePlanFilterMatches(BATTLE_PLAN_FILTER.ALL, BATTLE_SYSTEM.MAX),
+  true
+);
+assert.equal(
+  battlePlanFilterMatches(BATTLE_PLAN_FILTER.RAIDS, BATTLE_SYSTEM.MAX),
+  false
+);
+assert.equal(
+  battlePlanFilterMatches(BATTLE_PLAN_FILTER.MAX_BATTLES, BATTLE_SYSTEM.MAX),
+  true
+);
+
 assert.deepEqual(
   battleOpportunityMetadata(
     {
@@ -133,6 +163,58 @@ assert.equal(
     summary: "Community Day"
   }),
   null
+);
+
+const gigantamaxMetadata = battleOpportunityMetadata(
+  {
+    source_type: "max_battles",
+    summary: "Gigantamax Gengar"
+  },
+  {
+    pokemonName: "Gigantamax Gengar"
+  }
+);
+
+assert.deepEqual(
+  battleSpritePolicy(gigantamaxMetadata),
+  {
+    identity: "Gigantamax Gengar",
+    requires_exact_form: true,
+    badge: "GMAX"
+  }
+);
+
+const dynamaxMetadata = battleOpportunityMetadata(
+  {
+    source_type: "max_battles",
+    summary: "Dynamax Beldum"
+  },
+  {
+    pokemonName: "Dynamax Beldum"
+  }
+);
+
+assert.deepEqual(
+  battleSpritePolicy(dynamaxMetadata),
+  {
+    identity: "Beldum",
+    requires_exact_form: false,
+    badge: "DYNAMAX"
+  }
+);
+
+assert.deepEqual(
+  battleOpportunityPresentation(gigantamaxMetadata),
+  {
+    system_label: "Max Battle",
+    variant_label: "Gigantamax",
+    filter_key: "max",
+    sprite_policy: {
+      identity: "Gigantamax Gengar",
+      requires_exact_form: true,
+      badge: "GMAX"
+    }
+  }
 );
 
 // Max Battle and Max Monday feeds already participate in the existing event
