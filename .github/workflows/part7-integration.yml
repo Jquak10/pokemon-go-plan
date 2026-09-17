@@ -1,0 +1,50 @@
+name: Part 7 integration
+
+on:
+  push:
+    branches:
+      - feat/max-attacker-intelligence
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/max-attacker-intelligence
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply guarded integration patch
+        run: node scripts/part7-integrate.mjs
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check src/max-rankings.js
+          node --check src/resource-planning.js
+          node --check src/index.js
+
+      - name: Run deterministic tests
+        run: npm test
+
+      - name: Check diff
+        run: git diff --check
+
+      - name: Commit validated integration
+        run: |
+          if git diff --quiet; then
+            echo "No integration changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/index.js src/resource-planning.js public/manage.html package.json tests/max-ranking-integration.test.mjs
+          git commit -m "feat: integrate Max attacker intelligence"
+          git push origin HEAD:feat/max-attacker-intelligence
