@@ -133,6 +133,37 @@ script = replace_labeled_call(
     max_card_replacement,
 )
 
+shared_cards_replacement = """sub_once(
+    manage,
+    r'''    rec =>\n      renderRecommendationCard\(\n        rec,\n        rec\.battle_system === "max"\n          \? null\n          : allocationByName\.get\(\n              normalizePickerName\(\n                rec\.pokemon_name\n              \)\n            \)\n      \);''',
+    r'''    rec => {
+      const shared =
+        sharedAllocationByKey.get(
+          `${rec.battle_system || "raid"}|${normalizePickerName(rec.pokemon_name)}`
+        );
+
+      const legacy =
+        rec.battle_system === "max"
+          ? null
+          : allocationByName.get(
+              normalizePickerName(
+                rec.pokemon_name
+              )
+            );
+
+      return renderRecommendationCard(
+        rec,
+        shared || legacy
+      );
+    };''',
+    "shared allocation cards"
+)"""
+script = replace_labeled_call(
+    script,
+    "shared allocation cards",
+    shared_cards_replacement,
+)
+
 # These labels occur in both the cross-system Today card and Raid-only
 # summaries. Remove the broad substitutions and re-add exact replacements
 # scoped to the Today card so Raid-specific terminology stays intact.
