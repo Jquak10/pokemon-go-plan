@@ -5,7 +5,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "test": "node tests/raid-rankings.test.mjs && node tests/battle-opportunities.test.mjs && node tests/battle-plan-ui.test.mjs && node tests/resource-planning.test.mjs && node tests/recommendation-engine.test.mjs && node tests/battle-logging.test.mjs && node tests/battle-logging-ui.test.mjs && node tests/battle-targets.test.mjs",
+    "test": "node tests/raid-rankings.test.mjs && node tests/battle-opportunities.test.mjs && node tests/battle-plan-ui.test.mjs && node tests/resource-planning.test.mjs && node tests/recommendation-engine.test.mjs && node tests/max-rankings.test.mjs && node tests/battle-logging.test.mjs && node tests/battle-logging-ui.test.mjs && node tests/battle-targets.test.mjs",
     "test:live": "node tests/raid-rankings-live.mjs"
   },
   "devDependencies": {
