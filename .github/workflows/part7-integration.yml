@@ -32,7 +32,9 @@ jobs:
           path = Path("tests/max-ranking-integration.test.mjs")
           text = path.read_text()
           old = r'/max_rankings_json: targetBattleKind\(target\) === "raid" \? null/'
+          old = old.replace('\\\\', '\\')
           new = r'/max_rankings_json:\s*targetBattleKind\(target\)\s*===\s*"raid"\s*\?\s*null/'
+          new = new.replace('\\\\', '\\')
           if old not in text:
               raise SystemExit("Expected generated assertion not found")
           path.write_text(text.replace(old, new, 1))
