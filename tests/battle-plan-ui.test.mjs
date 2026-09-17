@@ -1,51 +1,74 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import vm from "node:vm";
 
-const source = readFileSync(
-  new URL("../public/battle-plan-ui.js", import.meta.url),
-  "utf8"
-);
+function read(relative) {
+  return readFileSync(new URL(relative, import.meta.url), "utf8");
+}
 
-assert.match(source, /MAX_SOURCE_TYPES\s*=\s*new Set\(\[/);
-assert.match(source, /"max_battles"/);
-assert.match(source, /"max_mondays"/);
+const manage = read("../public/manage.html");
+const styles = read("../public/styles.css");
+const worker = read("../src/index.js");
 
-assert.match(source, /pogo-battle-plan-filter/);
-assert.match(source, /data-battle-filter="all"/);
-assert.match(source, /data-battle-filter="raid"/);
-assert.match(source, /data-battle-filter="max"/);
-assert.match(source, /All/);
-assert.match(source, /Raids/);
-assert.match(source, /Max Battles/);
+assert.match(manage, /Pokémon GO Battle Planner/);
+assert.match(manage, /PERSONAL BATTLE STRATEGY/);
+assert.match(manage, /nav-label-desktop">Battle Plan/);
+assert.match(manage, /nav-label-mobile">Plan/);
 
-assert.match(source, /Pokémon GO Battle Planner/);
-assert.match(source, /PERSONAL BATTLE STRATEGY/);
-assert.match(source, /desktop-plan-label/);
-assert.match(source, /mobile-plan-label/);
+assert.match(manage, /data-battle-filter="all"/);
+assert.match(manage, /data-battle-filter="raid"/);
+assert.match(manage, /data-battle-filter="max"/);
+assert.match(manage, />\s*Max Battles\s*</);
+assert.match(manage, /battlePlanFilter/);
+assert.match(manage, /remoteRaidZeroDetails/);
 
-assert.match(source, /battleSystemForRecommendation/);
-assert.match(source, /maxVariantForRecommendation/);
-assert.match(source, /Gigantamax/);
-assert.match(source, /Dynamax/);
+assert.match(manage, /function recommendationSpriteUrl/);
+assert.match(manage, /requires_exact_form/);
+assert.match(manage, /sprite_exact_form/);
+assert.match(manage, /battleSystemBadgeHtml/);
+assert.match(manage, /max-capability-badge/);
 
-assert.match(source, /exactGigantamaxCatalogEntry/);
-assert.match(source, /return exact\?\.sprite_url/);
-assert.match(source, /raidEncounterEntry\(rec\?\.pokemon_name\)/);
+assert.match(manage, /rec\.boss_name/);
+assert.match(manage, /rec\.encounter_name/);
+assert.match(manage, /rec\.battle_system !== "max" && intel\.normalCp/);
+assert.match(manage, />Weak to</);
+assert.match(manage, /Battle form:/);
+assert.match(manage, /Encounter form:/);
 
-assert.match(source, /Remote: Pass \+ MP/);
-assert.match(source, /Planning only/);
-assert.match(source, /isMax \? "" : raidRankingsHtml/);
-assert.match(source, /Raid-level Hundo CP is intentionally not reused for Max Battles/);
-assert.match(source, /Weak to/);
-assert.match(source, /BOSS TYPE/);
-assert.match(source, /RESISTS/);
+assert.match(manage, /!isMax \? raidRankingsHtml/);
+assert.match(manage, /rec\.battle_system === "max"\s*\? null/);
+assert.doesNotMatch(manage, /battle-plan-ui\.js/);
 
-assert.match(source, /battlePlanFilter === "max"/);
-assert.match(source, /zero-raid-details/);
-assert.match(source, /classList\.toggle\(\s*"hidden"/);
+assert.match(styles, /Battle Plan \/ Max Battle UI — v31/);
+assert.match(styles, /\.battle-plan-filter/);
+assert.match(styles, /\.battle-filter-button/);
+assert.match(styles, /min-height:\s*44px/);
+assert.match(styles, /\.nav-label-mobile/);
+assert.match(styles, /@media \(max-width: 700px\)/);
 
-assert.match(source, /min-height:\s*44px/);
-assert.match(source, /@media \(max-width: 760px\)/);
-assert.match(source, /@media \(min-width: 761px\)/);
+for (const page of [
+  "../public/manage.html",
+  "../public/index.html",
+  "../public/admin.html",
+  "../public/sources.html"
+]) {
+  assert.match(read(page), /styles\.css\?v=31/);
+}
 
-console.log("Battle Plan UI contract tests passed");
+assert.match(worker, /BATTLE_SOURCE_TYPES/);
+assert.match(worker, /battleOpportunityMetadata/);
+assert.match(worker, /battleOpportunityPresentation/);
+assert.match(worker, /battle_presentation/);
+assert.match(worker, /sprite_exact_form/);
+assert.match(worker, /battleMetadata\?\.battle_system/);
+
+// Syntax-check the Planner's inline JavaScript without executing browser APIs.
+const inlineScripts = [...manage.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+  .map(match => match[1])
+  .filter(Boolean);
+assert.ok(inlineScripts.length >= 1, "Expected Planner inline JavaScript");
+for (const [index, script] of inlineScripts.entries()) {
+  new vm.Script(script, { filename: `manage-inline-${index + 1}.js` });
+}
+
+console.log("Battle Plan UI integration tests passed");
