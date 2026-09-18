@@ -373,6 +373,8 @@ export function planningValueForRecommendation(
 
   const recommendationScore =
     scoreOrNull(
+      recommendation
+        ?.recommendation_score ??
       recommendation?.score
     ) ?? 0;
 
@@ -491,6 +493,101 @@ export function planningValueForRecommendation(
     },
     note:
       "Provisional Max opportunity value only. It does not use normal Raid attacker rankings as Max Battle performance."
+  };
+}
+
+export function priorityPresentationForScore(
+  score,
+  battleSystem = "raid"
+) {
+  const value =
+    Math.round(
+      scoreOrNull(score) ?? 0
+    );
+
+  if (value >= 85) {
+    return {
+      label:
+        battleSystem === "max"
+          ? "MUST BATTLE"
+          : "MUST RAID",
+      emoji:
+        "🔥"
+    };
+  }
+
+  if (value >= 70) {
+    return {
+      label:
+        "HIGH PRIORITY",
+      emoji:
+        "⭐⭐⭐"
+    };
+  }
+
+  if (value >= 50) {
+    return {
+      label:
+        "RECOMMENDED",
+      emoji:
+        "⭐⭐"
+    };
+  }
+
+  if (value >= 30) {
+    return {
+      label:
+        "OPTIONAL",
+      emoji:
+        "⭐"
+    };
+  }
+
+  return {
+    label:
+      "SKIP",
+    emoji:
+      "⛔"
+  };
+}
+
+export function planningPriorityForRecommendation(
+  recommendation
+) {
+  const value =
+    planningValueForRecommendation(
+      recommendation
+    );
+
+  const system =
+    recommendation?.battle_system ||
+    "raid";
+
+  const presentation =
+    priorityPresentationForScore(
+      value.score,
+      system
+    );
+
+  let rationale;
+
+  if (system !== "max") {
+    rationale =
+      "Priority uses your personalized Raid value, including current meta inputs and target progress/priority.";
+  } else if (
+    value.max_performance_ranked
+  ) {
+    rationale =
+      "Priority combines your personalized value, rarity/availability, Max capability, and current Max attacker utility.";
+  } else {
+    rationale =
+      "Priority combines your personalized value, rarity/availability, and Max capability; current Max attacker utility is not available for this opportunity.";
+  }
+
+  return {
+    ...value,
+    ...presentation,
+    rationale
   };
 }
 
@@ -630,7 +727,7 @@ function recommendationBlockedReason(
       planningScore || 0
     ) < minScore
   ) {
-    return `${recommendation?.battle_system === "max" ? "Max planning value" : "Recommendation score"} is below your ${minScore}-point paid-battle threshold.`;
+    return `Planning priority score is below your ${minScore}-point paid-battle threshold.`;
   }
 
   return null;
@@ -705,6 +802,8 @@ function bestForecastOpportunity(
             value.score,
           recommendation_score:
             scoreOrNull(
+              item
+                ?.recommendation_score ??
               item?.score
             ),
           score_basis:
@@ -1285,6 +1384,9 @@ export function buildBattleResourcePlan({
             .score,
         recommendation_score:
           scoreOrNull(
+            candidate
+              .recommendation
+              .recommendation_score ??
             candidate
               .recommendation
               .score

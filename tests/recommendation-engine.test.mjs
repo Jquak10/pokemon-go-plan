@@ -4,7 +4,9 @@ import {
   DEFAULT_FUTURE_RESERVE_SCORE_GAP,
   MAX_OPPORTUNITY_METHOD_VERSION,
   buildBattleResourcePlan,
-  planningValueForRecommendation
+  planningPriorityForRecommendation,
+  planningValueForRecommendation,
+  priorityPresentationForScore
 } from "../src/resource-planning.js";
 
 assert.equal(DEFAULT_FUTURE_RESERVE_SCORE_GAP, 8);
@@ -26,6 +28,48 @@ assert.deepEqual(raidValue, {
   },
   note: null
 });
+
+assert.deepEqual(
+  priorityPresentationForScore(
+    85,
+    "raid"
+  ),
+  {
+    label: "MUST RAID",
+    emoji: "🔥"
+  }
+);
+
+assert.deepEqual(
+  priorityPresentationForScore(
+    85,
+    "max"
+  ),
+  {
+    label: "MUST BATTLE",
+    emoji: "🔥"
+  }
+);
+
+const raidPriority =
+  planningPriorityForRecommendation({
+    pokemon_name: "Raid Boss",
+    battle_system: "raid",
+    score: 84
+  });
+
+assert.equal(
+  raidPriority.score,
+  84
+);
+assert.equal(
+  raidPriority.label,
+  "HIGH PRIORITY"
+);
+assert.match(
+  raidPriority.rationale,
+  /personalized Raid value/i
+);
 
 const dynamaxValue = planningValueForRecommendation({
   pokemon_name: "Dynamax Example",
@@ -108,6 +152,36 @@ const gigantamaxValue = planningValueForRecommendation({
 
 assert.equal(gigantamaxValue.score, 85);
 assert.ok(gigantamaxValue.score > 80);
+
+const canonicalGigantamaxPriority =
+  planningPriorityForRecommendation({
+    pokemon_name:
+      "Gigantamax Example",
+    battle_system:
+      "max",
+    battle_variant:
+      "gigantamax",
+    // Public score is already canonical. The planner must derive from the
+    // preserved base recommendation score rather than recursively rescore 85.
+    score: 85,
+    recommendation_score: 80,
+    meta: {
+      rarity_score: 90
+    }
+  });
+
+assert.equal(
+  canonicalGigantamaxPriority.score,
+  85
+);
+assert.equal(
+  canonicalGigantamaxPriority.label,
+  "MUST BATTLE"
+);
+assert.match(
+  canonicalGigantamaxPriority.rationale,
+  /Max capability/i
+);
 
 const raid = {
   pokemon_name: "Today Raid",

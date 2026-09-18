@@ -73,6 +73,13 @@ assert.match(worker, /battleOpportunityPresentation/);
 assert.match(worker, /battle_presentation/);
 assert.match(worker, /sprite_exact_form/);
 assert.match(worker, /battleMetadata\?\.battle_system/);
+assert.match(worker, /planningPriorityForRecommendation/);
+assert.match(worker, /function withPlanningPriority/);
+assert.match(worker, /recommendation_score:/);
+assert.match(worker, /planning_score:/);
+assert.match(worker, /planning_rationale:/);
+assert.match(manage, /<strong>Planning priority:<\/strong>/);
+assert.match(manage, /item\.label \|\| "Priority"/);
 
 // Syntax-check the Planner's inline JavaScript without executing browser APIs.
 const inlineScripts = [...manage.matchAll(/<script>([\s\S]*?)<\/script>/g)]

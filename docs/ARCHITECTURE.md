@@ -487,6 +487,20 @@ The allocator compares the next worthwhile use across both systems while preserv
 
 Future opportunity matters. The planner may save capacity for a stronger upcoming day rather than fill today's ceiling.
 
+### 13.4 Canonical Battle Plan priority
+
+Every battle opportunity has one user-facing priority score and label after battle identity is known.
+
+The underlying general/personal recommendation value is preserved as `recommendation_score`. The public `score` and explicit `planning_score` represent the canonical Battle Plan priority used for ordering and presentation.
+
+- Raid: canonical planning priority equals the personalized Raid recommendation value.
+- Max: canonical planning priority is calculated by the shared resource-planning method. When a current Max ranking profile exists, it combines personalized value, rarity/availability, Max capability, and Max attacker utility. Otherwise it uses the documented provisional Max opportunity method without treating ordinary Raid attacker rankings as Max performance.
+- `planning_rationale`, `score_basis`, method/version metadata, and planning components travel with the recommendation so the UI and allocator can explain the same decision.
+- Cards, Today, desktop Quick Status, co-leader selection, recommendation sorting, current allocation, and the existing future recommendation summaries use the canonical planning score rather than a separate generic Max score.
+- The allocator recalculates from `recommendation_score` through the same canonical method. It must not recursively rescore an already-canonical public `score`.
+
+Priority presentation thresholds remain consistent across systems. The highest Raid label remains **MUST RAID**; the corresponding Max label is **MUST BATTLE** so Max opportunities are not mislabeled as Raids.
+
 ## 14. Remote participation and shared daily limit
 
 Current architecture treats ordinary Remote Raids and Remote Max Battles as consuming one shared official daily Remote participation ceiling.
