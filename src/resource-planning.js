@@ -87,7 +87,7 @@ export function maxBattleTierFromText(value) {
 
   const numericPatterns = [
     /\b(?:tier|difficulty)\s*[:#-]?\s*([1-6])\b/i,
-    /\b([1-6])\s*(?:-?\s*star|★)\b/i
+    /\b([1-6])\s*(?:-?\s*star\b|★)/i
   ];
 
   for (const pattern of numericPatterns) {
@@ -241,17 +241,18 @@ export function inferMaxParticleCost(recommendation) {
       recommendation
     );
 
+  const officialEvidence =
+    isOfficialCostEvidence(
+      recommendation
+    );
+
   const parsedTier =
     structuredTier ||
     maxBattleTierFromText(
       text
     );
 
-  if (
-    isOfficialCostEvidence(
-      recommendation
-    )
-  ) {
+  if (officialEvidence) {
     const officialCost =
       explicitMaxParticleEntryCostFromText(
         text
@@ -303,21 +304,21 @@ export function inferMaxParticleCost(recommendation) {
             ? recommendation
                 ?.max_battle_tier_source ||
               "structured"
-            : (
-                recommendation
-                  ?.source_kind ===
-                  "official"
-                  ? "official_text"
-                  : recommendation
-                      ?.source_kind ===
-                      "derived"
+            : officialEvidence
+              ? "official_text"
+              : (
+                  recommendation
+                    ?.source_kind ===
+                    "derived"
                     ? "derived_event_text"
                     : "event_text"
-              ),
+                ),
         evidence_source:
-          recommendation
-            ?.source_kind ||
-          "event"
+          officialEvidence
+            ? "official"
+            : recommendation
+                ?.source_kind ||
+              "event"
       };
     }
   }
