@@ -58,6 +58,43 @@ function textForRecommendation(recommendation) {
     .join(" ");
 }
 
+function battleSystemLabel(value) {
+  return value === "max"
+    ? "Max Battle"
+    : "Raid";
+}
+
+function dayDistance(fromDate, toDate) {
+  if (!fromDate || !toDate) return null;
+
+  const from = new Date(
+    `${fromDate}T00:00:00Z`
+  );
+
+  const to = new Date(
+    `${toDate}T00:00:00Z`
+  );
+
+  if (
+    !Number.isFinite(
+      from.getTime()
+    ) ||
+    !Number.isFinite(
+      to.getTime()
+    )
+  ) {
+    return null;
+  }
+
+  return Math.max(
+    0,
+    Math.round(
+      (to - from) /
+        86400000
+    )
+  );
+}
+
 const MAX_TIER_WORDS = Object.freeze({
   one: 1,
   two: 2,
