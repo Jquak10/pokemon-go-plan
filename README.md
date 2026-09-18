@@ -91,7 +91,7 @@ Fresh databases should be initialized from `schema.sql`, not by replaying produc
 - Remote Raid planning that treats official limits and an optional personal budget as ceilings, not spending targets.
 - Unified Local/Remote Raid, Dynamax and Gigantamax logging, recent activity, reversible resource accounting, and editable target-progress updates.
 - Targets for Mega Energy, raid counts, Candy XL, Candy, and custom goals, with priority, progress, notes, completion state, search, filters, card/list views, and bulk deletion.
-- A Hundo CP calculator for the loaded Pokémon GO Pokédex, common encounter levels, and custom levels.
+- A Hundo CP calculator for the loaded Pokémon GO Pokédex, common encounter levels, and custom levels. Catalog loading has explicit loading/error/retry states and can fall back to the last successfully saved public catalog when the live catalog endpoint is temporarily unavailable.
 - A live month calendar and private ICS feed with user-selectable event categories.
 - GO Calendar data, higher-priority official Pokémon GO schedule supplements, and suppression rules.
 - Automated PvPoke Master League data and Pokémon GO API-based analytical inputs, with visible source precedence and freshness.
@@ -121,7 +121,7 @@ The **Raid Plan** tab combines today's limits, activity, recommendations, and fu
 - **Today's planning capacity** divides capacity into **Used**, **Recommended**, and **Left unused**. Unused capacity is intentional when available bosses do not meet the configured value threshold.
 - **Paid Raid Budget Forecast** previews recommended paid-raid budgets for the next seven days and recalculates as targets or progress change.
 - **Today's Raid Activity** separates Remote, Local, and total logged raids.
-- **What to battle now** displays current Raid and Max Battle recommendations. Cards can include score/priority, shared Remote allocation, source, weaknesses, battle details, and a **Why?** explanation. Max weakness/resistance guidance resolves through the underlying exact species/form; Raid-only 100% IV encounter CP and Raid attacker rankings remain Raid-specific.
+- **What to battle now** displays current Raid and Max Battle recommendations. Cards can include score/priority, shared Remote allocation, source, weaknesses, battle details, and a **Why?** explanation. Max weakness/resistance guidance resolves through the underlying exact species/form; Raid-only 100% IV encounter CP and Raid attacker rankings remain Raid-specific. If the shared Pokémon catalog cannot load, battle intel exits the loading state, offers a retry, and uses the last successfully saved catalog when available.
 - The first recommendations appear directly; **More raid recommendations** expands the rest. **Bosses receiving 0 Remote Raids** explains exclusions from paid allocation.
 
 Recommendations combine current event availability with PvE, PvP, rarity/collection, and Mega utility inputs, plus personal targets and saved preference weights. A high recommendation score is evidence for consideration, not an instruction to spend a pass. The allocation badge is specifically for Remote Raids; Local raids are logged and counted separately.
