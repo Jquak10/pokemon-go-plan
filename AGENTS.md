@@ -44,7 +44,26 @@ Before architectural or product-behavior work, read:
 
 If older README text, PR text, or chat history conflicts with current architecture, follow newest main first, then docs/ARCHITECTURE.md. Use docs/DECISIONS.md to understand why a previous design was replaced.
 
-When a change materially alters architecture or supersedes a recorded decision, update the relevant documentation in the same PR.
+## Documentation impact and change logging
+
+Documentation is part of the definition of done for every feature, improvement, bug fix, refactor, migration, maintenance change, and workflow change. Do not rely on chat history to preserve what changed.
+
+For every change, perform a documentation-impact assessment before committing and update the relevant files in the same branch/PR:
+
+- `docs/DECISIONS.md` — **mandatory for every product improvement and bug fix**. Add a compact factual PR-lineage entry once the PR number exists. Add or update an ADR when the change introduces, changes, or supersedes a durable design decision. A routine fix that restores an existing invariant usually needs a lineage entry, not a new ADR.
+- `docs/ARCHITECTURE.md` — update whenever current behavior, invariants, data model, data flow, APIs, battle/resource semantics, event precedence, security, operational topology, or mobile/desktop architecture changes, or when a bug fix clarifies an invariant that future work must preserve.
+- `README.md` — update whenever user-visible behavior, features, setup, usage, migrations, deployment/operator steps, or developer workflow changes.
+- `AGENTS.md` — update whenever repository development automation, validation, PR, documentation, or release policy changes.
+
+Do not churn unrelated documentation merely to satisfy a checklist. If one of the files above is not relevant, leave it unchanged and state why in the PR documentation-impact summary. However, a product improvement or bug fix may not claim "no documentation impact" because its change-history entry in `docs/DECISIONS.md` is required.
+
+Documentation workflow:
+
+1. Assess documentation impact before implementation.
+2. Update current-behavior documentation while making the code/product change.
+3. Create the PR.
+4. Once the PR number exists, add/update its entry in the `docs/DECISIONS.md` PR lineage on the same branch and push that follow-up before the PR is considered ready.
+5. Re-check the documentation after final code changes so it describes the shipped behavior rather than an intermediate implementation.
 
 ## Implementation rules
 
@@ -126,7 +145,9 @@ After a successful commit:
    - whether D1 migration is required
    - whether CSS cache version changed
    - whether `wrangler.jsonc`, bindings, routes, Cron, secrets, or deployment configuration changed
-6. Check PR checks/status.
+   - documentation impact: which of `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `README.md`, and `AGENTS.md` changed, plus why any relevant file did not
+6. After the PR number exists, ensure `docs/DECISIONS.md` contains the PR-lineage entry required by the documentation policy.
+7. Check PR checks/status.
 
 If checks fail, investigate and fix them on the same feature branch.
 
@@ -146,6 +167,7 @@ Report:
 - D1 migration required: yes/no
 - CSS cache bump required/performed: yes/no
 - deployment configuration changed: yes/no
+- documentation updated: files + impact summary
 - any remaining risks or manual verification needed
 
 Do not merge to `main` automatically.
@@ -157,14 +179,15 @@ If the user explicitly says `ship it`, `merge it`, or clearly authorizes product
 1. Confirm the PR still targets `main`.
 2. Confirm required checks pass.
 3. Confirm the PR contains only intended changes.
-4. Merge using the repository's normal safe merge method.
-5. Do not run a manual `wrangler deploy` unless explicitly required.
-6. Switch local checkout back to `main`.
-7. Fetch and fast-forward to `origin/main`.
-8. Remove the completed local feature branch if safe.
-9. Confirm the working tree is clean.
-10. Verify the existing GitHub → Cloudflare deployment flow where possible.
-11. Perform an appropriate production smoke check where possible.
+4. Confirm the documentation-impact assessment is complete and the PR is recorded in `docs/DECISIONS.md` when required.
+5. Merge using the repository's normal safe merge method.
+6. Do not run a manual `wrangler deploy` unless explicitly required.
+7. Switch local checkout back to `main`.
+8. Fetch and fast-forward to `origin/main`.
+9. Remove the completed local feature branch if safe.
+10. Confirm the working tree is clean.
+11. Verify the existing GitHub → Cloudflare deployment flow where possible.
+12. Perform an appropriate production smoke check where possible.
 
 ## Safety
 
