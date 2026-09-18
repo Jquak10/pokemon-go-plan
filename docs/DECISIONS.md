@@ -923,7 +923,7 @@ do not invent precision.
 ## 53. Decision: current architecture docs belong in the repository
 
 Status: Active
-This documentation cleanup
+PR #30
 
 The project accumulated architecture across long chats and many PRs.
 
@@ -978,6 +978,7 @@ The table below captures the repository's PR history through the current baselin
 | #27 | Shared daily Remote limit | Combined Raid + Max official daily usage; MP dropdown |
 | #28 | Part 8 UX/regression hardening | Cross-system UI/accessibility consistency |
 | #29 | Timezone-aware Remote limit windows | Exact official timestamp conversion |
+| #30 | Architecture and decision consolidation | Made repository docs the durable replacement for chat-only history |
 
 # Superseded decisions to remember
 
