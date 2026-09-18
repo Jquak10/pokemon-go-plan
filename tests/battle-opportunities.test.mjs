@@ -21,6 +21,9 @@ import {
   maxBattleVariantFromText,
   maxRotationEventFromMaxMonday
 } from "../src/battle-opportunities.js";
+import {
+  officialMaxBattleSupplementsFromText
+} from "../src/index.js";
 
 assert.equal(
   battleSystemForSourceType("raid_battles"),
@@ -299,6 +302,100 @@ assert.match(workerSource, /source: MAX_ROTATION_SOURCE_TYPE, ok: true, count, d
 assert.doesNotMatch(
   workerSource.match(/const SOURCES = \{[\s\S]*?\n\};/)?.[0] || "",
   /max_rotation\s*:/
+);
+
+const officialCinderaceText = [
+  "Gigantamax Cinderace Max Battle Day",
+  "Saturday, October 3, 2026, from 2:00 p.m. to 5:00 p.m. local time",
+  "Featured Pokémon",
+  "The following Pokémon will appear in six-star Max Battles!",
+  "Gigantamax Cinderace",
+  "For the first time in Pokémon GO, Shiny Gigantamax Cinderace may appear.",
+  "Event Bonuses",
+  "Max Particle collection limit increased to 1,600",
+  "From October 2 at 5:00 p.m. to October 3 at 8:00 p.m. PDT, the Remote Raid limit will increase.",
+  "Pokémon GO Web Store",
+  "The ticket box includes 800 Max Particles at no additional cost."
+].join("\n");
+
+const cinderaceEvidence =
+  officialMaxBattleSupplementsFromText(
+    officialCinderaceText,
+    "https://pokemongo.com/news/gigantamax-cinderace-max-battle-day-2026"
+  );
+
+assert.equal(
+  cinderaceEvidence.length,
+  1
+);
+assert.equal(
+  cinderaceEvidence[0].pokemon_name,
+  "Gigantamax Cinderace"
+);
+assert.equal(
+  cinderaceEvidence[0].start_date,
+  "2026-10-03"
+);
+assert.equal(
+  cinderaceEvidence[0].end_date,
+  "2026-10-03"
+);
+assert.equal(
+  cinderaceEvidence[0].max_battle_tier,
+  6
+);
+assert.equal(
+  cinderaceEvidence[0].max_particle_cost,
+  800
+);
+assert.equal(
+  cinderaceEvidence[0].max_particle_cost_source,
+  "standard_tier_6"
+);
+assert.equal(
+  cinderaceEvidence[0].max_particle_cost_confidence,
+  "verified_tier_standard_cost"
+);
+
+// Store-bundle MP text is not battle entry-cost evidence, and species identity
+// alone must not create a cost.
+assert.deepEqual(
+  officialMaxBattleSupplementsFromText(
+    [
+      "Gigantamax Example Max Battle Day",
+      "Saturday, October 10, 2026",
+      "Featured Pokémon",
+      "Gigantamax Example",
+      "The ticket box includes 800 Max Particles at no additional cost."
+    ].join("\n"),
+    "https://pokemongo.com/news/example"
+  ),
+  []
+);
+
+assert.match(
+  workerSource,
+  /officialMaxBattleEvidenceStatements/
+);
+assert.match(
+  workerSource,
+  /X-POGO-MAX-EVIDENCE:official/
+);
+assert.match(
+  workerSource,
+  /X-POGO-MAX-BATTLE-TIER:/
+);
+assert.match(
+  workerSource,
+  /max_battle_tier:/
+);
+assert.match(
+  workerSource,
+  /max_particle_cost_evidence_source:/
+);
+assert.match(
+  workerSource,
+  /maxBattleLinks[\s\S]*otherLinks/
 );
 
 console.log("battle opportunity foundation tests passed");
