@@ -3485,20 +3485,6 @@ export function officialMaxBattleSupplementsFromText(
   const fullText =
     String(text || "");
 
-  const evidence =
-    inferMaxParticleCost({
-      battle_system:
-        "max",
-      source_kind:
-        "official",
-      event_description:
-        fullText
-    });
-
-  if (!evidence.cost) {
-    return [];
-  }
-
   const range =
     maxBattleOfficialDateRangeFromText(
       fullText
@@ -3514,128 +3500,229 @@ export function officialMaxBattleSupplementsFromText(
       .map(line => line.trim())
       .filter(Boolean);
 
-  const names = [];
+  const evidenceByName =
+    new Map();
 
-  const addName =
-    value => {
+  const addEvidence =
+    (
+      value,
+      evidence,
+      excerpt
+    ) => {
       const cleaned =
         cleanOfficialMaxPokemonLine(
           value
         );
 
       if (
-        cleaned &&
-        !names.some(
-          existing =>
-            normalizeName(existing) ===
-            normalizeName(cleaned)
-        )
+        !cleaned ||
+        !evidence?.cost
       ) {
-        names.push(
+        return;
+      }
+
+      const key =
+        normalizeName(
           cleaned
         );
+
+      if (
+        !key ||
+        evidenceByName.has(
+          key
+        )
+      ) {
+        return;
       }
+
+      evidenceByName.set(
+        key,
+        {
+          pokemon_name:
+            cleaned,
+          start_date:
+            range.start_date,
+          end_date:
+            range.end_date,
+          max_battle_tier:
+            evidence.tier,
+          max_particle_cost:
+            evidence.cost,
+          max_particle_cost_source:
+            evidence.basis,
+          max_particle_cost_confidence:
+            evidence.confidence,
+          source_url:
+            sourceUrl,
+          source_excerpt:
+            excerpt || null
+        }
+      );
     };
+
+  const tierGroups = [];
 
   for (
     let index = 0;
     index < lines.length;
     index++
   ) {
+    const line =
+      lines[index];
+
     if (
-      !/(?:one|two|three|four|five|six|[1-6])\s*-?\s*star\s+Max Battles?/i.test(
-        lines[index]
+      !/\bMax Battles?\b/i.test(
+        line
       )
     ) {
       continue;
     }
+
+    const tier =
+      maxBattleTierFromText(
+        line
+      );
+
+    if (!tier) {
+      continue;
+    }
+
+    const evidence =
+      inferMaxParticleCost({
+        battle_system:
+          "max",
+        source_kind:
+          "official",
+        event_description:
+          line
+      });
+
+    if (!evidence.cost) {
+      continue;
+    }
+
+    tierGroups.push({
+      index,
+      evidence
+    });
+
+    const excerpt =
+      lines
+        .slice(
+          Math.max(0, index - 1),
+          Math.min(
+            lines.length,
+            index + 7
+          )
+        )
+        .join(" ");
 
     for (
       let lookahead = index + 1;
       lookahead <
         Math.min(
           lines.length,
-          index + 10
+          index + 12
         );
       lookahead++
     ) {
+      const candidateLine =
+        lines[lookahead];
+
       if (
-        /^(?:Event Bonuses|Timed Research|Where can I find|Max out|Event Ticket|Pokémon GO Web Store)$/i.test(
-          lines[lookahead]
+        /\b(?:one|two|three|four|five|six|[1-6])\s*-?\s*star\s+Max Battles?\b/i.test(
+          candidateLine
+        ) ||
+        /^(?:Event Bonuses|Timed Research|Where can I find|Max out|Event Ticket|Pokémon GO Web Store|Bonuses|Research)$/i.test(
+          candidateLine
         )
       ) {
         break;
       }
 
-      addName(
-        lines[lookahead]
+      addEvidence(
+        candidateLine,
+        evidence,
+        excerpt
       );
     }
   }
 
-  if (!names.length) {
-    for (const line of lines.slice(0, 16)) {
+  // Some official articles state a battle entry cost directly without a
+  // difficulty heading. In that case, attach the official explicit cost only
+  // to a Pokémon named in the Max Battle Day title.
+  const articleEvidence =
+    inferMaxParticleCost({
+      battle_system:
+        "max",
+      source_kind:
+        "official",
+      event_description:
+        fullText
+    });
+
+  if (
+    !evidenceByName.size &&
+    articleEvidence.basis ===
+      "official_explicit_cost"
+  ) {
+    for (
+      const line of
+      lines.slice(0, 20)
+    ) {
       const titleMatch =
         line.match(
           /^((?:Gigantamax|Dynamax)\s+.+?)\s+Max Battle Day\b/i
         );
 
       if (titleMatch) {
-        addName(
-          titleMatch[1]
+        addEvidence(
+          titleMatch[1],
+          articleEvidence,
+          line
         );
       }
     }
   }
 
-  if (!names.length) {
-    return [];
+  // If a single verified tier is present but the article layout did not place
+  // the Pokémon immediately after its tier heading, a form-specific Max Battle
+  // Day title can still bind that one tier to that one named opportunity.
+  if (
+    !evidenceByName.size &&
+    tierGroups.length === 1
+  ) {
+    for (
+      const line of
+      lines.slice(0, 20)
+    ) {
+      const titleMatch =
+        line.match(
+          /^((?:Gigantamax|Dynamax)\s+.+?)\s+Max Battle Day\b/i
+        );
+
+      if (titleMatch) {
+        addEvidence(
+          titleMatch[1],
+          tierGroups[0]
+            .evidence,
+          lines
+            .slice(
+              tierGroups[0].index,
+              Math.min(
+                lines.length,
+                tierGroups[0].index + 6
+              )
+            )
+            .join(" ")
+        );
+      }
+    }
   }
 
-  const evidenceIndex =
-    fullText.search(
-      /(?:one|two|three|four|five|six|[1-6])\s*-?\s*star\s+Max Battles?/i
-    );
-
-  const excerpt =
-    evidenceIndex >= 0
-      ? fullText
-          .slice(
-            Math.max(
-              0,
-              evidenceIndex - 180
-            ),
-            evidenceIndex + 520
-          )
-          .replace(
-            /\s+/g,
-            " "
-          )
-          .trim()
-      : null;
-
-  return names.map(
-    pokemonName => ({
-      pokemon_name:
-        pokemonName,
-      start_date:
-        range.start_date,
-      end_date:
-        range.end_date,
-      max_battle_tier:
-        evidence.tier,
-      max_particle_cost:
-        evidence.cost,
-      max_particle_cost_source:
-        evidence.basis,
-      max_particle_cost_confidence:
-        evidence.confidence,
-      source_url:
-        sourceUrl,
-      source_excerpt:
-        excerpt
-    })
-  );
+  return [
+    ...evidenceByName.values()
+  ];
 }
 
 function nearbyDateWindow(text, startIndex, maxLength = 320) {
