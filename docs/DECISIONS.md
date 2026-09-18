@@ -290,7 +290,7 @@ The first Max resource layer introduced:
 
 At this stage, the official ordinary Remote Raid participation limit was intentionally kept separate from the Remote Max counter because the official rule relationship was not considered sufficiently established.
 
-That numeric-limit separation was later superseded by ADR-030.
+That numeric-limit separation was later superseded by ADR-031.
 
 ## ADR-021 — Keep physical-resource accounting distinct from participation-limit accounting
 
