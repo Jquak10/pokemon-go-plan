@@ -363,12 +363,14 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         page.reload(wait_until="domcontentloaded")
         page.wait_for_selector("#app:not(.hidden)")
 
+        page.locator('.tab-button[data-tab="hundo"]').click()
         status = page.locator("#hundoCatalogStatus")
         status.get_by_text(
             "Using the last saved Pokémon catalog",
             exact=False,
         ).wait_for(state="visible")
 
+        page.locator('.tab-button[data-tab="plan"]').click()
         card = page.locator(".recommendation-card", has_text="Dynamax Rhyhorn")
         card.locator(".raid-intel").wait_for(state="visible")
         self.assertNotIn("Loading battle intel", card.inner_text())
