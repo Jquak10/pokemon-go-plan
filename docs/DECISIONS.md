@@ -641,6 +641,29 @@ Rules:
 
 The initial browser coverage freezes the regressions that prompted PR #36: intermediate-desktop text visibility, asynchronous Dynamax battle-intel rendering, mobile modal containment/background locking, and horizontal overflow.
 
+## ADR-041 — Use one canonical Battle Plan priority after battle identity is known
+
+Status: Current  
+Introduced in PR #38.
+
+The Planner previously exposed the general recommendation score on cards, Today, and Quick Status while the shared resource allocator used a separate Max-aware planning score for Max Battles. That allowed the same Max opportunity to appear with one priority in the UI while resource allocation compared it using another.
+
+The user-facing Battle Plan therefore uses one canonical priority after battle identity is known.
+
+Rules:
+
+- preserve the underlying general/personal value as `recommendation_score`;
+- expose canonical Battle Plan priority as both public `score` and explicit `planning_score`;
+- Raid canonical priority equals the personalized Raid recommendation value;
+- Max canonical priority is calculated by the shared Max-aware planning method and may incorporate current Max attacker utility, rarity/availability, and Max capability;
+- normal Raid attacker rankings must never be treated as Max performance;
+- the canonical score drives card presentation, Today, desktop Quick Status, recommendation ordering/co-leader selection, shared resource allocation, and existing future recommendation summaries;
+- the allocator must derive from preserved `recommendation_score`, not recursively feed an already-canonical public Max score back into the Max formula;
+- each recommendation carries score-basis/method metadata and a human-readable planning rationale;
+- the highest Raid label remains **MUST RAID** while the equivalent Max label is **MUST BATTLE**.
+
+This decision unifies scoring/presentation but does not by itself replace the legacy seven-day Raid-oriented budget forecast with a fully shared Raid + Max forecast. That remains separate future work.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -684,6 +707,7 @@ The following sequence is retained as a compact repository implementation/change
 | #35 | Max battle intel + desktop text visibility | Resolves Max weakness/resistance intel through the underlying exact form, replaces permanent post-load placeholders with an explicit unavailable state, and keeps Battle Resources guidance fully visible on desktop. |
 | #36 | Automated browser regressions + broad Planner CI | Added self-starting Chromium responsive tests, made Planner regression CI run on every PR/main push, broadened JavaScript syntax coverage, and moved the remaining audit improvements into the durable backlog. |
 | #37 | Failure-safe Pokémon catalog loading | Added explicit catalog load states, retryable terminal failures, validated last-known-good local fallback, and browser regressions so Battle Plan intel/Hundo cannot remain stuck loading after catalog failure. |
+| #38 | Unified Battle Plan priority scoring | Made the Max-aware planning value the canonical visible Max priority, preserved the underlying recommendation score, aligned cards/Today/Quick Status/allocation/future summaries, and closed BL-002. |
 
 ## Supersession map
 
