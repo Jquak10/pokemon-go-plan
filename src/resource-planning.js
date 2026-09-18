@@ -135,6 +135,7 @@ function explicitMaxParticleEntryCostFromText(
     String(value || "");
 
   const patterns = [
+    /X-POGO-MAX-PARTICLE-COST\s*:\s*(\d{2,5})/i,
     /\b(?:requires?|costs?|cost(?:s)?(?:\s+(?:of|is))?|entry\s+cost(?:\s+(?:of|is))?)\s*:?\s*(\d{2,5})\s*(?:Max\s*Particles?|MP)\b/i,
     /\b(\d{2,5})\s*(?:Max\s*Particles?|MP)\s+(?:to|for)\s+(?:enter|join|challenge|engage\s+in)\b/i,
     /\b(?:enter|join|challenge|engage\s+in)\b[^.]{0,80}?\b(\d{2,5})\s*(?:Max\s*Particles?|MP)\b/i
