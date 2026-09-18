@@ -333,7 +333,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         card.locator(".raid-intel").wait_for(state="visible")
         self.assertNotIn("Loading battle intel", card.inner_text())
         intel = card.locator(".raid-intel").inner_text()
-        self.assertIn("Weak to", intel)
+        self.assertIn("WEAK TO", intel.upper())
         self.assertIn("Water", intel)
         self.assertIn("Grass", intel)
 
