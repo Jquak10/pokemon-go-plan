@@ -659,6 +659,7 @@ The following sequence is retained as a compact repository implementation/change
 | #32 | Mandatory documentation impact assessment | Requires every product improvement/bug fix to be logged and routes architecture, README, and workflow updates by impact. |
 | #33 | Durable backlog and chat-cleanup context | Added docs/BACKLOG.md, recorded the schema-completeness debt and non-planned Max-team idea, and made backlog maintenance part of the normal workflow. |
 | #34 | D1 schema baseline reconciliation | Verified the two missing operational table/index definitions against production D1, reconciled the fresh schema, added idempotent migration 0004 and regression coverage, and closed BL-001 without changing current production data. |
+| #35 | Max battle intel + desktop text visibility | Resolves Max weakness/resistance intel through the underlying exact form, replaces permanent post-load placeholders with an explicit unavailable state, and keeps Battle Resources guidance fully visible on desktop. |
 
 ## Supersession map
 
