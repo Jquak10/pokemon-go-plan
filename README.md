@@ -4,7 +4,8 @@ Pokémon GO Planner is a private, personalized raid-planning and calendar applic
 
 **Production app:** [https://pogo-plan.jquak-10.workers.dev](https://pogo-plan.jquak-10.workers.dev)
 
-**Durable architecture reference:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)  
+**Durable architecture reference:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
 **Architecture decisions and implementation history:** [docs/DECISIONS.md](docs/DECISIONS.md)
 
 The two docs above are the current architectural source of truth for future development. Historical implementation notes in this README may describe earlier rollout stages; where they conflict with a later recorded decision, follow the architecture/decisions docs and current code.
