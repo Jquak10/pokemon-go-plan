@@ -16,8 +16,9 @@ The reference order for future work is:
 1. Newest main branch code, schema, migrations, tests, and wrangler.jsonc.
 2. This architecture document for current system intent and invariants.
 3. docs/DECISIONS.md for historical reasoning and superseded choices.
-4. README.md for user and development guidance.
-5. Merged PRs for detailed implementation history.
+4. docs/BACKLOG.md for confirmed unshipped work and verified technical debt.
+5. README.md for user and development guidance.
+6. Merged PRs for detailed implementation history.
 
 ## 1. Product purpose
 
@@ -186,7 +187,9 @@ Keep pure, testable domain logic in these modules where practical. src/index.js 
 
 ## 7. Data model
 
-schema.sql is the fresh-database source of truth. Existing production databases are evolved by additive migrations.
+schema.sql is intended to be the fresh-database baseline. Existing production databases are evolved by additive migrations.
+
+Known completeness gap: current Worker code uses `event_suppression_rules` and `remote_raid_daily_budget_overrides`, but as of 18 September 2026 neither table is defined in `schema.sql` or the checked-in migrations `0001`–`0003`. This is tracked in `docs/BACKLOG.md` as BL-001. Do not guess their definitions or create an unreviewed migration; verify the production D1 shape first.
 
 Core tables in the current schema include:
 
@@ -826,7 +829,8 @@ Every feature, improvement, bug fix, refactor, migration, maintenance change, an
 - `docs/DECISIONS.md` is the **durable decision and change history**. Every product improvement and bug fix must receive a compact PR-lineage entry. Add or revise an ADR when rationale, tradeoffs, or a durable architectural/product decision changes or supersedes an older choice.
 - `README.md` is the **user/developer/operator guide**. Update it when features, visible behavior, setup, usage, migrations, deployment steps, or normal development workflow change.
 - `AGENTS.md` is the **automation and release policy**. Update it when development, validation, documentation, PR, or release workflow changes.
+- `docs/BACKLOG.md` is the **durable unshipped-work record**. Update it when confirmed future work, verified technical debt, or deferred/not-planned status changes. Remove shipped items from Active/Deferred and rely on `docs/DECISIONS.md` for the shipped history.
 
-Not every fix requires a new ADR, and unrelated docs should not be churned. However, product improvements and bug fixes are always logged in the DECISIONS.md PR lineage so the repository can reconstruct its evolution without old chats.
+Not every fix requires a new ADR, and unrelated docs should not be churned. However, product improvements and bug fixes are always logged in the DECISIONS.md PR lineage so the repository can reconstruct its evolution without old chats. Unshipped commitments must likewise be captured in BACKLOG.md if they need to survive chat cleanup.
 
 Because a PR number does not exist until the PR is opened, the development workflow may add the final PR-lineage entry as a small follow-up commit on the same branch. The PR is not considered ready to merge until that entry and any other relevant documentation are current.
