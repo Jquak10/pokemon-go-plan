@@ -637,7 +637,7 @@ Rules:
 - deterministic mocked Planner/catalog payloads are preferred for layout regression tests so upstream availability does not make UI checks flaky;
 - fixture Pokémon/events represent stable regression scenarios, not claims about the current live rotation, and should change only when the encoded product contract intentionally changes;
 - browser context fixes locale/timezone and reduces motion where practical to limit environment-driven timing/layout variance;
-- upstream/live contract validation remains a separate check.
+- upstream/live contract validation remains a separate check and does not gate pull requests; it runs on main pushes, schedules, and manual invocations so external outages/drift cannot create false-negative PR regressions.
 
 The initial browser coverage freezes the regressions that prompted PR #36: intermediate-desktop text visibility, asynchronous Dynamax battle-intel rendering, mobile modal containment/background locking, and horizontal overflow.
 
