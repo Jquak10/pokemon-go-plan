@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Battle Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=36">
+  <link rel="stylesheet" href="/styles.css?v=37">
 </head>
 
 <body class="manage-page">
@@ -4274,10 +4274,20 @@ function raidIntelForRecommendation(rec) {
     return null;
   }
 
+  const bossName =
+    rec.boss_name ||
+    rec.pokemon_name;
+
   const boss =
     catalogEntryByName(
-      rec.boss_name ||
-      rec.pokemon_name
+      bossName
+    ) ||
+    (
+      rec.battle_system === "max"
+        ? raidEncounterEntry(
+            bossName
+          )
+        : null
     ) ||
     catalogEntryByName(
       rec.pokemon_name
@@ -4363,9 +4373,9 @@ function raidIntelHtml(rec) {
     );
 
   if (!intel) {
-    return pokemonCatalogPromise
+    return !pokemonCatalog
       ? `<div class="raid-intel-loading">Loading battle intel…</div>`
-      : "";
+      : `<div class="raid-intel-unavailable">Battle intel unavailable for this form.</div>`;
   }
 
   const weaknessPills =

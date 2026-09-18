@@ -121,7 +121,7 @@ The **Raid Plan** tab combines today's limits, activity, recommendations, and fu
 - **Today's planning capacity** divides capacity into **Used**, **Recommended**, and **Left unused**. Unused capacity is intentional when available bosses do not meet the configured value threshold.
 - **Paid Raid Budget Forecast** previews recommended paid-raid budgets for the next seven days and recalculates as targets or progress change.
 - **Today's Raid Activity** separates Remote, Local, and total logged raids.
-- **What to raid now** displays current raid recommendations. Each card can include its score and label, Remote Raid allocation, source, weaknesses, 100% IV encounter CP, battle details, type-specific PvE attacker ranking, optimal fast + charged move pairing, and a **Why?** explanation.
+- **What to battle now** displays current Raid and Max Battle recommendations. Cards can include score/priority, shared Remote allocation, source, weaknesses, battle details, and a **Why?** explanation. Max weakness/resistance guidance resolves through the underlying exact species/form; Raid-only 100% IV encounter CP and Raid attacker rankings remain Raid-specific.
 - The first recommendations appear directly; **More raid recommendations** expands the rest. **Bosses receiving 0 Remote Raids** explains exclusions from paid allocation.
 
 Recommendations combine current event availability with PvE, PvP, rarity/collection, and Mega utility inputs, plus personal targets and saved preference weights. A high recommendation score is evidence for consideration, not an instruction to spend a pass. The allocation badge is specifically for Remote Raids; Local raids are logged and counted separately.
