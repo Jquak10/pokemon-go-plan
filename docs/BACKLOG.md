@@ -89,6 +89,6 @@ The Max Battle work that was discussed in the long-running project conversation 
 
 BL-001 was resolved after the production D1 definitions for `event_suppression_rules` and `remote_raid_daily_budget_overrides` were inspected directly and reconciled into the repository schema, migration path, and regression coverage.
 
-A follow-up repository audit on 18 September 2026 identified the active improvement items listed above. Automated browser regression coverage and broad PR CI were implemented immediately in the same workstream and therefore no longer remain in Active; their shipped history belongs in `docs/DECISIONS.md` once that PR merges.
+A follow-up repository audit on 18 September 2026 identified the improvement work tracked here. Automated browser regression coverage and broad PR CI shipped in PR #36, and failure-safe Pokémon catalog loading shipped in PR #37; completed items are removed from Active and retained in `docs/DECISIONS.md` instead.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
