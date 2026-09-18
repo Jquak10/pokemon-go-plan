@@ -27,29 +27,7 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-001 — Reconcile fresh-database schema completeness
-
-**Status:** Active maintenance debt  
-**Area:** D1 schema / reproducible environments
-
-Current `src/index.js` uses these operational tables:
-
-- `event_suppression_rules`
-- `remote_raid_daily_budget_overrides`
-
-As of 18 September 2026, neither table is defined in `schema.sql` and neither is created by the checked-in migrations `0001`–`0003`.
-
-This means the repository's fresh-database baseline is not yet sufficient to reconstruct every table the current Worker expects.
-
-**Required resolution:**
-
-- inspect the actual production D1 definitions for both tables before writing migration SQL;
-- reconcile `schema.sql` with the verified production shape;
-- add an appropriate migration only if existing installations need one;
-- add regression/setup coverage so a fresh supported database contains all Worker-required tables;
-- preserve existing production data and behavior.
-
-Do **not** guess the table definitions or apply an unreviewed migration.
+No confirmed active backlog items are currently recorded.
 
 ## Deferred
 
@@ -75,9 +53,8 @@ Revisit only if the user explicitly asks for owned-team/readiness tracking and t
 
 The Max Battle work that was discussed in the long-running project conversation has already been implemented and durably recorded through the merged Max-related PRs and the architecture/decision documents.
 
-The remaining durable items identified from the available project conversation context and current repository audit are captured above:
+BL-001 was resolved after the production D1 definitions for `event_suppression_rules` and `remote_raid_daily_budget_overrides` were inspected directly and reconciled into the repository schema, migration path, and regression coverage.
 
-- one verified active schema-completeness maintenance item;
-- one explicitly non-planned Max-team tracking idea.
+The remaining durable item identified from the available project conversation context and current repository audit is the explicitly non-planned Max-team tracking idea above.
 
 No other confirmed unimplemented commitment was identified during this audit. Future work should not infer requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
