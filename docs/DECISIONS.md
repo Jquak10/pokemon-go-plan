@@ -619,6 +619,26 @@ Rules:
 
 This separates present architecture, shipped history, and future work cleanly enough that old project chats can be removed without making them the only copy of important project knowledge.
 
+## ADR-040 — Require self-starting real-browser regression coverage for UI work
+
+Status: Current  
+Introduced in PR #36.
+
+Source/VM assertions remain useful for deterministic contracts, but they cannot prove that responsive CSS actually fits, that text is not visually clipped, or that modal/sheet geometry remains usable in a real browser.
+
+The repository therefore keeps a real Chromium regression suite for representative Planner behavior.
+
+Rules:
+
+- the browser test starts and stops its own deterministic local fixture server;
+- the user is never required to launch Wrangler or another development server for browser-test CI;
+- every pull request and every push to `main` runs the broad Planner regression workflow;
+- UI/responsive work must keep the `browser-ui` job green;
+- deterministic mocked Planner/catalog payloads are preferred for layout regression tests so upstream availability does not make UI checks flaky;
+- upstream/live contract validation remains a separate check.
+
+The initial browser coverage freezes the regressions that prompted PR #36: intermediate-desktop text visibility, asynchronous Dynamax battle-intel rendering, mobile modal containment/background locking, and horizontal overflow.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -660,6 +680,7 @@ The following sequence is retained as a compact repository implementation/change
 | #33 | Durable backlog and chat-cleanup context | Added docs/BACKLOG.md, recorded the schema-completeness debt and non-planned Max-team idea, and made backlog maintenance part of the normal workflow. |
 | #34 | D1 schema baseline reconciliation | Verified the two missing operational table/index definitions against production D1, reconciled the fresh schema, added idempotent migration 0004 and regression coverage, and closed BL-001 without changing current production data. |
 | #35 | Max battle intel + desktop text visibility | Resolves Max weakness/resistance intel through the underlying exact form, replaces permanent post-load placeholders with an explicit unavailable state, and keeps Battle Resources guidance fully visible on desktop. |
+| #36 | Automated browser regressions + broad Planner CI | Added self-starting Chromium responsive tests, made Planner regression CI run on every PR/main push, broadened JavaScript syntax coverage, and moved the remaining audit improvements into the durable backlog. |
 
 ## Supersession map
 
