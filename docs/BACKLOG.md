@@ -27,12 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-002 — Unify Battle Plan scoring and priority presentation
-
-The shared Battle Plan currently exposes the generic recommendation score/label on cards, Today, and Quick Status while Max Remote allocation uses a separate Max-aware planning value.
-
-Unify the user-facing priority model so every current opportunity exposes a canonical planning score/label and rationale. Raid and Max Battles may still use system-specific calculation methods, but cards, Today, Quick Status, allocation, and future planning must present one coherent result.
-
 ### BL-006 — Build a true shared Raid + Max future Battle forecast
 
 The seven-day budget forecast grew out of the Remote Raid planner. The shared resource planner can compare current Raid and Max opportunities, but future opportunity selection still depends on the older forecast representation.
