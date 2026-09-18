@@ -20,6 +20,10 @@ ADVICE_DETAIL = (
     "This guidance must remain fully readable on intermediate desktop widths instead of being clipped."
 )
 
+# This is deliberately a stable historical regression fixture, not a model of
+# the live Max Battle rotation. Rhyhorn can leave the live rotation without
+# invalidating this test: the contract under test is form resolution and UI
+# rendering for an ordinary Dynamax species.
 MOCK_STATE = {
     "user": {
         "timezone": "Asia/Singapore",
@@ -49,9 +53,9 @@ MOCK_STATE = {
             },
             "sprite_exact_form": True,
             "sprite_url": None,
-            "source_label": "Weekly Max rotation",
+            "source_label": "Regression fixture",
             "source_kind": "derived",
-            "event_title": "[MR] DYNAMAX RHYHORN IN MAX BATTLES",
+            "event_title": "[TEST] DYNAMAX RHYHORN REGRESSION FIXTURE",
             "event_description": "",
             "max_particle_cost": None,
             "logging_remote_eligible": False,
@@ -179,7 +183,7 @@ MOCK_STATE = {
                 "battle_system": "max",
                 "battle_variant": "dynamax",
                 "source_kind": "derived",
-                "source_label": "Weekly Max rotation",
+                "source_label": "Regression fixture",
                 "sprite_url": None,
             }
         ],
@@ -287,7 +291,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         cls.server_thread.join(timeout=2)
 
     def open_planner(self, width: int, height: int):
-        context = self.browser.new_context(viewport={"width": width, "height": height})
+        context = self.browser.new_context(\n            viewport={"width": width, "height": height},\n            locale="en-US",\n            timezone_id="Asia/Singapore",\n            reduced_motion="reduce",\n        )
         self.addCleanup(context.close)
         page = context.new_page()
         page.goto(f"{self.base_url}/manage/browser-test-token", wait_until="domcontentloaded")
