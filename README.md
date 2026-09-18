@@ -575,6 +575,22 @@ Smoke-test checklist:
 
 The repository does not currently include a script that initializes the local D1 schema automatically. Planner creation, management APIs, and other D1-backed behavior require separate manual local D1 setup using `schema.sql`; runtime-secret and external-source behavior may also differ from production. Stop Wrangler with `Ctrl+C`.
 
+### Automated regression checks
+
+Every pull request and every push to `main` runs the Planner regression workflow. It runs the deterministic Node regression suite across the application and a real Chromium browser suite for responsive Planner behavior. The browser job installs Chromium in CI and the test itself starts and stops its own local fixture server, so **you do not need to start Wrangler or any other server for browser tests**.
+
+The browser suite currently protects intermediate-desktop text visibility, asynchronous Dynamax battle-intel rendering, mobile modal containment, and horizontal-overflow regressions.
+
+For an optional local browser run, install Playwright once in the Dev Container and then run the test directly:
+
+```bash
+python -m pip install "playwright==1.55.0"
+python -m playwright install chromium
+python tests/browser_ui_test.py
+```
+
+The test command starts its fixture server automatically and shuts it down when finished. GitHub Actions performs the Playwright installation automatically, so routine PR validation requires no manual browser-test setup from the user.
+
 ## Daily development workflow
 
 Once setup is complete:
