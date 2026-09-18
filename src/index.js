@@ -3013,15 +3013,54 @@ export async function recommendationsForDate(
           battleMetadata
         );
 
+      const officialSource =
+        isOfficialSupplementEvent(event);
+
+      const sourceKind =
+        officialSource
+          ? "official"
+          : event.source_type === MAX_ROTATION_SOURCE_TYPE
+            ? "derived"
+            : "calendar";
+
+      const eventOtherLines =
+        event.other_lines || "";
+
+      const officialMaxCostEvidence =
+        /(?:^|\n)X-POGO-MAX-EVIDENCE:official(?:\n|$)/i.test(
+          eventOtherLines
+        );
+
+      const maxCostEvidenceUrl =
+        eventOtherLines.match(
+          /(?:^|\n)X-POGO-MAX-EVIDENCE-URL:([^\n]+)/i
+        )?.[1]?.trim() ||
+        (
+          officialSource
+            ? event.source_url || null
+            : null
+        );
+
       const maxParticleCost =
         inferMaxParticleCost({
           ...battleMetadata,
           pokemon_name:
             match.name,
+          source_kind:
+            sourceKind,
+          source_uid:
+            event.source_uid || null,
+          source_url:
+            event.source_url || null,
+          max_particle_cost_official:
+            officialSource ||
+            officialMaxCostEvidence,
           event_title:
             event.summary,
           event_description:
-            event.description || ""
+            event.description || "",
+          event_other_lines:
+            eventOtherLines
         });
 
       const key = [
@@ -3031,9 +3070,6 @@ export async function recommendationsForDate(
       ].join("|");
 
       const existing = map.get(key);
-
-      const officialSource =
-        isOfficialSupplementEvent(event);
 
       const occurrence =
         withPlanningPriority({
@@ -3046,6 +3082,14 @@ export async function recommendationsForDate(
         max_particle_cost_source:
           maxParticleCost.basis,
         max_particle_cost_confidence: maxParticleCost.confidence,
+        max_battle_tier:
+          maxParticleCost.tier,
+        max_battle_tier_source:
+          maxParticleCost.tier_source,
+        max_particle_cost_evidence_source:
+          maxParticleCost.evidence_source,
+        max_particle_cost_evidence_url:
+          maxCostEvidenceUrl,
         logging_remote_eligible: battleMetadata?.battle_system === "max"
           ? maxBattleRemotePassEligible({ ...battleMetadata, event_description: event.description, event_title: event.summary })
           : remoteEligible && !/(?:local|in[- ]person)[ -]?only|cannot be joined remotely/i.test(event.description || ""),
@@ -3059,11 +3103,7 @@ export async function recommendationsForDate(
         source_type: event.source_type,
         source_url: event.source_url || null,
         source_kind:
-          officialSource
-            ? "official"
-            : event.source_type === MAX_ROTATION_SOURCE_TYPE
-              ? "derived"
-              : "calendar",
+          sourceKind,
         source_label:
           officialSource
             ? "Official Pokémon GO"
