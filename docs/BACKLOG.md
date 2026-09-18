@@ -39,18 +39,6 @@ The Battle Plan now resolves ordinary Max battle intel through the underlying ex
 
 Add explicit catalog loading/ready/error state, rerender recommendations on failure, expose a useful unavailable/retry state, and preserve a safe last-known-good catalog where practical. Catalog failure must never leave battle cards apparently loading forever.
 
-### BL-004 — Add automated real-browser responsive regression tests
-
-Add real-browser coverage for Planner UI behavior that source/VM assertions cannot validate, including desktop and mobile layout, horizontal overflow, action visibility, modal/sheet scrolling, full Battle Resources guidance text, and asynchronous Max battle-intel rendering.
-
-The suite must be self-starting: running the test command or CI job starts any required local fixture server/browser process automatically. The user must not need to launch a development server manually.
-
-### BL-005 — Broaden pull-request CI coverage
-
-The current regression workflow is still scoped around historical Raid-ranking paths and can miss changes in other battle/resource/domain modules.
-
-Run deterministic regression coverage for the complete application change surface, including `src/**`, `public/**`, `tests/**`, `migrations/**`, `schema.sql`, package files, and relevant workflow changes. Automated browser tests should be a required CI job for applicable UI changes.
-
 ### BL-006 — Build a true shared Raid + Max future Battle forecast
 
 The seven-day budget forecast grew out of the Remote Raid planner. The shared resource planner can compare current Raid and Max opportunities, but future opportunity selection still depends on the older forecast representation.
