@@ -357,6 +357,52 @@ assert.equal(
   "verified_tier_standard_cost"
 );
 
+const mixedTierEvidence =
+  officialMaxBattleSupplementsFromText(
+    [
+      "Dynamax Example Max Battle Day",
+      "Saturday, October 10, 2026",
+      "Featured Pokémon",
+      "The following Pokémon will appear in one-star Max Battles!",
+      "Dynamax Wooloo",
+      "The following Pokémon will appear in three-star Max Battles!",
+      "Dynamax Beldum",
+      "Event Bonuses"
+    ].join("\n"),
+    "https://pokemongo.com/news/mixed-tier-example"
+  );
+
+assert.deepEqual(
+  mixedTierEvidence.map(
+    item => ({
+      pokemon_name:
+        item.pokemon_name,
+      max_battle_tier:
+        item.max_battle_tier,
+      max_particle_cost:
+        item.max_particle_cost
+    })
+  ),
+  [
+    {
+      pokemon_name:
+        "Dynamax Wooloo",
+      max_battle_tier:
+        1,
+      max_particle_cost:
+        250
+    },
+    {
+      pokemon_name:
+        "Dynamax Beldum",
+      max_battle_tier:
+        3,
+      max_particle_cost:
+        400
+    }
+  ]
+);
+
 // Store-bundle MP text is not battle entry-cost evidence, and species identity
 // alone must not create a cost.
 assert.deepEqual(
