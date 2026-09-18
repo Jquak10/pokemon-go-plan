@@ -762,7 +762,7 @@ There is also a live upstream contract test for Pokémon GO API/GameMaster-relat
 
 A real-browser regression suite runs in Chromium for UI behavior that source inspection and VM execution cannot validate reliably. The browser fixture is self-contained: the test starts and stops its own local HTTP fixture server and uses deterministic mocked Planner/catalog responses. Regression fixtures are intentionally independent of the live event rotation: a historical species/form such as Dynamax Rhyhorn remains valid test data after it leaves live Max Battles because the contract being tested is form resolution/rendering, not current availability. Current coverage includes intermediate desktop text visibility, asynchronous Max battle-intel rendering, mobile modal containment/background locking, and horizontal page overflow.
 
-GitHub Actions runs deterministic regression checks and the browser suite automatically for every pull request and every push to `main`; no manual development server is required for the browser job. The scheduled workflow keeps the upstream live-contract check while the browser job is reserved for PR/push/manual workflow runs.
+GitHub Actions runs deterministic regression checks and the browser suite automatically for every pull request and every push to `main`; no manual development server is required for the browser job. The upstream live-contract check does not gate pull requests because it depends on external availability and schema drift; it still runs on `main` pushes, schedules, and manual workflow runs. This keeps PR regression status deterministic while preserving early warning for upstream changes.
 
 Tests are deliberately used to freeze previously discovered regressions such as:
 
