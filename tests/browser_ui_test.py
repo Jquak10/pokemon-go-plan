@@ -291,7 +291,12 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         cls.server_thread.join(timeout=2)
 
     def open_planner(self, width: int, height: int):
-        context = self.browser.new_context(\n            viewport={"width": width, "height": height},\n            locale="en-US",\n            timezone_id="Asia/Singapore",\n            reduced_motion="reduce",\n        )
+        context = self.browser.new_context(
+            viewport={"width": width, "height": height},
+            locale="en-US",
+            timezone_id="Asia/Singapore",
+            reduced_motion="reduce",
+        )
         self.addCleanup(context.close)
         page = context.new_page()
         page.goto(f"{self.base_url}/manage/browser-test-token", wait_until="domcontentloaded")
