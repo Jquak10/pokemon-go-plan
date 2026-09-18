@@ -4,11 +4,11 @@ Pokémon GO Planner is a private, personalized raid-planning and calendar applic
 
 **Production app:** [https://pogo-plan.jquak-10.workers.dev](https://pogo-plan.jquak-10.workers.dev)
 
-**Engineering references:** [Current architecture](docs/ARCHITECTURE.md) · [Architecture decisions and supersession history](docs/DECISIONS.md)
+**Engineering references:** [Current architecture](docs/ARCHITECTURE.md) · [Architecture decisions and supersession history](docs/DECISIONS.md) · [Unshipped backlog](docs/BACKLOG.md)
 
-The engineering references above are the durable source for current architecture and design history. Some Part-by-Part notes below intentionally describe the state at that implementation stage; when a later decision superseded an earlier one, docs/DECISIONS.md records the replacement.
+The engineering references above are the durable source for current architecture, design history, and confirmed unshipped work. Some Part-by-Part notes below intentionally describe the state at that implementation stage; when a later decision superseded an earlier one, docs/DECISIONS.md records the replacement. Future ideas or known technical debt that have not shipped belong in docs/BACKLOG.md rather than relying on project chat history.
 
-**Change logging policy:** every product improvement and bug fix is recorded in the PR lineage in [docs/DECISIONS.md](docs/DECISIONS.md). Changes to current system behavior or invariants also update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); user/developer-facing behavior updates this README; development automation/policy updates [AGENTS.md](AGENTS.md). Documentation is maintained in the same PR as the change rather than reconstructed from chat history later.
+**Change logging policy:** every product improvement and bug fix is recorded in the PR lineage in [docs/DECISIONS.md](docs/DECISIONS.md). Changes to current system behavior or invariants also update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); confirmed unshipped work and technical debt update [docs/BACKLOG.md](docs/BACKLOG.md); user/developer-facing behavior updates this README; development automation/policy updates [AGENTS.md](AGENTS.md). Documentation is maintained in the same PR as the change rather than reconstructed from chat history later.
 
 Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner.
 
