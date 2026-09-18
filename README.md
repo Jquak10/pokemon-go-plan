@@ -579,7 +579,7 @@ The repository does not currently include a script that initializes the local D1
 
 Every pull request and every push to `main` runs the Planner regression workflow. It runs the deterministic Node regression suite across the application and a real Chromium browser suite for responsive Planner behavior. The browser job installs Chromium in CI and the test itself starts and stops its own local fixture server, so **you do not need to start Wrangler or any other server for browser tests**.
 
-The browser suite currently protects intermediate-desktop text visibility, asynchronous Dynamax battle-intel rendering, mobile modal containment, and horizontal-overflow regressions.
+The browser suite currently protects intermediate-desktop text visibility, asynchronous Dynamax battle-intel rendering, mobile modal containment, and horizontal-overflow regressions. Its Pokémon/event records are fixed regression fixtures rather than live schedule data, so a Pokémon leaving the current Raid/Max rotation does not make the test stale or flaky.
 
 For an optional local browser run, install Playwright once in the Dev Container and then run the test directly:
 
