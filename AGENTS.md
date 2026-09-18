@@ -37,6 +37,15 @@ Always work from the newest repository contents.
 
 Never use an older generated ZIP, patch, copied file, or stale implementation as source of truth when newer GitHub code exists.
 
+Before architectural or product-behavior work, read:
+
+- docs/ARCHITECTURE.md for the current system architecture, invariants, data model, battle/resource semantics, event precedence, UI architecture, and development guardrails.
+- docs/DECISIONS.md for the historical decision record, superseded choices, and PR lineage.
+
+If older README text, PR text, or chat history conflicts with current architecture, follow newest main first, then docs/ARCHITECTURE.md. Use docs/DECISIONS.md to understand why a previous design was replaced.
+
+When a change materially alters architecture or supersedes a recorded decision, update the relevant documentation in the same PR.
+
 ## Implementation rules
 
 Make the smallest safe change that satisfies the request.
