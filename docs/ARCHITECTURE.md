@@ -1,7 +1,7 @@
 # Pokémon GO Planner — Architecture
 
 Last consolidated: 18 September 2026  
-Architecture baseline: main through PR #29
+Architecture baseline: newest merged repository state; detailed change history is maintained in docs/DECISIONS.md
 
 This document is the durable technical reference for the current Pokémon GO Planner. It exists so future work can start from the repository rather than from old chat history.
 
@@ -9,7 +9,7 @@ This document is the durable technical reference for the current Pokémon GO Pla
 
 Use this file for the current intended architecture. Use DECISIONS.md for the history and reasoning behind that architecture.
 
-If documentation and executable behavior disagree, the newest code, schema, migrations, tests, and deployment configuration on main are the final source of truth. Update this document whenever a change materially alters the architecture.
+If documentation and executable behavior disagree, the newest code, schema, migrations, tests, and deployment configuration on main are the final source of truth. Every change receives a documentation-impact assessment. Update this document in the same PR whenever current behavior, invariants, data flow, persistence, battle/resource semantics, event precedence, security, operations, or UI architecture changes, including bug fixes that clarify an invariant future work must preserve.
 
 The reference order for future work is:
 
@@ -816,21 +816,17 @@ The Planner should not:
 - Delete underlying meta when an event is suppressed.
 - Rewrite existing Target IDs or historical log identity merely to normalize newer semantics.
 
-## 30. Updating this architecture
+## 30. Documentation maintenance and change logging
 
-Any PR that changes one of the following should update this document in the same PR:
+Documentation maintenance is a repository invariant, not optional cleanup after implementation.
 
-- Production topology or bindings.
-- Database model/migrations.
-- Battle-system model.
-- Source precedence.
-- Remote-limit semantics.
-- Resource planning.
-- Logging/Undo.
-- Target identity.
-- Ranking methodology.
-- Calendar/ICS behavior.
-- Mobile/desktop navigation architecture.
-- Security/capability-link model.
+Every feature, improvement, bug fix, refactor, migration, maintenance change, and workflow change must receive a documentation-impact assessment in the same branch/PR. The durable files have distinct roles:
 
-When a decision changes rather than merely extends the architecture, also add or update the corresponding record in DECISIONS.md.
+- `docs/ARCHITECTURE.md` describes **current intended system behavior and invariants**. Update it when a change affects production topology/bindings, database model/migrations, APIs/data flow, battle-system modeling, source precedence, Remote-limit semantics, resource planning, logging/Undo, Target identity, ranking methodology, calendar/ICS behavior, security, operations, or mobile/desktop architecture. A bug fix should also update this document when it reveals or clarifies an invariant future work must preserve.
+- `docs/DECISIONS.md` is the **durable decision and change history**. Every product improvement and bug fix must receive a compact PR-lineage entry. Add or revise an ADR when rationale, tradeoffs, or a durable architectural/product decision changes or supersedes an older choice.
+- `README.md` is the **user/developer/operator guide**. Update it when features, visible behavior, setup, usage, migrations, deployment steps, or normal development workflow change.
+- `AGENTS.md` is the **automation and release policy**. Update it when development, validation, documentation, PR, or release workflow changes.
+
+Not every fix requires a new ADR, and unrelated docs should not be churned. However, product improvements and bug fixes are always logged in the DECISIONS.md PR lineage so the repository can reconstruct its evolution without old chats.
+
+Because a PR number does not exist until the PR is opened, the development workflow may add the final PR-lineage entry as a small follow-up commit on the same branch. The PR is not considered ready to merge until that entry and any other relevant documentation are current.

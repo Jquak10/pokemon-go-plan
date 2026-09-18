@@ -1,7 +1,7 @@
 # Pokémon GO Planner — Architecture Decision Record
 
 Last consolidated: 18 September 2026  
-Decision history covered: project inception through PR #29
+Decision/change history covered: project inception through PR #32
 
 This file records why the Planner looks the way it does. It is intentionally historical: some early decisions were later superseded as Pokémon GO rules became clearer or the product matured.
 
@@ -573,13 +573,34 @@ The repository now carries:
 - docs/ARCHITECTURE.md — current architecture/invariants.
 - docs/DECISIONS.md — historical decisions and supersessions.
 
-Future architectural changes should update these files in the same PR.
+Future work must perform a documentation-impact assessment in the same PR. All product improvements and bug fixes are recorded in the PR lineage below; architecture and README updates are added when the change affects their respective current-behavior or user/developer guidance scopes.
 
-AGENTS.md points future development work at these documents before implementation begins.
+AGENTS.md points future development work at these documents before implementation begins and makes the documentation-impact assessment part of the normal definition of done.
+
+## ADR-038 — Require documentation impact assessment for every change
+
+Status: Current  
+Introduced in PR #32 after the PR #31 documentation consolidation.
+
+The repository must not depend on a maintainer remembering to reconstruct changes from old chats.
+
+For every feature, improvement, bug fix, refactor, migration, maintenance change, or workflow change, the implementation workflow assesses documentation impact and updates the relevant durable files in the same PR.
+
+Rules:
+
+- Every product improvement and bug fix gets a compact entry in the PR lineage in this file.
+- Current architecture/invariant changes update `docs/ARCHITECTURE.md`.
+- User/developer/operator-facing changes update `README.md`.
+- Development automation/release-policy changes update `AGENTS.md`.
+- New or superseded durable decisions add or revise an ADR.
+- Routine regression fixes do not need a new ADR when they simply restore an existing invariant, but they still require the PR-lineage entry and appropriate regression coverage.
+- Unrelated documentation should not be changed merely for checklist compliance.
+
+Because the PR number is only known after opening a PR, adding the final lineage row as a follow-up commit on the same branch is an accepted and expected workflow step.
 
 ## PR lineage
 
-The following sequence is retained as a compact implementation history.
+The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
 
 | PR | Purpose | Architectural significance |
 | --- | --- | --- |
@@ -612,6 +633,9 @@ The following sequence is retained as a compact implementation history.
 | #27 | Shared Remote daily limit + MP dropdown | Unified official Remote cap across Raid/Max and added tier cost control. |
 | #28 | Part 8 UX/regression hardening | Stabilized shared Battle Plan UX/accessibility and removed stale cap wording. |
 | #29 | Timezone-aware Remote limit windows | Added exact timestamp/timezone override evaluation. |
+| #30 | Architecture/decision documentation draft | Closed without merge; superseded by #31, so it introduced no change to main. |
+| #31 | Durable architecture and decision history | Added repository-level architecture/ADR references, linked them from README/AGENTS, and consolidated history through #29. |
+| #32 | Mandatory documentation impact assessment | Requires every product improvement/bug fix to be logged and routes architecture, README, and workflow updates by impact. |
 
 ## Supersession map
 
@@ -626,9 +650,11 @@ Important historical replacements:
 
 When reading older PR text or README sections, always apply this supersession map before assuming an earlier statement is still current.
 
-## Future decision discipline
+## Future decision and change-log discipline
 
-Create or update an ADR entry when a change affects:
+Every product improvement and bug fix must be represented in the PR lineage above. This is the minimum durable record even when no architectural decision changes.
+
+Create or update an ADR entry when a change affects or supersedes durable decisions involving:
 
 - battle-system boundaries;
 - resource ownership/accounting;
@@ -640,6 +666,9 @@ Create or update an ADR entry when a change affects:
 - recommendation methodology;
 - ranking methodology;
 - calendar/ICS semantics;
-- major mobile/desktop navigation.
+- major mobile/desktop navigation;
+- development/documentation/release governance.
 
-A routine bug fix that restores an existing invariant usually needs only an architecture clarification and regression test, not a new ADR.
+A routine bug fix that restores an existing invariant usually needs a PR-lineage entry, focused regression coverage, and—when the invariant was previously unclear—an architecture clarification. It does not need a new ADR unless the underlying decision or rationale changed.
+
+README and ARCHITECTURE updates are selected by impact rather than mechanically: update README for user/developer/operator-facing changes and ARCHITECTURE for current-system/invariant changes. AGENTS.md owns the mandatory assessment and PR workflow.

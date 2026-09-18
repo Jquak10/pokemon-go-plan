@@ -8,6 +8,8 @@ Pokémon GO Planner is a private, personalized raid-planning and calendar applic
 
 The engineering references above are the durable source for current architecture and design history. Some Part-by-Part notes below intentionally describe the state at that implementation stage; when a later decision superseded an earlier one, docs/DECISIONS.md records the replacement.
 
+**Change logging policy:** every product improvement and bug fix is recorded in the PR lineage in [docs/DECISIONS.md](docs/DECISIONS.md). Changes to current system behavior or invariants also update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); user/developer-facing behavior updates this README; development automation/policy updates [AGENTS.md](AGENTS.md). Documentation is maintained in the same PR as the change rather than reconstructed from chat history later.
+
 Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner.
 
 ## What the app does
@@ -575,7 +577,7 @@ Example:
 Fix the mobile Targets filter drawer so its actions are never blocked by the bottom navigation.
 ```
 
-For a normal change, `AGENTS.md` tells Codex to sync latest `main`, check the tree, create a feature branch, implement, validate, commit, push, create a PR, check it, and stop before merge. The user normally only reviews the result.
+For a normal change, `AGENTS.md` tells Codex to sync latest `main`, check the tree, create a feature branch, assess documentation impact, implement, update the relevant durable docs, validate, commit, push, create a PR, add the PR to the decision/change lineage when required, check it, and stop before merge. The user normally only reviews the result.
 
 Explicitly authorize merge and cleanup with:
 
