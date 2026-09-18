@@ -43,6 +43,7 @@ jobs:
         run: python tests/browser_ui_test.py
 
   live-contract:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
