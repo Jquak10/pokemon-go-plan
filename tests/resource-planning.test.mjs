@@ -5,6 +5,7 @@ import {
   STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
   buildBattleResourcePlan,
   inferMaxParticleCost,
+  maxBattleTierFromText,
   maxBattleRemotePassEligible,
   maxParticleAvailability,
   normalizeBattleResourceState
@@ -21,6 +22,25 @@ assert.deepEqual(MAX_PARTICLE_COST_BY_TIER, {
   6: 800
 });
 
+assert.equal(
+  maxBattleTierFromText(
+    "The following Pokémon will appear in six-star Max Battles!"
+  ),
+  6
+);
+assert.equal(
+  maxBattleTierFromText(
+    "Difficulty: 3"
+  ),
+  3
+);
+assert.equal(
+  maxBattleTierFromText(
+    "Tier two Max Battle"
+  ),
+  2
+);
+
 assert.deepEqual(
   inferMaxParticleCost({
     battle_system: "max",
@@ -28,34 +48,68 @@ assert.deepEqual(
   }),
   {
     cost: 400,
-    basis: "tier_3",
-    confidence: "standard_tier_cost"
+    basis: "standard_tier_3",
+    confidence: "verified_tier_standard_cost",
+    tier: 3,
+    tier_source: "event_text",
+    evidence_source: "event"
   }
 );
 
 assert.deepEqual(
+  inferMaxParticleCost({
+    battle_system: "max",
+    source_kind: "official",
+    event_title:
+      "Gigantamax Cinderace Max Battle Day",
+    event_description:
+      "The following Pokémon will appear in six-star Max Battles!"
+  }),
+  {
+    cost: 800,
+    basis: "standard_tier_6",
+    confidence: "verified_tier_standard_cost",
+    tier: 6,
+    tier_source: "official_text",
+    evidence_source: "official"
+  }
+);
+
+assert.deepEqual(
+  inferMaxParticleCost({
+    battle_system: "max",
+    source_kind: "official",
+    event_description:
+      "Each Trainer must use an entry cost of 250 Max Particles."
+  }),
+  {
+    cost: 250,
+    basis: "official_explicit_cost",
+    confidence: "official_explicit",
+    tier: null,
+    tier_source: null,
+    evidence_source: "official"
+  }
+);
+
+assert.equal(
+  inferMaxParticleCost({
+    battle_system: "max",
+    source_kind: "calendar",
+    event_description:
+      "This community note says the battle requires 250 Max Particles."
+  }).cost,
+  null
+);
+
+assert.equal(
   inferMaxParticleCost({
     battle_system: "max",
     battle_variant: "gigantamax",
     pokemon_name: "Gigantamax Gengar"
-  }),
-  {
-    cost: 800,
-    basis: "gigantamax_standard",
-    confidence: "standard_tier_cost"
-  }
-);
-
-assert.deepEqual(
-  inferMaxParticleCost({
-    battle_system: "max",
-    event_description: "This battle requires 250 Max Particles."
-  }),
-  {
-    cost: 250,
-    basis: "event_text",
-    confidence: "known"
-  }
+  }).cost,
+  null,
+  "Gigantamax identity alone must not invent an MP cost"
 );
 
 assert.equal(
@@ -131,6 +185,8 @@ const gmax = {
   battle_system: "max",
   battle_variant: "gigantamax",
   remote_pass_capable_by_source: true,
+  max_battle_tier: 6,
+  max_battle_tier_source: "official_text",
   score: 90,
   target: null
 };
