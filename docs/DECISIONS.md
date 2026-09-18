@@ -664,6 +664,30 @@ Rules:
 
 This decision unifies scoring/presentation but does not by itself replace the legacy seven-day Raid-oriented budget forecast with a fully shared Raid + Max forecast. That remains separate future work.
 
+## ADR-042 — Require verified evidence before assigning Max Particle entry cost
+
+Status: Current  
+Introduced in PR #39.
+
+Max Particle entry cost affects whether the shared resource planner can safely allocate a Remote Pass to a Max Battle. A species/form label is not sufficient evidence for an entry cost, and event-specific rules can supersede historical standard values.
+
+The Planner therefore uses evidence-driven Max cost normalization.
+
+Rules:
+
+- evidence precedence is explicit official battle-entry cost → verified Max Battle tier/difficulty → standard mapping for that verified tier → unknown;
+- current standard tier mapping is Tier 1 = 250 MP, Tier 2–3 = 400 MP, and Tier 4–6 = 800 MP;
+- Dynamax or Gigantamax identity alone never assigns an MP cost;
+- generic non-official text that merely claims an MP cost is not promoted to trusted entry-cost evidence;
+- official difficulty can be parsed from numeric or word-form tier descriptions, including forms such as `Difficulty 3`, `3★`, and `six-star`;
+- multiple tier groups in one official event page are scoped independently so one group's tier/cost cannot leak to another;
+- the existing official Pokémon GO sync may decorate an already-normalized Max calendar event with `X-POGO-MAX-*` evidence and provenance, but it must not create duplicate availability solely to carry cost metadata;
+- normalized recommendations expose Max tier, cost, confidence, evidence source, and evidence URL where available;
+- if reliable evidence is absent or cannot be matched, the cost remains unknown and automatic Remote Max allocation stays blocked;
+- the existing event/official sync cadence and D1 schema remain unchanged.
+
+This decision improves cost coverage while preserving source precedence and the conservative unknown-cost behavior established by shared resource planning.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -708,6 +732,7 @@ The following sequence is retained as a compact repository implementation/change
 | #36 | Automated browser regressions + broad Planner CI | Added self-starting Chromium responsive tests, made Planner regression CI run on every PR/main push, broadened JavaScript syntax coverage, and moved the remaining audit improvements into the durable backlog. |
 | #37 | Failure-safe Pokémon catalog loading | Added explicit catalog load states, retryable terminal failures, validated last-known-good local fallback, and browser regressions so Battle Plan intel/Hundo cannot remain stuck loading after catalog failure. |
 | #38 | Unified Battle Plan priority scoring | Made the Max-aware planning value the canonical visible Max priority, preserved the underlying recommendation score, aligned cards/Today/Quick Status/allocation/future summaries, and closed BL-002. |
+| #39 | Verified Max Particle cost evidence | Normalized official Max difficulty/cost evidence onto existing opportunities, removed species-based Gigantamax cost assumptions, preserved unknown-safe allocation, and closed BL-007. |
 
 ## Supersession map
 
