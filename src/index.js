@@ -26,7 +26,8 @@ import {
   STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
   buildBattleResourcePlan,
   inferMaxParticleCost,
-  maxBattleRemotePassEligible
+  maxBattleRemotePassEligible,
+  planningPriorityForRecommendation
 } from "./resource-planning.js";
 import {
   remoteRaidRuleApplicability
@@ -2863,6 +2864,58 @@ function recommendationFor(name, meta, target, user) {
   };
 }
 
+function withPlanningPriority(
+  recommendation
+) {
+  const recommendationScore =
+    Math.round(
+      Number(
+        recommendation
+          ?.recommendation_score ??
+        recommendation?.score ??
+        0
+      )
+    );
+
+  const priority =
+    planningPriorityForRecommendation({
+      ...recommendation,
+      recommendation_score:
+        recommendationScore
+    });
+
+  return {
+    ...recommendation,
+    recommendation_score:
+      recommendationScore,
+    score:
+      priority.score,
+    label:
+      priority.label,
+    emoji:
+      priority.emoji,
+    planning_score:
+      priority.score,
+    planning_label:
+      priority.label,
+    planning_emoji:
+      priority.emoji,
+    score_basis:
+      priority.basis,
+    planning_method_version:
+      priority.method_version,
+    max_performance_ranked:
+      priority.max_performance_ranked,
+    planning_components:
+      priority.components,
+    planning_note:
+      priority.note,
+    planning_rationale:
+      priority.rationale
+  };
+}
+
+
 export async function recommendationsForDate(
   env,
   user,
@@ -2939,9 +2992,8 @@ export async function recommendationsForDate(
           user
         );
 
-      // Part 2 keeps the existing Raid allocator unchanged. Max Battles are
-      // exposed to the Battle Plan UI now, but shared Remote Pass allocation
-      // is intentionally deferred to the resource-planning part.
+      // Battle identity must be known before the canonical planning priority
+      // is calculated because Max opportunities use a Max-specific value method.
       const remoteEligible =
         REMOTE_RAID_SOURCE_TYPES.has(
           event.source_type
@@ -2983,7 +3035,8 @@ export async function recommendationsForDate(
       const officialSource =
         isOfficialSupplementEvent(event);
 
-      const occurrence = {
+      const occurrence =
+        withPlanningPriority({
         ...rec,
         ...battleMetadata,
         battle_presentation:
@@ -3020,7 +3073,7 @@ export async function recommendationsForDate(
         start_date: event.start_date,
         end_date: event.end_date,
         remote_eligible: remoteEligible
-      };
+      });
 
       if (!existing) {
         map.set(key, occurrence);
@@ -3033,7 +3086,7 @@ export async function recommendationsForDate(
           remoteEligible
         );
 
-      if (rec.score > existing.score) {
+      if (occurrence.score > existing.score) {
         map.set(
           key,
           {
@@ -7161,6 +7214,16 @@ function recommendationCoLeaders(
         rec.label,
       emoji:
         rec.emoji,
+      recommendation_score:
+        rec.recommendation_score ??
+        rec.score,
+      planning_score:
+        rec.planning_score ??
+        rec.score,
+      score_basis:
+        rec.score_basis || null,
+      planning_rationale:
+        rec.planning_rationale || null,
       source_kind:
         rec.source_kind,
       source_label:
