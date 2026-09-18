@@ -33,12 +33,6 @@ The shared Battle Plan currently exposes the generic recommendation score/label 
 
 Unify the user-facing priority model so every current opportunity exposes a canonical planning score/label and rationale. Raid and Max Battles may still use system-specific calculation methods, but cards, Today, Quick Status, allocation, and future planning must present one coherent result.
 
-### BL-003 — Make Pokémon catalog loading failure-safe
-
-The Battle Plan now resolves ordinary Max battle intel through the underlying exact species/form after the Pokémon catalog loads, but a catalog request failure can still leave cards that were already rendering a loading placeholder without an explicit terminal state.
-
-Add explicit catalog loading/ready/error state, rerender recommendations on failure, expose a useful unavailable/retry state, and preserve a safe last-known-good catalog where practical. Catalog failure must never leave battle cards apparently loading forever.
-
 ### BL-006 — Build a true shared Raid + Max future Battle forecast
 
 The seven-day budget forecast grew out of the Remote Raid planner. The shared resource planner can compare current Raid and Max opportunities, but future opportunity selection still depends on the older forecast representation.
