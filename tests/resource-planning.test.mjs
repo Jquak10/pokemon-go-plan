@@ -40,6 +40,13 @@ assert.equal(
   ),
   2
 );
+assert.equal(
+  maxBattleTierFromText(
+    "Difficulty 3★"
+  ),
+  3
+);
+
 
 assert.deepEqual(
   inferMaxParticleCost({
@@ -71,6 +78,47 @@ assert.deepEqual(
     confidence: "verified_tier_standard_cost",
     tier: 6,
     tier_source: "official_text",
+    evidence_source: "official"
+  }
+);
+
+assert.deepEqual(
+  inferMaxParticleCost({
+    battle_system: "max",
+    source_kind: "calendar",
+    max_particle_cost_official: true,
+    event_other_lines: [
+      "X-POGO-MAX-EVIDENCE:official",
+      "X-POGO-MAX-BATTLE-TIER:6",
+      "X-POGO-MAX-EVIDENCE-URL:https://pokemongo.com/news/example"
+    ].join("\n")
+  }),
+  {
+    cost: 800,
+    basis: "standard_tier_6",
+    confidence: "verified_tier_standard_cost",
+    tier: 6,
+    tier_source: "official_text",
+    evidence_source: "official"
+  }
+);
+
+assert.deepEqual(
+  inferMaxParticleCost({
+    battle_system: "max",
+    source_kind: "calendar",
+    max_particle_cost_official: true,
+    event_other_lines: [
+      "X-POGO-MAX-EVIDENCE:official",
+      "X-POGO-MAX-PARTICLE-COST:400"
+    ].join("\n")
+  }),
+  {
+    cost: 400,
+    basis: "official_explicit_cost",
+    confidence: "official_explicit",
+    tier: null,
+    tier_source: null,
     evidence_source: "official"
   }
 );
