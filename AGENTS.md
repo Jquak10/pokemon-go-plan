@@ -41,8 +41,9 @@ Before architectural or product-behavior work, read:
 
 - docs/ARCHITECTURE.md for the current system architecture, invariants, data model, battle/resource semantics, event precedence, UI architecture, and development guardrails.
 - docs/DECISIONS.md for the historical decision record, superseded choices, and PR lineage.
+- docs/BACKLOG.md for confirmed unshipped work, verified technical debt, and explicitly deferred/not-planned ideas.
 
-If older README text, PR text, or chat history conflicts with current architecture, follow newest main first, then docs/ARCHITECTURE.md. Use docs/DECISIONS.md to understand why a previous design was replaced.
+If older README text, PR text, backlog text, or chat history conflicts with current architecture, follow newest main first, then docs/ARCHITECTURE.md. Use docs/DECISIONS.md to understand why a previous design was replaced. Use docs/BACKLOG.md only for unshipped work; newest explicit user direction outranks backlog entries.
 
 ## Documentation impact and change logging
 
@@ -54,16 +55,18 @@ For every change, perform a documentation-impact assessment before committing an
 - `docs/ARCHITECTURE.md` — update whenever current behavior, invariants, data model, data flow, APIs, battle/resource semantics, event precedence, security, operational topology, or mobile/desktop architecture changes, or when a bug fix clarifies an invariant that future work must preserve.
 - `README.md` — update whenever user-visible behavior, features, setup, usage, migrations, deployment/operator steps, or developer workflow changes.
 - `AGENTS.md` — update whenever repository development automation, validation, PR, documentation, or release policy changes.
+- `docs/BACKLOG.md` — update whenever confirmed future work, verified technical debt, or deferred/not-planned status changes. When a backlog item ships, remove it from Active/Deferred in the same PR and record the shipped result in `docs/DECISIONS.md`. Do not promote speculative assistant suggestions into active backlog requirements.
 
 Do not churn unrelated documentation merely to satisfy a checklist. If one of the files above is not relevant, leave it unchanged and state why in the PR documentation-impact summary. However, a product improvement or bug fix may not claim "no documentation impact" because its change-history entry in `docs/DECISIONS.md` is required.
 
 Documentation workflow:
 
-1. Assess documentation impact before implementation.
-2. Update current-behavior documentation while making the code/product change.
-3. Create the PR.
-4. Once the PR number exists, add/update its entry in the `docs/DECISIONS.md` PR lineage on the same branch and push that follow-up before the PR is considered ready.
-5. Re-check the documentation after final code changes so it describes the shipped behavior rather than an intermediate implementation.
+1. Assess documentation and backlog impact before implementation.
+2. Check `docs/BACKLOG.md` for a related item and update/remove it when the work changes its status.
+3. Update current-behavior documentation while making the code/product change.
+4. Create the PR.
+5. Once the PR number exists, add/update its entry in the `docs/DECISIONS.md` PR lineage on the same branch and push that follow-up before the PR is considered ready.
+6. Re-check the documentation and backlog after final code changes so they describe the shipped behavior and remaining work rather than an intermediate implementation.
 
 ## Implementation rules
 
@@ -145,7 +148,7 @@ After a successful commit:
    - whether D1 migration is required
    - whether CSS cache version changed
    - whether `wrangler.jsonc`, bindings, routes, Cron, secrets, or deployment configuration changed
-   - documentation impact: which of `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `README.md`, and `AGENTS.md` changed, plus why any relevant file did not
+   - documentation/backlog impact: which of `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/BACKLOG.md`, `README.md`, and `AGENTS.md` changed, plus why any relevant file did not
 6. After the PR number exists, ensure `docs/DECISIONS.md` contains the PR-lineage entry required by the documentation policy.
 7. Check PR checks/status.
 
@@ -179,7 +182,7 @@ If the user explicitly says `ship it`, `merge it`, or clearly authorizes product
 1. Confirm the PR still targets `main`.
 2. Confirm required checks pass.
 3. Confirm the PR contains only intended changes.
-4. Confirm the documentation-impact assessment is complete and the PR is recorded in `docs/DECISIONS.md` when required.
+4. Confirm the documentation/backlog-impact assessment is complete, any affected backlog item is current, and the PR is recorded in `docs/DECISIONS.md` when required.
 5. Merge using the repository's normal safe merge method.
 6. Do not run a manual `wrangler deploy` unless explicitly required.
 7. Switch local checkout back to `main`.
