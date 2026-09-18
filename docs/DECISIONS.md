@@ -683,6 +683,7 @@ The following sequence is retained as a compact repository implementation/change
 | #34 | D1 schema baseline reconciliation | Verified the two missing operational table/index definitions against production D1, reconciled the fresh schema, added idempotent migration 0004 and regression coverage, and closed BL-001 without changing current production data. |
 | #35 | Max battle intel + desktop text visibility | Resolves Max weakness/resistance intel through the underlying exact form, replaces permanent post-load placeholders with an explicit unavailable state, and keeps Battle Resources guidance fully visible on desktop. |
 | #36 | Automated browser regressions + broad Planner CI | Added self-starting Chromium responsive tests, made Planner regression CI run on every PR/main push, broadened JavaScript syntax coverage, and moved the remaining audit improvements into the durable backlog. |
+| #37 | Failure-safe Pokémon catalog loading | Added explicit catalog load states, retryable terminal failures, validated last-known-good local fallback, and browser regressions so Battle Plan intel/Hundo cannot remain stuck loading after catalog failure. |
 
 ## Supersession map
 
