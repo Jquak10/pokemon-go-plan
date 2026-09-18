@@ -89,7 +89,6 @@ const winInput=normalizeBattleLog({pokemon_name:'Gengar',battle_system:'max',bat
 assert.equal(winInput.progress_gained,2);
 
 // Availability preserves system and variant even when species names coincide.
-sql.exec('CREATE TABLE event_suppression_rules(id TEXT,event_name TEXT,start_date TEXT,end_date TEXT,active INTEGER,suppressed_source_types TEXT);');
 const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
 const future=new Date(Date.now()+5*86400000).toISOString().slice(0,10);
 const insertEvent=sql.prepare("INSERT INTO events(id,source_type,summary,description,dtstart_line,other_lines,start_date,end_date,content_hash,updated_at) VALUES(?,?,?,'costs 250 MP','DTSTART:20260917T000000','',?,?,?,'now')");
@@ -109,7 +108,9 @@ assert.equal(recs.find(r=>r.battle_variant==='gigantamax').target.id,counts.id);
 let options=await targetOptionsForUser(env,user,all(),metas,recs);
 assert.deepEqual(options.current.map(T.kind).sort(),['gigantamax','raid']);
 assert.deepEqual(options.upcoming.map(T.kind),['dynamax']);
-sql.prepare('INSERT INTO event_suppression_rules VALUES(?,?,?,?,?,?)').run('suppressed','Max replacement',today,future,1,'["max_battles"]');
+sql.prepare(`INSERT INTO event_suppression_rules (
+  id,event_name,start_date,end_date,active,suppressed_source_types,updated_at
+) VALUES(?,?,?,?,?,?,?)`).run('suppressed','Max replacement',today,future,1,'["max_battles"]','now');
 options=await targetOptionsForUser(env,user,all(),metas,[]);
 assert.deepEqual(options.current.map(T.kind),['raid']);
 assert.equal(options.upcoming.length,0);

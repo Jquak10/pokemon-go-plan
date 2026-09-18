@@ -70,6 +70,20 @@ Editing preserves a target's Pokémon/battle/goal identity and its ID; use Add t
 
 The Part 5 suite covers migration/FK preservation, separate same-species goals, CRUD/authentication, duplicate protection, form matching, recommendations, suppression-aware availability, allocation caps, editable progress and Undo, and filtered UI counts. No production migration, merge or deployment is part of Part 5 PR preparation.
 
+### Schema baseline reconciliation
+
+`schema.sql` is the supported fresh-database baseline. On 18 September 2026, the production D1 schema was inspected directly and confirmed to contain `event_suppression_rules`, `remote_raid_daily_budget_overrides`, `idx_event_suppression_dates`, and `idx_remote_raid_daily_budget_overrides_date`. The repository baseline now carries those verified definitions.
+
+`migrations/0004_schema_baseline_operational_tables.sql` is an idempotent repair migration for an existing installation that is missing either operational table or explicit index. It uses only `CREATE ... IF NOT EXISTS`, so it preserves existing rows and objects. The current production database already contains all four verified objects, so BL-001 does **not** require applying migration 0004 to production.
+
+For another installation, inspect `sqlite_schema` first. If any of the four objects are missing, apply the migration with the existing D1 binding:
+
+```bash
+npx wrangler d1 execute DB --remote --file=migrations/0004_schema_baseline_operational_tables.sql
+```
+
+Fresh databases should be initialized from `schema.sql`, not by replaying production migrations.
+
 ## Features
 
 - Personalized raid recommendations based on event availability, shared meta scores, user-defined weights, targets, progress, and priority.

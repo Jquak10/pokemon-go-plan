@@ -187,9 +187,9 @@ Keep pure, testable domain logic in these modules where practical. src/index.js 
 
 ## 7. Data model
 
-schema.sql is intended to be the fresh-database baseline. Existing production databases are evolved by additive migrations.
+schema.sql is the fresh-database baseline. Existing databases are evolved by additive migrations.
 
-Known completeness gap: current Worker code uses `event_suppression_rules` and `remote_raid_daily_budget_overrides`, but as of 18 September 2026 neither table is defined in `schema.sql` or the checked-in migrations `0001`–`0003`. This is tracked in `docs/BACKLOG.md` as BL-001. Do not guess their definitions or create an unreviewed migration; verify the production D1 shape first.
+The baseline includes every operational table used by the current Worker. On 18 September 2026, production D1 was inspected directly for `event_suppression_rules` and `remote_raid_daily_budget_overrides`, including their explicit date indexes, and those verified definitions were reconciled into `schema.sql`. `migrations/0004_schema_baseline_operational_tables.sql` is the idempotent repair path for existing installations that are missing either table or index. The verified production database already contained all four objects and therefore did not require that migration for BL-001.
 
 Core tables in the current schema include:
 
@@ -754,6 +754,7 @@ package.json runs a deterministic regression suite covering the major domains, i
 - Unified battle logging.
 - Battle logging UI.
 - Battle-aware Targets.
+- Fresh-database schema and idempotent operational-table migration completeness.
 
 There is also a live upstream contract test for Pokémon GO API/GameMaster-related assumptions.
 

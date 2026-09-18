@@ -112,6 +112,35 @@ CREATE TABLE IF NOT EXISTS remote_raid_limit_overrides (
 CREATE INDEX IF NOT EXISTS idx_remote_raid_limit_dates
 ON remote_raid_limit_overrides(start_date, end_date, active);
 
+CREATE TABLE IF NOT EXISTS event_suppression_rules (
+  id TEXT PRIMARY KEY,
+  event_name TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  suppressed_source_types TEXT NOT NULL,
+  note TEXT,
+  source_url TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  detected_automatically INTEGER NOT NULL DEFAULT 1,
+  source_excerpt TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_suppression_dates
+ON event_suppression_rules(start_date, end_date, active);
+
+CREATE TABLE IF NOT EXISTS remote_raid_daily_budget_overrides (
+  user_id TEXT NOT NULL,
+  local_date TEXT NOT NULL,
+  budget_override INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, local_date),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_remote_raid_daily_budget_overrides_date
+ON remote_raid_daily_budget_overrides(local_date);
+
 CREATE TABLE IF NOT EXISTS battle_resource_state (
   user_id TEXT PRIMARY KEY,
   max_particles_held INTEGER NOT NULL DEFAULT 0,
