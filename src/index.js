@@ -3478,7 +3478,7 @@ function cleanOfficialMaxPokemonLine(
   return null;
 }
 
-function officialMaxBattleSupplementsFromText(
+export function officialMaxBattleSupplementsFromText(
   text,
   sourceUrl
 ) {
