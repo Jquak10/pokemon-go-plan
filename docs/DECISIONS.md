@@ -1,7 +1,7 @@
 # Pokémon GO Planner — Architecture Decision Record
 
 Last consolidated: 18 September 2026  
-Decision/change history covered: project inception through PR #31
+Decision/change history covered: project inception through PR #32
 
 This file records why the Planner looks the way it does. It is intentionally historical: some early decisions were later superseded as Pokémon GO rules became clearer or the product matured.
 
@@ -580,7 +580,7 @@ AGENTS.md points future development work at these documents before implementatio
 ## ADR-038 — Require documentation impact assessment for every change
 
 Status: Current  
-Introduced after the PR #31 documentation consolidation.
+Introduced in PR #32 after the PR #31 documentation consolidation.
 
 The repository must not depend on a maintainer remembering to reconstruct changes from old chats.
 
@@ -635,6 +635,7 @@ The following sequence is retained as a compact repository implementation/change
 | #29 | Timezone-aware Remote limit windows | Added exact timestamp/timezone override evaluation. |
 | #30 | Architecture/decision documentation draft | Closed without merge; superseded by #31, so it introduced no change to main. |
 | #31 | Durable architecture and decision history | Added repository-level architecture/ADR references, linked them from README/AGENTS, and consolidated history through #29. |
+| #32 | Mandatory documentation impact assessment | Requires every product improvement/bug fix to be logged and routes architecture, README, and workflow updates by impact. |
 
 ## Supersession map
 
