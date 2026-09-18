@@ -4,6 +4,11 @@ Pokémon GO Planner is a private, personalized raid-planning and calendar applic
 
 **Production app:** [https://pogo-plan.jquak-10.workers.dev](https://pogo-plan.jquak-10.workers.dev)
 
+**Durable architecture reference:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)  
+**Architecture decisions and implementation history:** [docs/DECISIONS.md](docs/DECISIONS.md)
+
+The two docs above are the current architectural source of truth for future development. Historical implementation notes in this README may describe earlier rollout stages; where they conflict with a later recorded decision, follow the architecture/decisions docs and current code.
+
 Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner.
 
 ## What the app does
@@ -20,7 +25,7 @@ Official rules checked on 17 September 2026:
 
 - [Niantic: Joining Battles Remotely](https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/2487-joining-battles-remotely/) confirms Remote Max Battles use a Remote Raid Pass plus the same MP cost as local participation. The pass is consumed when battle starts, including a loss; eligible retries against the same boss do not consume another pass.
 - [Pokémon GO: Max Battles](https://pokemongo.com/max-pokemon-battle) confirms MP is spent only after defeating the boss. The logger therefore deducts MP for wins and records pass consumption separately.
-- The official help page states a normal limit of 10 Remote Raids per day, with event exceptions, but does not clearly establish a numeric Remote Max cap or how it relates to that Raid cap. Part 4 retains Part 3's separate Remote Max usage accounting, does not increment ordinary Remote Raid usage for Max logs, and does not invent a Max participation cap. The logger explicitly asks players to check in-game eligibility. Separate accounting is a conservative application choice, not a claim that unlimited Remote Max participation is officially confirmed.
+- The Planner now applies one official daily Remote participation ceiling across eligible Remote Raids and eligible Remote Max Battles. The underlying ordinary-Raid and Remote-Max ledgers remain separate for auditability, but Battle Plan sums them before applying the standard or event-adjusted limit. This supersedes the earlier Part 3/4 conservative separate-cap model.
 
 ### Required D1 migration
 
