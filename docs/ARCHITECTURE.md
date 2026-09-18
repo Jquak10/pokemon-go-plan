@@ -760,6 +760,10 @@ package.json runs a deterministic regression suite covering the major domains, i
 
 There is also a live upstream contract test for Pokémon GO API/GameMaster-related assumptions.
 
+A real-browser regression suite runs in Chromium for UI behavior that source inspection and VM execution cannot validate reliably. The browser fixture is self-contained: the test starts and stops its own local HTTP fixture server and uses deterministic mocked Planner/catalog responses. Current coverage includes intermediate desktop text visibility, asynchronous Max battle-intel rendering, mobile modal containment/background locking, and horizontal page overflow.
+
+GitHub Actions runs deterministic regression checks and the browser suite automatically for every pull request and every push to `main`; no manual development server is required for the browser job. The scheduled workflow keeps the upstream live-contract check while the browser job is reserved for PR/push/manual workflow runs.
+
 Tests are deliberately used to freeze previously discovered regressions such as:
 
 - Wrong form-family rankings.
@@ -786,6 +790,7 @@ Core rules:
 - Make the smallest safe change.
 - Preserve wrangler.jsonc, routes, D1 bindings, Cron, secrets, Service Bindings, and deployment settings unless explicitly required.
 - Validate syntax, tests, and diff cleanliness.
+- Treat the automated browser UI job as a required regression check for UI/responsive changes; it self-starts its fixture server and must not require the user to launch Wrangler.
 - Push the feature branch.
 - Open a PR to main.
 - Stop at a green PR unless the user explicitly authorizes merge/deploy.
