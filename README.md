@@ -577,7 +577,7 @@ The repository does not currently include a script that initializes the local D1
 
 ### Automated regression checks
 
-Every pull request and every push to `main` runs the Planner regression workflow. It runs the deterministic Node regression suite across the application and a real Chromium browser suite for responsive Planner behavior. The browser job installs Chromium in CI and the test itself starts and stops its own local fixture server, so **you do not need to start Wrangler or any other server for browser tests**.
+Every pull request and every push to `main` runs the deterministic Planner regression workflow. Pull requests run the Node regression suite and real Chromium browser suite; the upstream live-contract job is intentionally excluded from PR gating so an external outage or upstream drift cannot make an otherwise deterministic UI/code PR flaky. Pushes to `main`, scheduled runs, and manual workflow runs still exercise the live contract. The browser job installs Chromium in CI and the test itself starts and stops its own local fixture server, so **you do not need to start Wrangler or any other server for browser tests**.
 
 The browser suite currently protects intermediate-desktop text visibility, asynchronous Dynamax battle-intel rendering, mobile modal containment, and horizontal-overflow regressions. Its Pokémon/event records are fixed regression fixtures rather than live schedule data, so a Pokémon leaving the current Raid/Max rotation does not make the test stale or flaky.
 
