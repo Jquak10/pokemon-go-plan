@@ -4867,6 +4867,7 @@ async function fetchOfficialHtml(url) {
 async function syncOfficialRemoteRaidLimits(env) {
   const detected = [];
   const officialRaidSupplements = [];
+  const officialMaxBattleSupplements = [];
   const suppressionRules = [];
   const armoredMewtwoSupplements = [];
   let megaFinaleData = null;
@@ -4899,6 +4900,50 @@ async function syncOfficialRemoteRaidLimits(env) {
     try {
       const html = await fetchOfficialHtml(url);
       const plainText = htmlToPlainText(html);
+
+      const maxBattleSupplements =
+        officialMaxBattleSupplementsFromText(
+          plainText,
+          url
+        );
+
+      for (
+        const item of
+        maxBattleSupplements
+      ) {
+        const key = [
+          normalizeName(
+            item.pokemon_name
+          ),
+          item.start_date,
+          item.end_date,
+          item.max_battle_tier ||
+            "",
+          item.max_particle_cost ||
+            ""
+        ].join("|");
+
+        if (
+          !officialMaxBattleSupplements.some(
+            existing =>
+              [
+                normalizeName(
+                  existing.pokemon_name
+                ),
+                existing.start_date,
+                existing.end_date,
+                existing.max_battle_tier ||
+                  "",
+                existing.max_particle_cost ||
+                  ""
+              ].join("|") === key
+          )
+        ) {
+          officialMaxBattleSupplements.push(
+            item
+          );
+        }
+      }
 
       const pageSuppressions =
         officialEventSuppressionRulesFromText(
@@ -5165,6 +5210,17 @@ async function syncOfficialRemoteRaidLimits(env) {
     ...armoredMewtwoStatements
   );
 
+  const maxBattleEvidence =
+    await officialMaxBattleEvidenceStatements(
+      env,
+      officialMaxBattleSupplements,
+      timestamp
+    );
+
+  dbStatements.push(
+    ...maxBattleEvidence.statements
+  );
+
   if (dbStatements.length) {
     await env.DB.batch(dbStatements);
   }
@@ -5176,6 +5232,14 @@ async function syncOfficialRemoteRaidLimits(env) {
     official_raid_supplements: {
       count: officialRaidSupplements.length,
       events: officialRaidSupplements
+    },
+    official_max_battle_evidence: {
+      detected:
+        officialMaxBattleSupplements.length,
+      matched_events:
+        maxBattleEvidence.matched_events,
+      events:
+        officialMaxBattleSupplements
     },
     mega_finale_supplements: {
       main_event:
