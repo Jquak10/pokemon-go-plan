@@ -4683,6 +4683,171 @@ async function officialArmoredMewtwoStatements(
 }
 
 
+function stripMaxEvidenceLines(
+  otherLines
+) {
+  return String(
+    otherLines || ""
+  )
+    .split("\n")
+    .filter(
+      line =>
+        line &&
+        !/^X-POGO-MAX-(?:EVIDENCE|EVIDENCE-URL|BATTLE-TIER|PARTICLE-COST):/i.test(
+          line
+        )
+    );
+}
+
+async function officialMaxBattleEvidenceStatements(
+  env,
+  supplements,
+  timestamp
+) {
+  if (!supplements.length) {
+    return {
+      statements: [],
+      matched_events: 0
+    };
+  }
+
+  const startDate =
+    supplements
+      .map(item => item.start_date)
+      .filter(Boolean)
+      .sort()[0];
+
+  const endDate =
+    supplements
+      .map(item => item.end_date)
+      .filter(Boolean)
+      .sort()
+      .at(-1);
+
+  if (!startDate || !endDate) {
+    return {
+      statements: [],
+      matched_events: 0
+    };
+  }
+
+  const { results } =
+    await env.DB.prepare(`
+      SELECT
+        id,
+        source_type,
+        source_uid,
+        summary,
+        other_lines,
+        start_date,
+        end_date
+      FROM events
+      WHERE status = 'active'
+        AND source_type IN (
+          'max_battles',
+          'max_mondays',
+          '${MAX_ROTATION_SOURCE_TYPE}'
+        )
+        AND COALESCE(
+          start_date,
+          '0000-01-01'
+        ) <= ?
+        AND COALESCE(
+          end_date,
+          start_date,
+          '9999-12-31'
+        ) >= ?
+      ORDER BY start_date, summary
+    `).bind(
+      endDate,
+      startDate
+    ).all();
+
+  const statements = [];
+  let matchedEvents = 0;
+
+  for (const event of results || []) {
+    const eventName =
+      normalizeName(
+        event.summary
+      );
+
+    const match =
+      supplements.find(
+        item =>
+          item.start_date <=
+            (event.end_date ||
+              event.start_date) &&
+          item.end_date >=
+            event.start_date &&
+          eventName.includes(
+            normalizeName(
+              item.pokemon_name
+            )
+          )
+      );
+
+    if (!match) {
+      continue;
+    }
+
+    const lines =
+      stripMaxEvidenceLines(
+        event.other_lines
+      );
+
+    lines.push(
+      "X-POGO-MAX-EVIDENCE:official"
+    );
+
+    if (
+      match.max_battle_tier
+    ) {
+      lines.push(
+        `X-POGO-MAX-BATTLE-TIER:${match.max_battle_tier}`
+      );
+    }
+
+    if (
+      match.max_particle_cost_source ===
+      "official_explicit_cost"
+    ) {
+      lines.push(
+        `X-POGO-MAX-PARTICLE-COST:${match.max_particle_cost}`
+      );
+    }
+
+    if (match.source_url) {
+      lines.push(
+        `X-POGO-MAX-EVIDENCE-URL:${match.source_url}`
+      );
+    }
+
+    statements.push(
+      env.DB.prepare(`
+        UPDATE events
+        SET
+          other_lines = ?,
+          updated_at = ?
+        WHERE id = ?
+      `).bind(
+        lines.join("\n"),
+        timestamp,
+        event.id
+      )
+    );
+
+    matchedEvents += 1;
+  }
+
+  return {
+    statements,
+    matched_events:
+      matchedEvents
+  };
+}
+
+
 async function fetchOfficialHtml(url) {
   const response = await fetch(url, {
     headers: {
