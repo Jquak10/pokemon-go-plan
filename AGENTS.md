@@ -31,6 +31,15 @@ Do not require the user to manually perform routine Git, validation, push, or PR
 
 Never make development commits directly on `main`.
 
+## Persistent architecture context
+
+Before design or implementation work, read:
+
+- docs/ARCHITECTURE.md for the current system, invariants, data flow, and operational constraints
+- docs/DECISIONS.md for historical rationale, superseded approaches, and the implementation chronology
+
+Treat current code on newest main as authoritative if it is newer than the documentation. If a change alters an architectural decision or invariant, update the relevant documentation in the same PR.
+
 ## Source of truth
 
 Always work from the newest repository contents.
