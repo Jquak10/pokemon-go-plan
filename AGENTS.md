@@ -111,7 +111,7 @@ After editing:
 4. Run appropriate syntax checks for every changed JavaScript file.
 5. Run relevant existing automated tests/checks.
 6. Run targeted behavioral checks appropriate to the change.
-7. For UI/responsive changes, require the PR's automated Chromium `browser-ui` job to pass. The browser regression test starts/stops its own fixture server; never ask the user to manually start Wrangler or another server just to satisfy this test.
+7. For UI/responsive changes, require the PR's automated Chromium `browser-ui` job to pass. The browser regression test starts/stops its own fixture server; never ask the user to manually start Wrangler or another server just to satisfy this test. Keep browser fixtures deterministic and independent of the live Pokémon/event rotation; update them only when the product contract they encode intentionally changes.
 8. Use `npm run dev` / local Worker testing when the change affects runtime behavior and a separate local smoke test is useful.
 9. Confirm no unrelated files changed.
 10. Confirm protected Cloudflare/D1/deployment files did not change unless explicitly required.
