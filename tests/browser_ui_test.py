@@ -242,6 +242,19 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
             # Keep this asynchronous enough that the first render exercises the
             # loading placeholder before the catalog-driven rerender.
             time.sleep(0.12)
+
+            failures_remaining = getattr(
+                self.server,
+                "catalog_failures_remaining",
+                0,
+            )
+            if failures_remaining > 0:
+                self.server.catalog_failures_remaining = failures_remaining - 1
+                return self._json(
+                    {"error": "Fixture catalog temporarily unavailable."},
+                    status=503,
+                )
+
             return self._json(CATALOG)
 
         if path.startswith("/manage/"):
@@ -254,9 +267,9 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
 
         self.send_error(404)
 
-    def _json(self, value):
+    def _json(self, value, status=200):
         payload = json.dumps(value).encode("utf-8")
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("content-type", "application/json; charset=utf-8")
         self.send_header("content-length", str(len(payload)))
         self.end_headers()
@@ -290,6 +303,9 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         cls.server.server_close()
         cls.server_thread.join(timeout=2)
 
+    def setUp(self):
+        self.server.catalog_failures_remaining = 0
+
     def open_planner(self, width: int, height: int):
         context = self.browser.new_context(
             viewport={"width": width, "height": height},
@@ -317,6 +333,49 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             widest,
             dimensions["viewport"] + 1,
             f"Unexpected horizontal overflow: {dimensions}",
+        )
+
+    def test_catalog_failure_exits_loading_state_and_retry_recovers(self):
+        self.server.catalog_failures_remaining = 1
+        page = self.open_planner(1024, 800)
+
+        card = page.locator(".recommendation-card", has_text="Dynamax Rhyhorn")
+        unavailable = card.locator(".raid-intel-unavailable")
+        unavailable.wait_for(state="visible")
+        self.assertIn("temporarily unavailable", unavailable.inner_text().lower())
+        self.assertNotIn("Loading battle intel", card.inner_text())
+
+        retry = card.locator("[data-retry-pokemon-catalog]")
+        self.assertEqual(retry.count(), 1)
+        retry.click()
+
+        card.locator(".raid-intel").wait_for(state="visible")
+        self.assertNotIn("temporarily unavailable", card.inner_text().lower())
+        self.assertIn("Water", card.locator(".raid-intel").inner_text())
+
+    def test_catalog_failure_uses_last_known_good_saved_copy(self):
+        page = self.open_planner(1024, 800)
+
+        card = page.locator(".recommendation-card", has_text="Dynamax Rhyhorn")
+        card.locator(".raid-intel").wait_for(state="visible")
+
+        self.server.catalog_failures_remaining = 1
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_selector("#app:not(.hidden)")
+
+        status = page.locator("#hundoCatalogStatus")
+        status.get_by_text(
+            "Using the last saved Pokémon catalog",
+            exact=False,
+        ).wait_for(state="visible")
+
+        card = page.locator(".recommendation-card", has_text="Dynamax Rhyhorn")
+        card.locator(".raid-intel").wait_for(state="visible")
+        self.assertNotIn("Loading battle intel", card.inner_text())
+        self.assertIn("Water", card.locator(".raid-intel").inner_text())
+        self.assertEqual(
+            status.locator("[data-retry-pokemon-catalog]").count(),
+            1,
         )
 
     def test_intermediate_desktop_keeps_guidance_visible_and_resolves_max_intel(self):
