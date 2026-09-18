@@ -572,8 +572,9 @@ The repository now carries:
 
 - docs/ARCHITECTURE.md — current architecture/invariants.
 - docs/DECISIONS.md — historical decisions and supersessions.
+- docs/BACKLOG.md — confirmed unshipped work, verified technical debt, and explicitly deferred/not-planned ideas.
 
-Future work must perform a documentation-impact assessment in the same PR. All product improvements and bug fixes are recorded in the PR lineage below; architecture and README updates are added when the change affects their respective current-behavior or user/developer guidance scopes.
+Future work must perform a documentation/backlog-impact assessment in the same PR. All product improvements and bug fixes are recorded in the PR lineage below; architecture, backlog, and README updates are added when the change affects their respective current-behavior, unshipped-work, or user/developer guidance scopes.
 
 AGENTS.md points future development work at these documents before implementation begins and makes the documentation-impact assessment part of the normal definition of done.
 
@@ -597,6 +598,25 @@ Rules:
 - Unrelated documentation should not be changed merely for checklist compliance.
 
 Because the PR number is only known after opening a PR, adding the final lineage row as a follow-up commit on the same branch is an accepted and expected workflow step.
+
+## ADR-039 — Keep unshipped work in a repository backlog, not chat history
+
+Status: Current
+
+Project chats are useful working context but are not a reliable long-term backlog. Deleting a chat should not erase a confirmed future commitment or known technical debt.
+
+The repository therefore maintains `docs/BACKLOG.md` for work that has not shipped yet.
+
+Rules:
+
+- active backlog items require confirmed user intent or verified technical debt;
+- speculative assistant suggestions are not active requirements;
+- rejected or intentionally deferred ideas are recorded with status/reason when preserving that context is useful;
+- when an item ships, remove it from Active/Deferred and record the shipped result in the PR lineage here;
+- newest explicit user direction and newest `main` outrank backlog text;
+- backlog presence never authorizes an unreviewed production migration or destructive change.
+
+This separates present architecture, shipped history, and future work cleanly enough that old project chats can be removed without making them the only copy of important project knowledge.
 
 ## PR lineage
 
@@ -667,8 +687,9 @@ Create or update an ADR entry when a change affects or supersedes durable decisi
 - ranking methodology;
 - calendar/ICS semantics;
 - major mobile/desktop navigation;
-- development/documentation/release governance.
+- development/documentation/release governance;
+- backlog/change-lifecycle governance.
 
 A routine bug fix that restores an existing invariant usually needs a PR-lineage entry, focused regression coverage, and—when the invariant was previously unclear—an architecture clarification. It does not need a new ADR unless the underlying decision or rationale changed.
 
-README and ARCHITECTURE updates are selected by impact rather than mechanically: update README for user/developer/operator-facing changes and ARCHITECTURE for current-system/invariant changes. AGENTS.md owns the mandatory assessment and PR workflow.
+README, ARCHITECTURE, and BACKLOG updates are selected by impact rather than mechanically: update README for user/developer/operator-facing changes, ARCHITECTURE for current-system/invariant changes, and BACKLOG for confirmed unshipped work/status changes. AGENTS.md owns the mandatory assessment and PR workflow.
