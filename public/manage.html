@@ -690,7 +690,12 @@
             <div id="hundoRecent" class="hundo-recent"></div>
           </div>
 
-          <div id="hundoCatalogStatus" class="hundo-catalog-status">
+          <div
+            id="hundoCatalogStatus"
+            class="hundo-catalog-status"
+            role="status"
+            aria-live="polite"
+          >
             Open this tab to load the Pokémon catalog.
           </div>
         </section>
@@ -1443,8 +1448,15 @@ let mobileMoreLockedScrollY = 0;
 let mobileMorePageLocked = false;
 let desktopQuickRailFrame = 0;
 
+const POKEMON_CATALOG_CACHE_KEY =
+  "pogo-pokemon-catalog-v2";
+
 let pokemonCatalog = null;
 let pokemonCatalogPromise = null;
+let pokemonCatalogLoadState =
+  "idle";
+let pokemonCatalogError = "";
+let pokemonCatalogCachedAt = null;
 let selectedHundoPokemon = null;
 
 let raidLogType = "remote";
@@ -1583,7 +1595,8 @@ function activateTab(name, scroll = true) {
   }
 
   if (name === "hundo") {
-    ensurePokemonCatalogLoaded();
+    ensurePokemonCatalogLoaded()
+      .catch(() => {});
   }
 
   closeMobileMoreSheet();
@@ -4366,6 +4379,171 @@ function raidIntelForRecommendation(rec) {
   };
 }
 
+function usablePokemonCatalogEntries(
+  entries
+) {
+  return (
+    Array.isArray(entries) &&
+    entries.length > 0 &&
+    entries.every(
+      entry =>
+        entry &&
+        typeof entry.name === "string" &&
+        entry.name.trim() &&
+        Number.isFinite(
+          Number(entry.attack)
+        ) &&
+        Number.isFinite(
+          Number(entry.defense)
+        ) &&
+        Number.isFinite(
+          Number(entry.stamina)
+        ) &&
+        Array.isArray(entry.types)
+    )
+  );
+}
+
+function readPokemonCatalogCache() {
+  try {
+    const parsed =
+      JSON.parse(
+        localStorage.getItem(
+          POKEMON_CATALOG_CACHE_KEY
+        ) || "null"
+      );
+
+    if (
+      !parsed ||
+      !usablePokemonCatalogEntries(
+        parsed.entries
+      )
+    ) {
+      return null;
+    }
+
+    return {
+      entries:
+        parsed.entries,
+      saved_at:
+        parsed.saved_at || null
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writePokemonCatalogCache(
+  entries
+) {
+  try {
+    localStorage.setItem(
+      POKEMON_CATALOG_CACHE_KEY,
+      JSON.stringify({
+        saved_at:
+          new Date().toISOString(),
+        entries
+      })
+    );
+  } catch {
+    // Catalog caching is a best-effort resilience layer. Storage quota or
+    // privacy-mode restrictions must never break the live Planner.
+  }
+}
+
+function renderPokemonCatalogLoadState() {
+  const status =
+    document.getElementById(
+      "hundoCatalogStatus"
+    );
+
+  if (!status) {
+    return;
+  }
+
+  const retryButton = `
+    <button
+      type="button"
+      class="secondary small-button"
+      data-retry-pokemon-catalog
+    >
+      Retry catalog
+    </button>
+  `;
+
+  if (
+    pokemonCatalogLoadState ===
+    "loading"
+  ) {
+    status.textContent =
+      pokemonCatalog?.length
+        ? "Refreshing Pokémon catalog…"
+        : "Loading Pokémon catalog…";
+    return;
+  }
+
+  if (
+    pokemonCatalogLoadState ===
+    "ready"
+  ) {
+    status.textContent =
+      `${formatNumber(
+        pokemonCatalog?.length || 0
+      )} Pokémon/forms ready`;
+    return;
+  }
+
+  if (
+    pokemonCatalogLoadState ===
+    "stale"
+  ) {
+    status.innerHTML = `
+      <span>
+        Using the last saved Pokémon catalog because the live catalog could not be refreshed.
+      </span>
+      ${retryButton}
+    `;
+    return;
+  }
+
+  if (
+    pokemonCatalogLoadState ===
+    "error"
+  ) {
+    status.innerHTML = `
+      <span>
+        Pokémon catalog temporarily unavailable. Battle intel and Hundo search can be retried.
+      </span>
+      ${retryButton}
+    `;
+    return;
+  }
+
+  status.textContent =
+    "Open this tab to load the Pokémon catalog.";
+}
+
+function refreshPokemonCatalogConsumers() {
+  renderPokemonCatalogLoadState();
+  renderHundoRecent();
+  renderRecommendations();
+
+  if (selectedHundoPokemon) {
+    const fresh =
+      pokemonCatalog?.find(
+        item =>
+          item.key ===
+          selectedHundoPokemon.key
+      );
+
+    if (fresh) {
+      selectedHundoPokemon =
+        fresh;
+      renderHundoResult();
+    }
+  }
+}
+
 function raidIntelHtml(rec) {
   const intel =
     raidIntelForRecommendation(
@@ -4373,9 +4551,63 @@ function raidIntelHtml(rec) {
     );
 
   if (!intel) {
-    return !pokemonCatalog
-      ? `<div class="raid-intel-loading">Loading battle intel…</div>`
-      : `<div class="raid-intel-unavailable">Battle intel unavailable for this form.</div>`;
+    if (
+      !pokemonCatalog &&
+      [
+        "idle",
+        "loading"
+      ].includes(
+        pokemonCatalogLoadState
+      )
+    ) {
+      return `<div class="raid-intel-loading">Loading battle intel…</div>`;
+    }
+
+    if (
+      pokemonCatalogLoadState ===
+      "error"
+    ) {
+      return `
+        <div class="raid-intel-unavailable">
+          Battle intel temporarily unavailable.
+          <button
+            type="button"
+            class="secondary small-button"
+            data-retry-pokemon-catalog
+          >
+            Retry catalog
+          </button>
+        </div>
+      `;
+    }
+
+    if (
+      pokemonCatalogLoadState ===
+      "stale"
+    ) {
+      return `
+        <div class="raid-intel-unavailable">
+          Battle intel is unavailable in the saved catalog for this form.
+          <button
+            type="button"
+            class="secondary small-button"
+            data-retry-pokemon-catalog
+          >
+            Refresh catalog
+          </button>
+        </div>
+      `;
+    }
+
+    if (
+      pokemonCatalogLoadState ===
+        "loading" &&
+      pokemonCatalog
+    ) {
+      return `<div class="raid-intel-loading">Refreshing battle intel…</div>`;
+    }
+
+    return `<div class="raid-intel-unavailable">Battle intel unavailable for this form.</div>`;
   }
 
   const weaknessPills =
@@ -4451,8 +4683,20 @@ function raidIntelHtml(rec) {
   `;
 }
 
-async function ensurePokemonCatalogLoaded() {
-  if (pokemonCatalog) {
+async function ensurePokemonCatalogLoaded(
+  force = false
+) {
+  if (
+    pokemonCatalog &&
+    !force &&
+    [
+      "ready",
+      "stale"
+    ].includes(
+      pokemonCatalogLoadState
+    )
+  ) {
+    renderPokemonCatalogLoadState();
     renderHundoRecent();
     return pokemonCatalog;
   }
@@ -4461,66 +4705,108 @@ async function ensurePokemonCatalogLoaded() {
     return pokemonCatalogPromise;
   }
 
-  const status =
-    document.getElementById(
-      "hundoCatalogStatus"
-    );
+  pokemonCatalogLoadState =
+    "loading";
+  pokemonCatalogError = "";
+  renderPokemonCatalogLoadState();
 
-  if (status) {
-    status.textContent =
-      "Loading Pokémon catalog…";
+  if (!pokemonCatalog) {
+    renderRecommendations();
   }
 
   pokemonCatalogPromise =
-    api(
-      "/api/pokemon-catalog"
-    )
-      .then(
-        data => {
+    (async () => {
+      try {
+        const data =
+          await api(
+            "/api/pokemon-catalog"
+          );
+
+        const entries =
+          data.entries || [];
+
+        if (
+          !usablePokemonCatalogEntries(
+            entries
+          )
+        ) {
+          throw new Error(
+            "Pokémon catalog returned no usable entries."
+          );
+        }
+
+        pokemonCatalog =
+          entries;
+        pokemonCatalogLoadState =
+          "ready";
+        pokemonCatalogError = "";
+        pokemonCatalogCachedAt =
+          new Date().toISOString();
+
+        writePokemonCatalogCache(
+          entries
+        );
+        refreshPokemonCatalogConsumers();
+
+        return pokemonCatalog;
+      } catch (error) {
+        pokemonCatalogError =
+          String(
+            error?.message ||
+            "Pokémon catalog request failed."
+          );
+
+        const cached =
+          pokemonCatalog?.length
+            ? {
+                entries:
+                  pokemonCatalog,
+                saved_at:
+                  pokemonCatalogCachedAt
+              }
+            : readPokemonCatalogCache();
+
+        if (
+          cached &&
+          usablePokemonCatalogEntries(
+            cached.entries
+          )
+        ) {
           pokemonCatalog =
-            data.entries || [];
+            cached.entries;
+          pokemonCatalogCachedAt =
+            cached.saved_at || null;
+          pokemonCatalogLoadState =
+            "stale";
 
-          if (status) {
-            status.textContent =
-              `${formatNumber(pokemonCatalog.length)} Pokémon/forms ready`;
-          }
-
-          renderHundoRecent();
-          renderRecommendations();
-
-          if (selectedHundoPokemon) {
-            const fresh =
-              pokemonCatalog.find(
-                item =>
-                  item.key ===
-                  selectedHundoPokemon.key
-              );
-
-            if (fresh) {
-              selectedHundoPokemon =
-                fresh;
-              renderHundoResult();
-            }
-          }
-
+          refreshPokemonCatalogConsumers();
           return pokemonCatalog;
         }
-      )
-      .catch(
-        error => {
-          pokemonCatalogPromise =
-            null;
 
-          if (status) {
-            status.textContent =
-              error.message;
-          }
+        pokemonCatalog =
+          null;
+        pokemonCatalogCachedAt =
+          null;
+        pokemonCatalogLoadState =
+          "error";
 
-          throw error;
-        }
-      );
+        renderPokemonCatalogLoadState();
+        renderRecommendations();
+
+        throw error;
+      } finally {
+        pokemonCatalogPromise =
+          null;
+      }
+    })();
 
   return pokemonCatalogPromise;
+}
+
+function retryPokemonCatalogLoad() {
+  return ensurePokemonCatalogLoaded(
+    true
+  );
 }
 
 function hundoRecentKeys() {
@@ -7587,6 +7873,20 @@ document
 document.addEventListener(
   "click",
   event => {
+    const catalogRetryButton =
+      event.target.closest(
+        "[data-retry-pokemon-catalog]"
+      );
+
+    if (catalogRetryButton) {
+      catalogRetryButton.disabled =
+        true;
+
+      retryPokemonCatalogLoad()
+        .catch(() => {});
+      return;
+    }
+
     const battleFilterButton =
       event.target.closest(
         "[data-battle-filter]"
@@ -7824,12 +8124,14 @@ document.getElementById("targetSort").addEventListener("change", event => {
 document.getElementById("clearTargetFilters").addEventListener("click", clearTargetFilters);
 
 document.getElementById("hundoPokemonSearch").addEventListener("focus", async () => {
-  await ensurePokemonCatalogLoaded();
+  await ensurePokemonCatalogLoaded()
+    .catch(() => null);
   renderHundoSearchResults();
 });
 
 document.getElementById("hundoPokemonSearch").addEventListener("input", async () => {
-  await ensurePokemonCatalogLoaded();
+  await ensurePokemonCatalogLoaded()
+    .catch(() => null);
   updateHundoSearchMode();
   renderHundoSearchResults();
 });
