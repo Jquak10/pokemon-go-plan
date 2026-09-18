@@ -727,7 +727,7 @@ function recommendationBlockedReason(
       planningScore || 0
     ) < minScore
   ) {
-    return `${recommendation?.battle_system === "max" ? "Max planning value" : "Recommendation score"} is below your ${minScore}-point paid-battle threshold.`;
+    return `Planning priority score is below your ${minScore}-point paid-battle threshold.`;
   }
 
   return null;
@@ -802,6 +802,8 @@ function bestForecastOpportunity(
             value.score,
           recommendation_score:
             scoreOrNull(
+              item
+                ?.recommendation_score ??
               item?.score
             ),
           score_basis:
@@ -1382,6 +1384,9 @@ export function buildBattleResourcePlan({
             .score,
         recommendation_score:
           scoreOrNull(
+            candidate
+              .recommendation
+              .recommendation_score ??
             candidate
               .recommendation
               .score
