@@ -29,6 +29,8 @@ assert.match(manage, /battleSystemBadgeHtml/);
 assert.match(manage, /max-capability-badge/);
 
 assert.match(manage, /rec\.boss_name/);
+assert.match(manage, /const bossName =[\s\S]*rec\.battle_system === "max"[\s\S]*raidEncounterEntry\([\s\S]*bossName/);
+assert.match(manage, /Battle intel unavailable for this form\./);
 assert.match(manage, /rec\.encounter_name/);
 assert.match(manage, /rec\.battle_system !== "max" && intel\.normalCp/);
 assert.match(manage, />Weak to</);
@@ -53,7 +55,7 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=36/);
+  assert.match(read(page), /styles\.css\?v=37/);
 }
 
 assert.match(worker, /BATTLE_SOURCE_TYPES/);
@@ -115,3 +117,7 @@ assert.doesNotMatch(manage, /separate Raid-only rule/i);
 // Part 8 mobile actions remain 44px+ and only real tabs receive tab state.
 assert.match(styles, /recommendation-footer-row \.log-raid-button,[\s\S]*min-height:\s*44px/);
 assert.match(manage, /querySelectorAll\("\.tab-button\[data-tab\]"\)/);
+
+
+assert.match(styles, /Desktop text visibility \+ Max battle-intel hardening · v37/);
+assert.match(styles, /@media \(min-width: 900px\)[\s\S]*\.battle-resource-advice \{[\s\S]*display: grid;[\s\S]*overflow: visible;/);

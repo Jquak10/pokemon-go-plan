@@ -378,6 +378,8 @@ For ordinary Dynamax, the underlying exact species/form remains the encounter id
 
 For Gigantamax, the capability/form must be explicit. Exact Gigantamax assets are required for a Gigantamax sprite. If none exists, show no sprite instead of an ordinary form.
 
+Shared battle intel such as typing, weaknesses, and resistances resolves a Max Battle through its underlying exact species/form when the catalog has no separate Max-form record. After the Pokémon catalog has finished loading, a recommendation card must either render resolved battle intel or show an explicit unavailable state; it must not remain on a loading placeholder indefinitely.
+
 Max cards must not display ordinary Raid Hundo assumptions or ordinary Raid attacker rankings as though those were Max-specific metrics.
 
 ## 11. Battle Plan

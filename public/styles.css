@@ -4765,10 +4765,15 @@ button.danger-soft:hover:not(:disabled) {
   line-height: 1.45;
 }
 
-.raid-intel-loading {
+.raid-intel-loading,
+.raid-intel-unavailable {
   margin-top: 9px;
   color: #92a0ad;
   font-size: .64rem;
+}
+
+.raid-intel-unavailable {
+  line-height: 1.4;
 }
 
 /* ============================================================
@@ -7369,5 +7374,24 @@ body.modal-open {
     width: 100%;
     min-width: 0;
     white-space: normal;
+  }
+}
+
+
+/* ============================================================
+   Desktop text visibility + Max battle-intel hardening · v37
+   ============================================================ */
+@media (min-width: 900px) {
+  .battle-resource-advice {
+    display: grid;
+    overflow: visible;
+    -webkit-box-orient: initial;
+    -webkit-line-clamp: unset;
+  }
+
+  .battle-resource-advice strong,
+  .battle-resource-advice span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }
