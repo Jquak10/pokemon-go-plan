@@ -658,6 +658,7 @@ The following sequence is retained as a compact repository implementation/change
 | #31 | Durable architecture and decision history | Added repository-level architecture/ADR references, linked them from README/AGENTS, and consolidated history through #29. |
 | #32 | Mandatory documentation impact assessment | Requires every product improvement/bug fix to be logged and routes architecture, README, and workflow updates by impact. |
 | #33 | Durable backlog and chat-cleanup context | Added docs/BACKLOG.md, recorded the schema-completeness debt and non-planned Max-team idea, and made backlog maintenance part of the normal workflow. |
+| #34 | D1 schema baseline reconciliation | Verified the two missing operational table/index definitions against production D1, reconciled the fresh schema, added idempotent migration 0004 and regression coverage, and closed BL-001 without changing current production data. |
 
 ## Supersession map
 
