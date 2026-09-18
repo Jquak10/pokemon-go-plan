@@ -51,7 +51,8 @@ function textForRecommendation(recommendation) {
     recommendation?.event_title,
     recommendation?.event_description,
     recommendation?.description,
-    recommendation?.source_excerpt
+    recommendation?.source_excerpt,
+    recommendation?.event_other_lines
   ]
     .filter(Boolean)
     .join(" ");
@@ -66,12 +67,21 @@ function battleSystemLabel(value) {
 function dayDistance(fromDate, toDate) {
   if (!fromDate || !toDate) return null;
 
-  const from = new Date(`${fromDate}T00:00:00Z`);
-  const to = new Date(`${toDate}T00:00:00Z`);
+  const from = new Date(
+    `${fromDate}T00:00:00Z`
+  );
+
+  const to = new Date(
+    `${toDate}T00:00:00Z`
+  );
 
   if (
-    !Number.isFinite(from.getTime()) ||
-    !Number.isFinite(to.getTime())
+    !Number.isFinite(
+      from.getTime()
+    ) ||
+    !Number.isFinite(
+      to.getTime()
+    )
   ) {
     return null;
   }
@@ -79,8 +89,130 @@ function dayDistance(fromDate, toDate) {
   return Math.max(
     0,
     Math.round(
-      (to - from) / 86400000
+      (to - from) /
+        86400000
     )
+  );
+}
+
+const MAX_TIER_WORDS = Object.freeze({
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6
+});
+
+function normalizedMaxTier(value) {
+  const tier =
+    Number(value);
+
+  return (
+    Number.isInteger(tier) &&
+    tier >= 1 &&
+    tier <= 6
+  )
+    ? tier
+    : null;
+}
+
+export function maxBattleTierFromText(value) {
+  const text =
+    String(value || "")
+      .replace(/[–—]/g, "-");
+
+  const numericPatterns = [
+    /\b(?:tier|difficulty)\s*[:#-]?\s*([1-6])\b/i,
+    /\b([1-6])\s*(?:-?\s*star\b|★)/i
+  ];
+
+  for (const pattern of numericPatterns) {
+    const match =
+      text.match(pattern);
+
+    const tier =
+      normalizedMaxTier(
+        match?.[1]
+      );
+
+    if (tier) {
+      return tier;
+    }
+  }
+
+  const wordPatterns = [
+    /\b(?:tier|difficulty)\s*[:#-]?\s*(one|two|three|four|five|six)\b/i,
+    /\b(one|two|three|four|five|six)\s*-?\s*star\b/i
+  ];
+
+  for (const pattern of wordPatterns) {
+    const match =
+      text.match(pattern);
+
+    const tier =
+      MAX_TIER_WORDS[
+        String(
+          match?.[1] || ""
+        ).toLowerCase()
+      ] || null;
+
+    if (tier) {
+      return tier;
+    }
+  }
+
+  return null;
+}
+
+function explicitMaxParticleEntryCostFromText(
+  value
+) {
+  const text =
+    String(value || "");
+
+  const patterns = [
+    /X-POGO-MAX-PARTICLE-COST\s*:\s*(\d{2,5})/i,
+    /\b(?:requires?|costs?|cost(?:s)?(?:\s+(?:of|is))?|entry\s+cost(?:\s+(?:of|is))?)\s*:?\s*(\d{2,5})\s*(?:Max\s*Particles?|MP)\b/i,
+    /\b(\d{2,5})\s*(?:Max\s*Particles?|MP)\s+(?:to|for)\s+(?:enter|join|challenge|engage\s+in)\b/i,
+    /\b(?:enter|join|challenge|engage\s+in)\b[^.]{0,80}?\b(\d{2,5})\s*(?:Max\s*Particles?|MP)\b/i
+  ];
+
+  for (const pattern of patterns) {
+    const match =
+      text.match(pattern);
+
+    const cost =
+      Number(
+        match?.[1]
+      );
+
+    if (
+      Number.isFinite(cost) &&
+      cost > 0
+    ) {
+      return Math.floor(cost);
+    }
+  }
+
+  return null;
+}
+
+function isOfficialCostEvidence(
+  recommendation
+) {
+  return (
+    recommendation
+      ?.source_kind === "official" ||
+    String(
+      recommendation?.source_uid ||
+      ""
+    ).startsWith(
+      "official-supplement:"
+    ) ||
+    recommendation
+      ?.max_particle_cost_official ===
+      true
   );
 }
 
@@ -91,27 +223,53 @@ export function inferMaxParticleCost(recommendation) {
     return {
       cost: null,
       basis: null,
-      confidence: null
+      confidence: null,
+      tier: null,
+      tier_source: null,
+      evidence_source: null
     };
   }
 
-  const explicit =
+  const structuredCost =
     Number(
       recommendation?.max_particle_cost
     );
 
+  const structuredTier =
+    normalizedMaxTier(
+      recommendation?.max_battle_tier
+    );
+
   if (
-    Number.isFinite(explicit) &&
-    explicit > 0
+    Number.isFinite(
+      structuredCost
+    ) &&
+    structuredCost > 0
   ) {
     return {
       cost:
-        Math.floor(explicit),
+        Math.floor(
+          structuredCost
+        ),
       basis:
-        recommendation?.max_particle_cost_source ||
-        "explicit",
+        recommendation
+          ?.max_particle_cost_source ||
+        "structured_cost",
       confidence:
-        "known"
+        recommendation
+          ?.max_particle_cost_confidence ||
+        "structured",
+      tier:
+        structuredTier,
+      tier_source:
+        recommendation
+          ?.max_battle_tier_source ||
+        null,
+      evidence_source:
+        recommendation
+          ?.max_particle_cost_evidence_source ||
+        recommendation?.source_kind ||
+        "structured"
     };
   }
 
@@ -120,81 +278,86 @@ export function inferMaxParticleCost(recommendation) {
       recommendation
     );
 
-  const explicitMatch =
-    text.match(
-      /\b(?:requires?|costs?|cost(?:s)?(?:\s+(?:of|is))?|entry\s+cost(?:\s+(?:of|is))?)\s*:?\s*(\d{2,5})\s*(?:Max\s*Particles?|MP)\b/i
+  const officialEvidence =
+    isOfficialCostEvidence(
+      recommendation
     );
 
-  if (explicitMatch) {
-    const cost =
-      Number(
-        explicitMatch[1]
+  const parsedTier =
+    structuredTier ||
+    maxBattleTierFromText(
+      text
+    );
+
+  if (officialEvidence) {
+    const officialCost =
+      explicitMaxParticleEntryCostFromText(
+        text
       );
 
-    if (
-      Number.isFinite(cost) &&
-      cost > 0
-    ) {
+    if (officialCost) {
       return {
-        cost,
+        cost:
+          officialCost,
         basis:
-          "event_text",
+          "official_explicit_cost",
         confidence:
-          "known"
+          "official_explicit",
+        tier:
+          parsedTier,
+        tier_source:
+          parsedTier
+            ? (
+                structuredTier
+                  ? recommendation
+                      ?.max_battle_tier_source ||
+                    "structured"
+                  : "official_text"
+              )
+            : null,
+        evidence_source:
+          "official"
       };
     }
   }
 
-  const namedTierMatch =
-    text.match(
-      /\b(?:tier|difficulty)\s*([1-6])\b/i
-    );
-
-  const starTierMatch =
-    text.match(
-      /\b([1-6])\s*(?:-?\s*star|★)/i
-    );
-
-  const tierMatch =
-    namedTierMatch ||
-    starTierMatch;
-
-  if (tierMatch) {
-    const tier =
-      Number(
-        tierMatch[1]
-      );
-
+  if (parsedTier) {
     const cost =
       MAX_PARTICLE_COST_BY_TIER[
-        tier
+        parsedTier
       ] || null;
 
     if (cost) {
       return {
         cost,
         basis:
-          `tier_${tier}`,
+          `standard_tier_${parsedTier}`,
         confidence:
-          "standard_tier_cost"
+          "verified_tier_standard_cost",
+        tier:
+          parsedTier,
+        tier_source:
+          structuredTier
+            ? recommendation
+                ?.max_battle_tier_source ||
+              "structured"
+            : officialEvidence
+              ? "official_text"
+              : (
+                  recommendation
+                    ?.source_kind ===
+                    "derived"
+                    ? "derived_event_text"
+                    : "event_text"
+                ),
+        evidence_source:
+          officialEvidence
+            ? "official"
+            : recommendation
+                ?.source_kind ||
+              "event"
       };
     }
-  }
-
-  if (
-    recommendation?.battle_variant ===
-      "gigantamax" ||
-    /\bgigantamax\b|\bg[\s-]?max\b/i.test(
-      `${recommendation?.pokemon_name || ""} ${text}`
-    )
-  ) {
-    return {
-      cost: 800,
-      basis:
-        "gigantamax_standard",
-      confidence:
-        "standard_tier_cost"
-    };
   }
 
   return {
@@ -202,7 +365,13 @@ export function inferMaxParticleCost(recommendation) {
     basis:
       "unknown",
     confidence:
-      "unknown"
+      "unknown",
+    tier:
+      null,
+    tier_source:
+      null,
+    evidence_source:
+      null
   };
 }
 

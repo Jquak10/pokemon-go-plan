@@ -572,18 +572,31 @@ Historical standard values used by the Planner are 800 MP daily collection and 1
 
 Never assume an event-specific MP limit or cost without evidence.
 
-### 17.1 Max Battle cost tiers
+### 17.1 Max Battle cost evidence and tiers
 
-The logger uses a tier-oriented Max Particle cost control.
+The logger uses a tier-oriented Max Particle cost control, while automatic planning requires evidence before it assigns an MP entry cost.
 
-Current standard tier choices:
+Cost evidence precedence is:
+
+1. an explicit official battle-entry cost;
+2. a verified Max Battle difficulty/tier;
+3. the standard cost mapping for that verified tier;
+4. unknown.
+
+Current standard tier mapping used after a tier is verified:
 
 - Tier 1 — 250 MP.
 - Tier 2–3 — 400 MP.
-- Tier 4–6 / Gigantamax — 800 MP.
-- Event/custom cost.
+- Tier 4–6 — 800 MP.
+- Event/custom cost when an official source explicitly supplies one.
 
-An inferred tier is a suggestion, not a silent truth. Unknown or event-modified costs must remain user-confirmable/editable.
+A Dynamax/Gigantamax species or variant never implies a cost by itself. In particular, Gigantamax identity is not a substitute for verified difficulty. If no trustworthy cost/tier evidence exists, the cost remains unknown and the shared allocator does not auto-allocate a Remote Max Battle.
+
+`src/resource-planning.js` normalizes numeric and word-form difficulty evidence (for example, `3-star`, `Difficulty 3`, or `six-star`) and carries cost/tier provenance with each recommendation.
+
+The existing official Pokémon GO sync gives Max-event article links priority within its fixed page budget. When an official article provides Max Battle difficulty or an explicit entry cost, the sync decorates the already-normalized Max calendar event with `X-POGO-MAX-*` evidence in `events.other_lines`. It does not create a duplicate availability event. Recommendation normalization then exposes fields such as `max_battle_tier`, `max_particle_cost`, confidence/source metadata, and the official evidence URL.
+
+The regular event sync runs before the official evidence sync on the existing six-hour cadence, so source refreshes can safely replace calendar rows and official evidence is re-applied afterward. If official evidence cannot be refreshed or matched, the planner falls back to unknown rather than retaining an unsupported species-based assumption.
 
 ## 18. Unified battle logging
 

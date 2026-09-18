@@ -1249,7 +1249,7 @@
                   <option value="">Select tier cost</option>
                   <option value="250">Tier 1 · 250 MP</option>
                   <option value="400">Tier 2–3 · 400 MP</option>
-                  <option value="800">Tier 4–6 / Gigantamax · 800 MP</option>
+                  <option value="800">Tier 4–6 · 800 MP</option>
                   <option value="custom">Event / custom cost…</option>
                 </select>
                 <input id="battleLogMpCustom" class="hidden" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="Custom MP cost" aria-label="Custom Max Particle cost">
@@ -2392,8 +2392,14 @@ function prefillBattleLog(rec = null) {
   const variant = rec?.battle_variant || (/gigantamax|g[ -]?max/i.test(name) ? "gigantamax" : /dynamax/i.test(name) ? "dynamax" : null);
   document.getElementById("battleLogKind").value = variant || (rec?.battle_system === "max" ? "max" : "raid");
   const costConfidence = rec?.max_particle_cost_confidence || "unknown";
-  const knownCost = costConfidence === "known";
-  const suggestedCost = costConfidence === "standard_tier_cost"
+  const knownCost = [
+    "known",
+    "official_explicit"
+  ].includes(costConfidence);
+  const suggestedCost = [
+    "standard_tier_cost",
+    "verified_tier_standard_cost"
+  ].includes(costConfidence)
     ? Number(rec?.max_particle_cost || 0)
     : 0;
   setBattleLogParticleCost(
@@ -2401,9 +2407,9 @@ function prefillBattleLog(rec = null) {
     knownCost
   );
   document.getElementById("battleLogCostHint").textContent = knownCost
-    ? "Cost from the recommendation. Change the tier if an event changes the cost."
+    ? "Official/confirmed entry cost from the recommendation. Change it if the in-game battle shows a different event cost."
     : suggestedCost
-      ? `Standard tier suggests ${formatNumber(suggestedCost)} MP. Confirm the actual tier cost; event bonuses may change it.`
+      ? `Verified tier maps to ${formatNumber(suggestedCost)} MP. Confirm the actual entry cost before logging; event rules may differ.`
       : "MP cost is not confirmed. Select the actual tier cost, or choose Event / custom cost.";
   const remoteButton = document.querySelector('[data-raid-type="remote"]');
   remoteButton.disabled = rec?.logging_remote_eligible === false;

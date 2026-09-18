@@ -31,7 +31,7 @@ for (const name of ['raidLogMatchingTarget','raidLogPokemonNames','setRaidLogTyp
   vm.runInContext(next<0?remainder:remainder.slice(0,next+1),context);
 }
 element('raidLogPokemon').value='Gengar';
-context.openRaidLogModal('Gengar','t',{pokemon_name:'Gengar',battle_system:'max',battle_variant:'gigantamax',max_particle_cost:800,max_particle_cost_confidence:'known',logging_remote_eligible:true});
+context.openRaidLogModal('Gengar','t',{pokemon_name:'Gengar',battle_system:'max',battle_variant:'gigantamax',max_particle_cost:800,max_particle_cost_confidence:'official_explicit',logging_remote_eligible:true});
 assert.equal(element('battleLogKind').value,'gigantamax');
 assert.equal(element('battleLogMp').value,'800');
 assert.equal(element('raidLogProgress').value,3);
@@ -48,9 +48,9 @@ context.raidLogProgressDirty=false;
 context.syncRaidLogProgressDefault();
 assert.equal(element('raidLogProgress').value,6);
 
-context.openRaidLogModal('Gengar',null,{pokemon_name:'Gengar',battle_system:'max',battle_variant:'dynamax',max_particle_cost:400,max_particle_cost_confidence:'standard_tier_cost',logging_remote_eligible:false});
+context.openRaidLogModal('Gengar',null,{pokemon_name:'Gengar',battle_system:'max',battle_variant:'dynamax',max_particle_cost:400,max_particle_cost_confidence:'verified_tier_standard_cost',logging_remote_eligible:false});
 assert.equal(element('battleLogMp').value,'','Estimates must not silently become confirmed cost');
-assert.match(element('battleLogCostHint').textContent,/suggests 400 MP/);
+assert.match(element('battleLogCostHint').textContent,/maps to 400 MP/);
 assert.equal(context.raidLogType,'local');
 assert.equal(element('[data-raid-type="remote"]').disabled,true);
 assert.equal(element('confirmRaidLog').disabled,true,'Unconfirmed standard tier must not be saved');
@@ -75,11 +75,28 @@ assert.equal(element('confirmRaidLog').disabled,true,'Unknown Max variant must b
 for (const text of ['Collect 1600 Max Particles during the event.', 'Rewards include 800 MP.', 'Max Particle collection limit: 1600 Max Particles.']) {
   assert.equal(inferMaxParticleCost({battle_system:'max',event_description:text}).cost,null);
 }
-assert.equal(inferMaxParticleCost({battle_system:'max',event_description:'This battle requires 250 Max Particles.'}).cost,250);
+assert.equal(
+  inferMaxParticleCost({
+    battle_system:'max',
+    event_description:'This battle requires 250 Max Particles.'
+  }).cost,
+  null,
+  'Non-official text must not silently confirm a battle entry cost'
+);
+assert.equal(
+  inferMaxParticleCost({
+    battle_system:'max',
+    source_kind:'official',
+    event_description:'This battle requires 250 Max Particles.'
+  }).cost,
+  250
+);
 assert.match(manage,/<select id="battleLogMp">/);
 assert.match(manage,/Tier 1 · 250 MP/);
 assert.match(manage,/Tier 2–3 · 400 MP/);
-assert.match(manage,/Tier 4–6 \/ Gigantamax · 800 MP/);
+assert.match(manage,/Tier 4–6 · 800 MP/);
+assert.match(manage,/verified_tier_standard_cost/);
+assert.match(manage,/official_explicit/);
 assert.match(manage,/max_particle_cost: battleLogParticleCostValue\(\)/);
 assert.match(manage,/remote_battles_used: Number\(document\.getElementById\("raidsUsedToday"\)\.value\)/);
 assert.match(manage,/official daily Remote limit is shared by ordinary Remote Raids and Remote Max Battles/i);
