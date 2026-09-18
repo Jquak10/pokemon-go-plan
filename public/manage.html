@@ -1824,8 +1824,14 @@ function renderTodayBriefing() {
     .innerHTML =
       topPick
         ? `
-          <span class="status-badge ${scoreTone(topPick.score)}">${esc(topPick.label)}</span>
-          <span class="score-pill">${formatNumber(topPick.score)}</span>
+          <span
+            class="status-badge ${scoreTone(topPick.score)}"
+            title="${esc(topPick.planning_rationale || "Canonical Battle Plan priority")}"
+          >${esc(topPick.label)}</span>
+          <span
+            class="score-pill"
+            title="${esc(topPick.planning_rationale || "Canonical Battle Plan priority")}"
+          >${formatNumber(topPick.score)}</span>
 
           ${
             topPicks.length > 1
@@ -3198,7 +3204,7 @@ function renderDesktopQuickRail() {
       ? picks
           .map(
             item =>
-              item.pokemon_name
+              `${item.pokemon_name} · ${item.label || "Priority"} ${formatNumber(item.score)}`
           )
           .join(" + ")
       : "No urgent target";
@@ -5644,6 +5650,11 @@ function renderRecommendationCard(
         <details class="compact-details">
           <summary>Why?</summary>
           <ul>
+            ${
+              rec.planning_rationale
+                ? `<li><strong>Planning priority:</strong> ${esc(rec.planning_rationale)}</li>`
+                : ""
+            }
             ${rec.reasons.map(reason => `<li>${esc(reason)}</li>`).join("")}
           </ul>
         </details>
