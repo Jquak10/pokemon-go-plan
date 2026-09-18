@@ -4,13 +4,17 @@ Pokémon GO Planner is a private, personalized raid-planning and calendar applic
 
 **Production app:** [https://pogo-plan.jquak-10.workers.dev](https://pogo-plan.jquak-10.workers.dev)
 
+**Engineering references:** [Current architecture](docs/ARCHITECTURE.md) · [Architecture decisions and supersession history](docs/DECISIONS.md)
+
+The engineering references above are the durable source for current architecture and design history. Some Part-by-Part notes below intentionally describe the state at that implementation stage; when a later decision superseded an earlier one, docs/DECISIONS.md records the replacement.
+
 Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner.
 
 ## What the app does
 
 The planner brings the decisions that normally live in several places into one dashboard: what is currently available, how valuable each raid is, which Pokémon matter to you, how much progress remains, and whether another paid Remote Raid is worthwhile. It also provides a personal event calendar and a private calendar subscription.
 
-Create a planner with your timezone, save its private management link, and then tailor its Targets, recommendation weights, Remote Raid limits, and event filters. The Raid Plan updates from those choices and from the raids you log.
+Create a planner with your timezone, save its private management link, and then tailor its Targets, recommendation weights, Remote limits, and event filters. The Battle Plan updates from those choices and from the battles you log.
 
 ## Part 4: unified Battle logging
 
@@ -20,7 +24,7 @@ Official rules checked on 17 September 2026:
 
 - [Niantic: Joining Battles Remotely](https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/2487-joining-battles-remotely/) confirms Remote Max Battles use a Remote Raid Pass plus the same MP cost as local participation. The pass is consumed when battle starts, including a loss; eligible retries against the same boss do not consume another pass.
 - [Pokémon GO: Max Battles](https://pokemongo.com/max-pokemon-battle) confirms MP is spent only after defeating the boss. The logger therefore deducts MP for wins and records pass consumption separately.
-- The official help page states a normal limit of 10 Remote Raids per day, with event exceptions, but does not clearly establish a numeric Remote Max cap or how it relates to that Raid cap. Part 4 retains Part 3's separate Remote Max usage accounting, does not increment ordinary Remote Raid usage for Max logs, and does not invent a Max participation cap. The logger explicitly asks players to check in-game eligibility. Separate accounting is a conservative application choice, not a claim that unlimited Remote Max participation is officially confirmed.
+- The Part 4 implementation initially kept ordinary Remote Raid and Remote Max numeric usage separate while the official relationship was unclear. That historical choice was superseded in PR #27: ordinary Remote Raids and Remote Max Battles now consume one shared official daily Remote participation ceiling, while their underlying ledgers remain separate for auditability. Temporary increases and unlimited windows apply to the combined usage.
 
 ### Required D1 migration
 
