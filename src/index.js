@@ -3177,7 +3177,8 @@ function htmlToPlainText(html) {
 }
 
 function officialEventLinksFromHtml(html, baseUrl) {
-  const links = new Set(PINNED_OFFICIAL_EVENT_PAGES);
+  const maxBattleLinks = [];
+  const otherLinks = [];
 
   const hrefRegex = /href\s*=\s*["']([^"'#]+)["']/gi;
   let match;
@@ -3204,11 +3205,39 @@ function officialEventLinksFromHtml(html, baseUrl) {
 
       url.hash = "";
       url.search = "";
-      links.add(url.toString().replace(/\/$/, ""));
+
+      const normalizedUrl =
+        url.toString().replace(/\/$/, "");
+
+      if (
+        /(?:max[-_]?battle|gigantamax|dynamax)/i.test(
+          path
+        )
+      ) {
+        maxBattleLinks.push(
+          normalizedUrl
+        );
+      } else {
+        otherLinks.push(
+          normalizedUrl
+        );
+      }
     } catch {}
   }
 
-  return [...links].slice(0, MAX_OFFICIAL_EVENT_PAGES_PER_SYNC);
+  // Max-event articles often carry the only official difficulty evidence
+  // needed to derive a safe standard MP entry cost. Prioritize them without
+  // increasing the number of official pages fetched per sync.
+  return [
+    ...new Set([
+      ...PINNED_OFFICIAL_EVENT_PAGES,
+      ...maxBattleLinks,
+      ...otherLinks
+    ])
+  ].slice(
+    0,
+    MAX_OFFICIAL_EVENT_PAGES_PER_SYNC
+  );
 }
 
 function isoDate(year, month, day) {
@@ -3265,6 +3294,308 @@ function inferDateRangeFromText(value) {
     start_date: isoDate(first.year, first.month, first.day),
     end_date: isoDate(second.year, second.month, second.day)
   };
+}
+
+function maxBattleOfficialDateRangeFromText(
+  value
+) {
+  const fullText =
+    String(value || "");
+
+  const eventIndex =
+    fullText.search(
+      /(?:Gigantamax|Dynamax|Max)\b[^\n]{0,100}?Max Battle(?:s| Day| Weekend)?/i
+    );
+
+  const window =
+    eventIndex >= 0
+      ? fullText.slice(
+          Math.max(0, eventIndex - 240),
+          eventIndex + 1400
+        )
+      : fullText.slice(0, 1400);
+
+  const tokens =
+    dateTokensFromText(
+      window
+    );
+
+  if (!tokens.length) {
+    return null;
+  }
+
+  const first =
+    tokens[0];
+
+  const fallbackYear =
+    first.year ||
+    Number(
+      window.match(
+        /\b(20\d{2})\b/
+      )?.[1]
+    ) ||
+    new Date().getUTCFullYear();
+
+  const firstDate =
+    isoDate(
+      first.year || fallbackYear,
+      first.month,
+      first.day
+    );
+
+  if (tokens.length > 1) {
+    const second =
+      tokens[1];
+
+    const secondDate =
+      isoDate(
+        second.year || fallbackYear,
+        second.month,
+        second.day
+      );
+
+    const firstMs =
+      Date.parse(
+        `${firstDate}T00:00:00Z`
+      );
+
+    const secondMs =
+      Date.parse(
+        `${secondDate}T00:00:00Z`
+      );
+
+    const gapDays =
+      (
+        secondMs -
+        firstMs
+      ) / 86400000;
+
+    if (
+      Number.isFinite(gapDays) &&
+      gapDays >= 0 &&
+      gapDays <= 4
+    ) {
+      return {
+        start_date:
+          firstDate,
+        end_date:
+          secondDate
+      };
+    }
+  }
+
+  return {
+    start_date:
+      firstDate,
+    end_date:
+      firstDate
+  };
+}
+
+function cleanOfficialMaxPokemonLine(
+  value
+) {
+  const line =
+    String(value || "")
+      .replace(
+        /[＊*†‡]+$/g,
+        ""
+      )
+      .trim();
+
+  if (
+    !line ||
+    line.length > 64 ||
+    /^(?:Featured Pokémon|Event Bonuses|Timed Research|Where can I find|Max out|Event Ticket|Pokémon GO Web Store|Learn More)$/i.test(
+      line
+    ) ||
+    /\b(?:will|can|during|from|until|bonus|research|ticket|battle day|max battles? are|trainers?)\b/i.test(
+      line
+    ) ||
+    /[.!?]$/.test(
+      line
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    /^(?:Gigantamax|Dynamax)\s+[A-Za-z0-9À-ž.'’()\- ]+$/u.test(
+      line
+    )
+  ) {
+    return line;
+  }
+
+  if (
+    /^[A-ZÀ-Þ][A-Za-zÀ-ž0-9.'’()\-]*(?:\s+[A-ZÀ-Þ][A-Za-zÀ-ž0-9.'’()\-]*){0,4}$/u.test(
+      line
+    )
+  ) {
+    return line;
+  }
+
+  return null;
+}
+
+function officialMaxBattleSupplementsFromText(
+  text,
+  sourceUrl
+) {
+  const fullText =
+    String(text || "");
+
+  const evidence =
+    inferMaxParticleCost({
+      battle_system:
+        "max",
+      source_kind:
+        "official",
+      event_description:
+        fullText
+    });
+
+  if (!evidence.cost) {
+    return [];
+  }
+
+  const range =
+    maxBattleOfficialDateRangeFromText(
+      fullText
+    );
+
+  if (!range) {
+    return [];
+  }
+
+  const lines =
+    fullText
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean);
+
+  const names = [];
+
+  const addName =
+    value => {
+      const cleaned =
+        cleanOfficialMaxPokemonLine(
+          value
+        );
+
+      if (
+        cleaned &&
+        !names.some(
+          existing =>
+            normalizeName(existing) ===
+            normalizeName(cleaned)
+        )
+      ) {
+        names.push(
+          cleaned
+        );
+      }
+    };
+
+  for (
+    let index = 0;
+    index < lines.length;
+    index++
+  ) {
+    if (
+      !/(?:one|two|three|four|five|six|[1-6])\s*-?\s*star\s+Max Battles?/i.test(
+        lines[index]
+      )
+    ) {
+      continue;
+    }
+
+    for (
+      let lookahead = index + 1;
+      lookahead <
+        Math.min(
+          lines.length,
+          index + 10
+        );
+      lookahead++
+    ) {
+      if (
+        /^(?:Event Bonuses|Timed Research|Where can I find|Max out|Event Ticket|Pokémon GO Web Store)$/i.test(
+          lines[lookahead]
+        )
+      ) {
+        break;
+      }
+
+      addName(
+        lines[lookahead]
+      );
+    }
+  }
+
+  if (!names.length) {
+    for (const line of lines.slice(0, 16)) {
+      const titleMatch =
+        line.match(
+          /^((?:Gigantamax|Dynamax)\s+.+?)\s+Max Battle Day\b/i
+        );
+
+      if (titleMatch) {
+        addName(
+          titleMatch[1]
+        );
+      }
+    }
+  }
+
+  if (!names.length) {
+    return [];
+  }
+
+  const evidenceIndex =
+    fullText.search(
+      /(?:one|two|three|four|five|six|[1-6])\s*-?\s*star\s+Max Battles?/i
+    );
+
+  const excerpt =
+    evidenceIndex >= 0
+      ? fullText
+          .slice(
+            Math.max(
+              0,
+              evidenceIndex - 180
+            ),
+            evidenceIndex + 520
+          )
+          .replace(
+            /\s+/g,
+            " "
+          )
+          .trim()
+      : null;
+
+  return names.map(
+    pokemonName => ({
+      pokemon_name:
+        pokemonName,
+      start_date:
+        range.start_date,
+      end_date:
+        range.end_date,
+      max_battle_tier:
+        evidence.tier,
+      max_particle_cost:
+        evidence.cost,
+      max_particle_cost_source:
+        evidence.basis,
+      max_particle_cost_confidence:
+        evidence.confidence,
+      source_url:
+        sourceUrl,
+      source_excerpt:
+        excerpt
+    })
+  );
 }
 
 function nearbyDateWindow(text, startIndex, maxLength = 320) {
