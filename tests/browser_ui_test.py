@@ -40,9 +40,17 @@ MOCK_STATE = {
             "pokemon_name": "Dynamax Rhyhorn",
             "boss_name": "Dynamax Rhyhorn",
             "encounter_name": "Rhyhorn",
-            "score": 48,
-            "label": "OPTIONAL",
-            "emoji": "⭐",
+            "score": 54,
+            "label": "RECOMMENDED",
+            "emoji": "⭐⭐",
+            "recommendation_score": 48,
+            "planning_score": 54,
+            "score_basis": "max-opportunity-v1",
+            "planning_rationale": (
+                "Priority combines your personalized value, rarity/availability, "
+                "and Max capability; current Max attacker utility is not available "
+                "for this opportunity."
+            ),
             "reasons": ["Max Battle regression fixture."],
             "battle_system": "max",
             "battle_variant": "dynamax",
@@ -165,9 +173,13 @@ MOCK_STATE = {
         "local_date": "2026-09-18",
         "top_pick": {
             "pokemon_name": "Dynamax Rhyhorn",
-            "score": 48,
-            "label": "OPTIONAL",
-            "emoji": "⭐",
+            "score": 54,
+            "label": "RECOMMENDED",
+            "emoji": "⭐⭐",
+            "recommendation_score": 48,
+            "planning_score": 54,
+            "score_basis": "max-opportunity-v1",
+            "planning_rationale": "Priority combines personalized value and Max-specific signals.",
             "battle_system": "max",
             "battle_variant": "dynamax",
             "source_kind": "derived",
@@ -177,9 +189,13 @@ MOCK_STATE = {
         "top_picks": [
             {
                 "pokemon_name": "Dynamax Rhyhorn",
-                "score": 48,
-                "label": "OPTIONAL",
-                "emoji": "⭐",
+                "score": 54,
+                "label": "RECOMMENDED",
+                "emoji": "⭐⭐",
+                "recommendation_score": 48,
+                "planning_score": 54,
+                "score_basis": "max-opportunity-v1",
+                "planning_rationale": "Priority combines personalized value and Max-specific signals.",
                 "battle_system": "max",
                 "battle_variant": "dynamax",
                 "source_kind": "derived",
@@ -402,6 +418,13 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         card = page.locator(".recommendation-card", has_text="Dynamax Rhyhorn")
         card.locator(".raid-intel").wait_for(state="visible")
         self.assertNotIn("Loading battle intel", card.inner_text())
+        self.assertEqual(card.locator(".score-ring").inner_text().strip(), "54")
+        self.assertIn("RECOMMENDED", card.inner_text())
+        card.locator("summary", has_text="Why?").click()
+        self.assertIn("Planning priority:", card.inner_text())
+        self.assertIn("RECOMMENDED 54", page.locator("#desktopRailTopPick").inner_text())
+        self.assertIn("RECOMMENDED", page.locator("#todayTopPickMeta").inner_text())
+        self.assertIn("54", page.locator("#todayTopPickMeta").inner_text())
         intel = card.locator(".raid-intel").inner_text()
         self.assertIn("WEAK TO", intel.upper())
         self.assertIn("Water", intel)
