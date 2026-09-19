@@ -12,6 +12,7 @@ import {
   battleOpportunityMetadata,
   battleOpportunityPresentation,
   battlePlanFilterMatches,
+  canonicalBattlePokemonName,
   battleSpritePolicy,
   battleSystemForSourceType,
   battleSystemLabel,
@@ -24,6 +25,7 @@ import {
 import {
   calendarDisplaySourceType,
   calendarSourceTypesForUser,
+  findMatches,
   officialMaxBattleSupplementsFromText,
   suppressionSourceTypesForEvent
 } from "../src/index.js";
@@ -142,6 +144,44 @@ const birdRotation = maxRotationEventFromMaxMonday({
 assert.equal(birdRotation.end_date, "2026-09-27");
 assert.match(birdRotation.summary, /Articuno, Zapdos, and Moltres/);
 assert.equal(maxBattleVariantForEvent(birdRotation, "Zapdos"), BATTLE_VARIANT.DYNAMAX);
+assert.equal(
+  canonicalBattlePokemonName(
+    birdRotation,
+    "Zapdos"
+  ),
+  "Dynamax Zapdos"
+);
+assert.equal(
+  canonicalBattlePokemonName(
+    birdRotation,
+    "Moltres"
+  ),
+  "Dynamax Moltres"
+);
+
+const groupedBirdMatches =
+  findMatches(
+    birdRotation.summary,
+    [],
+    [],
+    birdRotation,
+    [
+      { names: { English: "Articuno" } },
+      { names: { English: "Zapdos" } },
+      { names: { English: "Moltres" } }
+    ]
+  );
+
+assert.deepEqual(
+  groupedBirdMatches
+    .map(item => item.name)
+    .sort(),
+  [
+    "Dynamax Articuno",
+    "Dynamax Moltres",
+    "Dynamax Zapdos"
+  ]
+);
 
 assert.equal(maxRotationEventFromMaxMonday({
   source_type: "max_mondays",
@@ -241,6 +281,24 @@ assert.deepEqual(
     battle_variant: "gigantamax",
     boss_name: "Gigantamax Gengar",
     encounter_name: "Gengar",
+    remote_pass_capable_by_source: true,
+    remote_eligible: true
+  }
+);
+
+assert.deepEqual(
+  battleOpportunityMetadata(
+    birdRotation,
+    {
+      pokemonName: "Zapdos",
+      remoteEligible: true
+    }
+  ),
+  {
+    battle_system: "max",
+    battle_variant: "dynamax",
+    boss_name: "Dynamax Zapdos",
+    encounter_name: "Zapdos",
     remote_pass_capable_by_source: true,
     remote_eligible: true
   }

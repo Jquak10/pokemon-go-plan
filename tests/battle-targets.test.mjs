@@ -64,14 +64,14 @@ const maxFallbackPokedex=[
 ];
 const birdsEvent={source_type:'max_battles',summary:'Articuno, Zapdos & Moltres Max Battles'};
 const birdMatches=findMatches(birdsEvent.summary,[],[],birdsEvent,maxFallbackPokedex);
-assert.deepEqual(birdMatches.map(match=>match.name).sort(),['Articuno','Moltres','Zapdos']);
+assert.deepEqual(birdMatches.map(match=>match.name).sort(),['Dynamax Articuno','Dynamax Moltres','Dynamax Zapdos']);
 for(const match of birdMatches){
   const metadata=battleOpportunityMetadata(birdsEvent,{pokemonName:match.name});
   assert.equal(metadata.battle_variant,'dynamax');
-  assert.equal(T.canonicalName(match.name,T.kind(metadata)),'Dynamax '+match.name);
+  assert.equal(T.canonicalName(match.name,T.kind(metadata)),match.name);
 }
 const rhyhornEvent={source_type:'max_battles',summary:'Rhyhorn Max Battles'};
-assert.equal(findMatches(rhyhornEvent.summary,[],[],rhyhornEvent,maxFallbackPokedex)[0].name,'Rhyhorn');
+assert.equal(findMatches(rhyhornEvent.summary,[],[],rhyhornEvent,maxFallbackPokedex)[0].name,'Dynamax Rhyhorn');
 
 // Explicit and automatic target matching update only the chosen system/goal.
 sql.exec("INSERT INTO battle_resource_state VALUES('u',1500,'now')");
@@ -98,7 +98,7 @@ insertEvent.run('dyn','max_battles','Dynamax Gengar Max Battles',future,future,'
 const user={id:'u',timezone:'Asia/Singapore',pve_weight:1,pvp_weight:0,collector_weight:0};
 insertEvent.run('rhyhorn-max','max_battles','Rhyhorn Max Battles',today,today,'4');
 const fallbackRecs=await recommendationsForDate(env,user,all(),metas,today,maxFallbackPokedex);
-const rhyhornRec=fallbackRecs.find(r=>r.battle_system==='max'&&r.pokemon_name==='Rhyhorn');
+const rhyhornRec=fallbackRecs.find(r=>r.battle_system==='max'&&r.pokemon_name==='Dynamax Rhyhorn');
 assert.ok(rhyhornRec,'Current Max boss without pokemon_meta must still render as a recommendation');
 assert.equal(rhyhornRec.battle_variant,'dynamax');
 sql.prepare("DELETE FROM events WHERE id='rhyhorn-max'").run();

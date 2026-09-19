@@ -176,6 +176,42 @@ export function encounterNameForMaxPokemon(value) {
   return name || null;
 }
 
+export function canonicalBattlePokemonName(
+  event,
+  value,
+  battleVariant = null
+) {
+  const name = String(value || "").trim();
+  if (!name) return null;
+
+  if (
+    battleSystemForSourceType(event?.source_type) !==
+    BATTLE_SYSTEM.MAX
+  ) {
+    return name;
+  }
+
+  const encounterName =
+    encounterNameForMaxPokemon(name);
+
+  if (!encounterName) return null;
+
+  const variant =
+    battleVariant ||
+    maxBattleVariantForEvent(
+      event,
+      name
+    ) ||
+    BATTLE_VARIANT.DYNAMAX;
+
+  const prefix =
+    variant === BATTLE_VARIANT.GIGANTAMAX
+      ? "Gigantamax"
+      : "Dynamax";
+
+  return `${prefix} ${encounterName}`;
+}
+
 export function battleSystemLabel(system) {
   if (system === BATTLE_SYSTEM.RAID) return "Raid";
   if (system === BATTLE_SYSTEM.MAX) return "Max Battle";
@@ -278,7 +314,7 @@ export function battleOpportunityMetadata(
 
   if (!battleSystem) return null;
 
-  const bossName =
+  const rawBossName =
     String(pokemonName || "").trim() ||
     null;
 
@@ -286,9 +322,18 @@ export function battleOpportunityMetadata(
     battleSystem === BATTLE_SYSTEM.MAX
       ? maxBattleVariantForEvent(
           event,
-          bossName
+          rawBossName
         )
       : null;
+
+  const bossName =
+    battleSystem === BATTLE_SYSTEM.MAX
+      ? canonicalBattlePokemonName(
+          event,
+          rawBossName,
+          battleVariant
+        )
+      : rawBossName;
 
   const resolvedEncounterName =
     String(encounterName || "").trim() ||

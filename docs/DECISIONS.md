@@ -761,6 +761,7 @@ The following sequence is retained as a compact repository implementation/change
 | #40 | Shared Raid + Max future forecast | Replaced the Raid-oriented seven-day forecast with a shared resource-aware Battle forecast, modeled cross-day target/MP constraints, switched future reserve guidance to feasible allocations, and closed BL-006. |
 | #41 | Planner schedule/forecast visibility fixes | Displayed exact temporary Remote-limit windows in the planner timezone, exposed derived weekly Dynamax rotations through the Max Battles calendar category, and added expandable Paid Battle Forecast details including unallocated Max opportunities/reasons. |
 | #42 | Forecast Raid/Max count-label clarification | Replaced ambiguous total-plus-Max labels such as “4 · 1 Max” with mutually exclusive system counts such as “3 Raid + 1 Max” without changing forecast allocation semantics. |
+| #43 | Canonical grouped Max Battle Pokémon identity | Canonicalized event-derived Max Pokémon names before recommendation/resource output so grouped schedules apply Dynamax/Gigantamax identity to every matched species; added regressions for the Kanto bird rotation and downstream metadata consistency. |
 
 ## Supersession map
 

@@ -374,7 +374,9 @@ battle_variant is:
 - dynamax
 - gigantamax
 
-For ordinary Dynamax, the underlying exact species/form remains the encounter identity. Dynamax is a capability/presentation state.
+For ordinary Dynamax, the underlying exact species/form remains the encounter identity. Dynamax is a capability/presentation state. User-facing battle identity is nevertheless canonicalized as `Dynamax <species/form>` so recommendations, forecasts, targets, logging, and resource planning all use one stable label.
+
+When a single source event lists several Max Pokémon but writes the capability only once (for example, “Dynamax Articuno, Zapdos, and Moltres”), the event-level Max variant applies to every matched Pokémon. The parser must not infer that only the first listed species is Dynamax. Canonicalization occurs before recommendation/resource output so downstream UI surfaces cannot diverge.
 
 For Gigantamax, the capability/form must be explicit. Exact Gigantamax assets are required for a Gigantamax sprite. If none exists, show no sprite instead of an ordinary form.
 
