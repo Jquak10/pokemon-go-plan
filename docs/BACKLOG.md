@@ -1,6 +1,6 @@
 # Pokémon GO Planner — Backlog
 
-Last reviewed: 18 September 2026
+Last reviewed: 20 September 2026
 
 This file is the durable home for **confirmed but unshipped work** and explicitly deferred/rejected ideas that would otherwise exist only in project chats.
 
