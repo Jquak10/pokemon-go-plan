@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Battle Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=38">
+  <link rel="stylesheet" href="/styles.css?v=39">
 </head>
 
 <body class="manage-page">
@@ -436,7 +436,7 @@
     <div id="recommendations" class="recommendation-grid compact-recommendation-grid"></div>
 
               <details id="remoteRaidZeroDetails" class="compact-details zero-raid-details">
-                <summary>Raid bosses receiving 0 Remote Raids</summary>
+                <summary id="remoteZeroSummary">Battles receiving 0 Remote allocation</summary>
                 <div id="remoteRaidZero" class="zero-raid-list"></div>
               </details>
             </section>
@@ -4409,20 +4409,9 @@ function renderRemoteRaidPlan() {
       ? `${formatNumber(plan.recommended_total)} raid${Number(plan.recommended_total) === 1 ? "" : "s"}`
       : `${formatNumber(sharedRecommendedPasses)} Remote Pass${Number(sharedRecommendedPasses) === 1 ? "" : "es"}`;
 
-  // Allocation counts are displayed directly on recommendation cards.
-
-
-  document.getElementById("remoteRaidZero").innerHTML = plan.not_allocated.length
-    ? plan.not_allocated.map(item => `
-      <div class="zero-raid-row">
-        <div>
-          <strong>${esc(item.pokemon_name)}</strong>
-          <small>${esc(item.exclusion_reason || "Marginal value fell below the allocation threshold.")}</small>
-        </div>
-        <span class="zero-badge">0</span>
-      </div>
-    `).join("")
-    : `<p class="muted">Every remotely eligible boss received at least one recommended raid.</p>`;
+  // Allocation counts and compact zero-allocation reasons are displayed
+  // directly on recommendation cards. Keep the full explanation list secondary.
+  renderZeroAllocationDetails();
 }
 
 
@@ -5954,9 +5943,215 @@ function battleSystemBadgeHtml(rec) {
   `;
 }
 
+function zeroAllocationKey(
+  item
+) {
+  return BattleTargets.key({
+    pokemon_name:
+      item?.pokemon_name || "",
+    battle_system:
+      item?.battle_system || "raid",
+    battle_variant:
+      item?.battle_variant || null
+  });
+}
+
+function zeroAllocationItems() {
+  const byKey =
+    new Map();
+
+  // Keep the legacy Raid-only plan as a compatibility fallback for older
+  // payload shapes, then let the shared Battle Resource plan override it.
+  for (
+    const item of
+    state.remote_raid_plan
+      ?.not_allocated || []
+  ) {
+    const normalized = {
+      ...item,
+      battle_system:
+        item?.battle_system ||
+        "raid",
+      battle_variant:
+        item?.battle_variant ||
+        null,
+      reason:
+        item?.reason ||
+        item?.exclusion_reason ||
+        "Marginal value fell below the allocation threshold."
+    };
+
+    byKey.set(
+      zeroAllocationKey(
+        normalized
+      ),
+      normalized
+    );
+  }
+
+  for (
+    const item of
+    state.battle_resource_plan
+      ?.not_allocated || []
+  ) {
+    byKey.set(
+      zeroAllocationKey(
+        item
+      ),
+      item
+    );
+  }
+
+  return [...byKey.values()];
+}
+
+function compactZeroAllocationReason(
+  item
+) {
+  const code =
+    String(
+      item?.reason_code || ""
+    );
+
+  const labels = {
+    priority_skip:
+      "Priority set to Skip",
+    target_complete:
+      "Target complete",
+    below_threshold:
+      "Below your paid-battle threshold",
+    no_worthwhile_attempts:
+      "No worthwhile paid attempts remain",
+    remote_ineligible:
+      "Not remotely eligible",
+    remote_access_unconfirmed:
+      "Remote access not confirmed",
+    max_particle_cost_unknown:
+      "MP cost unknown",
+    remote_capacity_exhausted:
+      "No Remote Pass capacity remains today",
+    raid_plan_zero:
+      "No additional Remote Raid uses planned today",
+    max_plan_zero:
+      "No additional Remote Max uses planned today",
+    max_particles_reserved:
+      "MP reserved for a stronger future opportunity",
+    max_particles_insufficient:
+      "Not enough spendable MP remains today",
+    lower_marginal_value:
+      "Higher-priority battles use today's worthwhile capacity"
+  };
+
+  if (
+    code === "future_reserve" &&
+    item?.reason
+  ) {
+    return item.reason;
+  }
+
+  if (labels[code]) {
+    return labels[code];
+  }
+
+  const reason =
+    String(
+      item?.reason ||
+      item?.exclusion_reason ||
+      ""
+    ).trim();
+
+  if (/max particle cost is unknown/i.test(reason)) {
+    return "MP cost unknown";
+  }
+
+  if (/priority is set to skip/i.test(reason)) {
+    return "Priority set to Skip";
+  }
+
+  if (/target is marked complete/i.test(reason)) {
+    return "Target complete";
+  }
+
+  if (/below your .*threshold/i.test(reason)) {
+    return "Below your paid-battle threshold";
+  }
+
+  if (/not remotely eligible/i.test(reason)) {
+    return "Not remotely eligible";
+  }
+
+  if (/not confirmed as remotely accessible/i.test(reason)) {
+    return "Remote access not confirmed";
+  }
+
+  return (
+    reason ||
+    "No paid Remote use is planned for this opportunity today."
+  );
+}
+
+function zeroAllocationSystemLabel(
+  item
+) {
+  return item?.battle_system === "max"
+    ? "Max Battle"
+    : "Raid";
+}
+
+function renderZeroAllocationDetails() {
+  const details =
+    document.getElementById(
+      "remoteRaidZeroDetails"
+    );
+
+  const list =
+    document.getElementById(
+      "remoteRaidZero"
+    );
+
+  if (!details || !list) {
+    return;
+  }
+
+  const visible =
+    zeroAllocationItems()
+      .filter(
+        item =>
+          battlePlanFilter === "all" ||
+          (item.battle_system || "raid") ===
+            battlePlanFilter
+      );
+
+  details.classList.toggle(
+    "hidden",
+    visible.length === 0
+  );
+
+  document
+    .getElementById(
+      "remoteZeroSummary"
+    )
+    .textContent =
+      `Battles receiving 0 Remote allocation · ${formatNumber(visible.length)}`;
+
+  list.innerHTML =
+    visible.length
+      ? visible.map(item => `
+          <div class="zero-raid-row">
+            <div>
+              <strong>${esc(item.pokemon_name)}</strong>
+              <small>${esc(zeroAllocationSystemLabel(item))} · ${esc(item.reason || item.exclusion_reason || compactZeroAllocationReason(item))}</small>
+            </div>
+            <span class="zero-badge">0</span>
+          </div>
+        `).join("")
+      : "";
+}
+
 function renderRecommendationCard(
   rec,
-  allocation
+  allocation,
+  zeroAllocation = null
 ) {
   const isMax =
     rec.battle_system === "max";
@@ -5979,6 +6174,18 @@ function renderRecommendationCard(
     allocated > 0
       ? "has-allocation"
       : "no-allocation";
+
+  const zeroReason =
+    allocated <= 0
+      ? compactZeroAllocationReason(
+          zeroAllocation
+        )
+      : null;
+
+  const zeroPrefix =
+    isMax
+      ? "No Remote Max allocation"
+      : "No Remote Raid allocation";
 
   return `
     <article class="recommendation-card compact-recommendation-card ${scoreTone(rec.score)} battle-card battle-card-${esc(rec.battle_system || "raid")}">
@@ -6045,6 +6252,17 @@ function renderRecommendationCard(
             : ""
         }
       </div>
+
+      ${
+        zeroReason
+          ? `
+            <div class="allocation-reason-inline allocation-reason-${isMax ? "max" : "raid"}">
+              <span>${esc(zeroPrefix)}</span>
+              <strong>${esc(zeroReason)}</strong>
+            </div>
+          `
+          : ""
+      }
 
       ${isMax ? maxRankingsHtml(rec.meta?.max_rankings_json) : raidRankingsHtml(rec.meta?.raid_rankings_json)}
 
@@ -6123,13 +6341,6 @@ function renderRecommendations() {
       (rec.battle_system || "raid") === battlePlanFilter
     );
 
-  document
-    .getElementById("remoteRaidZeroDetails")
-    ?.classList.toggle(
-      "hidden",
-      battlePlanFilter === "max"
-    );
-
   const allocations =
     state.remote_raid_plan
       ?.allocations || [];
@@ -6159,6 +6370,18 @@ function renderRecommendations() {
         ]
       )
     );
+
+  const zeroAllocationByKey =
+    new Map(
+      zeroAllocationItems().map(
+        item => [
+          zeroAllocationKey(item),
+          item
+        ]
+      )
+    );
+
+  renderZeroAllocationDetails();
 
   if (!recommendations.length) {
     const emptyLabel =
@@ -6207,7 +6430,11 @@ function renderRecommendations() {
 
       return renderRecommendationCard(
         rec,
-        shared || legacy
+        shared || legacy,
+        zeroAllocationByKey.get(
+          BattleTargets.key(rec)
+        ) ||
+        null
       );
     };
 

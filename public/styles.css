@@ -5160,6 +5160,43 @@ details[open] > summary .details-chevron {
   color: #7c8b99;
 }
 
+/* BL-008 — direct zero-Remote allocation explanations · v39 */
+.allocation-reason-inline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  margin-top: 8px;
+  padding: 7px 9px;
+  border: 1px solid #dfe7ef;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #63778a;
+  font-size: .66rem;
+  line-height: 1.35;
+}
+
+.allocation-reason-inline span {
+  flex: 0 0 auto;
+  color: #4f6478;
+  font-weight: 900;
+}
+
+.allocation-reason-inline strong {
+  min-width: 0;
+  color: #6f8090;
+  font-weight: 700;
+}
+
+.allocation-reason-max {
+  border-color: #e0dff3;
+  background: #f8f7fd;
+}
+
+.allocation-reason-max span {
+  color: #655a9a;
+}
+
 .recommendation-footer-row {
   display: flex;
   gap: 10px;

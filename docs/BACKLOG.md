@@ -27,12 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-008 — Explain zero Remote allocation directly on Raid and Max cards
-
-The shared resource planner already records useful non-allocation reasons, but the Planner still has a Raid-specific zero-allocation details section and Max cards can show “0 Remote Max battles” without the reason close to the card.
-
-Surface compact, system-aware reasons such as MP cost unknown, below threshold, not remotely accessible, target complete, or priority Skip. Replace Raid-only wording with shared Battle terminology while keeping secondary detail collapsible.
-
 ### BL-009 — Harden intermediate-width desktop responsiveness
 
 The latest desktop fix removes Battle Resources text clipping, but the desktop two-column layout still activates at a relatively narrow width and other intentional ellipses/clamps remain throughout the UI.

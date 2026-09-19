@@ -763,6 +763,7 @@ The following sequence is retained as a compact repository implementation/change
 | #42 | Forecast Raid/Max count-label clarification | Replaced ambiguous total-plus-Max labels such as “4 · 1 Max” with mutually exclusive system counts such as “3 Raid + 1 Max” without changing forecast allocation semantics. |
 | #43 | Canonical grouped Max Battle Pokémon identity | Canonicalized event-derived Max Pokémon names before recommendation/resource output so grouped schedules apply Dynamax/Gigantamax identity to every matched species; added regressions for the Kanto bird rotation and downstream metadata consistency. |
 | #44 | Ordinary Dynamax sprite fallback | Centralized battle sprite resolution so ordinary Dynamax reuses the exact underlying species/form sprite across recommendations, forecasts, Targets, and recent logs while regional forms remain exact and Gigantamax stays exact-only. |
+| #45 | Zero-Remote allocation explanations | Closed BL-008 by adding structured shared-plan non-allocation reasons, surfacing compact system-aware reasons directly on Raid/Max cards, and replacing the Raid-only zero-allocation section with a shared filtered collapsible Battle list. |
 
 ## Supersession map
 

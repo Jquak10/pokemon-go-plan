@@ -21,6 +21,15 @@ assert.match(manage, /data-battle-filter="max"/);
 assert.match(manage, />\s*Max Battles\s*</);
 assert.match(manage, /battlePlanFilter/);
 assert.match(manage, /remoteRaidZeroDetails/);
+assert.match(manage, /Battles receiving 0 Remote allocation/);
+assert.match(manage, /function zeroAllocationItems/);
+assert.match(manage, /function compactZeroAllocationReason/);
+assert.match(manage, /function renderZeroAllocationDetails/);
+assert.match(manage, /No Remote Max allocation/);
+assert.match(manage, /No Remote Raid allocation/);
+assert.match(manage, /max_particle_cost_unknown/);
+assert.match(manage, /Priority set to Skip/);
+assert.doesNotMatch(manage, /Raid bosses receiving 0 Remote Raids/);
 
 assert.match(manage, /function remoteRuleWindowLabel/);
 assert.match(manage, /Local time ·/);
@@ -75,7 +84,7 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=38/);
+  assert.match(read(page), /styles\.css\?v=39/);
 }
 
 assert.match(worker, /BATTLE_SOURCE_TYPES/);
@@ -148,6 +157,13 @@ assert.match(worker, /battle_resource_plan/);
 assert.match(worker, /battleResourcePlanForUser/);
 assert.match(worker, /updateBattleResourcesApi/);
 assert.match(worker, /max_particle_cost/);
+assert.match(read("../src/resource-planning.js"), /reason_code:/);
+assert.match(read("../src/resource-planning.js"), /remote_capacity_exhausted/);
+assert.match(read("../src/resource-planning.js"), /lower_marginal_value/);
+
+assert.match(styles, /BL-008 — direct zero-Remote allocation explanations · v39/);
+assert.match(styles, /\.allocation-reason-inline/);
+assert.match(styles, /\.allocation-reason-max/);
 
 assert.match(styles, /Battle Plan compact desktop polish — v35/);
 assert.match(styles, /grid-template-areas:[\s\S]*today-main resources[\s\S]*today-metrics resources/);
