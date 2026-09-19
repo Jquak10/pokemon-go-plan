@@ -42,6 +42,15 @@ assert.doesNotMatch(
   /<span>\$\{esc\(rule\.start_date \|\| ""\)\}\$\{rule\.end_date \? " → " \+ esc\(rule\.end_date\) : ""\}<\/span>/
 );
 
+assert.match(manage, /function maxTierOverrideControlHtml/);
+assert.match(manage, /data-max-tier-override/);
+assert.match(manage, /\/api\/max-battle-cost-override/);
+assert.match(manage, /Set Max tier…/);
+assert.match(manage, /Use automatic data/);
+assert.match(manage, /current Max data/);
+assert.match(manage, /You can correct the Pokémon, battle type, or goal type/);
+assert.doesNotMatch(manage, /Existing targets keep their Pokémon, battle and goal identity/);
+
 assert.match(manage, /function recommendationSpriteUrl/);
 assert.match(manage, /requires_exact_form/);
 assert.match(manage, /sprite_exact_form/);
@@ -157,9 +166,18 @@ assert.match(worker, /battle_resource_plan/);
 assert.match(worker, /battleResourcePlanForUser/);
 assert.match(worker, /updateBattleResourcesApi/);
 assert.match(worker, /max_particle_cost/);
+assert.match(worker, /POGO_API_MAX_BATTLES/);
+assert.match(worker, /currentMaxBattleTiersFromPayload/);
+assert.match(worker, /max_battle_cost_overrides/);
+assert.match(worker, /updateMaxBattleCostOverrideApi/);
 assert.match(read("../src/resource-planning.js"), /reason_code:/);
 assert.match(read("../src/resource-planning.js"), /remote_capacity_exhausted/);
 assert.match(read("../src/resource-planning.js"), /lower_marginal_value/);
+
+assert.match(styles, /Max Battle tier fallback controls · v40/);
+assert.match(styles, /\.max-tier-override-select/);
+assert.match(styles, /\.forecast-detail-side/);
+assert.match(styles, /max-tier-override-select \{[\s\S]*min-height:\s*44px/);
 
 assert.match(styles, /BL-008 — direct zero-Remote allocation explanations · v39/);
 assert.match(styles, /\.allocation-reason-inline/);
