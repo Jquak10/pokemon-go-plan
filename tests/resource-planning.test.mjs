@@ -3,6 +3,7 @@ import {
   MAX_PARTICLE_COST_BY_TIER,
   STANDARD_MAX_PARTICLE_DAILY_LIMIT,
   STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
+  buildBattleForecast,
   buildBattleResourcePlan,
   inferMaxParticleCost,
   maxBattleTierFromText,
@@ -291,6 +292,48 @@ assert.equal(
 );
 assert.equal(sharedTwo.remote_raid_limit.recommended_additional_raids, 1);
 
+const forecastCappedCurrent = buildBattleResourcePlan({
+  recommendations: [raid, gmax],
+  remoteRaidPlan: {
+    raids_used: 0,
+    remote_limit_used: 0,
+    official_remaining: 10,
+    official_is_unlimited: false,
+    system_recommended_budget: 5,
+    forecast_recommended_additional_raids: 0,
+    forecast_recommended_additional_max: 1
+  },
+  resourceState: {
+    max_particles_held: 2400,
+    max_particles_collected_today: 800,
+    remote_max_passes_used: 0
+  },
+  personalRemotePassCeiling: 5,
+  minScore: 60
+});
+
+assert.equal(
+  forecastCappedCurrent.allocations.length,
+  1
+);
+assert.equal(
+  forecastCappedCurrent.allocations[0].battle_system,
+  "max"
+);
+assert.equal(
+  forecastCappedCurrent.allocations[0].count,
+  1,
+  "Current shared allocation must not exceed the Max share selected by the future forecast"
+);
+assert.equal(
+  forecastCappedCurrent.forecast_today.recommended_additional_raids,
+  0
+);
+assert.equal(
+  forecastCappedCurrent.forecast_today.recommended_additional_max,
+  1
+);
+
 const alreadyAtCeiling = buildBattleResourcePlan({
   recommendations: [raid, gmax],
   remoteRaidPlan: {
@@ -441,5 +484,180 @@ const withFuture = buildBattleResourcePlan({
 
 assert.equal(withFuture.future_opportunity.pokemon_name, "Future Boss");
 assert.equal(withFuture.advice.code, "reserve");
+
+const sharedForecast = buildBattleForecast({
+  resourceState: {
+    max_particles_held: 900,
+    max_particles_collected_today: 300,
+    remote_max_passes_used: 0
+  },
+  minScore: 60,
+  marginalValueDecay: 3,
+  days: [
+    {
+      date: "2026-09-19",
+      label: "Sat, Sep 19",
+      remote_used: 0,
+      personal_remote_pass_ceiling: 2,
+      official_rule: {
+        limit: 10,
+        is_unlimited: false
+      },
+      max_particle_rule: {
+        daily_limit: 300,
+        storage_limit: 1500
+      },
+      recommendations: [{
+        pokemon_name: "Flexible Raid",
+        battle_system: "raid",
+        remote_eligible: true,
+        score: 82,
+        target: {
+          id: "raid-target",
+          target_type: "raids",
+          current_value: 0,
+          target_value: 2,
+          priority: "high",
+          completed: 0
+        }
+      }]
+    },
+    {
+      date: "2026-09-20",
+      label: "Sun, Sep 20",
+      remote_used: 0,
+      personal_remote_pass_ceiling: 2,
+      official_rule: {
+        limit: 10,
+        is_unlimited: false
+      },
+      max_particle_rule: {
+        daily_limit: 300,
+        storage_limit: 1500
+      },
+      recommendations: [
+        {
+          pokemon_name: "Flexible Raid",
+          battle_system: "raid",
+          remote_eligible: true,
+          score: 82,
+          target: {
+            id: "raid-target",
+            target_type: "raids",
+            current_value: 0,
+            target_value: 2,
+            priority: "high",
+            completed: 0
+          }
+        },
+        {
+          pokemon_name: "Gigantamax Mid",
+          battle_system: "max",
+          battle_variant: "gigantamax",
+          remote_pass_capable_by_source: true,
+          max_particle_cost: 800,
+          max_particle_cost_source: "official_explicit_cost",
+          max_particle_cost_confidence: "official_explicit",
+          recommendation_score: 82,
+          score: 88
+        }
+      ]
+    },
+    {
+      date: "2026-09-21",
+      label: "Mon, Sep 21",
+      remote_used: 0,
+      personal_remote_pass_ceiling: 2,
+      official_rule: {
+        limit: 10,
+        is_unlimited: false
+      },
+      max_particle_rule: {
+        daily_limit: 300,
+        storage_limit: 1500
+      },
+      recommendations: [{
+        pokemon_name: "Gigantamax Future",
+        battle_system: "max",
+        battle_variant: "gigantamax",
+        remote_pass_capable_by_source: true,
+        max_particle_cost: 800,
+        max_particle_cost_source: "official_explicit_cost",
+        max_particle_cost_confidence: "official_explicit",
+        recommendation_score: 96,
+        score: 99
+      }]
+    }
+  ]
+});
+
+assert.equal(sharedForecast.days.length, 3);
+assert.equal(sharedForecast.days[0].recommended_raid_budget, 1);
+assert.equal(sharedForecast.days[1].recommended_raid_budget, 1);
+assert.equal(
+  sharedForecast.days
+    .flatMap(day => day.allocations)
+    .filter(item => item.pokemon_name === "Flexible Raid")
+    .reduce((sum, item) => sum + item.count, 0),
+  2,
+  "Target progress must be budgeted once across the horizon, not once per day"
+);
+assert.equal(
+  sharedForecast.days[2].recommended_max_budget,
+  1,
+  "The stronger future Max opportunity should remain reachable after MP replenishment"
+);
+assert.equal(
+  sharedForecast.days[1].recommended_max_budget,
+  0,
+  "The forecast must not spend MP twice when the later higher-value Max battle would become unreachable"
+);
+assert.equal(
+  sharedForecast.days[2].max_particles.required_after_today,
+  200
+);
+assert.equal(
+  sharedForecast.best_future_day.date,
+  "2026-09-21"
+);
+assert.equal(
+  sharedForecast.days[2].allocations[0].battle_system,
+  "max"
+);
+
+const sharedForecastReserve = buildBattleResourcePlan({
+  recommendations: [{
+    pokemon_name: "Today Raid",
+    battle_system: "raid",
+    remote_eligible: true,
+    score: 82
+  }],
+  remoteRaidPlan: {
+    raids_used: 0,
+    remote_limit_used: 0,
+    official_remaining: 10,
+    official_is_unlimited: false,
+    system_recommended_budget: 2,
+    forecast_recommended_additional_raids: 1
+  },
+  resourceState: {
+    max_particles_held: 600,
+    max_particles_collected_today: 300
+  },
+  personalRemotePassCeiling: 2,
+  minScore: 60,
+  maxParticleDailyLimit: 300,
+  futureForecast: sharedForecast.days
+});
+
+assert.equal(
+  sharedForecastReserve.future_opportunity.pokemon_name,
+  "Gigantamax Future"
+);
+assert.equal(
+  sharedForecastReserve.max_particles.reserved_for_future,
+  200,
+  "Future-saving guidance must use the shared forecast's actual replenishment path"
+);
 
 console.log("shared battle resource planning tests passed");

@@ -902,6 +902,1015 @@ function recommendationBlockedReason(
   return null;
 }
 
+function forecastIdentityKey(
+  recommendation
+) {
+  const targetId =
+    recommendation?.target?.id;
+
+  if (targetId != null) {
+    return `target:${targetId}`;
+  }
+
+  return [
+    recommendation?.battle_system ||
+      "raid",
+    recommendation?.battle_variant ||
+      "",
+    String(
+      recommendation?.pokemon_name ||
+      ""
+    )
+      .trim()
+      .toLocaleLowerCase()
+  ].join("|");
+}
+
+function forecastRemoteBlockReason(
+  recommendation
+) {
+  const system =
+    recommendation?.battle_system ||
+    "raid";
+
+  if (
+    system === "raid" &&
+    !recommendation?.remote_eligible
+  ) {
+    return "This Raid is not remotely eligible.";
+  }
+
+  if (
+    system === "max" &&
+    !maxBattleRemotePassEligible(
+      recommendation
+    )
+  ) {
+    return "This Max Battle is not confirmed as remotely accessible.";
+  }
+
+  return null;
+}
+
+function simulateForecastParticles(
+  days,
+  resourceState
+) {
+  const state =
+    normalizeBattleResourceState(
+      resourceState
+    );
+
+  let held =
+    state.max_particles_held;
+
+  const output = [];
+  let feasible = true;
+
+  for (
+    let index = 0;
+    index < days.length;
+    index++
+  ) {
+    const day =
+      days[index];
+
+    const dailyLimit =
+      wholeNonNegative(
+        day.max_particle_rule
+          ?.daily_limit,
+        STANDARD_MAX_PARTICLE_DAILY_LIMIT
+      );
+
+    const storageLimit =
+      wholeNonNegative(
+        day.max_particle_rule
+          ?.storage_limit,
+        STANDARD_MAX_PARTICLE_STORAGE_LIMIT
+      );
+
+    const alreadyCollected =
+      index === 0
+        ? state
+            .max_particles_collected_today
+        : 0;
+
+    const collectionRemaining =
+      Math.max(
+        0,
+        dailyLimit -
+          alreadyCollected
+      );
+
+    const spendable =
+      held +
+      collectionRemaining;
+
+    const plannedSpend =
+      wholeNonNegative(
+        day.max_particle_spend
+      );
+
+    if (
+      plannedSpend >
+      spendable
+    ) {
+      feasible = false;
+    }
+
+    const afterSpend =
+      Math.max(
+        0,
+        spendable -
+          plannedSpend
+      );
+
+    const projectedEnd =
+      Math.min(
+        storageLimit,
+        afterSpend
+      );
+
+    output.push({
+      held_start:
+        held,
+      collected_already:
+        alreadyCollected,
+      daily_limit:
+        dailyLimit,
+      storage_limit:
+        storageLimit,
+      collection_remaining:
+        collectionRemaining,
+      projected_spendable:
+        spendable,
+      planned_spend:
+        plannedSpend,
+      projected_end:
+        projectedEnd
+    });
+
+    held =
+      projectedEnd;
+  }
+
+  let cumulativeSpend = 0;
+  let cumulativeCollection = 0;
+  let requiredAfterToday = 0;
+
+  for (
+    let index = 1;
+    index < output.length;
+    index++
+  ) {
+    cumulativeSpend +=
+      output[index]
+        .planned_spend;
+
+    cumulativeCollection +=
+      output[index]
+        .daily_limit;
+
+    requiredAfterToday =
+      Math.max(
+        requiredAfterToday,
+        cumulativeSpend -
+          cumulativeCollection
+      );
+
+    output[index]
+      .required_after_today =
+      Math.max(
+        0,
+        requiredAfterToday
+      );
+  }
+
+  if (output[0]) {
+    output[0]
+      .required_after_today = 0;
+  }
+
+  return {
+    feasible,
+    days:
+      output
+  };
+}
+
+/**
+ * Build a shared seven-day-style forecast from already-normalized battle
+ * opportunities. Every day competes for one Remote participation ceiling;
+ * Max Battles additionally compete for Max Particles that replenish according
+ * to that day's rule. Target attempt caps are shared across the horizon so the
+ * same remaining progress is not budgeted independently on every day.
+ */
+export function buildBattleForecast({
+  days = [],
+  resourceState = {},
+  minScore =
+    DEFAULT_PAID_BATTLE_MIN_SCORE,
+  marginalValueDecay =
+    DEFAULT_MARGINAL_VALUE_DECAY
+} = {}) {
+  const threshold =
+    clamp(
+      Number(minScore),
+      0,
+      100
+    );
+
+  const decay =
+    Math.max(
+      1,
+      finiteNonNegative(
+        marginalValueDecay,
+        DEFAULT_MARGINAL_VALUE_DECAY
+      )
+    );
+
+  const dayStates =
+    (Array.isArray(days)
+      ? days
+      : [])
+      .map(
+        (input, index) => {
+          const remoteUsed =
+            wholeNonNegative(
+              input.remote_used
+            );
+
+          const officialUnlimited =
+            Boolean(
+              input.official_rule
+                ?.is_unlimited
+            );
+
+          const officialLimit =
+            officialUnlimited
+              ? null
+              : wholeNonNegative(
+                  input.official_rule
+                    ?.limit
+                );
+
+          const officialRemaining =
+            officialUnlimited
+              ? Infinity
+              : Math.max(
+                  0,
+                  officialLimit -
+                    remoteUsed
+                );
+
+          const ceiling =
+            input
+              .personal_remote_pass_ceiling ==
+              null ||
+            input
+              .personal_remote_pass_ceiling ===
+              ""
+              ? null
+              : wholeNonNegative(
+                  input
+                    .personal_remote_pass_ceiling
+                );
+
+          const personalRemaining =
+            ceiling == null
+              ? Infinity
+              : Math.max(
+                  0,
+                  ceiling -
+                    remoteUsed
+                );
+
+          return {
+            index,
+            date:
+              input.date || null,
+            label:
+              input.label ||
+              input.date ||
+              "Upcoming",
+            recommendations:
+              Array.isArray(
+                input.recommendations
+              )
+                ? input.recommendations
+                : [],
+            official_rule:
+              input.official_rule ||
+              null,
+            official_limit:
+              officialLimit,
+            official_is_unlimited:
+              officialUnlimited,
+            remote_used:
+              remoteUsed,
+            personal_remote_pass_ceiling:
+              ceiling,
+            remote_capacity:
+              Math.min(
+                officialRemaining,
+                personalRemaining
+              ),
+            remote_allocated:
+              0,
+            raid_allocated:
+              0,
+            max_allocated:
+              0,
+            value_index:
+              0,
+            max_particle_rule:
+              input.max_particle_rule ||
+              {
+                daily_limit:
+                  STANDARD_MAX_PARTICLE_DAILY_LIMIT,
+                storage_limit:
+                  STANDARD_MAX_PARTICLE_STORAGE_LIMIT
+              },
+            max_particle_spend:
+              0,
+            allocations:
+              new Map(),
+            opportunities: [],
+            completed_targets: [],
+            skipped_targets: []
+          };
+        }
+      );
+
+  const groups =
+    new Map();
+
+  for (const day of dayStates) {
+    for (
+      const recommendation of
+      day.recommendations
+    ) {
+      const system =
+        recommendation
+          ?.battle_system ||
+        "raid";
+
+      const planningValue =
+        planningValueForRecommendation(
+          recommendation
+        );
+
+      const target =
+        recommendation?.target ||
+        null;
+
+      if (Number(target?.completed)) {
+        day.completed_targets.push(
+          recommendation.pokemon_name
+        );
+      }
+
+      if (
+        String(
+          target?.priority || ""
+        ).toLowerCase() ===
+        "skip"
+      ) {
+        day.skipped_targets.push(
+          recommendation.pokemon_name
+        );
+      }
+
+      let blockedReason =
+        recommendationBlockedReason(
+          recommendation,
+          planningValue.score,
+          threshold
+        );
+
+      if (!blockedReason) {
+        blockedReason =
+          forecastRemoteBlockReason(
+            recommendation
+          );
+      }
+
+      let particleCost = {
+        cost: null,
+        basis: null,
+        confidence: null
+      };
+
+      if (
+        !blockedReason &&
+        system === "max"
+      ) {
+        particleCost =
+          inferMaxParticleCost(
+            recommendation
+          );
+
+        if (!particleCost.cost) {
+          blockedReason =
+            "Max Particle cost is unknown.";
+        }
+      }
+
+      const cap =
+        naturalAttemptCap(
+          recommendation,
+          planningValue.score,
+          threshold,
+          decay
+        );
+
+      if (
+        !blockedReason &&
+        cap <= 0
+      ) {
+        blockedReason =
+          "No worthwhile paid attempts remain above the threshold.";
+      }
+
+      const opportunity = {
+        pokemon_name:
+          recommendation
+            ?.pokemon_name,
+        battle_system:
+          system,
+        battle_variant:
+          recommendation
+            ?.battle_variant ||
+          null,
+        planning_score:
+          planningValue.score,
+        recommendation_score:
+          scoreOrNull(
+            recommendation
+              ?.recommendation_score ??
+            recommendation?.score
+          ),
+        score_basis:
+          planningValue.basis,
+        max_particle_cost:
+          particleCost.cost,
+        max_particle_cost_source:
+          particleCost.basis,
+        remote_eligible:
+          !forecastRemoteBlockReason(
+            recommendation
+          ),
+        eligible:
+          !blockedReason,
+        exclusion_reason:
+          blockedReason,
+        target_id:
+          target?.id || null,
+        sprite_url:
+          recommendation
+            ?.sprite_url ||
+          recommendation
+            ?.meta?.sprite_url ||
+          null,
+        source_type:
+          recommendation
+            ?.source_type ||
+          null,
+        source_label:
+          recommendation
+            ?.source_label ||
+          null
+      };
+
+      day.opportunities.push(
+        opportunity
+      );
+
+      if (blockedReason) {
+        continue;
+      }
+
+      const key =
+        forecastIdentityKey(
+          recommendation
+        );
+
+      if (!groups.has(key)) {
+        groups.set(
+          key,
+          {
+            key,
+            cap: 0,
+            max_score: 0,
+            entries: []
+          }
+        );
+      }
+
+      const group =
+        groups.get(key);
+
+      group.cap =
+        Math.max(
+          group.cap,
+          cap
+        );
+
+      group.max_score =
+        Math.max(
+          group.max_score,
+          planningValue.score
+        );
+
+      group.entries.push({
+        day,
+        recommendation,
+        opportunity,
+        planning_value:
+          planningValue,
+        particle_cost:
+          particleCost.cost,
+        particle_cost_source:
+          particleCost.basis
+      });
+    }
+  }
+
+  const orderedGroups =
+    [...groups.values()]
+      .sort(
+        (a, b) => {
+          const aDays =
+            new Set(
+              a.entries.map(
+                entry =>
+                  entry.day.index
+              )
+            ).size;
+
+          const bDays =
+            new Set(
+              b.entries.map(
+                entry =>
+                  entry.day.index
+              )
+            ).size;
+
+          return (
+            aDays - bDays ||
+            b.max_score -
+              a.max_score ||
+            a.key.localeCompare(
+              b.key
+            )
+          );
+        }
+      );
+
+  const particleFeasible =
+    () =>
+      simulateForecastParticles(
+        dayStates,
+        resourceState
+      ).feasible;
+
+  for (const group of orderedGroups) {
+    for (
+      let attemptIndex = 0;
+      attemptIndex < group.cap;
+      attemptIndex++
+    ) {
+      const candidates =
+        group.entries
+          .map(entry => ({
+            ...entry,
+            marginal_score:
+              entry
+                .planning_value
+                .score -
+              attemptIndex *
+                decay
+          }))
+          .filter(
+            entry =>
+              entry.marginal_score >=
+                threshold &&
+              entry.day
+                .remote_allocated <
+                entry.day
+                  .remote_capacity
+          )
+          .sort(
+            (a, b) =>
+              b.marginal_score -
+                a.marginal_score ||
+              a.day
+                .remote_allocated -
+                b.day
+                  .remote_allocated ||
+              String(
+                a.day.date || ""
+              ).localeCompare(
+                String(
+                  b.day.date || ""
+                )
+              )
+          );
+
+      let selected = null;
+
+      for (const candidate of candidates) {
+        if (
+          candidate
+            .recommendation
+            ?.battle_system !==
+          "max"
+        ) {
+          selected =
+            candidate;
+          break;
+        }
+
+        candidate.day
+          .max_particle_spend +=
+          candidate.particle_cost;
+
+        const feasible =
+          particleFeasible();
+
+        candidate.day
+          .max_particle_spend -=
+          candidate.particle_cost;
+
+        if (feasible) {
+          selected =
+            candidate;
+          break;
+        }
+      }
+
+      if (!selected) {
+        break;
+      }
+
+      const day =
+        selected.day;
+
+      day.remote_allocated += 1;
+      day.value_index +=
+        selected.marginal_score;
+
+      if (
+        selected
+          .recommendation
+          ?.battle_system ===
+        "max"
+      ) {
+        day.max_allocated += 1;
+        day.max_particle_spend +=
+          selected.particle_cost;
+      } else {
+        day.raid_allocated += 1;
+      }
+
+      const allocationKey = [
+        selected.recommendation
+          ?.battle_system ||
+          "raid",
+        selected.recommendation
+          ?.battle_variant ||
+          "",
+        selected.recommendation
+          ?.pokemon_name ||
+          ""
+      ].join("|");
+
+      const existing =
+        day.allocations.get(
+          allocationKey
+        );
+
+      if (existing) {
+        existing.count += 1;
+        existing.max_particles +=
+          selected.particle_cost ||
+          0;
+        existing.planning_score =
+          Math.max(
+            existing.planning_score,
+            selected.marginal_score
+          );
+      } else {
+        day.allocations.set(
+          allocationKey,
+          {
+            pokemon_name:
+              selected
+                .recommendation
+                .pokemon_name,
+            battle_system:
+              selected
+                .recommendation
+                .battle_system ||
+              "raid",
+            battle_variant:
+              selected
+                .recommendation
+                .battle_variant ||
+              null,
+            count: 1,
+            planning_score:
+              selected.marginal_score,
+            recommendation_score:
+              scoreOrNull(
+                selected
+                  .recommendation
+                  ?.recommendation_score ??
+                selected
+                  .recommendation
+                  ?.score
+              ),
+            score_basis:
+              selected
+                .planning_value
+                .basis,
+            max_particle_cost_each:
+              selected
+                .particle_cost,
+            max_particles:
+              selected
+                .particle_cost ||
+              0,
+            max_particle_cost_source:
+              selected
+                .particle_cost_source,
+            sprite_url:
+              selected
+                .recommendation
+                .sprite_url ||
+              selected
+                .recommendation
+                .meta?.sprite_url ||
+              null
+          }
+        );
+      }
+    }
+  }
+
+  const particleProjection =
+    simulateForecastParticles(
+      dayStates,
+      resourceState
+    );
+
+  const outputDays =
+    dayStates.map(
+      (day, index) => {
+        const allocations =
+          [...day.allocations.values()]
+            .sort(
+              (a, b) =>
+                b.count -
+                  a.count ||
+                b.planning_score -
+                  a.planning_score ||
+                a.pokemon_name
+                  .localeCompare(
+                    b.pokemon_name
+                  )
+            );
+
+        const allocatedByKey =
+          new Map(
+            allocations.map(
+              item => [
+                [
+                  item.battle_system,
+                  item.battle_variant ||
+                    "",
+                  item.pokemon_name
+                ].join("|"),
+                item.count
+              ]
+            )
+          );
+
+        const opportunities =
+          day.opportunities
+            .map(item => ({
+              ...item,
+              allocated_count:
+                allocatedByKey.get(
+                  [
+                    item.battle_system,
+                    item.battle_variant ||
+                      "",
+                    item.pokemon_name
+                  ].join("|")
+                ) || 0
+            }))
+            .sort(
+              (a, b) =>
+                b.planning_score -
+                  a.planning_score ||
+                String(
+                  a.pokemon_name || ""
+                ).localeCompare(
+                  String(
+                    b.pokemon_name || ""
+                  )
+                )
+            );
+
+        const reasons = [];
+
+        if (
+          day.completed_targets
+            .length
+        ) {
+          reasons.push(
+            `${[
+              ...new Set(
+                day
+                  .completed_targets
+              )
+            ].join(", ")} already complete.`
+          );
+        }
+
+        if (
+          day.skipped_targets
+            .length
+        ) {
+          reasons.push(
+            `${[
+              ...new Set(
+                day
+                  .skipped_targets
+              )
+            ].join(", ")} set to Skip.`
+          );
+        }
+
+        const unknownCost =
+          opportunities.some(
+            item =>
+              item.battle_system ===
+                "max" &&
+              /cost is unknown/i.test(
+                item
+                  .exclusion_reason ||
+                ""
+              )
+          );
+
+        if (unknownCost) {
+          reasons.push(
+            "At least one Max Battle has no verified MP entry cost, so it is not auto-budgeted."
+          );
+        }
+
+        if (
+          !day.remote_allocated
+        ) {
+          reasons.push(
+            "No remotely accessible battle clears the shared value and resource rules for this day."
+          );
+        }
+
+        const topScore =
+          opportunities[0]
+            ?.planning_score;
+
+        const topRecommendations =
+          topScore == null
+            ? []
+            : opportunities
+                .filter(
+                  item =>
+                    item.planning_score ===
+                    topScore
+                )
+                .map(item => ({
+                  ...item,
+                  score:
+                    item.planning_score
+                }));
+
+        return {
+          date:
+            day.date,
+          label:
+            day.label,
+          official_rule:
+            day.official_rule,
+          official_limit:
+            day.official_limit,
+          official_is_unlimited:
+            day
+              .official_is_unlimited,
+          remote_used:
+            day.remote_used,
+          personal_remote_pass_ceiling:
+            day
+              .personal_remote_pass_ceiling,
+          remote_capacity:
+            Number.isFinite(
+              day.remote_capacity
+            )
+              ? day.remote_capacity
+              : null,
+          recommended_budget:
+            day.remote_allocated,
+          recommended_raid_budget:
+            day.raid_allocated,
+          recommended_max_budget:
+            day.max_allocated,
+          value_index:
+            Math.round(
+              day.value_index
+            ),
+          allocations,
+          opportunities,
+          top_recommendations:
+            topRecommendations,
+          max_particles:
+            particleProjection
+              .days[index] ||
+            null,
+          completed_targets:
+            [
+              ...new Set(
+                day
+                  .completed_targets
+              )
+            ],
+          skipped_targets:
+            [
+              ...new Set(
+                day
+                  .skipped_targets
+              )
+            ],
+          reasons
+        };
+      }
+    );
+
+  const today =
+    outputDays[0] ||
+    null;
+
+  const futureDays =
+    outputDays.slice(1);
+
+  const bestFutureDay =
+    futureDays
+      .filter(
+        day =>
+          day.recommended_budget >
+          0
+      )
+      .sort(
+        (a, b) =>
+          b.value_index -
+            a.value_index ||
+          b.recommended_budget -
+            a.recommended_budget ||
+          String(
+            a.date || ""
+          ).localeCompare(
+            String(
+              b.date || ""
+            )
+          )
+      )[0] || null;
+
+  return {
+    horizon_days:
+      outputDays.length,
+    today:
+      today?.date || null,
+    recommended_daily_budget:
+      today
+        ?.recommended_budget || 0,
+    recommended_raid_budget:
+      today
+        ?.recommended_raid_budget ||
+      0,
+    recommended_max_budget:
+      today
+        ?.recommended_max_budget ||
+      0,
+    best_future_day:
+      bestFutureDay,
+    days:
+      outputDays
+  };
+}
+
+
 function bestForecastOpportunity(
   forecast,
   threshold
@@ -919,21 +1928,46 @@ function bestForecastOpportunity(
   let best = null;
 
   for (const day of days) {
-    for (
-      const item of
-      day?.top_recommendations || []
-    ) {
-      const value =
-        planningValueForRecommendation(
-          item
+    const items =
+      Array.isArray(
+        day?.allocations
+      ) &&
+      day.allocations.length
+        ? day.allocations
+        : day
+            ?.top_recommendations ||
+          [];
+
+    for (const item of items) {
+      const hasCanonicalScore =
+        Number.isFinite(
+          Number(
+            item?.planning_score
+          )
         );
+
+      const value =
+        hasCanonicalScore
+          ? {
+              score:
+                Number(
+                  item.planning_score
+                ),
+              basis:
+                item.score_basis ||
+                null
+            }
+          : planningValueForRecommendation(
+              item
+            );
 
       if (value.score < threshold) {
         continue;
       }
 
       const particleCost =
-        item?.battle_system === "max"
+        item?.battle_system ===
+        "max"
           ? inferMaxParticleCost(
               item
             )
@@ -960,8 +1994,11 @@ function bestForecastOpportunity(
             item.battle_system ||
             "raid",
           battle_variant:
-            item.battle_variant || null,
+            item.battle_variant ||
+            null,
           max_particle_cost:
+            item
+              .max_particle_cost_each ??
             particleCost.cost ??
             item.max_particle_cost ??
             null,
@@ -981,7 +2018,11 @@ function bestForecastOpportunity(
             dayDistance(
               todayDate,
               day.date
-            )
+            ),
+          required_particles_after_today:
+            day.max_particles
+              ?.required_after_today ??
+            null
         };
       }
     }
@@ -1003,6 +2044,33 @@ function futureParticleReserve({
       ?.max_particle_cost
   ) {
     return 0;
+  }
+
+  const hasForecastReserve =
+    futureOpportunity
+      .required_particles_after_today !=
+    null;
+
+  const forecastReserve =
+    hasForecastReserve
+      ? Number(
+          futureOpportunity
+            .required_particles_after_today
+        )
+      : null;
+
+  if (
+    hasForecastReserve &&
+    Number.isFinite(
+      forecastReserve
+    ) &&
+    forecastReserve >= 0
+  ) {
+    return Math.min(
+      particles
+        .projected_spendable_today,
+      forecastReserve
+    );
   }
 
   const daysAhead =
@@ -1133,6 +2201,12 @@ export function buildBattleResourcePlan({
             .official_remaining
         );
 
+  const forecastRaidSlots =
+    Number(
+      remoteRaidPlan
+        .forecast_recommended_additional_raids
+    );
+
   const systemRaidBudget =
     wholeNonNegative(
       remoteRaidPlan
@@ -1144,12 +2218,39 @@ export function buildBattleResourcePlan({
   const recommendedRaidSlots =
     Math.min(
       officialRaidRemaining,
-      Math.max(
-        0,
-        systemRaidBudget -
-        sharedPassesUsed
+      Number.isFinite(
+        forecastRaidSlots
       )
+        ? Math.max(
+            0,
+            Math.floor(
+              forecastRaidSlots
+            )
+          )
+        : Math.max(
+            0,
+            systemRaidBudget -
+              sharedPassesUsed
+          )
     );
+
+  const forecastMaxSlots =
+    Number(
+      remoteRaidPlan
+        .forecast_recommended_additional_max
+    );
+
+  const recommendedMaxSlots =
+    Number.isFinite(
+      forecastMaxSlots
+    )
+      ? Math.max(
+          0,
+          Math.floor(
+            forecastMaxSlots
+          )
+        )
+      : Infinity;
 
   const candidates = [];
   const blocked = [];
@@ -1300,9 +2401,10 @@ export function buildBattleResourcePlan({
         }
 
         return (
+          recommendedMaxSlots > 0 &&
           candidate.max_particle_cost <=
-          particles
-            .projected_spendable_today
+            particles
+              .projected_spendable_today
         );
       })
       .sort(
@@ -1361,6 +2463,7 @@ export function buildBattleResourcePlan({
     });
 
   let raidAllocated = 0;
+  let maxAllocated = 0;
   let maxParticlesRemaining =
     Math.max(
       0,
@@ -1423,8 +2526,12 @@ export function buildBattleResourcePlan({
 
       if (
         candidate.system === "max" &&
-        maxParticlesRemaining <
-          candidate.max_particle_cost
+        (
+          maxAllocated >=
+            recommendedMaxSlots ||
+          maxParticlesRemaining <
+            candidate.max_particle_cost
+        )
       ) {
         continue;
       }
@@ -1522,6 +2629,7 @@ export function buildBattleResourcePlan({
     ) {
       raidAllocated += 1;
     } else {
+      maxAllocated += 1;
       maxParticlesRemaining -=
         best.candidate
           .max_particle_cost;
@@ -1831,6 +2939,16 @@ export function buildBattleResourcePlan({
               sharedPassesUsed -
               passesAllocated
             )
+    },
+    forecast_today: {
+      recommended_additional_raids:
+        recommendedRaidSlots,
+      recommended_additional_max:
+        Number.isFinite(
+          recommendedMaxSlots
+        )
+          ? recommendedMaxSlots
+          : null
     },
     remote_raid_limit: {
       used:

@@ -87,19 +87,59 @@ MOCK_STATE = {
         "remote_limit_used": 0,
         "official_remaining": 10,
         "system_recommended_budget": 0,
+        "system_recommended_additional": 0,
+        "forecast_recommended_additional_raids": 0,
+        "forecast_recommended_additional_max": 0,
+        "budget_forecast_kind": "shared_battle",
         "usual_personal_ceiling": None,
         "daily_budget_override": None,
         "effective_budget_cap": 0,
         "recommended_total": 0,
         "daily_planning_cap": 0,
         "purchase_advice": {
-            "code": "selective",
-            "label": "BE SELECTIVE",
-            "headline": "Use resources selectively.",
+            "code": "save",
+            "label": "SAVE FOR LATER",
+            "headline": "Keep resources flexible for the stronger upcoming Max Battle.",
             "detail": ADVICE_DETAIL,
         },
-        "best_future_day": None,
-        "budget_forecast": [],
+        "best_future_day": {
+            "date": "2026-09-19",
+            "label": "Sat, Sep 19",
+            "recommended_budget": 1,
+            "recommended_raid_budget": 0,
+            "recommended_max_budget": 1,
+            "value_index": 92,
+        },
+        "budget_forecast": [
+            {
+                "date": "2026-09-18",
+                "label": "Fri, Sep 18",
+                "recommended_budget": 0,
+                "recommended_raid_budget": 0,
+                "recommended_max_budget": 0,
+                "allocations": [],
+                "value_index": 0,
+            },
+            {
+                "date": "2026-09-19",
+                "label": "Sat, Sep 19",
+                "recommended_budget": 1,
+                "recommended_raid_budget": 0,
+                "recommended_max_budget": 1,
+                "value_index": 92,
+                "allocations": [
+                    {
+                        "pokemon_name": "Gigantamax Fixture",
+                        "battle_system": "max",
+                        "battle_variant": "gigantamax",
+                        "count": 1,
+                        "planning_score": 92,
+                        "max_particles": 800,
+                        "sprite_url": None,
+                    }
+                ],
+            },
+        ],
         "allocations": [],
         "not_allocated": [],
     },
@@ -425,6 +465,12 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("RECOMMENDED 54", page.locator("#desktopRailTopPick").inner_text())
         self.assertIn("RECOMMENDED", page.locator("#todayTopPickMeta").inner_text())
         self.assertIn("54", page.locator("#todayTopPickMeta").inner_text())
+        self.assertIn("Paid Battle Forecast", page.locator(".budget-forecast-wrap").inner_text())
+        forecast_text = page.locator("#budgetForecast").inner_text()
+        self.assertIn("Gigantamax Fixture", forecast_text)
+        self.assertIn("Max", forecast_text)
+        self.assertIn("800 MP", forecast_text)
+        self.assertIn("1 Remote Pass", page.locator("#purchaseAdvice").inner_text())
         intel = card.locator(".raid-intel").inner_text()
         self.assertIn("WEAK TO", intel.upper())
         self.assertIn("Water", intel)

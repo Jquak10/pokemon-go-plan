@@ -24,6 +24,7 @@ import {
 import {
   STANDARD_MAX_PARTICLE_DAILY_LIMIT,
   STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
+  buildBattleForecast,
   buildBattleResourcePlan,
   inferMaxParticleCost,
   maxBattleTierFromText,
@@ -6055,149 +6056,99 @@ async function remoteRaidBudgetOverrideForDate(
     : null;
 }
 
-function usefulRemoteRaidsForRecommendation(
-  recommendation,
-  minScore
-) {
-  if (!recommendation?.remote_eligible) {
-    return 0;
-  }
-
-  const target =
-    recommendation.target || null;
-
-  if (
-    String(target?.priority || "")
-      .toLowerCase() === "skip"
-  ) {
-    return 0;
-  }
-
-  if (Number(target?.completed)) {
-    return 0;
-  }
-
-  const score =
-    Number(recommendation.score || 0);
-
-  if (score < minScore) {
-    return 0;
-  }
-
-  const scoreBasedCap =
-    Math.max(
-      0,
-      Math.floor(
-        (score - minScore) /
-        REMOTE_RAID_DECAY_PER_RAID
-      ) + 1
-    );
-
-  const targetCap =
-    remoteTargetCap(target);
-
-  return Number.isFinite(targetCap)
-    ? Math.min(
-        scoreBasedCap,
-        targetCap
-      )
-    : scoreBasedCap;
-}
-
-function forecastDayCapacity(
-  officialRule
-) {
-  if (officialRule?.is_unlimited) {
-    return 999;
-  }
-
-  return Math.max(
-    0,
-    Number(
-      officialRule?.limit || 0
-    )
-  );
-}
-
-function budgetAdviceLevel(
+function battleForecastAdvice(
   day,
   bestFutureDay
 ) {
   const recommended =
     Number(
-      day.recommended_budget || 0
+      day?.recommended_budget ||
+      0
     );
 
-  const limit =
-    day.official_is_unlimited
-      ? null
-      : Number(
-          day.official_limit || 0
-        );
+  const capacity =
+    day?.remote_capacity != null &&
+    Number.isFinite(
+      Number(
+        day.remote_capacity
+      )
+    )
+      ? Number(
+          day.remote_capacity
+        )
+      : null;
 
   if (recommended <= 0) {
     return {
       code: "save",
-      label: "SAVE MONEY",
+      label: "SAVE RESOURCES",
       headline:
-        "No paid Remote Raids are compelling enough today.",
+        "No paid Remote Battle is compelling enough today.",
       detail:
         bestFutureDay
-          ? `Keep your raid spending for ${bestFutureDay.label}, which currently has stronger target value.`
-          : "There is no need to buy passes simply because raid capacity is available."
+          ? `Keep your Remote Passes and Max Particles flexible for ${bestFutureDay.label}, which currently has stronger shared Battle Plan value.`
+          : "There is no need to spend simply because Remote capacity is available."
     };
   }
 
   if (
-    limit != null &&
-    limit > 0 &&
-    recommended >= limit
+    capacity != null &&
+    capacity > 0 &&
+    recommended >= capacity
   ) {
     return {
       code: "max",
       label: "FULL-CAP DAY",
       headline:
-        `The current plan justifies all ${limit} Remote Raid slots.`,
+        `The shared Battle Plan supports all ${capacity} remaining Remote slot${capacity === 1 ? "" : "s"} today.`,
       detail:
-        "If you are comfortable spending for a heavy raid day, this is one of the days where preparing for the full official cap is supported by your targets and value threshold."
+        "Raid and Max opportunities have already been compared against the same Remote ceiling, target progress, and Max Particle constraints."
     };
   }
 
   const ratio =
-    limit && limit > 0
-      ? recommended / limit
+    capacity &&
+    capacity > 0
+      ? recommended /
+        capacity
       : null;
 
   if (
     ratio != null &&
-    ratio <= REMOTE_BUDGET_LIGHT_RATIO &&
+    ratio <=
+      REMOTE_BUDGET_LIGHT_RATIO &&
     bestFutureDay &&
-    Number(bestFutureDay.recommended_budget || 0) >
-      recommended + 3
+    Number(
+      bestFutureDay.value_index ||
+      0
+    ) >
+      Number(
+        day?.value_index || 0
+      ) *
+        1.15
   ) {
     return {
       code: "save",
       label: "SAVE FOR LATER",
       headline:
-        `Plan around ${recommended} paid raid${recommended === 1 ? "" : "s"} today rather than funding the full cap.`,
+        `Use about ${recommended} Remote Pass${recommended === 1 ? "" : "es"} today rather than filling the ceiling.`,
       detail:
-        `${bestFutureDay.label} currently has a stronger forward-looking budget of about ${bestFutureDay.recommended_budget}.`
+        `${bestFutureDay.label} currently has stronger combined Raid + Max value after future availability and MP replenishment are considered.`
     };
   }
 
   if (
     ratio != null &&
-    ratio >= REMOTE_BUDGET_HEAVY_RATIO
+    ratio >=
+      REMOTE_BUDGET_HEAVY_RATIO
   ) {
     return {
       code: "heavy",
-      label: "HEAVY RAID DAY",
+      label: "HEAVY BATTLE DAY",
       headline:
-        `A strong paid-raid day: plan around ${recommended} Remote Raids.`,
+        `A strong paid-battle day: plan around ${recommended} additional Remote Pass${recommended === 1 ? "" : "es"}.`,
       detail:
-        limit && recommended < limit
-          ? `The model still does not justify buying passes solely to force all ${limit} slots.`
-          : "The model sees a high concentration of worthwhile target progress today."
+        "The shared forecast finds a high concentration of worthwhile Raid/Max progress today while still respecting the daily ceiling."
     };
   }
 
@@ -6205,13 +6156,19 @@ function budgetAdviceLevel(
     code: "selective",
     label: "BE SELECTIVE",
     headline:
-      `Plan around ${recommended} paid raid${recommended === 1 ? "" : "s"} today.`,
+      `Plan around ${recommended} additional Remote Pass${recommended === 1 ? "" : "es"} today.`,
     detail:
       bestFutureDay &&
-      Number(bestFutureDay.value_index || 0) >
-        Number(day.value_index || 0) * 1.15
-        ? `There is stronger projected value on ${bestFutureDay.label}, so avoid spending just to fill today's cap.`
-        : "Spend only on the bosses that remain above your value threshold; unused capacity is intentional."
+      Number(
+        bestFutureDay.value_index ||
+        0
+      ) >
+        Number(
+          day?.value_index || 0
+        ) *
+          1.15
+        ? `There is stronger projected shared Battle Plan value on ${bestFutureDay.label}, so leave room rather than spending to the ceiling.`
+        : "Spend only on opportunities that clear the shared value and resource rules; unused capacity is intentional."
   };
 }
 
@@ -6245,11 +6202,17 @@ function shortDateLabel(dateValue) {
   ).format(date);
 }
 
-async function buildRemoteRaidBudgetForecast(
+async function buildBattleBudgetForecast(
   env,
   user,
   targets,
-  metas
+  metas,
+  {
+    todayOfficialRule = null,
+    todayRemoteUsed = 0,
+    todayDailyOverride = null,
+    initialResourceState = {}
+  } = {}
 ) {
   const today =
     localDateForTimezone(
@@ -6259,21 +6222,12 @@ async function buildRemoteRaidBudgetForecast(
   const currentInstant =
     nowIso();
 
-  const threshold =
-    clamp(
-      Number(
-        user.remote_raid_min_score ??
-        DEFAULT_REMOTE_RAID_MIN_SCORE
-      ),
-      0,
-      100
-    );
-
   const days = [];
 
   for (
     let offset = 0;
-    offset < REMOTE_BUDGET_LOOKAHEAD_DAYS;
+    offset <
+      REMOTE_BUDGET_LOOKAHEAD_DAYS;
     offset++
   ) {
     const date =
@@ -6284,7 +6238,8 @@ async function buildRemoteRaidBudgetForecast(
 
     const [
       recommendations,
-      officialRule
+      officialRule,
+      particleRule
     ] =
       await Promise.all([
         recommendationsForDate(
@@ -6294,453 +6249,89 @@ async function buildRemoteRaidBudgetForecast(
           metas,
           date
         ),
-        remoteRaidLimitForDate(
+        offset === 0 &&
+        todayOfficialRule
+          ? Promise.resolve(
+              todayOfficialRule
+            )
+          : remoteRaidLimitForDate(
+              env,
+              date,
+              user.timezone,
+              date === today
+                ? currentInstant
+                : null
+            ),
+        maxParticleRuleForDate(
           env,
-          date,
-          user.timezone,
-          date === today
-            ? currentInstant
-            : null
+          date
         )
       ]);
+
+    const usualCeiling =
+      user.remote_raid_budget ==
+        null ||
+      user.remote_raid_budget ===
+        ""
+        ? null
+        : Math.max(
+            0,
+            Math.floor(
+              Number(
+                user
+                  .remote_raid_budget
+              )
+            )
+          );
 
     days.push({
       date,
       label:
-        shortDateLabel(date),
+        shortDateLabel(
+          date
+        ),
       recommendations,
       official_rule:
         officialRule,
-      official_limit:
-        officialRule.is_unlimited
-          ? null
-          : Number(
-              officialRule.limit || 0
-            ),
-      official_is_unlimited:
-        Boolean(
-          officialRule.is_unlimited
-        ),
-      capacity:
-        forecastDayCapacity(
-          officialRule
-        ),
-      allocated: 0,
-      value_index: 0,
-      allocations:
-        new Map(),
-      completed_targets:
-        recommendations
-          .filter(
-            rec =>
-              Number(
-                rec.target?.completed
-              )
-          )
-          .map(
-            rec =>
-              rec.pokemon_name
-          ),
-      skipped_targets:
-        recommendations
-          .filter(
-            rec =>
-              String(
-                rec.target?.priority || ""
-              ).toLowerCase() === "skip"
-          )
-          .map(
-            rec =>
-              rec.pokemon_name
-          )
+      max_particle_rule:
+        particleRule,
+      remote_used:
+        offset === 0
+          ? todayRemoteUsed
+          : 0,
+      personal_remote_pass_ceiling:
+        offset === 0 &&
+        todayDailyOverride != null
+          ? todayDailyOverride
+          : usualCeiling
     });
   }
 
-  const species = new Map();
-
-  for (const day of days) {
-    for (
-      const recommendation of
-      day.recommendations
-    ) {
-      if (
-        !recommendation.remote_eligible
-      ) {
-        continue;
-      }
-
-      const useful =
-        usefulRemoteRaidsForRecommendation(
-          recommendation,
-          threshold
-        );
-
-      if (useful <= 0) {
-        continue;
-      }
-
-      const key =
-        normalizeName(
-          recommendation.pokemon_name
-        );
-
-      if (!species.has(key)) {
-        species.set(
-          key,
-          {
-            pokemon_name:
-              recommendation.pokemon_name,
-            recommendation,
-            useful_raids:
-              useful,
-            dates: []
-          }
-        );
-      }
-
-      const item =
-        species.get(key);
-
-      item.useful_raids =
-        Math.max(
-          item.useful_raids,
-          useful
-        );
-
-      item.dates.push(
-        day.date
-      );
-
-      if (
-        recommendation.score >
-        item.recommendation.score
-      ) {
-        item.recommendation =
-          recommendation;
-      }
-    }
-  }
-
-  const dayByDate =
-    new Map(
-      days.map(
-        day => [
-          day.date,
-          day
-        ]
-      )
-    );
-
-  const speciesItems =
-    [...species.values()]
-      .sort(
-        (a, b) =>
-          a.dates.length -
-            b.dates.length ||
-          b.recommendation.score -
-            a.recommendation.score ||
-          a.pokemon_name.localeCompare(
-            b.pokemon_name
-          )
-      );
-
-  const allocateOne = (
-    day,
-    item,
-    marginalScore
-  ) => {
-    day.allocated += 1;
-    day.value_index +=
-      marginalScore;
-
-    const current =
-      day.allocations.get(
-        item.pokemon_name
-      ) || 0;
-
-    day.allocations.set(
-      item.pokemon_name,
-      current + 1
-    );
-  };
-
-  // Short-window / single-day opportunities are allocated first.
-  for (
-    const item of speciesItems
-      .filter(
-        item =>
-          new Set(item.dates).size === 1
-      )
-  ) {
-    const date =
-      [...new Set(item.dates)][0];
-
-    const day =
-      dayByDate.get(date);
-
-    if (!day) continue;
-
-    for (
-      let raidIndex = 0;
-      raidIndex < item.useful_raids;
-      raidIndex++
-    ) {
-      if (
-        day.allocated >=
-        day.capacity
-      ) {
-        break;
-      }
-
-      const marginalScore =
-        item.recommendation.score -
-        raidIndex *
-          REMOTE_RAID_DECAY_PER_RAID;
-
-      if (
-        marginalScore <
-        threshold
-      ) {
-        break;
-      }
-
-      allocateOne(
-        day,
-        item,
-        marginalScore
-      );
-    }
-  }
-
-  // Flexible/multi-day targets are deliberately placed on the least-busy
-  // eligible days. This is what lets, for example, a completed one-day boss
-  // free up Thursday for multi-day Latios/Latias progress.
-  for (
-    const item of speciesItems
-      .filter(
-        item =>
-          new Set(item.dates).size > 1
-      )
-  ) {
-    const dates =
-      [...new Set(item.dates)]
-        .sort();
-
-    for (
-      let raidIndex = 0;
-      raidIndex < item.useful_raids;
-      raidIndex++
-    ) {
-      const marginalScore =
-        item.recommendation.score -
-        raidIndex *
-          REMOTE_RAID_DECAY_PER_RAID;
-
-      if (
-        marginalScore <
-        threshold
-      ) {
-        break;
-      }
-
-      const candidates =
-        dates
-          .map(
-            date =>
-              dayByDate.get(date)
-          )
-          .filter(
-            day =>
-              day &&
-              day.allocated <
-                day.capacity
-          )
-          .sort(
-            (a, b) =>
-              a.allocated -
-                b.allocated ||
-              a.value_index -
-                b.value_index ||
-              a.date.localeCompare(
-                b.date
-              )
-          );
-
-      if (!candidates.length) {
-        break;
-      }
-
-      allocateOne(
-        candidates[0],
-        item,
-        marginalScore
-      );
-    }
-  }
-
-  const outputDays =
-    days.map(day => {
-      const allocations =
-        [...day.allocations.entries()]
-          .map(
-            ([pokemon_name, count]) => {
-              const speciesItem =
-                species.get(
-                  normalizeName(
-                    pokemon_name
-                  )
-                );
-
-              return {
-                pokemon_name,
-                count,
-                sprite_url:
-                  speciesItem
-                    ?.recommendation
-                    ?.sprite_url ||
-                  speciesItem
-                    ?.recommendation
-                    ?.meta
-                    ?.sprite_url ||
-                  null
-              };
-            }
-          )
-          .sort(
-            (a, b) =>
-              b.count - a.count ||
-              a.pokemon_name.localeCompare(
-                b.pokemon_name
-              )
-          );
-
-      const flexibleBosses =
-        allocations
-          .filter(allocation => {
-            const item =
-              species.get(
-                normalizeName(
-                  allocation.pokemon_name
-                )
-              );
-
-            return (
-              item &&
-              new Set(item.dates).size > 1
-            );
-          })
-          .map(
-            allocation =>
-              allocation.pokemon_name
-          );
-
-      const reasons = [];
-
-      if (
-        day.completed_targets.length
-      ) {
-        reasons.push(
-          `${day.completed_targets.join(", ")} already complete, so no paid-raid budget is reserved for that target.`
-        );
-      }
-
-      if (
-        day.skipped_targets.length
-      ) {
-        reasons.push(
-          `${day.skipped_targets.join(", ")} set to Skip.`
-        );
-      }
-
-      if (
-        flexibleBosses.length
-      ) {
-        reasons.push(
-          `Flexible multi-day progress is shifted here for ${[...new Set(flexibleBosses)].join(", ")}.`
-        );
-      }
-
-      if (
-        !day.allocated
-      ) {
-        reasons.push(
-          "No remotely eligible target clears your current value threshold after target completion and priority rules."
-        );
-      }
-
-      const topRecommendations =
-        recommendationCoLeaders(
-          day.recommendations
-        );
-
-      return {
-        date: day.date,
-        label: day.label,
-        official_rule:
-          day.official_rule,
-        official_limit:
-          day.official_limit,
-        official_is_unlimited:
-          day.official_is_unlimited,
-        recommended_budget:
-          day.allocated,
-        value_index:
-          Math.round(
-            day.value_index
-          ),
-        allocations,
-        top_recommendations:
-          topRecommendations,
-        completed_targets:
-          day.completed_targets,
-        skipped_targets:
-          day.skipped_targets,
-        reasons
-      };
+  const forecast =
+    buildBattleForecast({
+      days,
+      resourceState:
+        initialResourceState,
+      minScore:
+        user.remote_raid_min_score,
+      marginalValueDecay:
+        REMOTE_RAID_DECAY_PER_RAID
     });
 
   const todayForecast =
-    outputDays[0];
-
-  const futureDays =
-    outputDays.slice(1);
-
-  const bestFutureDay =
-    futureDays
-      .filter(
-        day =>
-          day.recommended_budget > 0
-      )
-      .sort(
-        (a, b) =>
-          b.value_index -
-            a.value_index ||
-          b.recommended_budget -
-            a.recommended_budget ||
-          a.date.localeCompare(
-            b.date
-          )
-      )[0] || null;
-
-  const advice =
-    budgetAdviceLevel(
-      todayForecast,
-      bestFutureDay
-    );
+    forecast.days[0] ||
+    null;
 
   return {
-    horizon_days:
-      REMOTE_BUDGET_LOOKAHEAD_DAYS,
-    today,
-    recommended_daily_budget:
-      todayForecast.recommended_budget,
-    advice,
-    best_future_day:
-      bestFutureDay,
-    days:
-      outputDays
+    ...forecast,
+    advice:
+      battleForecastAdvice(
+        todayForecast,
+        forecast.best_future_day
+      )
   };
 }
+
 
 
 function remoteTargetCap(target) {
@@ -6959,7 +6550,7 @@ async function remoteRaidPlanForUser(
     officialRule,
     raidsUsed,
     dailyOverride,
-    budgetForecast
+    initialResourceState
   ] =
     await Promise.all([
       remoteRaidLimitForDate(
@@ -6978,23 +6569,63 @@ async function remoteRaidPlanForUser(
         user.id,
         localDate
       ),
-      buildRemoteRaidBudgetForecast(
+      battleResourceStateForDate(
         env,
-        user,
-        targets,
-        metas
+        user.id,
+        localDate
       )
     ]);
 
-  const systemRecommendedBudget =
-    Number(
-      budgetForecast
-        .recommended_daily_budget || 0
+  const budgetForecast =
+    await buildBattleBudgetForecast(
+      env,
+      user,
+      targets,
+      metas,
+      {
+        todayOfficialRule:
+          officialRule,
+        todayRemoteUsed:
+          raidsUsed,
+        todayDailyOverride:
+          dailyOverride,
+        initialResourceState
+      }
     );
 
+  const recommendedAdditional =
+    Number(
+      budgetForecast
+        .recommended_daily_budget ||
+      0
+    );
+
+  const recommendedRaidAdditional =
+    Number(
+      budgetForecast
+        .recommended_raid_budget ||
+      0
+    );
+
+  const recommendedMaxAdditional =
+    Number(
+      budgetForecast
+        .recommended_max_budget ||
+      0
+    );
+
+  // Keep this legacy field as a total daily shared Remote budget so existing
+  // UI/cap math remains coherent. The explicit *_additional fields below carry
+  // the new shared-forecast semantics.
+  const systemRecommendedBudget =
+    raidsUsed +
+    recommendedAdditional;
+
   const usualCeiling =
-    user.remote_raid_budget == null ||
-    user.remote_raid_budget === ""
+    user.remote_raid_budget ==
+      null ||
+    user.remote_raid_budget ===
+      ""
       ? null
       : Math.max(
           0,
@@ -7031,12 +6662,36 @@ async function remoteRaidPlanForUser(
       );
   }
 
-  // If the user has already used more than the current advice/ceiling,
-  // preserve the used count so the planning bar remains coherent.
   effectiveBudgetCap =
     Math.max(
       effectiveBudgetCap,
       raidsUsed
+    );
+
+  // The legacy Raid-only allocator remains for backward-compatible Raid card
+  // fields. Give it only the ordinary-Raid portion selected by the shared
+  // forecast instead of the combined Raid + Max budget.
+  let legacyRaidBudgetCap =
+    raidsUsed +
+    recommendedRaidAdditional;
+
+  if (!officialRule.is_unlimited) {
+    legacyRaidBudgetCap =
+      Math.min(
+        legacyRaidBudgetCap,
+        Number(
+          officialRule.limit || 0
+        )
+      );
+  }
+
+  legacyRaidBudgetCap =
+    Math.max(
+      raidsUsed,
+      Math.min(
+        legacyRaidBudgetCap,
+        effectiveBudgetCap
+      )
     );
 
   const plan =
@@ -7044,7 +6699,7 @@ async function remoteRaidPlanForUser(
       recommendations,
       officialRule,
       userBudget:
-        effectiveBudgetCap,
+        legacyRaidBudgetCap,
       raidsUsed,
       minScore:
         user.remote_raid_min_score
@@ -7063,6 +6718,15 @@ async function remoteRaidPlanForUser(
 
     system_recommended_budget:
       systemRecommendedBudget,
+
+    system_recommended_additional:
+      recommendedAdditional,
+
+    forecast_recommended_additional_raids:
+      recommendedRaidAdditional,
+
+    forecast_recommended_additional_max:
+      recommendedMaxAdditional,
 
     usual_personal_ceiling:
       usualCeiling,
@@ -7083,7 +6747,10 @@ async function remoteRaidPlanForUser(
       budgetForecast.days,
 
     budget_forecast_horizon_days:
-      budgetForecast.horizon_days
+      budgetForecast.horizon_days,
+
+    budget_forecast_kind:
+      "shared_battle"
   };
 }
 
@@ -8000,10 +7667,16 @@ function dashboardOverview(
       topPicks,
     top_pick_is_tie:
       topPicks.length > 1,
+    paid_battle_guidance:
+      remoteRaidPlan.purchase_advice,
+    // Legacy alias retained for older Planner clients.
     paid_raid_guidance:
       remoteRaidPlan.purchase_advice,
     planner_budget:
-      remoteRaidPlan.system_recommended_budget,
+      remoteRaidPlan
+        .system_recommended_additional ??
+      remoteRaidPlan
+        .system_recommended_budget,
     effective_budget:
       remoteRaidPlan.effective_budget_cap,
     next_change:
