@@ -18,6 +18,7 @@ import {
   battleOpportunityMetadata,
   battleOpportunityPresentation,
   canonicalBattlePokemonName,
+  encounterNameForMaxPokemon,
   maxBattleVariantFromText,
   maxBattleVariantForEvent,
   maxRotationEventFromMaxMonday
@@ -1332,11 +1333,98 @@ export function spriteAssetsForDisplayName(
   };
 }
 
-export function targetSpriteUrl(target, metas) {
-  const kind = targetBattleKind(target);
-  return metas.find(meta => normalizeName(meta.pokemon_name) === normalizeName(target.pokemon_name)
-    && (kind !== "gigantamax" || namedTargetKind(meta.pokemon_name) === "gigantamax"))?.sprite_url || null;
+function exactMetaForPokemonName(
+  name,
+  metas
+) {
+  const normalized =
+    normalizeName(name);
+
+  if (!normalized) return null;
+
+  return (
+    metas.find(
+      meta =>
+        normalizeName(
+          meta.pokemon_name
+        ) === normalized
+    ) ||
+    null
+  );
 }
+
+export function battleSpriteUrl(
+  item,
+  metas
+) {
+  const name =
+    String(
+      item?.pokemon_name ||
+      item?.boss_name ||
+      item?.name ||
+      ""
+    ).trim();
+
+  if (!name) return null;
+
+  const exact =
+    exactMetaForPokemonName(
+      name,
+      metas
+    );
+
+  if (exact?.sprite_url) {
+    return exact.sprite_url;
+  }
+
+  const kind =
+    targetBattleKind(
+      item
+    );
+
+  // Ordinary Dynamax is a battle capability layered on the exact underlying
+  // species/form. It may safely reuse that exact form's sprite. Gigantamax
+  // remains exact-only: never substitute an ordinary/base sprite for G-Max.
+  if (
+    kind !== "dynamax" &&
+    kind !== "max"
+  ) {
+    return null;
+  }
+
+  const encounterName =
+    encounterNameForMaxPokemon(
+      name
+    );
+
+  if (
+    !encounterName ||
+    normalizeName(
+      encounterName
+    ) ===
+      normalizeName(
+        name
+      )
+  ) {
+    return null;
+  }
+
+  return (
+    exactMetaForPokemonName(
+      encounterName,
+      metas
+    )?.sprite_url ||
+    null
+  );
+}
+
+export function targetSpriteUrl(target, metas) {
+  return battleSpriteUrl(
+    target,
+    metas
+  );
+}
+
 function spriteUrlForPokemonName(
   name,
   metas
@@ -3173,6 +3261,15 @@ export async function recommendationsForDate(
         withPlanningPriority({
         ...rec,
         ...battleMetadata,
+        sprite_url:
+          battleSpriteUrl(
+            {
+              pokemon_name:
+                match.name,
+              ...battleMetadata
+            },
+            metas
+          ),
         battle_presentation:
           battlePresentation,
         max_particle_cost:
@@ -7298,10 +7395,13 @@ export async function raidActivityForUser(env, user, metas) {
     manual_remote_adjustment: remoteRaidUsage - totals.logged_remote_raids,
     recent: rows.slice(0, 8).map(row => ({
       ...row,
-      // Exact identity only. In particular, a base Gengar asset is not a GMAX asset.
-      sprite_url: row.battle_variant === "gigantamax" && maxBattleVariantFromText(row.pokemon_name) !== "gigantamax"
-        ? null
-        : metas.find(meta => normalizeName(meta.pokemon_name) === normalizeName(row.pokemon_name))?.sprite_url || null
+      // Ordinary Dynamax may reuse its exact underlying species/form sprite.
+      // Gigantamax remains exact-only through the shared resolver.
+      sprite_url:
+        battleSpriteUrl(
+          row,
+          metas
+        )
     }))
   };
 }
