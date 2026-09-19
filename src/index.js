@@ -1367,6 +1367,31 @@ export function battleSpriteUrl(
 
   if (!name) return null;
 
+  const kind =
+    targetBattleKind(
+      item
+    );
+
+  // Gigantamax is exact-only even when the stored/logged Pokémon name is the
+  // underlying species and the battle variant carries the G-Max identity.
+  if (kind === "gigantamax") {
+    if (
+      namedTargetKind(
+        name
+      ) !== "gigantamax"
+    ) {
+      return null;
+    }
+
+    return (
+      exactMetaForPokemonName(
+        name,
+        metas
+      )?.sprite_url ||
+      null
+    );
+  }
+
   const exact =
     exactMetaForPokemonName(
       name,
@@ -1377,14 +1402,8 @@ export function battleSpriteUrl(
     return exact.sprite_url;
   }
 
-  const kind =
-    targetBattleKind(
-      item
-    );
-
   // Ordinary Dynamax is a battle capability layered on the exact underlying
-  // species/form. It may safely reuse that exact form's sprite. Gigantamax
-  // remains exact-only: never substitute an ordinary/base sprite for G-Max.
+  // species/form. It may safely reuse that exact form's sprite.
   if (
     kind !== "dynamax" &&
     kind !== "max"
