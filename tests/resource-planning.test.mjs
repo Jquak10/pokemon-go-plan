@@ -263,6 +263,11 @@ assert.equal(sharedOne.allocations[0].battle_system, "max");
 assert.equal(sharedOne.allocations[0].pokemon_name, "Gigantamax Gengar");
 assert.equal(sharedOne.allocations[0].max_particles, 800);
 assert.equal(sharedOne.remote_raid_limit.recommended_additional_raids, 0);
+assert.equal(
+  sharedOne.not_allocated.find(item => item.pokemon_name === "Raid Boss")?.reason_code,
+  "lower_marginal_value",
+  "A zero-allocation candidate should carry a structured reason even when it was otherwise eligible"
+);
 
 const sharedTwo = buildBattleResourcePlan({
   recommendations: [raid, gmax],
@@ -333,6 +338,10 @@ assert.equal(
   forecastCappedCurrent.forecast_today.recommended_additional_max,
   1
 );
+assert.equal(
+  forecastCappedCurrent.not_allocated.find(item => item.pokemon_name === "Raid Boss")?.reason_code,
+  "raid_plan_zero"
+);
 
 const alreadyAtCeiling = buildBattleResourcePlan({
   recommendations: [raid, gmax],
@@ -357,6 +366,12 @@ assert.equal(alreadyAtCeiling.remote_passes.ordinary_remote_raids_used, 2);
 assert.equal(alreadyAtCeiling.remote_raid_limit.used, 3);
 assert.equal(alreadyAtCeiling.remote_passes.recommended_additional, 0);
 assert.equal(alreadyAtCeiling.allocations.length, 0);
+assert.ok(
+  alreadyAtCeiling.not_allocated.length >= 2
+);
+assert.ok(
+  alreadyAtCeiling.not_allocated.every(item => item.reason_code === "remote_capacity_exhausted")
+);
 
 
 const unlimitedSharedLimit = buildBattleResourcePlan({
@@ -427,6 +442,14 @@ assert.match(
   unknownMax.not_allocated[0].reason,
   /cost is unknown/i
 );
+assert.equal(
+  unknownMax.not_allocated[0].reason_code,
+  "max_particle_cost_unknown"
+);
+assert.equal(
+  unknownMax.not_allocated[0].battle_variant,
+  "dynamax"
+);
 
 const localOnly = buildBattleResourcePlan({
   recommendations: [{
@@ -447,6 +470,14 @@ const localOnly = buildBattleResourcePlan({
 
 assert.equal(localOnly.allocations.length, 0);
 assert.match(localOnly.not_allocated[0].reason, /not confirmed as remotely accessible/i);
+assert.equal(
+  localOnly.not_allocated[0].reason_code,
+  "remote_access_unconfirmed"
+);
+assert.equal(
+  localOnly.not_allocated[0].battle_variant,
+  "gigantamax"
+);
 
 const withFuture = buildBattleResourcePlan({
   recommendations: [raid],
