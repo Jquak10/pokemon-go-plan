@@ -24,6 +24,7 @@ import {
   maxRotationEventFromMaxMonday
 } from "./battle-opportunities.js";
 import {
+  MAX_PARTICLE_COST_BY_TIER,
   STANDARD_MAX_PARTICLE_DAILY_LIMIT,
   STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
   buildBattleForecast,
@@ -107,6 +108,9 @@ const PVPOKE_MASTER_LEAGUE =
 
 const POGO_API_POKEDEX =
   "https://pokemon-go-api.github.io/pokemon-go-api/api/pokedex.json";
+
+const POGO_API_MAX_BATTLES =
+  "https://pokemon-go-api.github.io/pokemon-go-api/api/maxbattles.json";
 
 const BATTLE_MATCH_POKEDEX_TTL_MS = 6 * 60 * 60 * 1000;
 let battleMatchPokedex = [];
