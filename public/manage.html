@@ -1862,7 +1862,9 @@ function renderTodayBriefing() {
 
   const advice =
     sharedPlan?.advice ||
-    dashboard.paid_raid_guidance || {};
+    dashboard.paid_battle_guidance ||
+    dashboard.paid_raid_guidance ||
+    {};
 
   const spend =
     document.getElementById("todaySpendSignal");
@@ -1871,7 +1873,7 @@ function renderTodayBriefing() {
     `today-spend-signal signal-${esc(advice.code || "selective")}`;
 
   spend.innerHTML = `
-    <span>${esc(advice.label || "PAID RAID GUIDANCE")}</span>
+    <span>${esc(advice.label || "PAID BATTLE GUIDANCE")}</span>
     <strong>${esc(advice.headline || "Be selective today.")}</strong>
     <small>${esc(advice.detail || "")}</small>
   `;
