@@ -871,7 +871,7 @@ function naturalAttemptCap(
     : scoreCap;
 }
 
-function recommendationBlockedReason(
+function recommendationBlock(
   recommendation,
   planningScore,
   minScore
@@ -884,11 +884,19 @@ function recommendationBlockedReason(
       target?.priority || ""
     ).toLowerCase() === "skip"
   ) {
-    return "Personal priority is set to Skip.";
+    return {
+      code: "priority_skip",
+      reason:
+        "Personal priority is set to Skip."
+    };
   }
 
   if (Number(target?.completed)) {
-    return "Personal target is marked complete.";
+    return {
+      code: "target_complete",
+      reason:
+        "Personal target is marked complete."
+    };
   }
 
   if (
@@ -896,10 +904,29 @@ function recommendationBlockedReason(
       planningScore || 0
     ) < minScore
   ) {
-    return `Planning priority score is below your ${minScore}-point paid-battle threshold.`;
+    return {
+      code: "below_threshold",
+      reason:
+        `Planning priority score is below your ${minScore}-point paid-battle threshold.`
+    };
   }
 
   return null;
+}
+
+function recommendationBlockedReason(
+  recommendation,
+  planningScore,
+  minScore
+) {
+  return (
+    recommendationBlock(
+      recommendation,
+      planningScore,
+      minScore
+    )?.reason ||
+    null
+  );
 }
 
 function forecastIdentityKey(
@@ -2265,12 +2292,16 @@ export function buildBattleResourcePlan({
         rec
       );
 
-    const blockedReason =
-      recommendationBlockedReason(
+    const recommendationBlockInfo =
+      recommendationBlock(
         rec,
         planningValue.score,
         threshold
       );
+
+    const blockedReason =
+      recommendationBlockInfo?.reason ||
+      null;
 
     const cap =
       naturalAttemptCap(
@@ -2289,10 +2320,16 @@ export function buildBattleResourcePlan({
           rec?.pokemon_name,
         battle_system:
           system,
+        battle_variant:
+          rec?.battle_variant ||
+          null,
         planning_score:
           planningValue.score,
         score_basis:
           planningValue.basis,
+        reason_code:
+          recommendationBlockInfo?.code ||
+          "no_worthwhile_attempts",
         reason:
           blockedReason ||
           "No worthwhile paid attempts remain above the threshold."
@@ -2307,10 +2344,15 @@ export function buildBattleResourcePlan({
             rec?.pokemon_name,
           battle_system:
             system,
+          battle_variant:
+            rec?.battle_variant ||
+            null,
           planning_score:
             planningValue.score,
           score_basis:
             planningValue.basis,
+          reason_code:
+            "remote_ineligible",
           reason:
             "This Raid is not remotely eligible."
         });
@@ -2344,10 +2386,15 @@ export function buildBattleResourcePlan({
             rec?.pokemon_name,
           battle_system:
             system,
+          battle_variant:
+            rec?.battle_variant ||
+            null,
           planning_score:
             planningValue.score,
           score_basis:
             planningValue.basis,
+          reason_code:
+            "remote_access_unconfirmed",
           reason:
             "This Max Battle is not confirmed as remotely accessible."
         });
@@ -2365,10 +2412,15 @@ export function buildBattleResourcePlan({
             rec?.pokemon_name,
           battle_system:
             system,
+          battle_variant:
+            rec?.battle_variant ||
+            null,
           planning_score:
             planningValue.score,
           score_basis:
             planningValue.basis,
+          reason_code:
+            "max_particle_cost_unknown",
           reason:
             "Max Particle cost is unknown, so the planner will not auto-allocate a Remote Pass."
         });
@@ -2634,6 +2686,92 @@ export function buildBattleResourcePlan({
         best.candidate
           .max_particle_cost;
     }
+  }
+
+  for (const candidate of candidates) {
+    if (candidate.allocated > 0) {
+      continue;
+    }
+
+    let reasonCode;
+    let reason;
+
+    if (
+      Number.isFinite(
+        sharedAdditionalCapacity
+      ) &&
+      sharedAdditionalCapacity <= 0
+    ) {
+      reasonCode =
+        "remote_capacity_exhausted";
+      reason =
+        "No additional Remote Pass capacity remains today.";
+    } else if (
+      materiallyStrongerFuture &&
+      reservedRemotePasses > 0
+    ) {
+      reasonCode =
+        "future_reserve";
+      reason =
+        `A Remote Pass is being reserved for ${bestFuture.pokemon_name} on ${bestFuture.label}.`;
+    } else if (
+      candidate.system === "raid" &&
+      recommendedRaidSlots <= 0
+    ) {
+      reasonCode =
+        "raid_plan_zero";
+      reason =
+        "No additional Remote Raid uses are planned for this opportunity today.";
+    } else if (
+      candidate.system === "max" &&
+      recommendedMaxSlots <= 0
+    ) {
+      reasonCode =
+        "max_plan_zero";
+      reason =
+        "No additional Remote Max uses are planned for this opportunity today.";
+    } else if (
+      candidate.system === "max" &&
+      maxParticlesRemaining <
+        candidate.max_particle_cost
+    ) {
+      reasonCode =
+        reservedMaxParticles > 0
+          ? "max_particles_reserved"
+          : "max_particles_insufficient";
+      reason =
+        reservedMaxParticles > 0
+          ? "Max Particles are being reserved for a stronger future opportunity."
+          : "Not enough spendable Max Particles remain for this battle today.";
+    } else {
+      reasonCode =
+        "lower_marginal_value";
+      reason =
+        "Higher-priority paid battles use the worthwhile Remote capacity available today.";
+    }
+
+    blocked.push({
+      pokemon_name:
+        candidate.recommendation
+          .pokemon_name,
+      battle_system:
+        candidate.system,
+      battle_variant:
+        candidate.recommendation
+          .battle_variant ||
+        null,
+      planning_score:
+        candidate
+          .planning_value
+          .score,
+      score_basis:
+        candidate
+          .planning_value
+          .basis,
+      reason_code:
+        reasonCode,
+      reason
+    });
   }
 
   const allocations =
