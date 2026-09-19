@@ -22,6 +22,17 @@ assert.match(manage, />\s*Max Battles\s*</);
 assert.match(manage, /battlePlanFilter/);
 assert.match(manage, /remoteRaidZeroDetails/);
 
+assert.match(manage, /function remoteRuleWindowLabel/);
+assert.match(manage, /Local time ·/);
+assert.match(manage, /rule\.start_at/);
+assert.match(manage, /rule\.end_at/);
+assert.match(manage, /state\?\.user\?\.timezone/);
+assert.match(manage, /remoteRuleWindowLabel\(rule\)/);
+assert.doesNotMatch(
+  manage,
+  /<span>\$\{esc\(rule\.start_date \|\| ""\)\}\$\{rule\.end_date \? " → " \+ esc\(rule\.end_date\) : ""\}<\/span>/
+);
+
 assert.match(manage, /function recommendationSpriteUrl/);
 assert.match(manage, /requires_exact_form/);
 assert.match(manage, /sprite_exact_form/);
@@ -64,7 +75,7 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=37/);
+  assert.match(read(page), /styles\.css\?v=38/);
 }
 
 assert.match(worker, /BATTLE_SOURCE_TYPES/);
@@ -95,6 +106,19 @@ console.log("Battle Plan UI integration tests passed");
 
 assert.match(manage, /Remote Battle Plan/);
 assert.match(manage, /Paid Battle Forecast/);
+assert.match(manage, /budgetForecastDetails/);
+assert.match(manage, /data-forecast-day-index/);
+assert.match(manage, /View all/);
+assert.match(manage, /item\.exclusion_reason/);
+assert.match(manage, /MP cost unknown/);
+assert.match(styles, /PAID BATTLE FORECAST EXPANSION · v38/);
+assert.match(styles, /\.forecast-expand-button/);
+assert.match(styles, /\.forecast-detail-row/);
+assert.match(worker, /function calendarSourceTypesForUser/);
+assert.match(worker, /included\.includes\("max_battles"\)[\s\S]*MAX_ROTATION_SOURCE_TYPE/);
+assert.match(worker, /calendarDisplaySourceType/);
+assert.match(worker, /suppressionSourceTypesForEvent/);
+
 assert.doesNotMatch(manage, /Paid Raid Budget Forecast/);
 assert.match(manage, /Additional Remote Pass uses from the shared Raid \+ Max forecast/);
 assert.match(manage, /item\.battle_system === "max" \? "Max" : "Raid"/);

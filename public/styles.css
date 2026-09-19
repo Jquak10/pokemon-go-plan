@@ -7395,3 +7395,140 @@ body.modal-open {
     overflow-wrap: anywhere;
   }
 }
+
+
+/* ============================================================
+   PAID BATTLE FORECAST EXPANSION · v38
+   ============================================================ */
+
+.forecast-expand-button {
+  width: 100%;
+  min-height: 34px;
+  margin-top: 7px;
+  padding: 5px 7px;
+  border: 1px solid #d7e5f2;
+  border-radius: 9px;
+  background: #f6faff;
+  color: #3b6b93;
+  font-size: .62rem;
+  font-weight: 800;
+  box-shadow: none;
+}
+
+.forecast-expand-button:hover {
+  background: #edf6ff;
+}
+
+.forecast-details {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #dce7f1;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.forecast-details-heading {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.forecast-details-heading strong {
+  display: block;
+  margin-top: 2px;
+  color: #2d4f6e;
+  font-size: .84rem;
+}
+
+.forecast-details-heading > span {
+  color: #75889b;
+  font-size: .66rem;
+}
+
+.forecast-details-list {
+  display: grid;
+  gap: 6px;
+}
+
+.forecast-detail-row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(180px, .8fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 9px;
+  border: 1px solid #e6edf4;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+
+.forecast-detail-main {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.forecast-detail-main > div {
+  min-width: 0;
+}
+
+.forecast-detail-main strong,
+.forecast-detail-main span {
+  display: block;
+}
+
+.forecast-detail-main strong {
+  overflow: hidden;
+  color: #355675;
+  font-size: .73rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forecast-detail-main span {
+  margin-top: 2px;
+  color: #7b8da0;
+  font-size: .62rem;
+}
+
+.forecast-detail-row > small {
+  color: #7b8da0;
+  font-size: .63rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.forecast-detail-row
+  > small.forecast-status-planned {
+  color: #25805d;
+  font-weight: 800;
+}
+
+.forecast-detail-sprite {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+}
+
+@media (max-width: 700px) {
+  .forecast-expand-button {
+    min-height: 44px;
+  }
+
+  .forecast-details-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .forecast-detail-row {
+    grid-template-columns: 1fr;
+  }
+
+  .forecast-detail-row > small {
+    text-align: left;
+  }
+}

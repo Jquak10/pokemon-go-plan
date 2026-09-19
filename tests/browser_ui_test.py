@@ -138,6 +138,52 @@ MOCK_STATE = {
                         "sprite_url": None,
                     }
                 ],
+                "opportunities": [
+                    {
+                        "pokemon_name": "Gigantamax Fixture",
+                        "battle_system": "max",
+                        "battle_variant": "gigantamax",
+                        "planning_score": 92,
+                        "allocated_count": 1,
+                        "eligible": True,
+                        "exclusion_reason": None,
+                        "max_particle_cost": 800,
+                        "sprite_url": None,
+                    },
+                    {
+                        "pokemon_name": "Dynamax Articuno",
+                        "battle_system": "max",
+                        "battle_variant": "dynamax",
+                        "planning_score": 88,
+                        "allocated_count": 0,
+                        "eligible": False,
+                        "exclusion_reason": "Max Particle cost is unknown.",
+                        "max_particle_cost": None,
+                        "sprite_url": None,
+                    },
+                    {
+                        "pokemon_name": "Dynamax Zapdos",
+                        "battle_system": "max",
+                        "battle_variant": "dynamax",
+                        "planning_score": 87,
+                        "allocated_count": 0,
+                        "eligible": False,
+                        "exclusion_reason": "Max Particle cost is unknown.",
+                        "max_particle_cost": None,
+                        "sprite_url": None,
+                    },
+                    {
+                        "pokemon_name": "Dynamax Moltres",
+                        "battle_system": "max",
+                        "battle_variant": "dynamax",
+                        "planning_score": 86,
+                        "allocated_count": 0,
+                        "eligible": False,
+                        "exclusion_reason": "Max Particle cost is unknown.",
+                        "max_particle_cost": None,
+                        "sprite_url": None,
+                    },
+                ],
             },
         ],
         "allocations": [],
@@ -468,13 +514,63 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("Paid Battle Forecast", page.locator(".budget-forecast-wrap").inner_text())
         forecast_text = page.locator("#budgetForecast").inner_text()
         self.assertIn("Gigantamax Fixture", forecast_text)
+        self.assertIn("Dynamax Articuno", forecast_text)
         self.assertIn("Max", forecast_text)
         self.assertIn("800 MP", forecast_text)
+        self.assertIn("View all 4", forecast_text)
+        page.locator("[data-forecast-day-index='1']").click()
+        details = page.locator("#budgetForecastDetails")
+        details.wait_for(state="visible")
+        detail_text = details.inner_text()
+        self.assertIn("Dynamax Articuno", detail_text)
+        self.assertIn("Dynamax Zapdos", detail_text)
+        self.assertIn("Dynamax Moltres", detail_text)
+        self.assertIn("Max Particle cost is unknown.", detail_text)
+        self.assertIn("1 paid use planned", detail_text)
         self.assertIn("1 Remote Pass", page.locator("#purchaseAdvice").inner_text())
         intel = card.locator(".raid-intel").inner_text()
         self.assertIn("WEAK TO", intel.upper())
         self.assertIn("Water", intel)
         self.assertIn("Grass", intel)
+
+        self.assert_no_horizontal_overflow(page)
+
+    def test_exact_remote_rule_banner_uses_planner_timezone(self):
+        page = self.open_planner(1024, 800)
+
+        page.evaluate(
+            """() => {
+                state.remote_raid_plan.official_rule = {
+                    label: "Official temporary Remote Raid limit: 20",
+                    detected_automatically: true,
+                    is_override: true,
+                    start_date: "2026-09-18",
+                    end_date: "2026-09-19",
+                    start_at: "2026-09-19T00:00:00.000Z",
+                    end_at: "2026-09-20T03:00:00.000Z",
+                    start_local_date: "2026-09-19",
+                    end_local_date: "2026-09-20",
+                    timing_precision: "instant",
+                    source_url: "https://pokemongo.com/news/example"
+                };
+                state.remote_raid_plan.official_limit = 20;
+                state.remote_raid_plan.official_remaining = 20;
+                renderRemoteRaidPlan();
+            }"""
+        )
+
+        banner = page.locator("#specialEventBanner")
+        banner.wait_for(state="visible")
+        text = banner.inner_text()
+
+        self.assertIn("Official temporary Remote Raid limit: 20", text)
+        self.assertIn("Local time", text)
+        self.assertIn("Sat, Sep 19", text)
+        self.assertIn("8:00 AM", text)
+        self.assertIn("Sun, Sep 20", text)
+        self.assertIn("11:00 AM", text)
+        self.assertIn("Asia/Singapore", text)
+        self.assertNotIn("2026-09-18 → 2026-09-19", text)
 
         self.assert_no_horizontal_overflow(page)
 

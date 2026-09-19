@@ -505,6 +505,8 @@ Priority presentation thresholds remain consistent across systems. The highest R
 
 The seven-day forward-looking forecast is battle-system aware rather than Raid-only.
 
+The Planner UI previews the highest-priority opportunities in each day card and provides an explicit **View all** expansion. The expanded day view includes both allocated and unallocated Raid/Max opportunities, their canonical priority, Max Particle cost when known, and the reason an opportunity was not auto-budgeted. This keeps unknown-cost Max Battles visible without pretending they are safe to allocate.
+
 `recommendationsForDate()` remains the source of exact day-level availability, so suppression rules, official replacements, source precedence, and exact event windows are applied before the forecast sees an opportunity.
 
 `buildBattleForecast()` in `src/resource-planning.js` then evaluates the normalized opportunities across the horizon:
@@ -557,6 +559,8 @@ src/remote-raid-rules.js:
 - Projects those instants into the user's saved IANA timezone.
 - Evaluates today's rule against the current instant.
 - Allows a source-date window to overlap the next local day after timezone conversion.
+- Exposes both source-calendar dates and projected local dates/instants to the Planner.
+- The Planner's active-rule banner displays an exact override in the user's saved timezone; source-calendar dates must not be presented as though they were the user's effective local interval.
 - Falls back to date-only behavior when exact time/timezone cannot be trusted.
 
 This was added after the Staraptor Super Mega Raid Day case exposed a source-date/local-date mismatch. A Sep 18 17:00 PDT start must not become a full-day Sep 18 override in Singapore.
@@ -620,6 +624,8 @@ A Dynamax/Gigantamax species or variant never implies a cost by itself. In parti
 The existing official Pokémon GO sync gives Max-event article links priority within its fixed page budget. When an official article provides Max Battle difficulty or an explicit entry cost, the sync decorates the already-normalized Max calendar event with `X-POGO-MAX-*` evidence in `events.other_lines`. It does not create a duplicate availability event. Recommendation normalization then exposes fields such as `max_battle_tier`, `max_particle_cost`, confidence/source metadata, and the official evidence URL.
 
 The regular event sync runs before the official evidence sync on the existing six-hour cadence, so source refreshes can safely replace calendar rows and official evidence is re-applied afterward. If official evidence cannot be refreshed or matched, the planner falls back to unknown rather than retaining an unsupported species-based assumption.
+
+Weekly standard Dynamax rotations derived from `max_mondays` are stored internally as `max_rotation`. They participate in Battle Plan availability directly. For user calendars, `max_rotation` inherits the visible **Max Battles** category: selecting Max Battles includes the derived weekly rotation in both the month view and private ICS feed, while the API normalizes its display category back to `max_battles`. Suppression rules targeting `max_battles` also apply to derived `max_rotation` events. The internal source is never exposed as a separate calendar preference. This matters when the upstream `max_battles` ICS feed contains only special Max Battle Days but the Max Monday schedule still provides the weekly species rotation.
 
 ## 18. Unified battle logging
 

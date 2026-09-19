@@ -759,6 +759,7 @@ The following sequence is retained as a compact repository implementation/change
 | #38 | Unified Battle Plan priority scoring | Made the Max-aware planning value the canonical visible Max priority, preserved the underlying recommendation score, aligned cards/Today/Quick Status/allocation/future summaries, and closed BL-002. |
 | #39 | Verified Max Particle cost evidence | Normalized official Max difficulty/cost evidence onto existing opportunities, removed species-based Gigantamax cost assumptions, preserved unknown-safe allocation, and closed BL-007. |
 | #40 | Shared Raid + Max future forecast | Replaced the Raid-oriented seven-day forecast with a shared resource-aware Battle forecast, modeled cross-day target/MP constraints, switched future reserve guidance to feasible allocations, and closed BL-006. |
+| #41 | Planner schedule/forecast visibility fixes | Displayed exact temporary Remote-limit windows in the planner timezone, exposed derived weekly Dynamax rotations through the Max Battles calendar category, and added expandable Paid Battle Forecast details including unallocated Max opportunities/reasons. |
 
 ## Supersession map
 
