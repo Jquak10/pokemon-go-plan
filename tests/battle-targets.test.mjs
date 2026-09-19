@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import vm from 'node:vm';
-import {battleSpriteUrl,currentMaxBattleTiersFromPayload,maxBattleCostOverrideKey,upsertTarget,findMatches,targetOptionsForUser,targetSpriteUrl,recommendationsForDate} from '../src/index.js';
+import {battleSpriteUrl,currentMaxBattleTiersFromPayload,maxBattleCostOverrideKey,updateMaxBattleCostOverrideApi,upsertTarget,findMatches,targetOptionsForUser,targetSpriteUrl,recommendationsForDate} from '../src/index.js';
 import {normalizeBattleLog,createBattleLog,undoBattleLog} from '../src/battle-logging.js';
 import {buildBattleResourcePlan} from '../src/resource-planning.js';
 import {battleOpportunityMetadata} from '../src/battle-opportunities.js';
@@ -183,12 +183,23 @@ const rhyhornOverrideKey=maxBattleCostOverrideKey({
   start_date:today,
   end_date:today
 });
-sql.prepare(`INSERT INTO max_battle_cost_overrides (
-  user_id,opportunity_key,pokemon_name,battle_variant,start_date,end_date,
-  max_battle_tier,max_particle_cost,updated_at
-) VALUES(?,?,?,?,?,?,?,?,?)`).run(
-  'u',rhyhornOverrideKey,'Dynamax Rhyhorn','dynamax',today,today,1,250,'now'
+const overrideResponse=await updateMaxBattleCostOverrideApi(
+  new Request('http://localhost/api/max-battle-cost-override',{
+    method:'POST',
+    body:JSON.stringify({
+      token,
+      opportunity_key:rhyhornOverrideKey,
+      pokemon_name:'Dynamax Rhyhorn',
+      battle_variant:'dynamax',
+      start_date:today,
+      end_date:today,
+      max_battle_tier:1
+    })
+  }),
+  env
 );
+assert.equal(overrideResponse.status,200);
+assert.equal((await overrideResponse.json()).max_particle_cost,250);
 const fallbackRecs=await recommendationsForDate(env,user,all(),metas,today,maxFallbackPokedex);
 const rhyhornRec=fallbackRecs.find(r=>r.battle_system==='max'&&r.pokemon_name==='Dynamax Rhyhorn');
 assert.ok(rhyhornRec,'Current Max boss without pokemon_meta must still render as a recommendation');
@@ -198,6 +209,23 @@ assert.equal(rhyhornRec.max_battle_tier,1);
 assert.equal(rhyhornRec.max_particle_cost_confidence,'user_override');
 assert.equal(rhyhornRec.max_cost_override_key,rhyhornOverrideKey);
 assert.equal(rhyhornRec.max_cost_override_source,'user');
+const clearOverrideResponse=await updateMaxBattleCostOverrideApi(
+  new Request('http://localhost/api/max-battle-cost-override',{
+    method:'POST',
+    body:JSON.stringify({
+      token,
+      opportunity_key:rhyhornOverrideKey,
+      pokemon_name:'Dynamax Rhyhorn',
+      battle_variant:'dynamax',
+      start_date:today,
+      end_date:today,
+      clear:true
+    })
+  }),
+  env
+);
+assert.equal(clearOverrideResponse.status,200);
+assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM max_battle_cost_overrides').get().n,0);
 sql.prepare("DELETE FROM events WHERE id='rhyhorn-max'").run();
 const recs=await recommendationsForDate(env,user,all(),metas,today);
 assert.equal(recs.find(r=>r.battle_system==='raid').target.id,raid.id);
