@@ -688,6 +688,31 @@ Rules:
 
 This decision improves cost coverage while preserving source precedence and the conservative unknown-cost behavior established by shared resource planning.
 
+## ADR-043 — Use one shared Raid + Max forecast for future paid-battle guidance
+
+Status: Current  
+Introduced in PR #40.
+
+The original seven-day budget forecast was built for ordinary Remote Raids. After Max Battles became first-class opportunities, the current shared allocator could compare Raid and Max today, but future-saving guidance still selected from a Raid-oriented forecast/top-recommendation representation. That allowed future Max opportunity, MP replenishment, and cross-day target progress to be represented incompletely.
+
+The Planner therefore uses a shared future Battle forecast.
+
+Rules:
+
+- day-level inputs come from `recommendationsForDate()`, so event source precedence, suppression, and exact availability are resolved before forecasting;
+- Raid and Max opportunities use their canonical planning methods, with no Raid-attacker proxy for Max;
+- each forecast day applies the official shared Remote daily limit plus the user's personal ceiling; today's logged shared usage is subtracted and a one-day manual ceiling override applies only to today;
+- remaining target progress/attempt caps are shared across the full horizon instead of being independently recreated for every available day;
+- verified Max Particle entry cost is required for automatic Max allocation;
+- MP held, today's remaining collection, future daily collection/storage rules, and already-planned Max spend are simulated across the horizon before later Max allocations are accepted;
+- flexible opportunities may move across available days, while short-window opportunities are considered first so exact availability is respected;
+- future-saving guidance selects from actual forecast allocations that are remotely and resource-feasible, not from the old Raid-only `top_recommendations` proxy;
+- when the selected future opportunity is Max, the current-day MP reserve uses the forecast's replenishment/spend path when available;
+- the legacy `remote_raid_plan` API envelope remains for compatibility, but `budget_forecast_kind = "shared_battle"` and explicit Raid/Max additional-count fields define the new forecast semantics;
+- the legacy ordinary-Raid allocator may remain for backward-compatible Raid fields, but it receives only the Raid share selected by the shared forecast.
+
+This supersedes the Raid-oriented future-budget model while preserving current Remote-limit, target-completion, source-precedence, and conservative unknown-MP invariants.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -733,6 +758,7 @@ The following sequence is retained as a compact repository implementation/change
 | #37 | Failure-safe Pokémon catalog loading | Added explicit catalog load states, retryable terminal failures, validated last-known-good local fallback, and browser regressions so Battle Plan intel/Hundo cannot remain stuck loading after catalog failure. |
 | #38 | Unified Battle Plan priority scoring | Made the Max-aware planning value the canonical visible Max priority, preserved the underlying recommendation score, aligned cards/Today/Quick Status/allocation/future summaries, and closed BL-002. |
 | #39 | Verified Max Particle cost evidence | Normalized official Max difficulty/cost evidence onto existing opportunities, removed species-based Gigantamax cost assumptions, preserved unknown-safe allocation, and closed BL-007. |
+| #40 | Shared Raid + Max future forecast | Replaced the Raid-oriented seven-day forecast with a shared resource-aware Battle forecast, modeled cross-day target/MP constraints, switched future reserve guidance to feasible allocations, and closed BL-006. |
 
 ## Supersession map
 
@@ -744,6 +770,8 @@ Important historical replacements:
 - PR #24 superseded that provisional intelligence for attacker analysis with dedicated Max rankings.
 - Date-only Remote-limit interpretation was sufficient until a cross-timezone event exposed the flaw.
 - PR #29 superseded automatic date-only interpretation whenever exact official timing can be parsed safely.
+- The original paid-Raid seven-day forecast remained Raid-oriented after Max Battles were introduced.
+- PR #40 superseded that future-planning proxy with a shared Raid + Max forecast that models target progress, shared Remote capacity, and Max Particle replenishment across days.
 
 When reading older PR text or README sections, always apply this supersession map before assuming an earlier statement is still current.
 
