@@ -22,7 +22,10 @@ import {
   maxRotationEventFromMaxMonday
 } from "../src/battle-opportunities.js";
 import {
-  officialMaxBattleSupplementsFromText
+  calendarDisplaySourceType,
+  calendarSourceTypesForUser,
+  officialMaxBattleSupplementsFromText,
+  suppressionSourceTypesForEvent
 } from "../src/index.js";
 
 assert.equal(
@@ -51,6 +54,53 @@ assert.equal(REMOTE_PASS_SOURCE_TYPES.has("max_battles"), true);
 assert.equal(REMOTE_PASS_SOURCE_TYPES.has("max_mondays"), true);
 assert.equal(BATTLE_SOURCE_TYPES.has(MAX_ROTATION_SOURCE_TYPE), true);
 assert.equal(REMOTE_PASS_SOURCE_TYPES.has(MAX_ROTATION_SOURCE_TYPE), true);
+
+assert.deepEqual(
+  calendarSourceTypesForUser({
+    included_sources:
+      JSON.stringify([
+        "raid_battles",
+        "max_battles",
+        "max_mondays"
+      ])
+  }),
+  [
+    "raid_battles",
+    "max_battles",
+    "max_mondays",
+    MAX_ROTATION_SOURCE_TYPE
+  ]
+);
+assert.deepEqual(
+  calendarSourceTypesForUser({
+    included_sources:
+      JSON.stringify([
+        "raid_battles",
+        "max_mondays"
+      ])
+  }),
+  [
+    "raid_battles",
+    "max_mondays"
+  ],
+  "Weekly rotations inherit Max Battles, not the separate Max Monday calendar toggle"
+);
+assert.equal(
+  calendarDisplaySourceType(
+    MAX_ROTATION_SOURCE_TYPE
+  ),
+  "max_battles"
+);
+assert.deepEqual(
+  suppressionSourceTypesForEvent({
+    source_type:
+      MAX_ROTATION_SOURCE_TYPE
+  }),
+  [
+    MAX_ROTATION_SOURCE_TYPE,
+    "max_battles"
+  ]
+);
 
 assert.equal(
   maxBattleVariantFromText("Gigantamax Gengar"),
