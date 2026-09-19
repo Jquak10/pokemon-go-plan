@@ -138,6 +138,52 @@ MOCK_STATE = {
                         "sprite_url": None,
                     }
                 ],
+                "opportunities": [
+                    {
+                        "pokemon_name": "Gigantamax Fixture",
+                        "battle_system": "max",
+                        "battle_variant": "gigantamax",
+                        "planning_score": 92,
+                        "allocated_count": 1,
+                        "eligible": True,
+                        "exclusion_reason": None,
+                        "max_particle_cost": 800,
+                        "sprite_url": None,
+                    },
+                    {
+                        "pokemon_name": "Dynamax Articuno",
+                        "battle_system": "max",
+                        "battle_variant": "dynamax",
+                        "planning_score": 88,
+                        "allocated_count": 0,
+                        "eligible": False,
+                        "exclusion_reason": "Max Particle cost is unknown.",
+                        "max_particle_cost": None,
+                        "sprite_url": None,
+                    },
+                    {
+                        "pokemon_name": "Dynamax Zapdos",
+                        "battle_system": "max",
+                        "battle_variant": "dynamax",
+                        "planning_score": 87,
+                        "allocated_count": 0,
+                        "eligible": False,
+                        "exclusion_reason": "Max Particle cost is unknown.",
+                        "max_particle_cost": None,
+                        "sprite_url": None,
+                    },
+                    {
+                        "pokemon_name": "Dynamax Moltres",
+                        "battle_system": "max",
+                        "battle_variant": "dynamax",
+                        "planning_score": 86,
+                        "allocated_count": 0,
+                        "eligible": False,
+                        "exclusion_reason": "Max Particle cost is unknown.",
+                        "max_particle_cost": None,
+                        "sprite_url": None,
+                    },
+                ],
             },
         ],
         "allocations": [],
@@ -468,8 +514,19 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("Paid Battle Forecast", page.locator(".budget-forecast-wrap").inner_text())
         forecast_text = page.locator("#budgetForecast").inner_text()
         self.assertIn("Gigantamax Fixture", forecast_text)
+        self.assertIn("Dynamax Articuno", forecast_text)
         self.assertIn("Max", forecast_text)
         self.assertIn("800 MP", forecast_text)
+        self.assertIn("View all 4", forecast_text)
+        page.locator("[data-forecast-day-index='1']").click()
+        details = page.locator("#budgetForecastDetails")
+        details.wait_for(state="visible")
+        detail_text = details.inner_text()
+        self.assertIn("Dynamax Articuno", detail_text)
+        self.assertIn("Dynamax Zapdos", detail_text)
+        self.assertIn("Dynamax Moltres", detail_text)
+        self.assertIn("Max Particle cost is unknown.", detail_text)
+        self.assertIn("1 paid use planned", detail_text)
         self.assertIn("1 Remote Pass", page.locator("#purchaseAdvice").inner_text())
         intel = card.locator(".raid-intel").inner_text()
         self.assertIn("WEAK TO", intel.upper())
