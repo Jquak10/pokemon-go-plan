@@ -408,6 +408,10 @@ The Plan combines:
 - Recent battle activity.
 - Recommendation explanations.
 
+A current recommendation with zero Remote allocation must explain the decision on the card itself, using system-aware Raid/Max wording. The shared resource plan emits a stable `reason_code` plus the full human-readable reason for blocked or otherwise zero-allocated opportunities; presentation maps common codes to compact card copy without discarding the full explanation. Examples include unknown Max Particle cost, paid-battle threshold, Remote accessibility, target complete, priority Skip, exhausted capacity, future reserve, insufficient/reserved MP, and lower marginal value.
+
+The detailed zero-allocation list is secondary and collapsible. It uses shared Battle terminology, includes both Raids and Max Battles, and follows the active All/Raids/Max Battles filter rather than disappearing for Max Battles.
+
 ## 12. Targets
 
 Targets are shared across the product but battle-aware.
