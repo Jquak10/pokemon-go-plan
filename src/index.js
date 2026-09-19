@@ -6513,6 +6513,224 @@ async function battleResourcePlanForUser(
   };
 }
 
+async function updateMaxBattleCostOverrideApi(
+  request,
+  env
+) {
+  const body =
+    await request.json();
+
+  const user =
+    await userByManageToken(
+      env,
+      body.token
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  const pokemonName =
+    String(
+      body.pokemon_name || ""
+    ).trim();
+
+  const battleVariant =
+    String(
+      body.battle_variant || ""
+    ).toLowerCase();
+
+  const startDate =
+    String(
+      body.start_date || ""
+    );
+
+  const endDate =
+    String(
+      body.end_date ||
+      body.start_date ||
+      ""
+    );
+
+  if (
+    !pokemonName ||
+    pokemonName.length > 200
+  ) {
+    return bad(
+      "Pokémon/form name is required."
+    );
+  }
+
+  if (
+    ![
+      "dynamax",
+      "gigantamax"
+    ].includes(
+      battleVariant
+    )
+  ) {
+    return bad(
+      "Choose a Dynamax or Gigantamax battle."
+    );
+  }
+
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      startDate
+    ) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      endDate
+    ) ||
+    endDate < startDate
+  ) {
+    return bad(
+      "A valid Max Battle date range is required."
+    );
+  }
+
+  const opportunityKey =
+    maxBattleCostOverrideKey({
+      pokemon_name:
+        pokemonName,
+      battle_variant:
+        battleVariant,
+      start_date:
+        startDate,
+      end_date:
+        endDate
+    });
+
+  if (
+    !opportunityKey ||
+    (
+      body.opportunity_key &&
+      body.opportunity_key !==
+        opportunityKey
+    )
+  ) {
+    return bad(
+      "Max Battle opportunity identity does not match."
+    );
+  }
+
+  try {
+    if (
+      body.clear === true ||
+      body.max_battle_tier === "" ||
+      body.max_battle_tier == null
+    ) {
+      await env.DB.prepare(`
+        DELETE FROM max_battle_cost_overrides
+        WHERE user_id = ?
+          AND opportunity_key = ?
+      `).bind(
+        user.id,
+        opportunityKey
+      ).run();
+
+      return json({
+        ok: true,
+        opportunity_key:
+          opportunityKey,
+        cleared: true
+      });
+    }
+
+    const tier =
+      Number(
+        body.max_battle_tier
+      );
+
+    if (
+      !Number.isInteger(tier) ||
+      tier < 1 ||
+      tier > 6
+    ) {
+      return bad(
+        "Max Battle tier must be a whole number from 1 to 6."
+      );
+    }
+
+    const cost =
+      MAX_PARTICLE_COST_BY_TIER[
+        tier
+      ];
+
+    if (!cost) {
+      return bad(
+        "No standard Max Particle cost is available for that tier."
+      );
+    }
+
+    const timestamp =
+      nowIso();
+
+    await env.DB.prepare(`
+      INSERT INTO max_battle_cost_overrides (
+        user_id,
+        opportunity_key,
+        pokemon_name,
+        battle_variant,
+        start_date,
+        end_date,
+        max_battle_tier,
+        max_particle_cost,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, opportunity_key)
+      DO UPDATE SET
+        pokemon_name = excluded.pokemon_name,
+        battle_variant = excluded.battle_variant,
+        start_date = excluded.start_date,
+        end_date = excluded.end_date,
+        max_battle_tier = excluded.max_battle_tier,
+        max_particle_cost = excluded.max_particle_cost,
+        updated_at = excluded.updated_at
+    `).bind(
+      user.id,
+      opportunityKey,
+      pokemonName,
+      battleVariant,
+      startDate,
+      endDate,
+      tier,
+      cost,
+      timestamp
+    ).run();
+
+    return json({
+      ok: true,
+      opportunity_key:
+        opportunityKey,
+      max_battle_tier:
+        tier,
+      max_particle_cost:
+        cost
+    });
+  } catch (error) {
+    if (
+      /no such table:\s*max_battle_cost_overrides/i.test(
+        String(
+          error?.message ||
+          error
+        )
+      )
+    ) {
+      return bad(
+        "Max Battle tier overrides need migrations/0005_max_battle_cost_overrides.sql. No changes were saved.",
+        503
+      );
+    }
+
+    throw error;
+  }
+}
+
+
 async function updateBattleResourcesApi(
   request,
   env
@@ -9824,6 +10042,16 @@ async function handleFetch(request, env) {
       path === "/api/battle-resources"
     ) {
       return updateBattleResourcesApi(
+        request,
+        env
+      );
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/max-battle-cost-override"
+    ) {
+      return updateMaxBattleCostOverrideApi(
         request,
         env
       );
