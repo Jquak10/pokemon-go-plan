@@ -478,6 +478,45 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
 
         self.assert_no_horizontal_overflow(page)
 
+    def test_exact_remote_rule_banner_uses_planner_timezone(self):
+        page = self.open_planner(1024, 800)
+
+        page.evaluate(
+            """() => {
+                state.remote_raid_plan.official_rule = {
+                    label: "Official temporary Remote Raid limit: 20",
+                    detected_automatically: true,
+                    is_override: true,
+                    start_date: "2026-09-18",
+                    end_date: "2026-09-19",
+                    start_at: "2026-09-19T00:00:00.000Z",
+                    end_at: "2026-09-20T03:00:00.000Z",
+                    start_local_date: "2026-09-19",
+                    end_local_date: "2026-09-20",
+                    timing_precision: "instant",
+                    source_url: "https://pokemongo.com/news/example"
+                };
+                state.remote_raid_plan.official_limit = 20;
+                state.remote_raid_plan.official_remaining = 20;
+                renderRemoteRaidPlan();
+            }"""
+        )
+
+        banner = page.locator("#specialEventBanner")
+        banner.wait_for(state="visible")
+        text = banner.inner_text()
+
+        self.assertIn("Official temporary Remote Raid limit: 20", text)
+        self.assertIn("Local time", text)
+        self.assertIn("Sat, Sep 19", text)
+        self.assertIn("8:00 AM", text)
+        self.assertIn("Sun, Sep 20", text)
+        self.assertIn("11:00 AM", text)
+        self.assertIn("Asia/Singapore", text)
+        self.assertNotIn("2026-09-18 → 2026-09-19", text)
+
+        self.assert_no_horizontal_overflow(page)
+
     def test_mobile_logger_stays_in_view_and_freezes_background(self):
         page = self.open_planner(390, 667)
         self.assert_no_horizontal_overflow(page)
