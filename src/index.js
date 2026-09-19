@@ -2461,7 +2461,7 @@ function parseSources(row) {
   }
 }
 
-function calendarSourceTypesForUser(row) {
+export function calendarSourceTypesForUser(row) {
   const included =
     parseSources(row);
 
@@ -2480,7 +2480,7 @@ function calendarSourceTypesForUser(row) {
   return included;
 }
 
-function calendarDisplaySourceType(
+export function calendarDisplaySourceType(
   sourceType
 ) {
   return sourceType ===
@@ -2489,7 +2489,7 @@ function calendarDisplaySourceType(
     : sourceType;
 }
 
-function suppressionSourceTypesForEvent(
+export function suppressionSourceTypesForEvent(
   event
 ) {
   const sourceType =
