@@ -17,6 +17,7 @@ import {
   MAX_ROTATION_SOURCE_TYPE,
   battleOpportunityMetadata,
   battleOpportunityPresentation,
+  canonicalBattlePokemonName,
   maxBattleVariantFromText,
   maxBattleVariantForEvent,
   maxRotationEventFromMaxMonday
@@ -1624,19 +1625,20 @@ function maxEligibleNamesFromEvents(
         event.summary,
         pokedex
       )) {
-      const kind =
-        eventKindForMatch(
+      const detectedName =
+        displayNameForMatch(
+          match.name,
+          match.kind,
           event.summary,
-          match.name
+          match.pokemon
         );
 
       names.add(
-        displayNameForMatch(
-          match.name,
-          kind,
-          event.summary,
-          match.pokemon
-        )
+        canonicalBattlePokemonName(
+          event,
+          detectedName
+        ) ||
+        detectedName
       );
     }
   }
@@ -1745,13 +1747,20 @@ async function syncAutomaticMeta(env) {
     const matches = findPokemonMatchesInSummary(event.summary, pokedex);
 
     for (const match of matches) {
-      const displayName =
+      const detectedName =
         displayNameForMatch(
           match.name,
           match.kind,
           event.summary,
           match.pokemon
         );
+
+      const displayName =
+        canonicalBattlePokemonName(
+          event,
+          detectedName
+        ) ||
+        detectedName;
       const key = normalizeName(displayName);
       const pvePower =
         rawPvePower(match.pokemon) *
@@ -2695,16 +2704,20 @@ export function findMatches(summary, targets, metas, event = null, pokedex = [])
   // Resolve bosses from the current Pokédex so a newly scheduled Max Pokémon
   // cannot disappear merely because pokemon_meta has not caught up yet.
   for (const match of findPokemonMatchesInSummary(summary, pokedex)) {
-    const maxVariant = event
-      ? maxBattleVariantForEvent(event, match.name)
-      : null;
+    const detectedName =
+      displayNameForMatch(
+        match.name,
+        match.kind,
+        summary,
+        match.pokemon
+      );
 
-    const displayName = displayNameForMatch(
-      match.name,
-      maxVariant === "gigantamax" ? "gigantamax" : "normal",
-      summary,
-      match.pokemon
-    );
+    const displayName =
+      canonicalBattlePokemonName(
+        event,
+        detectedName
+      ) ||
+      detectedName;
 
     const needle = normalizeName(displayName);
     if (!needle) continue;
@@ -2774,12 +2787,49 @@ export function findMatches(summary, targets, metas, event = null, pokedex = [])
     );
   }
 
-  // Select by exact form AND battle context after event identity is known.
-  // Never transfer a base-form target to a more specific form just by substring.
-  return selected.map(candidate => ({...candidate, target: matchingBattleTargets(targets, {
-    pokemon_name:candidate.name,
-    ...(event ? battleOpportunityMetadata(event,{pokemonName:candidate.name}) : {battle_system:'raid'})
-  })[0] || null}));
+  // Canonicalize the final name after event identity is known so every
+  // downstream surface receives the same form/capability label, even when a
+  // grouped event writes "Dynamax" only once before several Pokémon names.
+  return selected.map(candidate => {
+    const name =
+      canonicalBattlePokemonName(
+        event,
+        candidate.name
+      ) ||
+      candidate.name;
+
+    const exactMeta =
+      metas.find(meta =>
+        normalizeName(
+          meta.pokemon_name
+        ) ===
+        normalizeName(name)
+      ) ||
+      candidate.meta;
+
+    return {
+      ...candidate,
+      name,
+      meta: exactMeta,
+      target:
+        matchingBattleTargets(
+          targets,
+          {
+            pokemon_name: name,
+            ...(event
+              ? battleOpportunityMetadata(
+                  event,
+                  { pokemonName: name }
+                )
+              : {
+                  battle_system:
+                    "raid"
+                })
+          }
+        )[0] ||
+        null
+    };
+  });
 }
 
 function weightedInternetScore(meta, user) {
