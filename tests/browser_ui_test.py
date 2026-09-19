@@ -105,6 +105,11 @@ MOCK_STATE = {
             "event_title": "[TEST] DYNAMAX RHYHORN REGRESSION FIXTURE",
             "event_description": "",
             "max_particle_cost": None,
+            "max_battle_tier": None,
+            "max_cost_override_key": "dynamax rhyhorn|dynamax|2026-09-18|2026-09-18",
+            "max_cost_override_source": None,
+            "start_date": "2026-09-18",
+            "end_date": "2026-09-18",
             "logging_remote_eligible": False,
             "remote_pass_capable_by_source": False,
             "remote_eligible": False,
@@ -198,6 +203,11 @@ MOCK_STATE = {
                         "eligible": False,
                         "exclusion_reason": "Max Particle cost is unknown.",
                         "max_particle_cost": None,
+                        "max_battle_tier": None,
+                        "max_cost_override_key": "dynamax articuno|dynamax|2026-09-19|2026-09-19",
+                        "max_cost_override_source": None,
+                        "start_date": "2026-09-19",
+                        "end_date": "2026-09-19",
                         "sprite_url": SPRITE_DATA_URL,
                     },
                     {
@@ -209,6 +219,11 @@ MOCK_STATE = {
                         "eligible": False,
                         "exclusion_reason": "Max Particle cost is unknown.",
                         "max_particle_cost": None,
+                        "max_battle_tier": None,
+                        "max_cost_override_key": "dynamax zapdos|dynamax|2026-09-19|2026-09-19",
+                        "max_cost_override_source": None,
+                        "start_date": "2026-09-19",
+                        "end_date": "2026-09-19",
                         "sprite_url": SPRITE_DATA_URL,
                     },
                     {
@@ -220,6 +235,11 @@ MOCK_STATE = {
                         "eligible": False,
                         "exclusion_reason": "Max Particle cost is unknown.",
                         "max_particle_cost": None,
+                        "max_battle_tier": None,
+                        "max_cost_override_key": "dynamax moltres|dynamax|2026-09-19|2026-09-19",
+                        "max_cost_override_source": None,
+                        "start_date": "2026-09-19",
+                        "end_date": "2026-09-19",
                         "sprite_url": SPRITE_DATA_URL,
                     },
                 ],
@@ -564,6 +584,30 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("RECOMMENDED", card.inner_text())
         self.assertIn("No Remote Max allocation", card.inner_text())
         self.assertIn("MP cost unknown", card.inner_text())
+        tier_select = card.locator("[data-max-tier-override]")
+        self.assertEqual(tier_select.count(), 1)
+        self.assertIn("Tier 5 · 800 MP", tier_select.locator("option").all_inner_texts())
+
+        saved_override = {}
+
+        def capture_override(route):
+            saved_override.update(json.loads(route.request.post_data or "{}"))
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({
+                    "ok": True,
+                    "max_battle_tier": 5,
+                    "max_particle_cost": 800,
+                }),
+            )
+
+        page.route("**/api/max-battle-cost-override", capture_override)
+        tier_select.select_option("5")
+        page.wait_for_timeout(100)
+        self.assertEqual(saved_override.get("pokemon_name"), "Dynamax Rhyhorn")
+        self.assertEqual(saved_override.get("max_battle_tier"), "5")
+        self.assertEqual(saved_override.get("start_date"), "2026-09-18")
 
         zero_details = page.locator("#remoteRaidZeroDetails")
         self.assertFalse(zero_details.evaluate("element => element.classList.contains('hidden')"))
@@ -597,6 +641,10 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("Dynamax Zapdos", detail_text)
         self.assertIn("Dynamax Moltres", detail_text)
         self.assertIn("Max Particle cost is unknown.", detail_text)
+        self.assertGreaterEqual(
+            details.locator("[data-max-tier-override]").count(),
+            3,
+        )
         self.assertIn("1 paid use planned", detail_text)
         self.assertIn("1 Remote Pass", page.locator("#purchaseAdvice").inner_text())
 
@@ -748,6 +796,31 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("11:00 AM", text)
         self.assertIn("Asia/Singapore", text)
         self.assertNotIn("2026-09-18 → 2026-09-19", text)
+
+        self.assert_no_horizontal_overflow(page)
+
+    def test_existing_target_identity_fields_are_editable(self):
+        page = self.open_planner(1024, 800)
+        page.locator('.tab-button[data-tab="targets"]').click()
+
+        card = page.locator(".target-card", has_text="Dynamax Moltres")
+        card.locator("[data-edit-target]").click()
+
+        modal = page.locator("#targetModal")
+        modal.wait_for(state="visible")
+
+        for selector in ("#pokemonName", "#targetBattleKind", "#targetType"):
+            self.assertFalse(
+                page.locator(selector).is_disabled(),
+                f"{selector} should remain editable for an existing target",
+            )
+
+        self.assertEqual(page.locator("#targetBattleKind").input_value(), "dynamax")
+        self.assertEqual(page.locator("#targetType").input_value(), "battles")
+
+        page.locator("#targetBattleKind").select_option("gigantamax")
+        self.assertEqual(page.locator("#targetBattleKind").input_value(), "gigantamax")
+        self.assertFalse(page.locator("#targetType").is_disabled())
 
         self.assert_no_horizontal_overflow(page)
 
