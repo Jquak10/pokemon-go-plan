@@ -374,11 +374,11 @@ battle_variant is:
 - dynamax
 - gigantamax
 
-For ordinary Dynamax, the underlying exact species/form remains the encounter identity. Dynamax is a capability/presentation state. User-facing battle identity is nevertheless canonicalized as `Dynamax <species/form>` so recommendations, forecasts, targets, logging, and resource planning all use one stable label.
+For ordinary Dynamax, the underlying exact species/form remains the encounter identity. Dynamax is a capability/presentation state. User-facing battle identity is nevertheless canonicalized as `Dynamax <species/form>` so recommendations, forecasts, targets, logging, and resource planning all use one stable label. Sprite resolution follows the same model: an ordinary Dynamax identity may reuse the sprite of its exact underlying species/form (for example, `Dynamax Moltres` → `Moltres`), but regional/form identity must be preserved (`Dynamax Alolan Raichu` may use `Alolan Raichu`, never ordinary Raichu).
 
 When a single source event lists several Max Pokémon but writes the capability only once (for example, “Dynamax Articuno, Zapdos, and Moltres”), the event-level Max variant applies to every matched Pokémon. The parser must not infer that only the first listed species is Dynamax. Canonicalization occurs before recommendation/resource output so downstream UI surfaces cannot diverge.
 
-For Gigantamax, the capability/form must be explicit. Exact Gigantamax assets are required for a Gigantamax sprite. If none exists, show no sprite instead of an ordinary form.
+For Gigantamax, the capability/form must be explicit. Exact Gigantamax assets are required for a Gigantamax sprite. If none exists, show no sprite instead of an ordinary form. The ordinary-Dynamax sprite fallback must never be applied to Gigantamax.
 
 Shared battle intel such as typing, weaknesses, and resistances resolves a Max Battle through its underlying exact species/form when the catalog has no separate Max-form record. Pokémon catalog loading has explicit idle/loading/ready/stale/error state. A failed live catalog request must rerender dependent UI into an explicit retryable state rather than leave cards loading indefinitely. The client may use a validated last-known-good public catalog from local storage as a stale fallback; stale use is labeled, remains retryable, and never substitutes a different Pokémon/form merely to produce intel. After catalog resolution, a recommendation card must either render resolved battle intel or show an explicit unavailable state.
 

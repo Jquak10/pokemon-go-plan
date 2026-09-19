@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import vm from 'node:vm';
-import {upsertTarget,findMatches,targetOptionsForUser,targetSpriteUrl,recommendationsForDate} from '../src/index.js';
+import {battleSpriteUrl,upsertTarget,findMatches,targetOptionsForUser,targetSpriteUrl,recommendationsForDate} from '../src/index.js';
 import {normalizeBattleLog,createBattleLog,undoBattleLog} from '../src/battle-logging.js';
 import {buildBattleResourcePlan} from '../src/resource-planning.js';
 import {battleOpportunityMetadata} from '../src/battle-opportunities.js';
@@ -53,6 +53,44 @@ assert.equal(T.matches(all()[0],{pokemon_name:'Gengar',battle_system:'max',battl
 assert.equal(T.kind({pokemon_name:'Gigantamax Gengar',battle_kind:null}),'gigantamax');
 assert.equal(targetSpriteUrl({pokemon_name:'Gigantamax Gengar',battle_kind:'gigantamax'},metas.slice(0,1)),null);
 assert.equal(targetSpriteUrl({pokemon_name:'Gigantamax Gengar',battle_kind:'gigantamax'},metas),'gmax.png');
+
+const dynamaxSpriteMetas=[
+  {pokemon_name:'Moltres',sprite_url:'moltres.png'},
+  {pokemon_name:'Zapdos',sprite_url:'zapdos.png'},
+  {pokemon_name:'Raichu',sprite_url:'raichu.png'},
+  {pokemon_name:'Alolan Raichu',sprite_url:'alolan-raichu.png'},
+  {pokemon_name:'Gengar',sprite_url:'gengar.png'}
+];
+assert.equal(
+  targetSpriteUrl({pokemon_name:'Dynamax Moltres',battle_kind:'dynamax'},dynamaxSpriteMetas),
+  'moltres.png',
+  'Ordinary Dynamax targets reuse the exact underlying species sprite'
+);
+assert.equal(
+  battleSpriteUrl({pokemon_name:'Dynamax Zapdos',battle_system:'max',battle_variant:'dynamax'},dynamaxSpriteMetas),
+  'zapdos.png',
+  'Forecast/recommendation Max identity uses the same ordinary Dynamax fallback'
+);
+assert.equal(
+  targetSpriteUrl({pokemon_name:'Dynamax Alolan Raichu',battle_kind:'dynamax'},dynamaxSpriteMetas),
+  'alolan-raichu.png',
+  'Dynamax fallback preserves regional form identity'
+);
+assert.notEqual(
+  targetSpriteUrl({pokemon_name:'Dynamax Alolan Raichu',battle_kind:'dynamax'},dynamaxSpriteMetas),
+  'raichu.png',
+  'Dynamax regional forms never fall back to a different base form'
+);
+assert.equal(
+  battleSpriteUrl({pokemon_name:'Gigantamax Gengar',battle_system:'max',battle_variant:'gigantamax'},dynamaxSpriteMetas),
+  null,
+  'Gigantamax remains exact-only when only the ordinary sprite exists'
+);
+assert.equal(
+  battleSpriteUrl({pokemon_name:'Gengar',battle_system:'max',battle_variant:'gigantamax'},dynamaxSpriteMetas),
+  null,
+  'Gigantamax stored as underlying species plus battle variant must not leak the base sprite'
+);
 
 // A battle boss must be discoverable before pokemon_meta catches up. Multi-boss
 // Max feeds also inherit standard Dynamax capability consistently.
