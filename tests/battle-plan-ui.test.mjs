@@ -93,6 +93,18 @@ for (const [index, script] of inlineScripts.entries()) {
 console.log("Battle Plan UI integration tests passed");
 
 
+assert.match(manage, /Remote Battle Plan/);
+assert.match(manage, /Paid Battle Forecast/);
+assert.doesNotMatch(manage, /Paid Raid Budget Forecast/);
+assert.match(manage, /Additional Remote Pass uses from the shared Raid \+ Max forecast/);
+assert.match(manage, /item\.battle_system === "max" \? "Max" : "Raid"/);
+assert.match(worker, /buildBattleForecast/);
+assert.match(worker, /buildBattleBudgetForecast/);
+assert.match(worker, /budget_forecast_kind:[\s\S]*"shared_battle"/);
+assert.match(worker, /forecast_recommended_additional_raids/);
+assert.match(worker, /forecast_recommended_additional_max/);
+assert.doesNotMatch(worker, /buildRemoteRaidBudgetForecast/);
+
 assert.match(manage, /BATTLE RESOURCES/);
 assert.match(manage, /Remote Passes & Max Particles/);
 assert.match(manage, /maxParticlesHeld/);
