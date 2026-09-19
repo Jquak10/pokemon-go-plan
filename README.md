@@ -135,7 +135,7 @@ Expired raid events are defensively excluded from current recommendations even i
 Remote limits are always ceilings, not goals, and eligible Remote Max Battles share the same official daily Remote participation counter:
 
 - **Official remaining** is the official daily capacity minus already logged shared Remote uses.
-- **Recommended next** is the number of additional worthwhile Remote Pass uses from the shared Raid + Max forecast, not a spending target.
+- **Recommended next** is the final current shared-plan recommendation after the Raid + Max forecast and stronger-future reserve logic, not a spending target.
 - **Today's ceiling** applies the saved **Usual personal ceiling** or a one-day override without exceeding the official game limit.
 - The **Paid Battle Forecast** evaluates every normalized Raid/Max opportunity for each forecast day. Suppressed/unavailable events are absent before planning; remaining target progress is shared across the horizon instead of duplicated per day.
 - Raid and Max candidates use their own canonical planning method. Allocations stop when marginal value falls below the saved **Minimum Remote Raid score**.
