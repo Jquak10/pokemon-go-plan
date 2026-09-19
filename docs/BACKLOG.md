@@ -27,12 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-006 — Build a true shared Raid + Max future Battle forecast
-
-The seven-day budget forecast grew out of the Remote Raid planner. The shared resource planner can compare current Raid and Max opportunities, but future opportunity selection still depends on the older forecast representation.
-
-Build a battle-aware future forecast that evaluates every Raid and Max opportunity with its appropriate planning method, Remote capacity, Max Particle requirements/replenishment, target progress, suppression, and exact availability. Future-saving guidance should use this shared forecast rather than a Raid-oriented proxy.
-
 ### BL-008 — Explain zero Remote allocation directly on Raid and Max cards
 
 The shared resource planner already records useful non-allocation reasons, but the Planner still has a Raid-specific zero-allocation details section and Max cards can show “0 Remote Max battles” without the reason close to the card.
@@ -83,6 +77,6 @@ The Max Battle work that was discussed in the long-running project conversation 
 
 BL-001 was resolved after the production D1 definitions for `event_suppression_rules` and `remote_raid_daily_budget_overrides` were inspected directly and reconciled into the repository schema, migration path, and regression coverage.
 
-A follow-up repository audit on 18 September 2026 identified the improvement work tracked here. Automated browser regression coverage and broad PR CI shipped in PR #36, failure-safe Pokémon catalog loading shipped in PR #37, and canonical Battle Plan priority scoring shipped in PR #38. Completed items are removed from Active and retained in `docs/DECISIONS.md` instead.
+A follow-up repository audit on 18 September 2026 identified the improvement work tracked here. Automated browser regression coverage and broad PR CI shipped in PR #36, failure-safe Pokémon catalog loading shipped in PR #37, canonical Battle Plan priority scoring shipped in PR #38, and verified Max Particle cost evidence shipped in PR #39. Completed items are removed from Active and retained in `docs/DECISIONS.md` instead.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
