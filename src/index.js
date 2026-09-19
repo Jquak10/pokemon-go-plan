@@ -3663,8 +3663,10 @@ export async function recommendationsForDate(
         });
 
       const maxParticleCost =
-        automaticMaxParticleCost.cost ||
-        !userCostOverride
+        (
+          automaticMaxParticleCost.cost ||
+          !userCostOverride
+        )
           ? automaticMaxParticleCost
           : {
               cost:
@@ -6532,7 +6534,7 @@ async function battleResourcePlanForUser(
   };
 }
 
-async function updateMaxBattleCostOverrideApi(
+export async function updateMaxBattleCostOverrideApi(
   request,
   env
 ) {
