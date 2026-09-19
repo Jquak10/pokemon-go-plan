@@ -2046,13 +2046,21 @@ function futureParticleReserve({
     return 0;
   }
 
+  const hasForecastReserve =
+    futureOpportunity
+      .required_particles_after_today !=
+    null;
+
   const forecastReserve =
-    Number(
-      futureOpportunity
-        .required_particles_after_today
-    );
+    hasForecastReserve
+      ? Number(
+          futureOpportunity
+            .required_particles_after_today
+        )
+      : null;
 
   if (
+    hasForecastReserve &&
     Number.isFinite(
       forecastReserve
     ) &&
