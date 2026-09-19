@@ -6067,9 +6067,10 @@ function battleForecastAdvice(
     );
 
   const capacity =
+    day?.remote_capacity != null &&
     Number.isFinite(
       Number(
-        day?.remote_capacity
+        day.remote_capacity
       )
     )
       ? Number(
