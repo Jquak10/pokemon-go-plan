@@ -1670,6 +1670,75 @@ function compactDateLabel(dateValue) {
   ).format(date);
 }
 
+function remoteRuleWindowLabel(rule) {
+  if (!rule) {
+    return "";
+  }
+
+  const timezone =
+    state?.user?.timezone ||
+    Intl.DateTimeFormat()
+      .resolvedOptions()
+      .timeZone ||
+    "UTC";
+
+  if (
+    rule.start_at &&
+    rule.end_at
+  ) {
+    const start =
+      new Date(
+        rule.start_at
+      );
+
+    const end =
+      new Date(
+        rule.end_at
+      );
+
+    if (
+      !Number.isNaN(
+        start.getTime()
+      ) &&
+      !Number.isNaN(
+        end.getTime()
+      )
+    ) {
+      const formatter =
+        new Intl.DateTimeFormat(
+          undefined,
+          {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            timeZone:
+              timezone
+          }
+        );
+
+      return `Local time · ${formatter.format(start)} → ${formatter.format(end)} · ${timezone}`;
+    }
+  }
+
+  const startDate =
+    rule.start_local_date ||
+    rule.start_date ||
+    "";
+
+  const endDate =
+    rule.end_local_date ||
+    rule.end_date ||
+    "";
+
+  if (!startDate) {
+    return "";
+  }
+
+  return `Local date · ${startDate}${endDate ? " → " + endDate : ""}`;
+}
+
 function relativeFreshness(value) {
   if (!value) {
     return "Not yet available";
@@ -3884,7 +3953,7 @@ function renderRemoteRaidPlan() {
       <span class="event-banner-icon" aria-hidden="true">⚡</span>
       <div>
         <strong>${esc(rule.label)}</strong>
-        <span>${esc(rule.start_date || "")}${rule.end_date ? " → " + esc(rule.end_date) : ""}</span>
+        <span>${esc(remoteRuleWindowLabel(rule))}</span>
       </div>
     `;
   } else {
