@@ -351,11 +351,15 @@ export function inferMaxParticleCost(recommendation) {
                     : "event_text"
                 ),
         evidence_source:
-          officialEvidence
-            ? "official"
-            : recommendation
-                ?.source_kind ||
-              "event"
+          recommendation
+            ?.max_particle_cost_evidence_source ||
+          (
+            officialEvidence
+              ? "official"
+              : recommendation
+                  ?.source_kind ||
+                "event"
+          )
       };
     }
   }
