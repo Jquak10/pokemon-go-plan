@@ -4125,15 +4125,33 @@ function renderRemoteRaidPlan() {
               .join("");
 
           const visibleCount =
-            opportunities.length ||
-            allocations.length;
+            allPreviewItems.length;
 
           const maxCount =
-            opportunities.filter(
+            allPreviewItems.filter(
               item =>
                 item.battle_system ===
                 "max"
             ).length;
+
+          const raidCount =
+            allPreviewItems.filter(
+              item =>
+                item.battle_system !==
+                "max"
+            ).length;
+
+          const systemCountLabel =
+            [
+              raidCount
+                ? `${raidCount} Raid`
+                : "",
+              maxCount
+                ? `${maxCount} Max`
+                : ""
+            ]
+              .filter(Boolean)
+              .join(" + ");
 
           const needsDetails =
             visibleCount > 2 ||
@@ -4169,8 +4187,7 @@ function renderRemoteRaidPlan() {
                       data-forecast-day-index="${index}"
                       aria-expanded="${expanded ? "true" : "false"}"
                     >
-                      ${expanded ? "Hide" : "View all"} ${visibleCount}
-                      ${maxCount ? ` · ${maxCount} Max` : ""}
+                      ${expanded ? "Hide" : "View all"} · ${systemCountLabel || visibleCount}
                     </button>
                   `
                   : ""
