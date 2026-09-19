@@ -4294,9 +4294,7 @@ function renderRemoteRaidPlan() {
                               ${
                                 item.battle_system === "max"
                                   ? (
-                                      mpCost
-                                        ? ` · ${formatNumber(mpCost)} MP each`
-                                        : " · MP cost unknown"
+                                      ` · ${maxTierCostLabel(item)}`
                                     )
                                   : ""
                               }
@@ -4304,9 +4302,12 @@ function renderRemoteRaidPlan() {
                           </div>
                         </div>
 
-                        <small class="${count > 0 ? "forecast-status-planned" : ""}">
-                          ${esc(status)}
-                        </small>
+                        <div class="forecast-detail-side">
+                          <small class="${count > 0 ? "forecast-status-planned" : ""}">
+                            ${esc(status)}
+                          </small>
+                          ${maxTierOverrideControlHtml(item, "forecast-tier-control")}
+                        </div>
                       </div>
                     `;
                   }
@@ -6148,6 +6149,214 @@ function renderZeroAllocationDetails() {
       : "";
 }
 
+function maxTierCostLabel(
+  item
+) {
+  const tier =
+    Number(
+      item?.max_battle_tier ||
+      0
+    );
+
+  const cost =
+    Number(
+      item?.max_particle_cost ??
+      item?.max_particle_cost_each ??
+      0
+    );
+
+  if (!cost) {
+    return "MP cost unknown";
+  }
+
+  return tier
+    ? `Tier ${formatNumber(tier)} · ${formatNumber(cost)} MP`
+    : `${formatNumber(cost)} MP each`;
+}
+
+function maxTierOverrideControlHtml(
+  item,
+  className = ""
+) {
+  if (
+    item?.battle_system !== "max"
+  ) {
+    return "";
+  }
+
+  const key =
+    item?.max_cost_override_key;
+
+  const isUserOverride =
+    item?.max_cost_override_source ===
+      "user" ||
+    item
+      ?.max_particle_cost_evidence_source ===
+      "user" ||
+    item
+      ?.max_particle_cost_confidence ===
+      "user_override";
+
+  const cost =
+    Number(
+      item?.max_particle_cost ??
+      item?.max_particle_cost_each ??
+      0
+    );
+
+  if (
+    cost &&
+    !isUserOverride
+  ) {
+    const sourceLabel =
+      item
+        ?.max_particle_cost_evidence_source ===
+        "pokemon-go-api"
+          ? "current Max data"
+          : item
+              ?.max_particle_cost_evidence_source ===
+              "official"
+            ? "verified"
+            : "verified tier";
+
+    return `
+      <span class="max-tier-source-badge">
+        ${esc(maxTierCostLabel(item))} · ${esc(sourceLabel)}
+      </span>
+    `;
+  }
+
+  if (
+    !key ||
+    !item?.start_date ||
+    !item?.end_date ||
+    !item?.battle_variant
+  ) {
+    return `
+      <span class="max-particle-cost-badge ${cost ? "" : "cost-unknown"}">
+        ${esc(maxTierCostLabel(item))}
+      </span>
+    `;
+  }
+
+  const selectedTier =
+    isUserOverride
+      ? String(
+          item.max_battle_tier ||
+          ""
+        )
+      : "";
+
+  const options = [
+    [1, 250],
+    [2, 400],
+    [3, 400],
+    [4, 800],
+    [5, 800],
+    [6, 800]
+  ];
+
+  return `
+    <span class="max-tier-override-control ${esc(className)}">
+      <select
+        class="max-tier-override-select"
+        data-max-tier-override
+        data-opportunity-key="${esc(key)}"
+        data-pokemon-name="${esc(item.pokemon_name || "")}"
+        data-battle-variant="${esc(item.battle_variant || "")}"
+        data-start-date="${esc(item.start_date || "")}"
+        data-end-date="${esc(item.end_date || item.start_date || "")}"
+        aria-label="Max Battle tier for ${esc(item.pokemon_name || "Max Battle")}"
+      >
+        <option value="">${isUserOverride ? "Use automatic data" : "Set Max tier…"}</option>
+        ${options.map(([tier, tierCost]) => `
+          <option value="${tier}" ${selectedTier === String(tier) ? "selected" : ""}>
+            Tier ${tier} · ${formatNumber(tierCost)} MP
+          </option>
+        `).join("")}
+      </select>
+      <small class="max-tier-override-status">
+        ${
+          isUserOverride
+            ? "Your tier setting"
+            : "Needed only when verified tier data is unavailable"
+        }
+      </small>
+    </span>
+  `;
+}
+
+async function saveMaxTierOverride(
+  select
+) {
+  const status =
+    select
+      .closest(
+        ".max-tier-override-control"
+      )
+      ?.querySelector(
+        ".max-tier-override-status"
+      );
+
+  const tier =
+    select.value;
+
+  select.disabled = true;
+
+  if (status) {
+    status.textContent =
+      tier
+        ? "Saving tier…"
+        : "Removing your tier setting…";
+  }
+
+  try {
+    await api(
+      "/api/max-battle-cost-override",
+      {
+        method: "POST",
+        headers: {
+          "content-type":
+            "application/json"
+        },
+        body:
+          JSON.stringify({
+            token,
+            opportunity_key:
+              select.dataset
+                .opportunityKey,
+            pokemon_name:
+              select.dataset
+                .pokemonName,
+            battle_variant:
+              select.dataset
+                .battleVariant,
+            start_date:
+              select.dataset
+                .startDate,
+            end_date:
+              select.dataset
+                .endDate,
+            max_battle_tier:
+              tier,
+            clear:
+              !tier
+          })
+      }
+    );
+
+    await load();
+  } catch (error) {
+    select.disabled = false;
+
+    if (status) {
+      status.textContent =
+        error.message;
+    }
+  }
+}
+
+
 function renderRecommendationCard(
   rec,
   allocation,
@@ -6231,13 +6440,7 @@ function renderRecommendationCard(
                         : "0 Remote Max battles"
                     }
                   </span>
-                  <span class="max-particle-cost-badge ${maxParticleCost ? "" : "cost-unknown"}">
-                    ${
-                      maxParticleCost
-                        ? `${formatNumber(maxParticleCost)} MP each`
-                        : "MP cost unknown"
-                    }
-                  </span>
+                  ${maxTierOverrideControlHtml(rec, "max-tier-card-control")}
                 `
         }
 
@@ -8600,6 +8803,22 @@ document.getElementById("battleLogMpCustom").addEventListener("input", updateRai
 
 document.getElementById("saveDailyBudgetOverride").addEventListener("click", saveDailyBudgetOverride);
 document.getElementById("clearDailyBudgetOverride").addEventListener("click", clearDailyBudgetOverride);
+
+document.addEventListener(
+  "change",
+  event => {
+    const select =
+      event.target.closest(
+        "[data-max-tier-override]"
+      );
+
+    if (select) {
+      saveMaxTierOverride(
+        select
+      );
+    }
+  }
+);
 
 document.getElementById("targetBattleKind").addEventListener("change", () => {
   const name = selectedTargetPokemonName();
