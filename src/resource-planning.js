@@ -2234,6 +2234,24 @@ export function buildBattleResourcePlan({
           )
     );
 
+  const forecastMaxSlots =
+    Number(
+      remoteRaidPlan
+        .forecast_recommended_additional_max
+    );
+
+  const recommendedMaxSlots =
+    Number.isFinite(
+      forecastMaxSlots
+    )
+      ? Math.max(
+          0,
+          Math.floor(
+            forecastMaxSlots
+          )
+        )
+      : Infinity;
+
   const candidates = [];
   const blocked = [];
 
@@ -2383,9 +2401,10 @@ export function buildBattleResourcePlan({
         }
 
         return (
+          recommendedMaxSlots > 0 &&
           candidate.max_particle_cost <=
-          particles
-            .projected_spendable_today
+            particles
+              .projected_spendable_today
         );
       })
       .sort(
@@ -2444,6 +2463,7 @@ export function buildBattleResourcePlan({
     });
 
   let raidAllocated = 0;
+  let maxAllocated = 0;
   let maxParticlesRemaining =
     Math.max(
       0,
@@ -2506,8 +2526,12 @@ export function buildBattleResourcePlan({
 
       if (
         candidate.system === "max" &&
-        maxParticlesRemaining <
-          candidate.max_particle_cost
+        (
+          maxAllocated >=
+            recommendedMaxSlots ||
+          maxParticlesRemaining <
+            candidate.max_particle_cost
+        )
       ) {
         continue;
       }
@@ -2605,6 +2629,7 @@ export function buildBattleResourcePlan({
     ) {
       raidAllocated += 1;
     } else {
+      maxAllocated += 1;
       maxParticlesRemaining -=
         best.candidate
           .max_particle_cost;
@@ -2914,6 +2939,16 @@ export function buildBattleResourcePlan({
               sharedPassesUsed -
               passesAllocated
             )
+    },
+    forecast_today: {
+      recommended_additional_raids:
+        recommendedRaidSlots,
+      recommended_additional_max:
+        Number.isFinite(
+          recommendedMaxSlots
+        )
+          ? recommendedMaxSlots
+          : null
     },
     remote_raid_limit: {
       used:
