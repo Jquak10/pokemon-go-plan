@@ -260,7 +260,9 @@ MOCK_STATE = {
             {
                 "pokemon_name": "Dynamax Rhyhorn",
                 "battle_system": "max",
-                "reason": "Max Particle cost is unknown.",
+                "battle_variant": "dynamax",
+                "reason_code": "max_particle_cost_unknown",
+                "reason": "Max Particle cost is unknown, so the planner will not auto-allocate a Remote Pass.",
             }
         ],
         "advice": {
@@ -560,6 +562,21 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertNotIn("Loading battle intel", card.inner_text())
         self.assertEqual(card.locator(".score-ring").inner_text().strip(), "54")
         self.assertIn("RECOMMENDED", card.inner_text())
+        self.assertIn("No Remote Max allocation", card.inner_text())
+        self.assertIn("MP cost unknown", card.inner_text())
+
+        zero_details = page.locator("#remoteRaidZeroDetails")
+        self.assertFalse(zero_details.evaluate("element => element.classList.contains('hidden')"))
+        self.assertIn(
+            "Battles receiving 0 Remote allocation · 1",
+            page.locator("#remoteZeroSummary").inner_text(),
+        )
+
+        page.locator('[data-battle-filter="max"]').click()
+        self.assertFalse(zero_details.evaluate("element => element.classList.contains('hidden')"))
+        self.assertIn("· 1", page.locator("#remoteZeroSummary").inner_text())
+        page.locator('[data-battle-filter="all"]').click()
+
         card.locator("summary", has_text="Why?").click()
         self.assertIn("Planning priority:", card.inner_text())
         self.assertIn("RECOMMENDED 54", page.locator("#desktopRailTopPick").inner_text())
@@ -624,6 +641,74 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             card = page.locator(".target-card", has_text=name)
             self.assertEqual(card.locator("img.target-sprite").count(), 1)
             self.assertTrue(card.locator("img.target-sprite").is_visible())
+
+        self.assert_no_horizontal_overflow(page)
+
+    def test_zero_allocation_reason_is_system_aware_on_raid_card(self):
+        page = self.open_planner(1024, 800)
+
+        page.evaluate(
+            """() => {
+                const base = state.recommendations[0];
+                state.recommendations = [{
+                    ...base,
+                    pokemon_name: "Raid Fixture",
+                    boss_name: "Raid Fixture",
+                    encounter_name: null,
+                    battle_system: "raid",
+                    battle_variant: null,
+                    battle_presentation: {
+                        system_label: "Raid",
+                        variant_label: null,
+                        sprite_policy: { requires_exact_form: false }
+                    },
+                    score: 45,
+                    planning_score: 45,
+                    recommendation_score: 45,
+                    label: "OPTIONAL",
+                    emoji: "⭐",
+                    remote_eligible: true,
+                    source_kind: "calendar",
+                    source_label: "Regression fixture",
+                    event_title: "[TEST] RAID ZERO ALLOCATION",
+                    meta: null,
+                    target: {
+                        id: "raid-skip-target",
+                        pokemon_name: "Raid Fixture",
+                        priority: "skip",
+                        completed: 0
+                    },
+                    reasons: ["Raid zero-allocation regression fixture."]
+                }];
+
+                state.battle_resource_plan.allocations = [];
+                state.battle_resource_plan.not_allocated = [{
+                    pokemon_name: "Raid Fixture",
+                    battle_system: "raid",
+                    battle_variant: null,
+                    reason_code: "priority_skip",
+                    reason: "Personal priority is set to Skip."
+                }];
+                state.remote_raid_plan.allocations = [];
+                state.remote_raid_plan.not_allocated = [];
+                battlePlanFilter = "all";
+                renderRecommendations();
+            }"""
+        )
+
+        card = page.locator(".recommendation-card", has_text="Raid Fixture")
+        self.assertIn("0 Remote raids", card.inner_text())
+        self.assertIn("No Remote Raid allocation", card.inner_text())
+        self.assertIn("Priority set to Skip", card.inner_text())
+
+        details = page.locator("#remoteRaidZeroDetails")
+        self.assertIn(
+            "Battles receiving 0 Remote allocation · 1",
+            page.locator("#remoteZeroSummary").inner_text(),
+        )
+        details.locator("summary").click()
+        self.assertIn("Raid · Personal priority is set to Skip.", details.inner_text())
+        self.assertNotIn("Raid bosses receiving 0 Remote Raids", details.inner_text())
 
         self.assert_no_horizontal_overflow(page)
 
