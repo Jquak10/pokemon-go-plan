@@ -282,6 +282,8 @@ Current explicit migrations are:
 - migrations/0001_battle_resources.sql — Max Particle and battle resource state.
 - migrations/0002_battle_logging.sql — unified battle_log, atomic triggers, unified history.
 - migrations/0003_target_battle_kind.sql — battle-aware Targets.
+- migrations/0004_schema_baseline_operational_tables.sql — idempotent operational-table/index repair.
+- migrations/0005_max_battle_cost_overrides.sql — private per-opportunity Max tier/cost fallback.
 
 Production migrations are deliberate manual steps. Do not initialize production by applying the entire schema.sql over an existing D1 database.
 
