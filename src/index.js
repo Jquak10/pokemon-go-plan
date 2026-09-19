@@ -8480,16 +8480,23 @@ export async function upsertTarget(request, env) {
   if (expected != null && (!Number.isFinite(expected) || expected <= 0)) return bad("Expected progress per battle must be blank or greater than 0.");
   const priority = ["high","medium","low","skip"].includes(body.priority) ? body.priority : "medium";
   const targets = await getTargets(env,user.id);
-  const identity = {pokemon_name:name,battle_kind:kind};
+  const pokemonName = canonicalTargetName(name,kind);
+  const identity = {pokemon_name:pokemonName,battle_kind:kind};
   const existing = body.id ? targets.find(t => t.id === String(body.id))
     : matchingBattleTargets(targets,identity).find(t => t.target_type === targetType);
   if (body.id && !existing) return bad("Target not found.",404);
-  if (!body.id && body.battle_kind != null && existing) return bad("This target already exists. Use Edit to change its progress or settings.",409);
-  if (existing && (targetBattleKey(existing) !== targetBattleKey(identity) || existing.target_type !== targetType)) {
-    return bad("Pokémon, battle type and goal identify a target. Create a new target for a different identity.");
+
+  const duplicate = matchingBattleTargets(
+    targets.filter(target => !existing || target.id !== existing.id),
+    identity
+  ).find(target => target.target_type === targetType);
+
+  if (duplicate) {
+    return bad("A target with this Pokémon, battle type, and target type already exists.",409);
   }
-  // Existing IDs and names stay intact so historical Undo retains its target.
-  const pokemonName = existing?.pokemon_name || canonicalTargetName(name,kind);
+
+  // Keep the existing opaque ID stable when identity is corrected so historical
+  // battle logs and Undo continue to reference the same target row.
   const id = existing?.id || await sha256Hex(`${user.id}|${normalizeName(pokemonName)}|${targetType}`);
   const timestamp = nowIso();
   try {
@@ -8497,9 +8504,10 @@ export async function upsertTarget(request, env) {
       INSERT INTO targets (id,user_id,pokemon_name,target_type,battle_kind,target_value,
         current_value,expected_progress_per_raid,priority,completed,notes,created_at,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-      ON CONFLICT(id) DO UPDATE SET target_value=excluded.target_value,current_value=excluded.current_value,
-        battle_kind=excluded.battle_kind,expected_progress_per_raid=excluded.expected_progress_per_raid,
-        priority=excluded.priority,completed=excluded.completed,notes=excluded.notes,updated_at=excluded.updated_at
+      ON CONFLICT(id) DO UPDATE SET pokemon_name=excluded.pokemon_name,target_type=excluded.target_type,
+        target_value=excluded.target_value,current_value=excluded.current_value,battle_kind=excluded.battle_kind,
+        expected_progress_per_raid=excluded.expected_progress_per_raid,priority=excluded.priority,
+        completed=excluded.completed,notes=excluded.notes,updated_at=excluded.updated_at
         WHERE targets.user_id=excluded.user_id AND ?
     `).bind(id,user.id,pokemonName,targetType,kind,targetValue,currentValue,expected,priority,
       body.completed === true || body.completed === 1 || body.completed === "1" ? 1 : 0,
@@ -8507,6 +8515,9 @@ export async function upsertTarget(request, env) {
     if (!saved.meta?.changes) return bad("This target already exists. Use Edit to change it.",409);
   } catch (error) {
     if (/no column named battle_kind|no such column:.*battle_kind/i.test(String(error.message))) return bad("Targets need migrations/0003_target_battle_kind.sql. No changes were saved.",503);
+    if (/UNIQUE constraint failed: targets\.user_id, targets\.pokemon_name, targets\.target_type/i.test(String(error.message))) {
+      return bad("A target with this Pokémon, battle type, and target type already exists.",409);
+    }
     throw error;
   }
   return json({ok:true,id});
