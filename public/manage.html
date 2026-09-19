@@ -3816,6 +3816,9 @@ function renderRemoteRaidPlan() {
 
   const systemBudgetText =
     formatNumber(
+      state.battle_resource_plan
+        ?.remote_passes
+        ?.recommended_additional ??
       plan.system_recommended_additional ??
       Math.max(
         0,
@@ -3896,7 +3899,10 @@ function renderRemoteRaidPlan() {
 
 
   const advice =
-    plan.purchase_advice || {};
+    state.battle_resource_plan
+      ?.advice ||
+    plan.purchase_advice ||
+    {};
 
   const adviceClass =
     {
