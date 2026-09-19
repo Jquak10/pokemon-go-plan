@@ -9154,7 +9154,11 @@ export async function upsertTarget(request, env) {
     : matchingBattleTargets(targets,identity).find(t => t.target_type === targetType);
   if (body.id && !existing) return bad("Target not found.",404);
 
-  if (!body.id && existing) {
+  if (
+    !body.id &&
+    body.battle_kind != null &&
+    existing
+  ) {
     return bad("This target already exists. Use Edit to change its progress or settings.",409);
   }
 
