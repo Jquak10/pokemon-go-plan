@@ -46,7 +46,7 @@ This command is a manual production step, not part of tests or this PR's executi
 
 ## Part 5: Targets integration
 
-Targets now distinguish ordinary Raids, Dynamax and Gigantamax. Add a target from a recommendation, or choose its battle type in the editor. Max goals default to battles won; Candy, Candy XL and editable custom progress remain supported. A matching existing recommendation target opens Edit. The logger offers a goal selector when several goals match the same battle.
+Targets now distinguish ordinary Raids, Dynamax and Gigantamax. Add a target from a recommendation, or choose its battle type in the editor. Max goals default to battles won; Candy, Candy XL and editable custom progress remain supported. A matching existing recommendation target opens Edit. Existing targets can correct Pokémon/form, battle type, and target type while keeping the same stable target ID so historical battle-log/Undo links remain attached. Duplicate identity changes are rejected. The logger offers a goal selector when several goals match the same battle.
 
 Matching uses the exact Pokémon/form plus battle identity across recommendations, current/upcoming availability, calendar personalization and logging. A Raid target never automatically receives Max progress. Explicitly named legacy Max targets retain that identity; otherwise historical targets remain Raid targets. New Max targets use capability-prefixed names (for example, Gigantamax Gengar) so separate goals coexist under the existing per-user/name/goal uniqueness rule. No existing name, ID or progress is rewritten.
 
@@ -66,7 +66,7 @@ npx wrangler d1 execute DB --remote --file=migrations/0003_target_battle_kind.sq
 
 Unlike the CREATE-based Part 4 migration, SQLite ADD COLUMN is not repeatable. Check `PRAGMA table_info(targets)` first if application status is uncertain. Do not apply it again to a database already containing `battle_kind`, including a fresh database initialized with the new schema. Before migration, reads retain legacy identity inference and Target saves return an actionable 503.
 
-Editing preserves a target's Pokémon/battle/goal identity and its ID; use Add target for a different identity. Duplicate creation reports an error rather than resetting existing progress. Progress, desired amount, expected progress, priority, completion and notes remain editable.
+Editing preserves a target's stable ID and history link, but Pokémon/form, battle type, and target type can now be corrected in place. A change that would collide with another existing target is rejected instead of merging/resetting progress. Progress, desired amount, expected progress, priority, completion and notes remain editable.
 
 The Part 5 suite covers migration/FK preservation, separate same-species goals, CRUD/authentication, duplicate protection, form matching, recommendations, suppression-aware availability, allocation caps, editable progress and Undo, and filtered UI counts. No production migration, merge or deployment is part of Part 5 PR preparation.
 
@@ -83,6 +83,16 @@ npx wrangler d1 execute DB --remote --file=migrations/0004_schema_baseline_opera
 ```
 
 Fresh databases should be initialized from `schema.sql`, not by replaying production migrations.
+
+### Max Battle tier override migration
+
+`migrations/0005_max_battle_cost_overrides.sql` adds private per-user, per-opportunity Max Battle tier/cost fallback data. It is additive and uses `CREATE ... IF NOT EXISTS`. Apply it to an existing production D1 database before deploying the Worker/UI that exposes **Set Max tier…**:
+
+```bash
+npx wrangler d1 execute DB --remote --file=migrations/0005_max_battle_cost_overrides.sql
+```
+
+The override is used only when automatic cost evidence is unavailable. It does not replace official event evidence or trusted current tier data.
 
 ## Features
 
@@ -139,7 +149,7 @@ Remote limits are always ceilings, not goals, and eligible Remote Max Battles sh
 - **Today's ceiling** applies the saved **Usual personal ceiling** or a one-day override without exceeding the official game limit.
 - The **Paid Battle Forecast** evaluates every normalized Raid/Max opportunity for each forecast day. Suppressed/unavailable events are absent before planning; remaining target progress is shared across the horizon instead of duplicated per day.
 - Raid and Max candidates use their own canonical planning method. Allocations stop when marginal value falls below the saved **Minimum Remote Raid score**.
-- Remote Max allocation additionally requires a verified MP entry cost. The forecast simulates held MP, today's remaining collection, future daily replenishment/storage rules, and planned Max spend across days; unknown-cost Max Battles stay unallocated.
+- Remote Max allocation requires a usable MP entry cost. Official event evidence remains highest priority; the event sync also consumes the pokemon-go-api current Max Battle tier feed (sourced from SnackNap) for currently active bosses when official tier data is absent. If automatic tier evidence is still missing, the card/forecast exposes a per-opportunity **Set Max tier…** control. The selected tier maps to the standard cost (Tier 1 = 250 MP, Tier 2–3 = 400 MP, Tier 4–6 = 800 MP) and is stored as a private user fallback; verified automatic evidence always wins when available. The forecast then simulates held MP, today's remaining collection, future daily replenishment/storage rules, and planned Max spend across days.
 - Future-saving guidance is selected from resource-feasible forecast allocations rather than a Raid-only top-recommendation proxy. A stronger future Max opportunity can therefore reserve both a Remote Pass and the amount of MP that cannot be replenished before it.
 - Completed or skipped targets receive zero paid allocation. Target priority, remaining progress, expected progress per battle, exact availability, and future resource competition can change the recommendation.
 
@@ -170,7 +180,7 @@ Use the status controls to switch among **Active**, **Completed**, and **All**. 
 
 Active targets that are high priority or **Available now** appear under **NEEDS ATTENTION — Available now or high priority**. Other active goals appear under **TRACKING — Other active goals**. Finished goals appear under the collapsible **COMPLETED — Finished goals** group.
 
-Each target card shows progress, availability, priority/completion, expected progress per raid when present, and its available PvE raid-attacker ranking where applicable. Use **Edit** to change values or set **Completed?** to Yes. Completed targets stay visible through **Completed** or **All** and receive zero paid Remote Raid allocations. The overflow menu provides **Delete target**.
+Each target card shows progress, availability, priority/completion, expected progress per battle when present, and its available system-appropriate attacker ranking where applicable. Use **Edit** to change the Pokémon/form, **Battle**, **Target type**, progress values, priority, completion, or notes. Identity corrections keep the same target ID/history link unless the new identity would duplicate another target. Completed targets stay visible through **Completed** or **All** and receive zero paid Remote allocations. The overflow menu provides **Delete target**.
 
 For bulk cleanup, select **Select** to enter multi-select mode, choose individual targets or **Select all shown**, then use **Delete selected**. **Select all shown** respects the current search and non-status filters, and **Cancel** exits selection mode without deleting anything. The Targets navigation badge shows the **Active** target count only rather than Active + Completed targets.
 

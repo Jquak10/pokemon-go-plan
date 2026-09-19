@@ -351,11 +351,15 @@ export function inferMaxParticleCost(recommendation) {
                     : "event_text"
                 ),
         evidence_source:
-          officialEvidence
-            ? "official"
-            : recommendation
-                ?.source_kind ||
-              "event"
+          recommendation
+            ?.max_particle_cost_evidence_source ||
+          (
+            officialEvidence
+              ? "official"
+              : recommendation
+                  ?.source_kind ||
+                "event"
+          )
       };
     }
   }
@@ -1383,6 +1387,44 @@ export function buildBattleForecast({
           particleCost.cost,
         max_particle_cost_source:
           particleCost.basis,
+        max_particle_cost_confidence:
+          particleCost.confidence ||
+          recommendation
+            ?.max_particle_cost_confidence ||
+          null,
+        max_battle_tier:
+          particleCost.tier ||
+          recommendation
+            ?.max_battle_tier ||
+          null,
+        max_battle_tier_source:
+          particleCost.tier_source ||
+          recommendation
+            ?.max_battle_tier_source ||
+          null,
+        max_particle_cost_evidence_source:
+          particleCost.evidence_source ||
+          recommendation
+            ?.max_particle_cost_evidence_source ||
+          null,
+        max_cost_override_key:
+          recommendation
+            ?.max_cost_override_key ||
+          null,
+        max_cost_override_source:
+          recommendation
+            ?.max_cost_override_source ||
+          null,
+        start_date:
+          recommendation
+            ?.start_date ||
+          day.date,
+        end_date:
+          recommendation
+            ?.end_date ||
+          recommendation
+            ?.start_date ||
+          day.date,
         remote_eligible:
           !forecastRemoteBlockReason(
             recommendation
@@ -1671,6 +1713,49 @@ export function buildBattleForecast({
             max_particle_cost_source:
               selected
                 .particle_cost_source,
+            max_battle_tier:
+              selected
+                .recommendation
+                .max_battle_tier ||
+              null,
+            max_battle_tier_source:
+              selected
+                .recommendation
+                .max_battle_tier_source ||
+              null,
+            max_particle_cost_confidence:
+              selected
+                .recommendation
+                .max_particle_cost_confidence ||
+              null,
+            max_particle_cost_evidence_source:
+              selected
+                .recommendation
+                .max_particle_cost_evidence_source ||
+              null,
+            max_cost_override_key:
+              selected
+                .recommendation
+                .max_cost_override_key ||
+              null,
+            max_cost_override_source:
+              selected
+                .recommendation
+                .max_cost_override_source ||
+              null,
+            start_date:
+              selected
+                .recommendation
+                .start_date ||
+              null,
+            end_date:
+              selected
+                .recommendation
+                .end_date ||
+              selected
+                .recommendation
+                .start_date ||
+              null,
             sprite_url:
               selected
                 .recommendation
@@ -2831,6 +2916,40 @@ export function buildBattleResourcePlan({
             : 0,
         max_particle_cost_source:
           candidate.cost_basis,
+        max_battle_tier:
+          candidate.recommendation
+            .max_battle_tier ||
+          null,
+        max_battle_tier_source:
+          candidate.recommendation
+            .max_battle_tier_source ||
+          null,
+        max_particle_cost_confidence:
+          candidate.recommendation
+            .max_particle_cost_confidence ||
+          null,
+        max_particle_cost_evidence_source:
+          candidate.recommendation
+            .max_particle_cost_evidence_source ||
+          null,
+        max_cost_override_key:
+          candidate.recommendation
+            .max_cost_override_key ||
+          null,
+        max_cost_override_source:
+          candidate.recommendation
+            .max_cost_override_source ||
+          null,
+        start_date:
+          candidate.recommendation
+            .start_date ||
+          null,
+        end_date:
+          candidate.recommendation
+            .end_date ||
+          candidate.recommendation
+            .start_date ||
+          null,
         sprite_url:
           candidate.recommendation
             .sprite_url ||

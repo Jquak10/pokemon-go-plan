@@ -667,7 +667,7 @@ This decision unifies scoring/presentation but does not by itself replace the le
 ## ADR-042 — Require verified evidence before assigning Max Particle entry cost
 
 Status: Current  
-Introduced in PR #39.
+Introduced in PR #39; extended in PR #46.
 
 Max Particle entry cost affects whether the shared resource planner can safely allocate a Remote Pass to a Max Battle. A species/form label is not sufficient evidence for an entry cost, and event-specific rules can supersede historical standard values.
 
@@ -675,18 +675,21 @@ The Planner therefore uses evidence-driven Max cost normalization.
 
 Rules:
 
-- evidence precedence is explicit official battle-entry cost → verified Max Battle tier/difficulty → standard mapping for that verified tier → unknown;
+- evidence precedence is explicit official battle-entry cost → verified official/event Max Battle tier/difficulty → structured current Max Battle tier data → private user per-opportunity tier fallback → unknown;
 - current standard tier mapping is Tier 1 = 250 MP, Tier 2–3 = 400 MP, and Tier 4–6 = 800 MP;
 - Dynamax or Gigantamax identity alone never assigns an MP cost;
 - generic non-official text that merely claims an MP cost is not promoted to trusted entry-cost evidence;
 - official difficulty can be parsed from numeric or word-form tier descriptions, including forms such as `Difficulty 3`, `3★`, and `six-star`;
 - multiple tier groups in one official event page are scoped independently so one group's tier/cost cannot leak to another;
 - the existing official Pokémon GO sync may decorate an already-normalized Max calendar event with `X-POGO-MAX-*` evidence and provenance, but it must not create duplicate availability solely to carry cost metadata;
-- normalized recommendations expose Max tier, cost, confidence, evidence source, and evidence URL where available;
-- if reliable evidence is absent or cannot be matched, the cost remains unknown and automatic Remote Max allocation stays blocked;
-- the existing event/official sync cadence and D1 schema remain unchanged.
+- the event sync may also consume pokemon-go-api's structured current Max Battle list (currently sourced from SnackNap) to decorate a currently active event with a tier when official evidence is absent and every matched boss in that event resolves to the same tier;
+- structured current-boss data is lower precedence than official event evidence and is never used to fabricate future availability;
+- when automatic evidence remains unavailable, the user may select Tier 1–6 for that exact Pokémon/variant/event date range; the Planner stores the standard mapped MP cost in `max_battle_cost_overrides`;
+- user tier data is a fallback, not a competing authority: verified automatic evidence wins if it later becomes available;
+- normalized recommendations expose Max tier, cost, confidence, evidence source, evidence URL where applicable, and the opportunity key needed to edit/clear a user fallback;
+- if neither automatic evidence nor a user fallback is available, the cost remains unknown and automatic Remote Max allocation stays blocked.
 
-This decision improves cost coverage while preserving source precedence and the conservative unknown-cost behavior established by shared resource planning.
+This decision improves cost coverage while preserving source precedence and the conservative unknown-cost behavior established by shared resource planning. PR #46 adds the lower-precedence structured current-tier source and the private per-opportunity user fallback without allowing species identity alone to invent a cost.
 
 ## ADR-043 — Use one shared Raid + Max forecast for future paid-battle guidance
 
@@ -764,6 +767,7 @@ The following sequence is retained as a compact repository implementation/change
 | #43 | Canonical grouped Max Battle Pokémon identity | Canonicalized event-derived Max Pokémon names before recommendation/resource output so grouped schedules apply Dynamax/Gigantamax identity to every matched species; added regressions for the Kanto bird rotation and downstream metadata consistency. |
 | #44 | Ordinary Dynamax sprite fallback | Centralized battle sprite resolution so ordinary Dynamax reuses the exact underlying species/form sprite across recommendations, forecasts, Targets, and recent logs while regional forms remain exact and Gigantamax stays exact-only. |
 | #45 | Zero-Remote allocation explanations | Closed BL-008 by adding structured shared-plan non-allocation reasons, surfacing compact system-aware reasons directly on Raid/Max cards, and replacing the Raid-only zero-allocation section with a shared filtered collapsible Battle list. |
+| #46 | Max tier fallbacks + editable Target identity | Added current structured Max tier ingestion plus private per-opportunity tier overrides for unknown MP costs, and allowed Pokémon/Battle/Target type corrections on existing targets while keeping stable IDs/history links and duplicate protection. |
 
 ## Supersession map
 

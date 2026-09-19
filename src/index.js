@@ -24,6 +24,7 @@ import {
   maxRotationEventFromMaxMonday
 } from "./battle-opportunities.js";
 import {
+  MAX_PARTICLE_COST_BY_TIER,
   STANDARD_MAX_PARTICLE_DAILY_LIMIT,
   STANDARD_MAX_PARTICLE_STORAGE_LIMIT,
   buildBattleForecast,
@@ -107,6 +108,9 @@ const PVPOKE_MASTER_LEAGUE =
 
 const POGO_API_POKEDEX =
   "https://pokemon-go-api.github.io/pokemon-go-api/api/pokedex.json";
+
+const POGO_API_MAX_BATTLES =
+  "https://pokemon-go-api.github.io/pokemon-go-api/api/maxbattles.json";
 
 const BATTLE_MATCH_POKEDEX_TTL_MS = 6 * 60 * 60 * 1000;
 let battleMatchPokedex = [];
@@ -560,6 +564,236 @@ async function syncDerivedMaxRotations(env) {
   return derived.length;
 }
 
+export function currentMaxBattleTiersFromPayload(
+  payload
+) {
+  const current =
+    payload?.currentList;
+
+  if (
+    !current ||
+    typeof current !== "object" ||
+    Array.isArray(current)
+  ) {
+    return [];
+  }
+
+  const byName =
+    new Map();
+
+  for (
+    const [tierKey, bosses] of
+    Object.entries(current)
+  ) {
+    const tierMatch =
+      String(tierKey).match(
+        /^tier_([1-6])$/i
+      );
+
+    const tier =
+      Number(
+        tierMatch?.[1] || 0
+      );
+
+    if (
+      !tier ||
+      !Array.isArray(bosses)
+    ) {
+      continue;
+    }
+
+    for (const boss of bosses) {
+      const name =
+        englishName(boss);
+
+      if (!name) {
+        continue;
+      }
+
+      byName.set(
+        normalizeName(name),
+        {
+          pokemon_name:
+            name,
+          max_battle_tier:
+            tier
+        }
+      );
+    }
+  }
+
+  return [...byName.values()];
+}
+
+async function syncCurrentMaxBattleTierEvidence(
+  env
+) {
+  const response =
+    await fetch(
+      POGO_API_MAX_BATTLES,
+      {
+        headers: {
+          accept:
+            "application/json"
+        }
+      }
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `pokemon-go-api Max Battles returned ${response.status}`
+    );
+  }
+
+  const bosses =
+    currentMaxBattleTiersFromPayload(
+      await response.json()
+    );
+
+  if (!bosses.length) {
+    return {
+      matched_events: 0,
+      bosses: 0
+    };
+  }
+
+  const today =
+    todayUtc();
+
+  const { results } =
+    await env.DB.prepare(`
+      SELECT *
+      FROM events
+      WHERE status = 'active'
+        AND source_type IN (?, ?, ?)
+        AND COALESCE(start_date, '0000-01-01') <= ?
+        AND COALESCE(end_date, start_date, '9999-12-31') >= ?
+      ORDER BY start_date, summary
+    `).bind(
+      "max_battles",
+      "max_mondays",
+      MAX_ROTATION_SOURCE_TYPE,
+      today,
+      today
+    ).all();
+
+  const statements = [];
+  const timestamp =
+    nowIso();
+
+  for (const event of results || []) {
+    const otherLines =
+      String(
+        event.other_lines || ""
+      );
+
+    // Official evidence has higher precedence and must never be replaced by
+    // the lower-precedence current-boss reference feed.
+    if (
+      /(?:^|\n)X-POGO-MAX-EVIDENCE:official(?:\n|$)/i.test(
+        otherLines
+      )
+    ) {
+      continue;
+    }
+
+    const eventName =
+      normalizeName(
+        event.summary
+      );
+
+    const matches =
+      bosses.filter(
+        boss =>
+          eventName.includes(
+            normalizeName(
+              boss.pokemon_name
+            )
+          )
+      );
+
+    if (!matches.length) {
+      continue;
+    }
+
+    const tiers =
+      [
+        ...new Set(
+          matches.map(
+            boss =>
+              boss.max_battle_tier
+          )
+        )
+      ];
+
+    // An event-level evidence line can only be applied safely when every
+    // matched Pokémon in that event has the same tier.
+    if (tiers.length !== 1) {
+      continue;
+    }
+
+    const tier =
+      tiers[0];
+
+    const lines =
+      otherLines
+        .split("\n")
+        .filter(
+          line =>
+            line &&
+            !/^X-POGO-MAX-(?:EVIDENCE|EVIDENCE-URL|BATTLE-TIER):pokemon_go_api_current/i.test(
+              line
+            )
+        );
+
+    // Do not overwrite any generic tier evidence already attached by a
+    // higher-confidence source.
+    if (
+      lines.some(
+        line =>
+          /^X-POGO-MAX-BATTLE-TIER:/i.test(
+            line
+          )
+      )
+    ) {
+      continue;
+    }
+
+    lines.push(
+      "X-POGO-MAX-EVIDENCE:pokemon_go_api_current",
+      `X-POGO-MAX-BATTLE-TIER:${tier}`,
+      `X-POGO-MAX-EVIDENCE-URL:${POGO_API_MAX_BATTLES}`
+    );
+
+    statements.push(
+      env.DB.prepare(`
+        UPDATE events
+        SET other_lines = ?,
+            updated_at = ?
+        WHERE id = ?
+      `).bind(
+        lines.join("\n"),
+        timestamp,
+        event.id
+      )
+    );
+  }
+
+  if (statements.length) {
+    await env.DB.batch(
+      statements
+    );
+  }
+
+  return {
+    matched_events:
+      statements.length,
+    bosses:
+      bosses.length
+  };
+}
+
+
 async function syncAllEvents(env) {
   const results = [];
   for (const [sourceType, url] of Object.entries(SOURCES)) {
@@ -580,6 +814,30 @@ async function syncAllEvents(env) {
       ok: false,
       derived: true,
       error: String(error.message || error)
+    });
+  }
+
+  try {
+    const currentMaxTiers =
+      await syncCurrentMaxBattleTierEvidence(
+        env
+      );
+    results.push({
+      source:
+        "pokemon_go_api_current_max_battles",
+      ok: true,
+      ...currentMaxTiers
+    });
+  } catch (error) {
+    results.push({
+      source:
+        "pokemon_go_api_current_max_battles",
+      ok: false,
+      error:
+        String(
+          error.message ||
+          error
+        )
     });
   }
 
@@ -2736,6 +2994,92 @@ async function getTargets(env, userId) {
   return results;
 }
 
+export function maxBattleCostOverrideKey(
+  item
+) {
+  const name =
+    normalizeName(
+      item?.pokemon_name || ""
+    );
+
+  const variant =
+    String(
+      item?.battle_variant || ""
+    ).toLowerCase();
+
+  const startDate =
+    String(
+      item?.start_date || ""
+    );
+
+  const endDate =
+    String(
+      item?.end_date ||
+      item?.start_date ||
+      ""
+    );
+
+  if (
+    !name ||
+    !["dynamax", "gigantamax"].includes(
+      variant
+    ) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      startDate
+    ) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      endDate
+    )
+  ) {
+    return null;
+  }
+
+  return [
+    name,
+    variant,
+    startDate,
+    endDate
+  ].join("|");
+}
+
+async function maxBattleCostOverridesForDate(
+  env,
+  userId,
+  day
+) {
+  try {
+    const { results } =
+      await env.DB.prepare(`
+        SELECT *
+        FROM max_battle_cost_overrides
+        WHERE user_id = ?
+          AND start_date <= ?
+          AND end_date >= ?
+        ORDER BY updated_at DESC
+      `).bind(
+        userId,
+        day,
+        day
+      ).all();
+
+    return results || [];
+  } catch (error) {
+    if (
+      /no such table:\s*max_battle_cost_overrides/i.test(
+        String(
+          error?.message ||
+          error
+        )
+      )
+    ) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+
 async function getMeta(env) {
   const { results } = await env.DB.prepare(`
     SELECT
@@ -3159,6 +3503,23 @@ export async function recommendationsForDate(
       day
     );
 
+  const maxCostOverrides =
+    await maxBattleCostOverridesForDate(
+      env,
+      user.id,
+      day
+    );
+
+  const maxCostOverrideByKey =
+    new Map(
+      maxCostOverrides.map(
+        item => [
+          item.opportunity_key,
+          item
+        ]
+      )
+    );
+
   const map = new Map();
 
   for (const event of events) {
@@ -3236,6 +3597,11 @@ export async function recommendationsForDate(
           eventOtherLines
         );
 
+      const currentMaxTierEvidence =
+        /(?:^|\n)X-POGO-MAX-EVIDENCE:pokemon_go_api_current(?:\n|$)/i.test(
+          eventOtherLines
+        );
+
       const maxCostEvidenceUrl =
         eventOtherLines.match(
           /(?:^|\n)X-POGO-MAX-EVIDENCE-URL:([^\n]+)/i
@@ -3246,7 +3612,31 @@ export async function recommendationsForDate(
             : null
         );
 
-      const maxParticleCost =
+      const overrideKey =
+        battleMetadata?.battle_system ===
+          "max"
+          ? maxBattleCostOverrideKey({
+              pokemon_name:
+                match.name,
+              battle_variant:
+                battleMetadata
+                  .battle_variant,
+              start_date:
+                event.start_date,
+              end_date:
+                event.end_date ||
+                event.start_date
+            })
+          : null;
+
+      const userCostOverride =
+        overrideKey
+          ? maxCostOverrideByKey.get(
+              overrideKey
+            ) || null
+          : null;
+
+      const automaticMaxParticleCost =
         inferMaxParticleCost({
           ...battleMetadata,
           pokemon_name:
@@ -3260,6 +3650,10 @@ export async function recommendationsForDate(
           max_particle_cost_official:
             officialSource ||
             officialMaxCostEvidence,
+          max_particle_cost_evidence_source:
+            currentMaxTierEvidence
+              ? "pokemon-go-api"
+              : null,
           event_title:
             event.summary,
           event_description:
@@ -3267,6 +3661,33 @@ export async function recommendationsForDate(
           event_other_lines:
             eventOtherLines
         });
+
+      const maxParticleCost =
+        (
+          automaticMaxParticleCost.cost ||
+          !userCostOverride
+        )
+          ? automaticMaxParticleCost
+          : {
+              cost:
+                Number(
+                  userCostOverride
+                    .max_particle_cost
+                ),
+              basis:
+                "user_tier_override",
+              confidence:
+                "user_override",
+              tier:
+                Number(
+                  userCostOverride
+                    .max_battle_tier
+                ),
+              tier_source:
+                "user_override",
+              evidence_source:
+                "user"
+            };
 
       const key = [
         battleMetadata?.battle_system || "raid",
@@ -3303,7 +3724,17 @@ export async function recommendationsForDate(
         max_particle_cost_evidence_source:
           maxParticleCost.evidence_source,
         max_particle_cost_evidence_url:
-          maxCostEvidenceUrl,
+          maxParticleCost.evidence_source ===
+            "user"
+            ? null
+            : maxCostEvidenceUrl,
+        max_cost_override_key:
+          overrideKey,
+        max_cost_override_source:
+          maxParticleCost.evidence_source ===
+            "user"
+            ? "user"
+            : null,
         logging_remote_eligible: battleMetadata?.battle_system === "max"
           ? maxBattleRemotePassEligible({ ...battleMetadata, event_description: event.description, event_title: event.summary })
           : remoteEligible && !/(?:local|in[- ]person)[ -]?only|cannot be joined remotely/i.test(event.description || ""),
@@ -3340,7 +3771,26 @@ export async function recommendationsForDate(
           remoteEligible
         );
 
-      if (occurrence.score > existing.score) {
+      const occurrenceHasCost =
+        Number(
+          occurrence
+            .max_particle_cost || 0
+        ) > 0;
+
+      const existingHasCost =
+        Number(
+          existing
+            .max_particle_cost || 0
+        ) > 0;
+
+      if (
+        occurrence.score >
+          existing.score ||
+        (
+          occurrenceHasCost &&
+          !existingHasCost
+        )
+      ) {
         map.set(
           key,
           {
@@ -6084,6 +6534,224 @@ async function battleResourcePlanForUser(
   };
 }
 
+export async function updateMaxBattleCostOverrideApi(
+  request,
+  env
+) {
+  const body =
+    await request.json();
+
+  const user =
+    await userByManageToken(
+      env,
+      body.token
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  const pokemonName =
+    String(
+      body.pokemon_name || ""
+    ).trim();
+
+  const battleVariant =
+    String(
+      body.battle_variant || ""
+    ).toLowerCase();
+
+  const startDate =
+    String(
+      body.start_date || ""
+    );
+
+  const endDate =
+    String(
+      body.end_date ||
+      body.start_date ||
+      ""
+    );
+
+  if (
+    !pokemonName ||
+    pokemonName.length > 200
+  ) {
+    return bad(
+      "Pokémon/form name is required."
+    );
+  }
+
+  if (
+    ![
+      "dynamax",
+      "gigantamax"
+    ].includes(
+      battleVariant
+    )
+  ) {
+    return bad(
+      "Choose a Dynamax or Gigantamax battle."
+    );
+  }
+
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      startDate
+    ) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      endDate
+    ) ||
+    endDate < startDate
+  ) {
+    return bad(
+      "A valid Max Battle date range is required."
+    );
+  }
+
+  const opportunityKey =
+    maxBattleCostOverrideKey({
+      pokemon_name:
+        pokemonName,
+      battle_variant:
+        battleVariant,
+      start_date:
+        startDate,
+      end_date:
+        endDate
+    });
+
+  if (
+    !opportunityKey ||
+    (
+      body.opportunity_key &&
+      body.opportunity_key !==
+        opportunityKey
+    )
+  ) {
+    return bad(
+      "Max Battle opportunity identity does not match."
+    );
+  }
+
+  try {
+    if (
+      body.clear === true ||
+      body.max_battle_tier === "" ||
+      body.max_battle_tier == null
+    ) {
+      await env.DB.prepare(`
+        DELETE FROM max_battle_cost_overrides
+        WHERE user_id = ?
+          AND opportunity_key = ?
+      `).bind(
+        user.id,
+        opportunityKey
+      ).run();
+
+      return json({
+        ok: true,
+        opportunity_key:
+          opportunityKey,
+        cleared: true
+      });
+    }
+
+    const tier =
+      Number(
+        body.max_battle_tier
+      );
+
+    if (
+      !Number.isInteger(tier) ||
+      tier < 1 ||
+      tier > 6
+    ) {
+      return bad(
+        "Max Battle tier must be a whole number from 1 to 6."
+      );
+    }
+
+    const cost =
+      MAX_PARTICLE_COST_BY_TIER[
+        tier
+      ];
+
+    if (!cost) {
+      return bad(
+        "No standard Max Particle cost is available for that tier."
+      );
+    }
+
+    const timestamp =
+      nowIso();
+
+    await env.DB.prepare(`
+      INSERT INTO max_battle_cost_overrides (
+        user_id,
+        opportunity_key,
+        pokemon_name,
+        battle_variant,
+        start_date,
+        end_date,
+        max_battle_tier,
+        max_particle_cost,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, opportunity_key)
+      DO UPDATE SET
+        pokemon_name = excluded.pokemon_name,
+        battle_variant = excluded.battle_variant,
+        start_date = excluded.start_date,
+        end_date = excluded.end_date,
+        max_battle_tier = excluded.max_battle_tier,
+        max_particle_cost = excluded.max_particle_cost,
+        updated_at = excluded.updated_at
+    `).bind(
+      user.id,
+      opportunityKey,
+      pokemonName,
+      battleVariant,
+      startDate,
+      endDate,
+      tier,
+      cost,
+      timestamp
+    ).run();
+
+    return json({
+      ok: true,
+      opportunity_key:
+        opportunityKey,
+      max_battle_tier:
+        tier,
+      max_particle_cost:
+        cost
+    });
+  } catch (error) {
+    if (
+      /no such table:\s*max_battle_cost_overrides/i.test(
+        String(
+          error?.message ||
+          error
+        )
+      )
+    ) {
+      return bad(
+        "Max Battle tier overrides need migrations/0005_max_battle_cost_overrides.sql. No changes were saved.",
+        503
+      );
+    }
+
+    throw error;
+  }
+}
+
+
 async function updateBattleResourcesApi(
   request,
   env
@@ -8480,16 +9148,42 @@ export async function upsertTarget(request, env) {
   if (expected != null && (!Number.isFinite(expected) || expected <= 0)) return bad("Expected progress per battle must be blank or greater than 0.");
   const priority = ["high","medium","low","skip"].includes(body.priority) ? body.priority : "medium";
   const targets = await getTargets(env,user.id);
-  const identity = {pokemon_name:name,battle_kind:kind};
+  const pokemonName = canonicalTargetName(name,kind);
+  const identity = {pokemon_name:pokemonName,battle_kind:kind};
   const existing = body.id ? targets.find(t => t.id === String(body.id))
     : matchingBattleTargets(targets,identity).find(t => t.target_type === targetType);
   if (body.id && !existing) return bad("Target not found.",404);
-  if (!body.id && body.battle_kind != null && existing) return bad("This target already exists. Use Edit to change its progress or settings.",409);
-  if (existing && (targetBattleKey(existing) !== targetBattleKey(identity) || existing.target_type !== targetType)) {
-    return bad("Pokémon, battle type and goal identify a target. Create a new target for a different identity.");
+
+  if (
+    !body.id &&
+    body.battle_kind != null &&
+    existing
+  ) {
+    return bad("This target already exists. Use Edit to change its progress or settings.",409);
   }
-  // Existing IDs and names stay intact so historical Undo retains its target.
-  const pokemonName = existing?.pokemon_name || canonicalTargetName(name,kind);
+
+  const duplicate =
+    body.id
+      ? matchingBattleTargets(
+          targets.filter(
+            target =>
+              target.id !==
+              existing.id
+          ),
+          identity
+        ).find(
+          target =>
+            target.target_type ===
+            targetType
+        )
+      : null;
+
+  if (duplicate) {
+    return bad("A target with this Pokémon, battle type, and target type already exists.",409);
+  }
+
+  // Keep the existing opaque ID stable when identity is corrected so historical
+  // battle logs and Undo continue to reference the same target row.
   const id = existing?.id || await sha256Hex(`${user.id}|${normalizeName(pokemonName)}|${targetType}`);
   const timestamp = nowIso();
   try {
@@ -8497,9 +9191,10 @@ export async function upsertTarget(request, env) {
       INSERT INTO targets (id,user_id,pokemon_name,target_type,battle_kind,target_value,
         current_value,expected_progress_per_raid,priority,completed,notes,created_at,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-      ON CONFLICT(id) DO UPDATE SET target_value=excluded.target_value,current_value=excluded.current_value,
-        battle_kind=excluded.battle_kind,expected_progress_per_raid=excluded.expected_progress_per_raid,
-        priority=excluded.priority,completed=excluded.completed,notes=excluded.notes,updated_at=excluded.updated_at
+      ON CONFLICT(id) DO UPDATE SET pokemon_name=excluded.pokemon_name,target_type=excluded.target_type,
+        target_value=excluded.target_value,current_value=excluded.current_value,battle_kind=excluded.battle_kind,
+        expected_progress_per_raid=excluded.expected_progress_per_raid,priority=excluded.priority,
+        completed=excluded.completed,notes=excluded.notes,updated_at=excluded.updated_at
         WHERE targets.user_id=excluded.user_id AND ?
     `).bind(id,user.id,pokemonName,targetType,kind,targetValue,currentValue,expected,priority,
       body.completed === true || body.completed === 1 || body.completed === "1" ? 1 : 0,
@@ -8507,6 +9202,9 @@ export async function upsertTarget(request, env) {
     if (!saved.meta?.changes) return bad("This target already exists. Use Edit to change it.",409);
   } catch (error) {
     if (/no column named battle_kind|no such column:.*battle_kind/i.test(String(error.message))) return bad("Targets need migrations/0003_target_battle_kind.sql. No changes were saved.",503);
+    if (/UNIQUE constraint failed: targets\.user_id, targets\.pokemon_name, targets\.target_type/i.test(String(error.message))) {
+      return bad("A target with this Pokémon, battle type, and target type already exists.",409);
+    }
     throw error;
   }
   return json({ok:true,id});
@@ -9384,6 +10082,16 @@ async function handleFetch(request, env) {
       path === "/api/battle-resources"
     ) {
       return updateBattleResourcesApi(
+        request,
+        env
+      );
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/max-battle-cost-override"
+    ) {
+      return updateMaxBattleCostOverrideApi(
         request,
         env
       );

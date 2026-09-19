@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const schema = read('../schema.sql');
 const migration = read('../migrations/0004_schema_baseline_operational_tables.sql');
+const maxCostMigration = read('../migrations/0005_max_battle_cost_overrides.sql');
 
 const expectedColumns = {
   event_suppression_rules: [
@@ -33,6 +34,32 @@ const expectedIndexes = {
   remote_raid_daily_budget_overrides: 'idx_remote_raid_daily_budget_overrides_date'
 };
 
+const maxCostOverrideColumns = [
+  ['user_id', 'TEXT', 1, null, 1],
+  ['opportunity_key', 'TEXT', 1, null, 2],
+  ['pokemon_name', 'TEXT', 1, null, 0],
+  ['battle_variant', 'TEXT', 1, null, 0],
+  ['start_date', 'TEXT', 1, null, 0],
+  ['end_date', 'TEXT', 1, null, 0],
+  ['max_battle_tier', 'INTEGER', 1, null, 0],
+  ['max_particle_cost', 'INTEGER', 1, null, 0],
+  ['updated_at', 'TEXT', 1, null, 0]
+];
+
+function assertMaxCostOverrideShape(db) {
+  assert.deepEqual(
+    columnShape(db, 'max_battle_cost_overrides'),
+    maxCostOverrideColumns,
+    'max_battle_cost_overrides columns must match the migration'
+  );
+
+  const indexes = db.prepare('PRAGMA index_list(max_battle_cost_overrides)').all().map(row => row.name);
+  assert.ok(
+    indexes.includes('idx_max_battle_cost_overrides_dates'),
+    'max_battle_cost_overrides must include its date index'
+  );
+}
+
 function columnShape(db, table) {
   return db.prepare(`PRAGMA table_info(${table})`).all()
     .map(row => [row.name, row.type, Number(row.notnull), row.dflt_value, Number(row.pk)]);
@@ -52,6 +79,9 @@ fresh.exec(schema);
 assertOperationalShape(fresh);
 fresh.exec(migration);
 assertOperationalShape(fresh);
+assertMaxCostOverrideShape(fresh);
+fresh.exec(maxCostMigration);
+assertMaxCostOverrideShape(fresh);
 
 const existing = new DatabaseSync(':memory:');
 existing.exec(`
@@ -60,6 +90,8 @@ existing.exec(`
 `);
 existing.exec(migration);
 assertOperationalShape(existing);
+existing.exec(maxCostMigration);
+assertMaxCostOverrideShape(existing);
 
 existing.prepare(`
   INSERT INTO event_suppression_rules (
@@ -82,12 +114,29 @@ existing.prepare(`
   INSERT INTO users(id) VALUES (?)
 `).run('user');
 existing.prepare(`
+  INSERT INTO max_battle_cost_overrides (
+    user_id, opportunity_key, pokemon_name, battle_variant,
+    start_date, end_date, max_battle_tier, max_particle_cost, updated_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`).run(
+  'user',
+  'dynamax moltres|dynamax|2026-09-21|2026-09-27',
+  'Dynamax Moltres',
+  'dynamax',
+  '2026-09-21',
+  '2026-09-27',
+  5,
+  800,
+  'now'
+);
+existing.prepare(`
   INSERT INTO remote_raid_daily_budget_overrides (
     user_id, local_date, budget_override, updated_at
   ) VALUES (?, ?, ?, ?)
 `).run('user', '2026-09-18', 7, 'now');
 
 existing.exec(migration);
+existing.exec(maxCostMigration);
 assert.equal(
   existing.prepare(`SELECT budget_override AS value FROM remote_raid_daily_budget_overrides WHERE user_id = 'user'`).get().value,
   7,
@@ -109,6 +158,11 @@ assert.equal(
   existing.prepare(`SELECT COUNT(*) AS count FROM remote_raid_daily_budget_overrides WHERE user_id = 'user'`).get().count,
   0,
   'daily overrides must cascade when their user is deleted'
+);
+assert.equal(
+  existing.prepare(`SELECT COUNT(*) AS count FROM max_battle_cost_overrides WHERE user_id = 'user'`).get().count,
+  0,
+  'Max Battle cost overrides must cascade when their user is deleted'
 );
 
 console.log('schema completeness regression tests passed');

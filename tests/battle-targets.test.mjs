@@ -3,11 +3,27 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import vm from 'node:vm';
-import {battleSpriteUrl,upsertTarget,findMatches,targetOptionsForUser,targetSpriteUrl,recommendationsForDate} from '../src/index.js';
+import {battleSpriteUrl,currentMaxBattleTiersFromPayload,maxBattleCostOverrideKey,updateMaxBattleCostOverrideApi,upsertTarget,findMatches,targetOptionsForUser,targetSpriteUrl,recommendationsForDate} from '../src/index.js';
 import {normalizeBattleLog,createBattleLog,undoBattleLog} from '../src/battle-logging.js';
 import {buildBattleResourcePlan} from '../src/resource-planning.js';
 import {battleOpportunityMetadata} from '../src/battle-opportunities.js';
 const T = globalThis.BattleTargets;
+assert.deepEqual(
+  currentMaxBattleTiersFromPayload({
+    currentList: {
+      tier_1: [{names:{English:'Rhyhorn'}}],
+      tier_5: [
+        {names:{English:'Articuno'}},
+        {names:{English:'Zapdos'}}
+      ]
+    }
+  }).sort((a,b)=>a.pokemon_name.localeCompare(b.pokemon_name)),
+  [
+    {pokemon_name:'Articuno',max_battle_tier:5},
+    {pokemon_name:'Rhyhorn',max_battle_tier:1},
+    {pokemon_name:'Zapdos',max_battle_tier:5}
+  ]
+);
 const read = path => readFileSync(new URL(path,import.meta.url),'utf8');
 const sql = new DatabaseSync(':memory:');
 // Upgrade an old database, including a historical FK, without rebuilding IDs.
@@ -36,7 +52,33 @@ assert.equal(all().length,3,'Max spelling aliases update the same identity');
 await save({...base,battle_kind:'gigantamax'},409);
 assert.equal(all().find(t=>t.id===gmax.id).current_value,12,'Duplicate create cannot reset progress');
 const counts=await save({...base,battle_kind:'gigantamax',target_type:'battles',current_value:0,target_value:2});
-await save({...base,id:dyn.id,battle_kind:'raid'},400);
+await save({...base,id:dyn.id,battle_kind:'raid'},409);
+
+const editable=await save({
+  pokemon_name:'Abra',
+  battle_kind:'dynamax',
+  target_type:'candy',
+  target_value:100,
+  current_value:7,
+  expected_progress_per_raid:2,
+  priority:'medium'
+});
+await save({
+  id:editable.id,
+  pokemon_name:'Machop',
+  battle_kind:'gigantamax',
+  target_type:'battles',
+  target_value:5,
+  current_value:2,
+  expected_progress_per_raid:1,
+  priority:'high'
+});
+const edited=all().find(t=>t.id===editable.id);
+assert.equal(edited.pokemon_name,'Gigantamax Machop');
+assert.equal(edited.battle_kind,'gigantamax');
+assert.equal(edited.target_type,'battles');
+assert.equal(edited.current_value,2);
+assert.equal(editable.id,edited.id,'Identity edits keep the target ID stable for historical log/Undo links');
 await save({...base,id:'foreign-user-target'},404);
 await save({...base,battle_kind:'gigantamax',target_type:'mega_energy'},400);
 await save({...base,pokemon_name:'Gigantamax Gengar',battle_kind:'dynamax'},400);
@@ -135,10 +177,55 @@ insertEvent.run('gmax','max_battles','Gigantamax Gengar Max Battles',today,today
 insertEvent.run('dyn','max_battles','Dynamax Gengar Max Battles',future,future,'3');
 const user={id:'u',timezone:'Asia/Singapore',pve_weight:1,pvp_weight:0,collector_weight:0};
 insertEvent.run('rhyhorn-max','max_battles','Rhyhorn Max Battles',today,today,'4');
+const rhyhornOverrideKey=maxBattleCostOverrideKey({
+  pokemon_name:'Dynamax Rhyhorn',
+  battle_variant:'dynamax',
+  start_date:today,
+  end_date:today
+});
+const overrideResponse=await updateMaxBattleCostOverrideApi(
+  new Request('http://localhost/api/max-battle-cost-override',{
+    method:'POST',
+    body:JSON.stringify({
+      token,
+      opportunity_key:rhyhornOverrideKey,
+      pokemon_name:'Dynamax Rhyhorn',
+      battle_variant:'dynamax',
+      start_date:today,
+      end_date:today,
+      max_battle_tier:1
+    })
+  }),
+  env
+);
+assert.equal(overrideResponse.status,200);
+assert.equal((await overrideResponse.json()).max_particle_cost,250);
 const fallbackRecs=await recommendationsForDate(env,user,all(),metas,today,maxFallbackPokedex);
 const rhyhornRec=fallbackRecs.find(r=>r.battle_system==='max'&&r.pokemon_name==='Dynamax Rhyhorn');
 assert.ok(rhyhornRec,'Current Max boss without pokemon_meta must still render as a recommendation');
 assert.equal(rhyhornRec.battle_variant,'dynamax');
+assert.equal(rhyhornRec.max_particle_cost,250);
+assert.equal(rhyhornRec.max_battle_tier,1);
+assert.equal(rhyhornRec.max_particle_cost_confidence,'user_override');
+assert.equal(rhyhornRec.max_cost_override_key,rhyhornOverrideKey);
+assert.equal(rhyhornRec.max_cost_override_source,'user');
+const clearOverrideResponse=await updateMaxBattleCostOverrideApi(
+  new Request('http://localhost/api/max-battle-cost-override',{
+    method:'POST',
+    body:JSON.stringify({
+      token,
+      opportunity_key:rhyhornOverrideKey,
+      pokemon_name:'Dynamax Rhyhorn',
+      battle_variant:'dynamax',
+      start_date:today,
+      end_date:today,
+      clear:true
+    })
+  }),
+  env
+);
+assert.equal(clearOverrideResponse.status,200);
+assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM max_battle_cost_overrides').get().n,0);
 sql.prepare("DELETE FROM events WHERE id='rhyhorn-max'").run();
 const recs=await recommendationsForDate(env,user,all(),metas,today);
 assert.equal(recs.find(r=>r.battle_system==='raid').target.id,raid.id);

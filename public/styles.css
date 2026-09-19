@@ -5197,6 +5197,76 @@ details[open] > summary .details-chevron {
   color: #655a9a;
 }
 
+/* Max Battle tier fallback controls · v40 */
+.max-tier-override-control {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 7px;
+  min-width: 0;
+}
+
+.max-tier-override-select {
+  width: auto;
+  min-width: 150px;
+  min-height: 32px;
+  padding: 4px 28px 4px 8px;
+  border-radius: 9px;
+  font-size: .66rem;
+  font-weight: 800;
+}
+
+.max-tier-override-status {
+  color: #7c8b99;
+  font-size: .6rem;
+  line-height: 1.25;
+}
+
+.max-tier-source-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border: 1px solid #d8e7dc;
+  border-radius: 999px;
+  background: #f1f9f3;
+  color: #39704b;
+  font-size: .62rem;
+  font-weight: 850;
+}
+
+.forecast-detail-side {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  text-align: right;
+}
+
+.forecast-tier-control {
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .max-tier-override-control,
+  .forecast-tier-control {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .max-tier-override-select {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .forecast-detail-side {
+    align-items: stretch;
+    width: 100%;
+    text-align: left;
+  }
+}
+
 .recommendation-footer-row {
   display: flex;
   gap: 10px;
