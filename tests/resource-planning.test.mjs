@@ -550,7 +550,8 @@ const sharedForecast = buildBattleForecast({
 });
 
 assert.equal(sharedForecast.days.length, 3);
-assert.equal(sharedForecast.days[0].recommended_raid_budget, 2);
+assert.equal(sharedForecast.days[0].recommended_raid_budget, 1);
+assert.equal(sharedForecast.days[1].recommended_raid_budget, 1);
 assert.equal(
   sharedForecast.days
     .flatMap(day => day.allocations)
