@@ -213,7 +213,13 @@ Stores personal goals. Key concepts include:
 - Completion state.
 - Notes.
 
-The battle_kind column was added by migration 0003_target_battle_kind.sql.
+The battle_kind column was added by migration 0003_target_battle_kind.sql. Existing target rows keep a stable opaque ID when the user corrects Pokémon/form, battle kind, or target type. That preserves historical battle-log/Undo references. The edit is rejected if the resulting Pokémon/battle/target-type identity would duplicate another target.
+
+### max_battle_cost_overrides
+
+Stores a private user fallback for a specific Max Battle opportunity when automatic tier/cost evidence is unavailable. The opportunity key is derived from canonical Pokémon/form, Dynamax/Gigantamax variant, and the event start/end date range. Stored fields include the selected tier, the standard mapped MP cost, and update time. Automatic verified evidence takes precedence over this fallback.
+
+Migration 0005_max_battle_cost_overrides.sql adds this table and its user/date index for existing databases.
 
 ### events
 
@@ -313,6 +319,9 @@ Suppression does not delete underlying Pokémon meta or ranking data.
 ### 9.1 GO Calendar ingestion
 
 GO Calendar feeds provide the normalized baseline for events, Raids, Max Battles, Max Mondays, Raid Hours, Spotlight Hours, and other event categories.
+
+For currently active Max bosses, the event sync may additionally read pokemon-go-api's structured current Max Battle list to obtain a tier when the event itself lacks one. That feed is lower precedence than explicit official Pokémon GO evidence and is applied only to current event rows whose matched bosses all resolve to the same tier; it must not overwrite official cost/tier evidence or fabricate future availability.
+
 
 The Planner stores normalized events in D1 and retains enough raw DTSTART/DTEND information to correctly interpret iCalendar semantics.
 
@@ -522,7 +531,7 @@ The Planner UI previews the highest-priority opportunities in each day card and 
 - A one-day manual ceiling override applies only to today. Future days use the normal saved personal ceiling.
 - Target progress is budgeted once across the horizon. A remaining target cap is not independently re-created on every day that the same target is available.
 - Single/short-window opportunities are naturally favored because groups with fewer available days are placed first; flexible opportunities are spread across feasible days by current load/value.
-- Max opportunities require verified MP cost evidence. Unknown-cost Max Battles remain visible as opportunities but are not auto-budgeted.
+- Max opportunities require a usable MP cost. Evidence precedence is official event cost/tier, other verified event tier evidence, then current structured Max Battle tier data from pokemon-go-api (whose current-list datasource is SnackNap). When those automatic sources are unavailable, a private per-opportunity user tier override may supply the standard tier cost. Species/form identity alone still never invents a cost. Unknown-cost Max Battles remain visible and are not auto-budgeted.
 - Max Particle feasibility is simulated across the whole horizon from the user's current held/collected state plus each day's applicable collection/storage rule. Planned Max spend on an earlier day can therefore make a later Max Battle infeasible, while future daily replenishment can make a later opportunity reachable.
 - Forecast output keeps per-day Raid/Max allocation counts, MP spend/projection, all evaluated opportunities, and the actual shared allocation list.
 
