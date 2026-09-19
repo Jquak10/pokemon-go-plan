@@ -9154,10 +9154,25 @@ export async function upsertTarget(request, env) {
     : matchingBattleTargets(targets,identity).find(t => t.target_type === targetType);
   if (body.id && !existing) return bad("Target not found.",404);
 
-  const duplicate = matchingBattleTargets(
-    targets.filter(target => !existing || target.id !== existing.id),
-    identity
-  ).find(target => target.target_type === targetType);
+  if (!body.id && existing) {
+    return bad("This target already exists. Use Edit to change its progress or settings.",409);
+  }
+
+  const duplicate =
+    body.id
+      ? matchingBattleTargets(
+          targets.filter(
+            target =>
+              target.id !==
+              existing.id
+          ),
+          identity
+        ).find(
+          target =>
+            target.target_type ===
+            targetType
+        )
+      : null;
 
   if (duplicate) {
     return bad("A target with this Pokémon, battle type, and target type already exists.",409);
