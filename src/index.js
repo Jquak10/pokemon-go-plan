@@ -6549,7 +6549,7 @@ async function remoteRaidPlanForUser(
     officialRule,
     raidsUsed,
     dailyOverride,
-    budgetForecast
+    initialResourceState
   ] =
     await Promise.all([
       remoteRaidLimitForDate(
@@ -6568,23 +6568,63 @@ async function remoteRaidPlanForUser(
         user.id,
         localDate
       ),
-      buildRemoteRaidBudgetForecast(
+      battleResourceStateForDate(
         env,
-        user,
-        targets,
-        metas
+        user.id,
+        localDate
       )
     ]);
 
-  const systemRecommendedBudget =
-    Number(
-      budgetForecast
-        .recommended_daily_budget || 0
+  const budgetForecast =
+    await buildBattleBudgetForecast(
+      env,
+      user,
+      targets,
+      metas,
+      {
+        todayOfficialRule:
+          officialRule,
+        todayRemoteUsed:
+          raidsUsed,
+        todayDailyOverride:
+          dailyOverride,
+        initialResourceState
+      }
     );
 
+  const recommendedAdditional =
+    Number(
+      budgetForecast
+        .recommended_daily_budget ||
+      0
+    );
+
+  const recommendedRaidAdditional =
+    Number(
+      budgetForecast
+        .recommended_raid_budget ||
+      0
+    );
+
+  const recommendedMaxAdditional =
+    Number(
+      budgetForecast
+        .recommended_max_budget ||
+      0
+    );
+
+  // Keep this legacy field as a total daily shared Remote budget so existing
+  // UI/cap math remains coherent. The explicit *_additional fields below carry
+  // the new shared-forecast semantics.
+  const systemRecommendedBudget =
+    raidsUsed +
+    recommendedAdditional;
+
   const usualCeiling =
-    user.remote_raid_budget == null ||
-    user.remote_raid_budget === ""
+    user.remote_raid_budget ==
+      null ||
+    user.remote_raid_budget ===
+      ""
       ? null
       : Math.max(
           0,
@@ -6621,12 +6661,36 @@ async function remoteRaidPlanForUser(
       );
   }
 
-  // If the user has already used more than the current advice/ceiling,
-  // preserve the used count so the planning bar remains coherent.
   effectiveBudgetCap =
     Math.max(
       effectiveBudgetCap,
       raidsUsed
+    );
+
+  // The legacy Raid-only allocator remains for backward-compatible Raid card
+  // fields. Give it only the ordinary-Raid portion selected by the shared
+  // forecast instead of the combined Raid + Max budget.
+  let legacyRaidBudgetCap =
+    raidsUsed +
+    recommendedRaidAdditional;
+
+  if (!officialRule.is_unlimited) {
+    legacyRaidBudgetCap =
+      Math.min(
+        legacyRaidBudgetCap,
+        Number(
+          officialRule.limit || 0
+        )
+      );
+  }
+
+  legacyRaidBudgetCap =
+    Math.max(
+      raidsUsed,
+      Math.min(
+        legacyRaidBudgetCap,
+        effectiveBudgetCap
+      )
     );
 
   const plan =
@@ -6634,7 +6698,7 @@ async function remoteRaidPlanForUser(
       recommendations,
       officialRule,
       userBudget:
-        effectiveBudgetCap,
+        legacyRaidBudgetCap,
       raidsUsed,
       minScore:
         user.remote_raid_min_score
@@ -6653,6 +6717,15 @@ async function remoteRaidPlanForUser(
 
     system_recommended_budget:
       systemRecommendedBudget,
+
+    system_recommended_additional:
+      recommendedAdditional,
+
+    forecast_recommended_additional_raids:
+      recommendedRaidAdditional,
+
+    forecast_recommended_additional_max:
+      recommendedMaxAdditional,
 
     usual_personal_ceiling:
       usualCeiling,
@@ -6673,7 +6746,10 @@ async function remoteRaidPlanForUser(
       budgetForecast.days,
 
     budget_forecast_horizon_days:
-      budgetForecast.horizon_days
+      budgetForecast.horizon_days,
+
+    budget_forecast_kind:
+      "shared_battle"
   };
 }
 
