@@ -36,7 +36,33 @@ assert.equal(all().length,3,'Max spelling aliases update the same identity');
 await save({...base,battle_kind:'gigantamax'},409);
 assert.equal(all().find(t=>t.id===gmax.id).current_value,12,'Duplicate create cannot reset progress');
 const counts=await save({...base,battle_kind:'gigantamax',target_type:'battles',current_value:0,target_value:2});
-await save({...base,id:dyn.id,battle_kind:'raid'},400);
+await save({...base,id:dyn.id,battle_kind:'raid'},409);
+
+const editable=await save({
+  pokemon_name:'Abra',
+  battle_kind:'dynamax',
+  target_type:'candy',
+  target_value:100,
+  current_value:7,
+  expected_progress_per_raid:2,
+  priority:'medium'
+});
+await save({
+  id:editable.id,
+  pokemon_name:'Machop',
+  battle_kind:'gigantamax',
+  target_type:'battles',
+  target_value:5,
+  current_value:2,
+  expected_progress_per_raid:1,
+  priority:'high'
+});
+const edited=all().find(t=>t.id===editable.id);
+assert.equal(edited.pokemon_name,'Gigantamax Machop');
+assert.equal(edited.battle_kind,'gigantamax');
+assert.equal(edited.target_type,'battles');
+assert.equal(edited.current_value,2);
+assert.equal(editable.id,edited.id,'Identity edits keep the target ID stable for historical log/Undo links');
 await save({...base,id:'foreign-user-target'},404);
 await save({...base,battle_kind:'gigantamax',target_type:'mega_energy'},400);
 await save({...base,pokemon_name:'Gigantamax Gengar',battle_kind:'dynamax'},400);
