@@ -2994,6 +2994,92 @@ async function getTargets(env, userId) {
   return results;
 }
 
+export function maxBattleCostOverrideKey(
+  item
+) {
+  const name =
+    normalizeName(
+      item?.pokemon_name || ""
+    );
+
+  const variant =
+    String(
+      item?.battle_variant || ""
+    ).toLowerCase();
+
+  const startDate =
+    String(
+      item?.start_date || ""
+    );
+
+  const endDate =
+    String(
+      item?.end_date ||
+      item?.start_date ||
+      ""
+    );
+
+  if (
+    !name ||
+    !["dynamax", "gigantamax"].includes(
+      variant
+    ) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      startDate
+    ) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      endDate
+    )
+  ) {
+    return null;
+  }
+
+  return [
+    name,
+    variant,
+    startDate,
+    endDate
+  ].join("|");
+}
+
+async function maxBattleCostOverridesForDate(
+  env,
+  userId,
+  day
+) {
+  try {
+    const { results } =
+      await env.DB.prepare(`
+        SELECT *
+        FROM max_battle_cost_overrides
+        WHERE user_id = ?
+          AND start_date <= ?
+          AND end_date >= ?
+        ORDER BY updated_at DESC
+      `).bind(
+        userId,
+        day,
+        day
+      ).all();
+
+    return results || [];
+  } catch (error) {
+    if (
+      /no such table:\s*max_battle_cost_overrides/i.test(
+        String(
+          error?.message ||
+          error
+        )
+      )
+    ) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+
 async function getMeta(env) {
   const { results } = await env.DB.prepare(`
     SELECT
@@ -3417,6 +3503,23 @@ export async function recommendationsForDate(
       day
     );
 
+  const maxCostOverrides =
+    await maxBattleCostOverridesForDate(
+      env,
+      user.id,
+      day
+    );
+
+  const maxCostOverrideByKey =
+    new Map(
+      maxCostOverrides.map(
+        item => [
+          item.opportunity_key,
+          item
+        ]
+      )
+    );
+
   const map = new Map();
 
   for (const event of events) {
@@ -3494,6 +3597,11 @@ export async function recommendationsForDate(
           eventOtherLines
         );
 
+      const currentMaxTierEvidence =
+        /(?:^|\n)X-POGO-MAX-EVIDENCE:pokemon_go_api_current(?:\n|$)/i.test(
+          eventOtherLines
+        );
+
       const maxCostEvidenceUrl =
         eventOtherLines.match(
           /(?:^|\n)X-POGO-MAX-EVIDENCE-URL:([^\n]+)/i
@@ -3504,7 +3612,31 @@ export async function recommendationsForDate(
             : null
         );
 
-      const maxParticleCost =
+      const overrideKey =
+        battleMetadata?.battle_system ===
+          "max"
+          ? maxBattleCostOverrideKey({
+              pokemon_name:
+                match.name,
+              battle_variant:
+                battleMetadata
+                  .battle_variant,
+              start_date:
+                event.start_date,
+              end_date:
+                event.end_date ||
+                event.start_date
+            })
+          : null;
+
+      const userCostOverride =
+        overrideKey
+          ? maxCostOverrideByKey.get(
+              overrideKey
+            ) || null
+          : null;
+
+      const automaticMaxParticleCost =
         inferMaxParticleCost({
           ...battleMetadata,
           pokemon_name:
@@ -3518,6 +3650,10 @@ export async function recommendationsForDate(
           max_particle_cost_official:
             officialSource ||
             officialMaxCostEvidence,
+          max_particle_cost_evidence_source:
+            currentMaxTierEvidence
+              ? "pokemon-go-api"
+              : null,
           event_title:
             event.summary,
           event_description:
@@ -3525,6 +3661,31 @@ export async function recommendationsForDate(
           event_other_lines:
             eventOtherLines
         });
+
+      const maxParticleCost =
+        automaticMaxParticleCost.cost ||
+        !userCostOverride
+          ? automaticMaxParticleCost
+          : {
+              cost:
+                Number(
+                  userCostOverride
+                    .max_particle_cost
+                ),
+              basis:
+                "user_tier_override",
+              confidence:
+                "user_override",
+              tier:
+                Number(
+                  userCostOverride
+                    .max_battle_tier
+                ),
+              tier_source:
+                "user_override",
+              evidence_source:
+                "user"
+            };
 
       const key = [
         battleMetadata?.battle_system || "raid",
@@ -3561,7 +3722,17 @@ export async function recommendationsForDate(
         max_particle_cost_evidence_source:
           maxParticleCost.evidence_source,
         max_particle_cost_evidence_url:
-          maxCostEvidenceUrl,
+          maxParticleCost.evidence_source ===
+            "user"
+            ? null
+            : maxCostEvidenceUrl,
+        max_cost_override_key:
+          overrideKey,
+        max_cost_override_source:
+          maxParticleCost.evidence_source ===
+            "user"
+            ? "user"
+            : null,
         logging_remote_eligible: battleMetadata?.battle_system === "max"
           ? maxBattleRemotePassEligible({ ...battleMetadata, event_description: event.description, event_title: event.summary })
           : remoteEligible && !/(?:local|in[- ]person)[ -]?only|cannot be joined remotely/i.test(event.description || ""),
