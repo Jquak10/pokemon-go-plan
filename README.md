@@ -117,10 +117,10 @@ There is no email/password recovery flow. Someone who has the management link ca
 
 The **Raid Plan** tab combines today's limits, activity, recommendations, and future opportunities:
 
-- **Remote Raid Plan** shows the **Official limit**, the forward-looking **Planner budget**, **Today's ceiling**, and **Official remaining** after already logged Remote Raids.
-- **Today's planning capacity** divides capacity into **Used**, **Recommended**, and **Left unused**. Unused capacity is intentional when available bosses do not meet the configured value threshold.
-- **Paid Raid Budget Forecast** previews recommended paid-raid budgets for the next seven days and recalculates as targets or progress change.
-- **Today's Raid Activity** separates Remote, Local, and total logged raids.
+- **Remote Battle Plan** shows the **Official limit**, **Recommended next** shared Remote Pass uses, **Today's ceiling**, and **Official remaining** after already logged Remote Raids/Remote Max Battles.
+- **Today's planning capacity** divides the shared Remote ceiling into **Used**, **Recommended**, and **Left unused**. Unused capacity is intentional when available Raid/Max opportunities do not meet the configured value/resource rules.
+- **Paid Battle Forecast** evaluates Raid and Max opportunities across the next seven days. It uses exact normalized availability/suppression, canonical Raid/Max planning value, the shared Remote ceiling, target progress across the whole horizon, and Max Particle cost/replenishment. Forecast rows show which system receives each planned use and the MP spend for Max allocations.
+- **Today's Battle Activity** separates Raid/Max, Remote/Local, and total logged battles.
 - **What to battle now** displays current Raid and Max Battle recommendations. Each card uses the same canonical planning score/priority that drives Today, desktop Quick Status, recommendation ordering, and shared resource allocation. Raid priority uses the personalized Raid value; Max priority uses the Max-aware planning method and never treats ordinary Raid attacker rankings as Max performance. **Why?** includes the planning-priority rationale. Max Particle cost is used automatically only when backed by an explicit official entry cost or a verified Max Battle tier mapped to the standard tier cost; Dynamax/Gigantamax identity alone never invents a cost, and unknown cost continues to block automatic Remote Max allocation. Max weakness/resistance guidance resolves through the underlying exact species/form; Raid-only 100% IV encounter CP and Raid attacker rankings remain Raid-specific. If the shared Pokémon catalog cannot load, battle intel exits the loading state, offers a retry, and uses the last successfully saved catalog when available.
 - The first recommendations appear directly; **More raid recommendations** expands the rest. **Bosses receiving 0 Remote Raids** explains exclusions from paid allocation.
 
@@ -132,22 +132,24 @@ Expired raid events are defensively excluded from current recommendations even i
 
 ### Remote Raid planning
 
-Remote limits are always ceilings, not goals:
+Remote limits are always ceilings, not goals, and eligible Remote Max Battles share the same official daily Remote participation counter:
 
-- **Official remaining** is the official daily capacity minus Remote Raids already logged.
-- **Planner budget** is the planner's forward-looking recommendation.
-- **Today's ceiling** applies automatic planning, the saved **Usual personal ceiling**, or a one-day override without exceeding the official game limit.
-- Allocations stop when a boss's marginal value falls below the saved **Minimum Remote Raid score**.
-- Remote Max allocation additionally requires a verified MP entry cost. The planner accepts explicit official cost evidence or verified tier evidence and its standard tier mapping; otherwise the cost stays unknown and capacity is left unused.
-- Completed or skipped targets receive zero paid Remote Raid allocation. Target priority, remaining progress, expected progress per raid, and current availability can change the recommendation.
+- **Official remaining** is the official daily capacity minus already logged shared Remote uses.
+- **Recommended next** is the number of additional worthwhile Remote Pass uses from the shared Raid + Max forecast, not a spending target.
+- **Today's ceiling** applies the saved **Usual personal ceiling** or a one-day override without exceeding the official game limit.
+- The **Paid Battle Forecast** evaluates every normalized Raid/Max opportunity for each forecast day. Suppressed/unavailable events are absent before planning; remaining target progress is shared across the horizon instead of duplicated per day.
+- Raid and Max candidates use their own canonical planning method. Allocations stop when marginal value falls below the saved **Minimum Remote Raid score**.
+- Remote Max allocation additionally requires a verified MP entry cost. The forecast simulates held MP, today's remaining collection, future daily replenishment/storage rules, and planned Max spend across days; unknown-cost Max Battles stay unallocated.
+- Future-saving guidance is selected from resource-feasible forecast allocations rather than a Raid-only top-recommendation proxy. A stronger future Max opportunity can therefore reserve both a Remote Pass and the amount of MP that cannot be replenished before it.
+- Completed or skipped targets receive zero paid allocation. Target priority, remaining progress, expected progress per battle, exact availability, and future resource competition can change the recommendation.
 
 Open **Planner controls & manual corrections** on the Raid Plan to use:
 
 - **Today's budget override** and **Save override** for a one-day ceiling.
 - **Use Auto** to remove that override.
-- **Remote Raids used today · manual correction** for raids completed before using the logger or to correct the counter.
+- **Remote limit used today · manual correction** for shared Remote Raid/Remote Max usage completed before using the logger or to correct the counter.
 
-Logging a Remote Raid normally updates the usage counter automatically. Logging a Local raid does not consume Remote Raid capacity.
+Logging a Remote Raid or eligible Remote Max Battle normally updates the shared usage counter automatically. Local battles do not consume Remote capacity.
 
 ### Targets
 
