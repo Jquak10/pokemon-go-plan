@@ -22,6 +22,17 @@ assert.match(manage, />\s*Max Battles\s*</);
 assert.match(manage, /battlePlanFilter/);
 assert.match(manage, /remoteRaidZeroDetails/);
 
+assert.match(manage, /function remoteRuleWindowLabel/);
+assert.match(manage, /Local time ·/);
+assert.match(manage, /rule\.start_at/);
+assert.match(manage, /rule\.end_at/);
+assert.match(manage, /state\?\.user\?\.timezone/);
+assert.match(manage, /remoteRuleWindowLabel\(rule\)/);
+assert.doesNotMatch(
+  manage,
+  /<span>\$\{esc\(rule\.start_date \|\| ""\)\}\$\{rule\.end_date \? " → " \+ esc\(rule\.end_date\) : ""\}<\/span>/
+);
+
 assert.match(manage, /function recommendationSpriteUrl/);
 assert.match(manage, /requires_exact_form/);
 assert.match(manage, /sprite_exact_form/);
