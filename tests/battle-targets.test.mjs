@@ -3,11 +3,27 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import vm from 'node:vm';
-import {battleSpriteUrl,upsertTarget,findMatches,targetOptionsForUser,targetSpriteUrl,recommendationsForDate} from '../src/index.js';
+import {battleSpriteUrl,currentMaxBattleTiersFromPayload,maxBattleCostOverrideKey,upsertTarget,findMatches,targetOptionsForUser,targetSpriteUrl,recommendationsForDate} from '../src/index.js';
 import {normalizeBattleLog,createBattleLog,undoBattleLog} from '../src/battle-logging.js';
 import {buildBattleResourcePlan} from '../src/resource-planning.js';
 import {battleOpportunityMetadata} from '../src/battle-opportunities.js';
 const T = globalThis.BattleTargets;
+assert.deepEqual(
+  currentMaxBattleTiersFromPayload({
+    currentList: {
+      tier_1: [{names:{English:'Rhyhorn'}}],
+      tier_5: [
+        {names:{English:'Articuno'}},
+        {names:{English:'Zapdos'}}
+      ]
+    }
+  }).sort((a,b)=>a.pokemon_name.localeCompare(b.pokemon_name)),
+  [
+    {pokemon_name:'Articuno',max_battle_tier:5},
+    {pokemon_name:'Rhyhorn',max_battle_tier:1},
+    {pokemon_name:'Zapdos',max_battle_tier:5}
+  ]
+);
 const read = path => readFileSync(new URL(path,import.meta.url),'utf8');
 const sql = new DatabaseSync(':memory:');
 // Upgrade an old database, including a historical FK, without rebuilding IDs.
@@ -161,10 +177,27 @@ insertEvent.run('gmax','max_battles','Gigantamax Gengar Max Battles',today,today
 insertEvent.run('dyn','max_battles','Dynamax Gengar Max Battles',future,future,'3');
 const user={id:'u',timezone:'Asia/Singapore',pve_weight:1,pvp_weight:0,collector_weight:0};
 insertEvent.run('rhyhorn-max','max_battles','Rhyhorn Max Battles',today,today,'4');
+const rhyhornOverrideKey=maxBattleCostOverrideKey({
+  pokemon_name:'Dynamax Rhyhorn',
+  battle_variant:'dynamax',
+  start_date:today,
+  end_date:today
+});
+sql.prepare(`INSERT INTO max_battle_cost_overrides (
+  user_id,opportunity_key,pokemon_name,battle_variant,start_date,end_date,
+  max_battle_tier,max_particle_cost,updated_at
+) VALUES(?,?,?,?,?,?,?,?,?)`).run(
+  'u',rhyhornOverrideKey,'Dynamax Rhyhorn','dynamax',today,today,1,250,'now'
+);
 const fallbackRecs=await recommendationsForDate(env,user,all(),metas,today,maxFallbackPokedex);
 const rhyhornRec=fallbackRecs.find(r=>r.battle_system==='max'&&r.pokemon_name==='Dynamax Rhyhorn');
 assert.ok(rhyhornRec,'Current Max boss without pokemon_meta must still render as a recommendation');
 assert.equal(rhyhornRec.battle_variant,'dynamax');
+assert.equal(rhyhornRec.max_particle_cost,250);
+assert.equal(rhyhornRec.max_battle_tier,1);
+assert.equal(rhyhornRec.max_particle_cost_confidence,'user_override');
+assert.equal(rhyhornRec.max_cost_override_key,rhyhornOverrideKey);
+assert.equal(rhyhornRec.max_cost_override_source,'user');
 sql.prepare("DELETE FROM events WHERE id='rhyhorn-max'").run();
 const recs=await recommendationsForDate(env,user,all(),metas,today);
 assert.equal(recs.find(r=>r.battle_system==='raid').target.id,raid.id);
