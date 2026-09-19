@@ -109,6 +109,11 @@ assert.match(manage, /Paid Battle Forecast/);
 assert.match(manage, /budgetForecastDetails/);
 assert.match(manage, /data-forecast-day-index/);
 assert.match(manage, /View all/);
+assert.match(manage, /const raidCount =/);
+assert.match(manage, /const maxCount =/);
+assert.match(manage, /const systemCountLabel =/);
+assert.match(manage, /\.join\("\ \+ "\)/);
+
 assert.match(manage, /item\.exclusion_reason/);
 assert.match(manage, /MP cost unknown/);
 assert.match(styles, /PAID BATTLE FORECAST EXPANSION · v38/);
