@@ -3769,7 +3769,26 @@ export async function recommendationsForDate(
           remoteEligible
         );
 
-      if (occurrence.score > existing.score) {
+      const occurrenceHasCost =
+        Number(
+          occurrence
+            .max_particle_cost || 0
+        ) > 0;
+
+      const existingHasCost =
+        Number(
+          existing
+            .max_particle_cost || 0
+        ) > 0;
+
+      if (
+        occurrence.score >
+          existing.score ||
+        (
+          occurrenceHasCost &&
+          !existingHasCost
+        )
+      ) {
         map.set(
           key,
           {
