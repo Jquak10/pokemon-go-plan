@@ -501,6 +501,27 @@ The underlying general/personal recommendation value is preserved as `recommenda
 
 Priority presentation thresholds remain consistent across systems. The highest Raid label remains **MUST RAID**; the corresponding Max label is **MUST BATTLE** so Max opportunities are not mislabeled as Raids.
 
+### 13.5 Shared future Battle forecast
+
+The seven-day forward-looking forecast is battle-system aware rather than Raid-only.
+
+`recommendationsForDate()` remains the source of exact day-level availability, so suppression rules, official replacements, source precedence, and exact event windows are applied before the forecast sees an opportunity.
+
+`buildBattleForecast()` in `src/resource-planning.js` then evaluates the normalized opportunities across the horizon:
+
+- Raid and Max opportunities use their canonical planning value; Max never borrows ordinary Raid attacker rankings.
+- Every day uses the applicable official shared Remote limit and the saved personal Remote ceiling. Today's already-used shared Remote count is subtracted; future days start with zero logged usage.
+- A one-day manual ceiling override applies only to today. Future days use the normal saved personal ceiling.
+- Target progress is budgeted once across the horizon. A remaining target cap is not independently re-created on every day that the same target is available.
+- Single/short-window opportunities are naturally favored because groups with fewer available days are placed first; flexible opportunities are spread across feasible days by current load/value.
+- Max opportunities require verified MP cost evidence. Unknown-cost Max Battles remain visible as opportunities but are not auto-budgeted.
+- Max Particle feasibility is simulated across the whole horizon from the user's current held/collected state plus each day's applicable collection/storage rule. Planned Max spend on an earlier day can therefore make a later Max Battle infeasible, while future daily replenishment can make a later opportunity reachable.
+- Forecast output keeps per-day Raid/Max allocation counts, MP spend/projection, all evaluated opportunities, and the actual shared allocation list.
+
+Future-saving guidance no longer chooses from a Raid-oriented `top_recommendations` proxy. It selects the strongest **allocated, resource-feasible future opportunity** from the shared forecast. When that opportunity is a Max Battle, MP reserve guidance uses the forecast's day-by-day replenishment path (including earlier planned Max spend) before falling back to the legacy simple daily-limit estimate for compatibility data.
+
+The existing `remote_raid_plan` response remains for API/UI compatibility, but `budget_forecast_kind = "shared_battle"` identifies the new semantics. Its legacy ordinary-Raid allocator receives only the Raid share chosen by the shared forecast; the combined forecast exposes separate additional Raid and Max counts so the shared allocator is not inflated by Max demand.
+
 ## 14. Remote participation and shared daily limit
 
 Current architecture treats ordinary Remote Raids and Remote Max Battles as consuming one shared official daily Remote participation ceiling.
@@ -552,6 +573,8 @@ Remote Pass usage and Remote participation limit are related but conceptually se
 - Event rules can change the participation ceiling.
 
 The Planner's personal ceiling is also a ceiling, not a spending goal.
+
+The forward-looking **Paid Battle Forecast** evaluates Raid and Max opportunities against that shared daily ceiling. Forecast budgets are additional worthwhile Remote Pass uses, not instructions to fill the ceiling, and the current-day shared plan can reserve a pass/MP for a materially stronger feasible future opportunity.
 
 Unused capacity is acceptable.
 
