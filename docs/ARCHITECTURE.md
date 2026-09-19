@@ -557,6 +557,8 @@ src/remote-raid-rules.js:
 - Projects those instants into the user's saved IANA timezone.
 - Evaluates today's rule against the current instant.
 - Allows a source-date window to overlap the next local day after timezone conversion.
+- Exposes both source-calendar dates and projected local dates/instants to the Planner.
+- The Planner's active-rule banner displays an exact override in the user's saved timezone; source-calendar dates must not be presented as though they were the user's effective local interval.
 - Falls back to date-only behavior when exact time/timezone cannot be trusted.
 
 This was added after the Staraptor Super Mega Raid Day case exposed a source-date/local-date mismatch. A Sep 18 17:00 PDT start must not become a full-day Sep 18 override in Singapore.
