@@ -2461,6 +2461,52 @@ function parseSources(row) {
   }
 }
 
+function calendarSourceTypesForUser(row) {
+  const included =
+    parseSources(row);
+
+  if (
+    included.includes("max_battles") &&
+    !included.includes(
+      MAX_ROTATION_SOURCE_TYPE
+    )
+  ) {
+    return [
+      ...included,
+      MAX_ROTATION_SOURCE_TYPE
+    ];
+  }
+
+  return included;
+}
+
+function calendarDisplaySourceType(
+  sourceType
+) {
+  return sourceType ===
+    MAX_ROTATION_SOURCE_TYPE
+    ? "max_battles"
+    : sourceType;
+}
+
+function suppressionSourceTypesForEvent(
+  event
+) {
+  const sourceType =
+    String(
+      event?.source_type || ""
+    );
+
+  return sourceType ===
+    MAX_ROTATION_SOURCE_TYPE
+    ? [
+        MAX_ROTATION_SOURCE_TYPE,
+        "max_battles"
+      ]
+    : [sourceType];
+}
+
+
 
 function publicBaseUrl(request, env) {
   const configured =
@@ -6795,7 +6841,10 @@ async function calendarEventsApi(request, env) {
 
   if (!bounds) return bad("Month must use YYYY-MM.");
 
-  const included = parseSources(user);
+  const included =
+    calendarSourceTypesForUser(
+      user
+    );
 
   if (!included.length) {
     return json({
@@ -6918,7 +6967,9 @@ async function calendarEventsApi(request, env) {
         description:
           personalized.description || "",
         source_type:
-          event.source_type,
+          calendarDisplaySourceType(
+            event.source_type
+          ),
         start_date:
           event.start_date,
         end_date:
@@ -8426,10 +8477,18 @@ function eventIsSuppressedByRules(event, rules) {
     event.start_date ||
     "9999-12-31";
 
+  const sourceTypes =
+    suppressionSourceTypesForEvent(
+      event
+    );
+
   return rules.some((rule) => {
     if (
-      !rule.suppressed_source_types.includes(
-        event.source_type
+      !rule.suppressed_source_types.some(
+        sourceType =>
+          sourceTypes.includes(
+            sourceType
+          )
       )
     ) {
       return false;
@@ -8452,10 +8511,18 @@ function visibleEventSegments(event, rules) {
     return [event];
   }
 
+  const sourceTypes =
+    suppressionSourceTypesForEvent(
+      event
+    );
+
   const applicableRules =
     rules.filter((rule) =>
-      rule.suppressed_source_types.includes(
-        event.source_type
+      rule.suppressed_source_types.some(
+        sourceType =>
+          sourceTypes.includes(
+            sourceType
+          )
       )
     );
 
@@ -8750,7 +8817,10 @@ function buildVevent(event, personalized) {
 }
 
 async function calendarFeedForUser(request, env, user) {
-  const included = parseSources(user);
+  const included =
+    calendarSourceTypesForUser(
+      user
+    );
   if (!included.length) {
     return new Response(
       "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Pokemon GO Personal Calendar//EN\r\nEND:VCALENDAR\r\n",
