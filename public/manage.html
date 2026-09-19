@@ -307,6 +307,11 @@
                 </div>
 
                 <div id="budgetForecast" class="budget-forecast-strip"></div>
+                <div
+                  id="budgetForecastDetails"
+                  class="forecast-details hidden"
+                  aria-live="polite"
+                ></div>
               </div>
 
               <details class="planner-controls-details">
@@ -1470,6 +1475,7 @@ let raidLogExplicitTargetId = null;
 
 let calendarMonthDate = null;
 let calendarMonthData = null;
+let expandedForecastDayIndex = null;
 let selectedCalendarDate = null;
 let recoverableFeedUrl = "";
 const calendarMonthCache = new Map();
@@ -4015,37 +4021,115 @@ function renderRemoteRaidPlan() {
       </div>
     `;
 
+  const forecastDays =
+    plan.budget_forecast ||
+    [];
+
+  if (
+    expandedForecastDayIndex != null &&
+    !forecastDays[
+      expandedForecastDayIndex
+    ]
+  ) {
+    expandedForecastDayIndex =
+      null;
+  }
+
   document
     .getElementById("budgetForecast")
     .innerHTML =
-      (plan.budget_forecast || [])
+      forecastDays
         .map((day, index) => {
-          const allocationText =
-            (day.allocations || [])
-              .slice(0, 2)
+          const allocations =
+            day.allocations ||
+            [];
+
+          const opportunities =
+            day.opportunities ||
+            [];
+
+          const previewItems =
+            (
+              opportunities.length
+                ? opportunities
+                : allocations.map(
+                    item => ({
+                      ...item,
+                      allocated_count:
+                        item.count,
+                      eligible: true
+                    })
+                  )
+            )
+              .slice(0, 2);
+
+          const previewText =
+            previewItems
               .map(
-                item => `
-                  <span class="forecast-boss">
-                    ${spriteImg(
-                      item.sprite_url,
-                      item.pokemon_name,
-                      "pokemon-sprite forecast-sprite"
-                    )}
-                    <span>
-                      ${esc(item.pokemon_name)} ×${item.count}
-                      · ${item.battle_system === "max" ? "Max" : "Raid"}
-                      ${item.battle_system === "max" && item.max_particles ? ` · ${formatNumber(item.max_particles)} MP` : ""}
+                item => {
+                  const count =
+                    Number(
+                      item.allocated_count ??
+                      item.count ??
+                      0
+                    );
+
+                  const mpCost =
+                    item.max_particle_cost ??
+                    item.max_particle_cost_each ??
+                    null;
+
+                  return `
+                    <span class="forecast-boss">
+                      ${spriteImg(
+                        item.sprite_url,
+                        item.pokemon_name,
+                        "pokemon-sprite forecast-sprite"
+                      )}
+                      <span>
+                        ${esc(item.pokemon_name)}
+                        · ${item.battle_system === "max" ? "Max" : "Raid"}
+                        ${count > 0 ? ` · ×${count}` : " · 0 planned"}
+                        ${
+                          item.battle_system === "max"
+                            ? (
+                                mpCost
+                                  ? ` · ${formatNumber(mpCost)} MP`
+                                  : " · MP unknown"
+                              )
+                            : ""
+                        }
+                      </span>
                     </span>
-                  </span>
-                `
+                  `;
+                }
               )
               .join("");
 
-          const extra =
-            Math.max(
-              0,
-              (day.allocations || []).length - 2
+          const visibleCount =
+            opportunities.length ||
+            allocations.length;
+
+          const maxCount =
+            opportunities.filter(
+              item =>
+                item.battle_system ===
+                "max"
+            ).length;
+
+          const needsDetails =
+            visibleCount > 2 ||
+            opportunities.some(
+              item =>
+                !Number(
+                  item.allocated_count ||
+                  0
+                )
             );
+
+          const expanded =
+            expandedForecastDayIndex ===
+            index;
 
           return `
             <article class="budget-day ${index === 0 ? "today" : ""}">
@@ -4053,19 +4137,180 @@ function renderRemoteRaidPlan() {
               <strong>${formatNumber(day.recommended_budget)}</strong>
               <small class="forecast-boss-list">
                 ${
-                  allocationText ||
-                  "Save / no paid raids"
-                }
-                ${
-                  extra > 0
-                    ? `<span class="forecast-more">+${extra} more</span>`
-                    : ""
+                  previewText ||
+                  "Save / no paid battles"
                 }
               </small>
+
+              ${
+                needsDetails
+                  ? `
+                    <button
+                      type="button"
+                      class="forecast-expand-button"
+                      data-forecast-day-index="${index}"
+                      aria-expanded="${expanded ? "true" : "false"}"
+                    >
+                      ${expanded ? "Hide" : "View all"} ${visibleCount}
+                      ${maxCount ? ` · ${maxCount} Max` : ""}
+                    </button>
+                  `
+                  : ""
+              }
             </article>
           `;
         })
         .join("");
+
+  const detailsPanel =
+    document.getElementById(
+      "budgetForecastDetails"
+    );
+
+  const expandedDay =
+    expandedForecastDayIndex == null
+      ? null
+      : forecastDays[
+          expandedForecastDayIndex
+        ];
+
+  if (!expandedDay) {
+    detailsPanel.classList.add(
+      "hidden"
+    );
+    detailsPanel.innerHTML = "";
+  } else {
+    const detailItems =
+      (
+        expandedDay.opportunities ||
+        []
+      ).length
+        ? expandedDay.opportunities
+        : (
+            expandedDay.allocations ||
+            []
+          ).map(
+            item => ({
+              ...item,
+              allocated_count:
+                item.count,
+              eligible: true
+            })
+          );
+
+    detailsPanel.classList.remove(
+      "hidden"
+    );
+
+    detailsPanel.innerHTML = `
+      <div class="forecast-details-heading">
+        <div>
+          <span class="section-eyebrow">ALL OPPORTUNITIES</span>
+          <strong>${esc(expandedDay.label)}</strong>
+        </div>
+        <span>
+          ${formatNumber(expandedDay.recommended_budget)} paid use${Number(expandedDay.recommended_budget) === 1 ? "" : "s"} planned
+        </span>
+      </div>
+
+      <div class="forecast-details-list">
+        ${
+          detailItems.length
+            ? detailItems
+                .map(
+                  item => {
+                    const count =
+                      Number(
+                        item.allocated_count ??
+                        item.count ??
+                        0
+                      );
+
+                    const mpCost =
+                      item.max_particle_cost ??
+                      item.max_particle_cost_each ??
+                      null;
+
+                    const status =
+                      count > 0
+                        ? `${count} paid use${count === 1 ? "" : "s"} planned`
+                        : (
+                            item.exclusion_reason ||
+                            (
+                              item.eligible
+                                ? "Available, but not selected for paid allocation."
+                                : "Not auto-budgeted."
+                            )
+                          );
+
+                    return `
+                      <div class="forecast-detail-row">
+                        <div class="forecast-detail-main">
+                          ${spriteImg(
+                            item.sprite_url,
+                            item.pokemon_name,
+                            "pokemon-sprite forecast-detail-sprite"
+                          )}
+                          <div>
+                            <strong>${esc(item.pokemon_name)}</strong>
+                            <span>
+                              ${item.battle_system === "max" ? "Max Battle" : "Raid"}
+                              · priority ${formatNumber(item.planning_score)}
+                              ${
+                                item.battle_system === "max"
+                                  ? (
+                                      mpCost
+                                        ? ` · ${formatNumber(mpCost)} MP each`
+                                        : " · MP cost unknown"
+                                    )
+                                  : ""
+                              }
+                            </span>
+                          </div>
+                        </div>
+
+                        <small class="${count > 0 ? "forecast-status-planned" : ""}">
+                          ${esc(status)}
+                        </small>
+                      </div>
+                    `;
+                  }
+                )
+                .join("")
+            : `
+              <p class="muted">
+                No Raid or Max opportunities are available for this day.
+              </p>
+            `
+        }
+      </div>
+    `;
+  }
+
+  document
+    .querySelectorAll(
+      "[data-forecast-day-index]"
+    )
+    .forEach(button => {
+      button.addEventListener(
+        "click",
+        () => {
+          const index =
+            Number(
+              button.dataset
+                .forecastDayIndex
+            );
+
+          expandedForecastDayIndex =
+            expandedForecastDayIndex ===
+              index
+              ? null
+              : index;
+
+          renderRemoteRaidPlan();
+        }
+      );
+    });
 
   document
     .getElementById("dailyBudgetOverride")
