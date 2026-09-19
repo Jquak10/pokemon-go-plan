@@ -517,7 +517,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("Dynamax Articuno", forecast_text)
         self.assertIn("Max", forecast_text)
         self.assertIn("800 MP", forecast_text)
-        self.assertIn("View all 4", forecast_text)
+        self.assertIn("View all · 4 Max", forecast_text)
         page.locator("[data-forecast-day-index='1']").click()
         details = page.locator("#budgetForecastDetails")
         details.wait_for(state="visible")
@@ -528,6 +528,23 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("Max Particle cost is unknown.", detail_text)
         self.assertIn("1 paid use planned", detail_text)
         self.assertIn("1 Remote Pass", page.locator("#purchaseAdvice").inner_text())
+
+        page.evaluate(
+            """() => {
+                state.remote_raid_plan.budget_forecast[1].opportunities = [
+                    { pokemon_name: "Raid A", battle_system: "raid", planning_score: 90, allocated_count: 1, eligible: true },
+                    { pokemon_name: "Raid B", battle_system: "raid", planning_score: 89, allocated_count: 1, eligible: true },
+                    { pokemon_name: "Raid C", battle_system: "raid", planning_score: 88, allocated_count: 0, eligible: true },
+                    { pokemon_name: "Max A", battle_system: "max", planning_score: 87, allocated_count: 0, eligible: false, exclusion_reason: "Max Particle cost is unknown." }
+                ];
+                expandedForecastDayIndex = null;
+                renderRemoteRaidPlan();
+            }"""
+        )
+        mixed_label = page.locator("[data-forecast-day-index='1']").inner_text()
+        self.assertIn("3 Raid + 1 Max", mixed_label)
+        self.assertNotIn("4 · 1 Max", mixed_label)
+
         intel = card.locator(".raid-intel").inner_text()
         self.assertIn("WEAK TO", intel.upper())
         self.assertIn("Water", intel)
