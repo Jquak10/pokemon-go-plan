@@ -292,6 +292,48 @@ assert.equal(
 );
 assert.equal(sharedTwo.remote_raid_limit.recommended_additional_raids, 1);
 
+const forecastCappedCurrent = buildBattleResourcePlan({
+  recommendations: [raid, gmax],
+  remoteRaidPlan: {
+    raids_used: 0,
+    remote_limit_used: 0,
+    official_remaining: 10,
+    official_is_unlimited: false,
+    system_recommended_budget: 5,
+    forecast_recommended_additional_raids: 0,
+    forecast_recommended_additional_max: 1
+  },
+  resourceState: {
+    max_particles_held: 2400,
+    max_particles_collected_today: 800,
+    remote_max_passes_used: 0
+  },
+  personalRemotePassCeiling: 5,
+  minScore: 60
+});
+
+assert.equal(
+  forecastCappedCurrent.allocations.length,
+  1
+);
+assert.equal(
+  forecastCappedCurrent.allocations[0].battle_system,
+  "max"
+);
+assert.equal(
+  forecastCappedCurrent.allocations[0].count,
+  1,
+  "Current shared allocation must not exceed the Max share selected by the future forecast"
+);
+assert.equal(
+  forecastCappedCurrent.forecast_today.recommended_additional_raids,
+  0
+);
+assert.equal(
+  forecastCappedCurrent.forecast_today.recommended_additional_max,
+  1
+);
+
 const alreadyAtCeiling = buildBattleResourcePlan({
   recommendations: [raid, gmax],
   remoteRaidPlan: {
