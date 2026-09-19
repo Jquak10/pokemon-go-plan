@@ -1336,7 +1336,7 @@
               <option value="dynamax">Dynamax Max Battle</option>
               <option value="gigantamax">Gigantamax Max Battle</option>
             </select>
-            <p class="field-help">Each battle type tracks its own goal. Existing targets keep their Pokémon, battle and goal identity; create another target for a different goal.</p>
+            <p class="field-help">You can correct the Pokémon, battle type, or goal type on an existing target. Its target ID, saved progress, and battle-log history stay linked.</p>
           </div>
           <div>
             <label for="targetType">Target type</label>
@@ -7989,7 +7989,7 @@ function syncTargetBattleForm() {
   const isMax = document.getElementById("targetBattleKind").value !== "raid";
   const type = document.getElementById("targetType");
   for (const option of type.options) option.disabled = isMax && option.value === "mega_energy";
-  if (!editingTargetId && isMax && ["mega_energy","raids"].includes(type.value)) type.value = "battles";
+  if (isMax && ["mega_energy","raids"].includes(type.value)) type.value = "battles";
 }
 function clearTargetForm() {
   editingTargetId = null;
@@ -8014,7 +8014,6 @@ function openTargetModal(target = null, recommendation = null) {
   if (target) {
     editingTargetId = target.id;
     document.getElementById("targetBattleKind").value = BattleTargets.kind(target);
-    for (const id of ["pokemonName","customPokemonName","targetBattleKind","targetType"]) document.getElementById(id).disabled = true;
     document.getElementById("targetModalTitle").textContent = `Edit ${target.pokemon_name}`;
     renderTargetPokemonOptions(target.pokemon_name);
     document.getElementById("targetType").value = target.target_type;
