@@ -520,7 +520,7 @@ The seven-day forward-looking forecast is battle-system aware rather than Raid-o
 
 Future-saving guidance no longer chooses from a Raid-oriented `top_recommendations` proxy. It selects the strongest **allocated, resource-feasible future opportunity** from the shared forecast. When that opportunity is a Max Battle, MP reserve guidance uses the forecast's day-by-day replenishment path (including earlier planned Max spend) before falling back to the legacy simple daily-limit estimate for compatibility data.
 
-The existing `remote_raid_plan` response remains for API/UI compatibility, but `budget_forecast_kind = "shared_battle"` identifies the new semantics. Its legacy ordinary-Raid allocator receives only the Raid share chosen by the shared forecast; the combined forecast exposes separate additional Raid and Max counts so the shared allocator is not inflated by Max demand.
+The existing `remote_raid_plan` response remains for API/UI compatibility, but `budget_forecast_kind = "shared_battle"` identifies the new semantics. Its legacy ordinary-Raid allocator receives only the Raid share chosen by the shared forecast; the combined forecast exposes separate additional Raid and Max counts. The current shared allocator respects both of those today-shares before applying stronger-future reserve logic, so a flexible Max target is not silently pulled forward from a later forecast day just because today's raw MP/pass capacity exists.
 
 ## 14. Remote participation and shared daily limit
 
