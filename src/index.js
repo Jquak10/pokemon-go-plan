@@ -7667,10 +7667,16 @@ function dashboardOverview(
       topPicks,
     top_pick_is_tie:
       topPicks.length > 1,
+    paid_battle_guidance:
+      remoteRaidPlan.purchase_advice,
+    // Legacy alias retained for older Planner clients.
     paid_raid_guidance:
       remoteRaidPlan.purchase_advice,
     planner_budget:
-      remoteRaidPlan.system_recommended_budget,
+      remoteRaidPlan
+        .system_recommended_additional ??
+      remoteRaidPlan
+        .system_recommended_budget,
     effective_budget:
       remoteRaidPlan.effective_budget_cap,
     next_change:
