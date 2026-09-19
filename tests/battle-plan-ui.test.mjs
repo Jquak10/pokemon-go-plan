@@ -75,7 +75,7 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=37/);
+  assert.match(read(page), /styles\.css\?v=38/);
 }
 
 assert.match(worker, /BATTLE_SOURCE_TYPES/);
@@ -106,6 +106,18 @@ console.log("Battle Plan UI integration tests passed");
 
 assert.match(manage, /Remote Battle Plan/);
 assert.match(manage, /Paid Battle Forecast/);
+assert.match(manage, /budgetForecastDetails/);
+assert.match(manage, /data-forecast-day-index/);
+assert.match(manage, /View all/);
+assert.match(manage, /Max Particle cost is unknown/);
+assert.match(styles, /PAID BATTLE FORECAST EXPANSION · v38/);
+assert.match(styles, /\.forecast-expand-button/);
+assert.match(styles, /\.forecast-detail-row/);
+assert.match(worker, /function calendarSourceTypesForUser/);
+assert.match(worker, /included\.includes\("max_battles"\)[\s\S]*MAX_ROTATION_SOURCE_TYPE/);
+assert.match(worker, /calendarDisplaySourceType/);
+assert.match(worker, /suppressionSourceTypesForEvent/);
+
 assert.doesNotMatch(manage, /Paid Raid Budget Forecast/);
 assert.match(manage, /Additional Remote Pass uses from the shared Raid \+ Max forecast/);
 assert.match(manage, /item\.battle_system === "max" \? "Max" : "Raid"/);
