@@ -586,7 +586,10 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("MP cost unknown", card.inner_text())
         tier_select = card.locator("[data-max-tier-override]")
         self.assertEqual(tier_select.count(), 1)
-        self.assertIn("Tier 5 · 800 MP", tier_select.locator("option").all_inner_texts())
+        self.assertIn(
+            "Tier 5 · 800 MP",
+            [text.strip() for text in tier_select.locator("option").all_inner_texts()],
+        )
 
         saved_override = {}
 
