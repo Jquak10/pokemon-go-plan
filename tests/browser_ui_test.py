@@ -20,6 +20,8 @@ ADVICE_DETAIL = (
     "This guidance must remain fully readable on intermediate desktop widths instead of being clipped."
 )
 
+SPRITE_DATA_URL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+
 # This is deliberately a stable historical regression fixture, not a model of
 # the live Max Battle rotation. Rhyhorn can leave the live rotation without
 # invalidating this test: the contract under test is form resolution and UI
@@ -34,7 +36,44 @@ MOCK_STATE = {
         "remote_raid_budget": None,
         "remote_raid_min_score": 60,
     },
-    "targets": [],
+    "targets": [
+        {
+            "id": "target-dynamax-moltres",
+            "pokemon_name": "Dynamax Moltres",
+            "target_type": "battles",
+            "current_value": 0,
+            "target_value": 5,
+            "expected_progress_per_raid": 1,
+            "priority": "medium",
+            "completed": 0,
+            "notes": "",
+            "updated_at": "2026-09-18T06:00:00.000Z",
+            "battle_kind": "dynamax",
+            "battle_system": "max",
+            "battle_variant": "dynamax",
+            "sprite_url": SPRITE_DATA_URL,
+            "raid_rankings_json": None,
+            "max_rankings_json": None,
+        },
+        {
+            "id": "target-dynamax-zapdos",
+            "pokemon_name": "Dynamax Zapdos",
+            "target_type": "battles",
+            "current_value": 0,
+            "target_value": 5,
+            "expected_progress_per_raid": 1,
+            "priority": "medium",
+            "completed": 0,
+            "notes": "",
+            "updated_at": "2026-09-18T06:00:00.000Z",
+            "battle_kind": "dynamax",
+            "battle_system": "max",
+            "battle_variant": "dynamax",
+            "sprite_url": SPRITE_DATA_URL,
+            "raid_rankings_json": None,
+            "max_rankings_json": None,
+        },
+    ],
     "recommendations": [
         {
             "pokemon_name": "Dynamax Rhyhorn",
@@ -159,7 +198,7 @@ MOCK_STATE = {
                         "eligible": False,
                         "exclusion_reason": "Max Particle cost is unknown.",
                         "max_particle_cost": None,
-                        "sprite_url": None,
+                        "sprite_url": SPRITE_DATA_URL,
                     },
                     {
                         "pokemon_name": "Dynamax Zapdos",
@@ -170,7 +209,7 @@ MOCK_STATE = {
                         "eligible": False,
                         "exclusion_reason": "Max Particle cost is unknown.",
                         "max_particle_cost": None,
-                        "sprite_url": None,
+                        "sprite_url": SPRITE_DATA_URL,
                     },
                     {
                         "pokemon_name": "Dynamax Moltres",
@@ -181,7 +220,7 @@ MOCK_STATE = {
                         "eligible": False,
                         "exclusion_reason": "Max Particle cost is unknown.",
                         "max_particle_cost": None,
-                        "sprite_url": None,
+                        "sprite_url": SPRITE_DATA_URL,
                     },
                 ],
             },
@@ -251,7 +290,22 @@ MOCK_STATE = {
     },
     "target_options": {
         "current": [],
-        "upcoming": [],
+        "upcoming": [
+            {
+                "name": "Dynamax Moltres",
+                "battle_kind": "dynamax",
+                "battle_system": "max",
+                "battle_variant": "dynamax",
+                "source": "upcoming_event",
+            },
+            {
+                "name": "Dynamax Zapdos",
+                "battle_kind": "dynamax",
+                "battle_system": "max",
+                "battle_variant": "dynamax",
+                "source": "upcoming_event",
+            },
+        ],
         "existing": [],
         "horizon_days": 30,
     },
@@ -549,6 +603,27 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("WEAK TO", intel.upper())
         self.assertIn("Water", intel)
         self.assertIn("Grass", intel)
+
+        self.assert_no_horizontal_overflow(page)
+
+    def test_dynamax_sprites_render_in_forecast_and_targets(self):
+        page = self.open_planner(1024, 800)
+
+        page.locator("[data-forecast-day-index='1']").click()
+        details = page.locator("#budgetForecastDetails")
+        details.wait_for(state="visible")
+
+        for name in ("Dynamax Zapdos", "Dynamax Moltres"):
+            row = details.locator(".forecast-detail-row", has_text=name)
+            self.assertEqual(row.locator("img.forecast-detail-sprite").count(), 1)
+            self.assertTrue(row.locator("img.forecast-detail-sprite").is_visible())
+
+        page.locator('.tab-button[data-tab="targets"]').click()
+
+        for name in ("Dynamax Zapdos", "Dynamax Moltres"):
+            card = page.locator(".target-card", has_text=name)
+            self.assertEqual(card.locator("img.target-sprite").count(), 1)
+            self.assertTrue(card.locator("img.target-sprite").is_visible())
 
         self.assert_no_horizontal_overflow(page)
 
