@@ -86,6 +86,11 @@ assert.equal(
   null,
   'Gigantamax remains exact-only when only the ordinary sprite exists'
 );
+assert.equal(
+  battleSpriteUrl({pokemon_name:'Gengar',battle_system:'max',battle_variant:'gigantamax'},dynamaxSpriteMetas),
+  null,
+  'Gigantamax stored as underlying species plus battle variant must not leak the base sprite'
+);
 
 // A battle boss must be discoverable before pokemon_meta catches up. Multi-boss
 // Max feeds also inherit standard Dynamax capability consistently.
