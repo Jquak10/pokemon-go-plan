@@ -4048,19 +4048,37 @@ function renderRemoteRaidPlan() {
             day.opportunities ||
             [];
 
+          const allPreviewItems =
+            opportunities.length
+              ? opportunities
+              : allocations.map(
+                  item => ({
+                    ...item,
+                    allocated_count:
+                      item.count,
+                    eligible: true
+                  })
+                );
+
           const previewItems =
-            (
-              opportunities.length
-                ? opportunities
-                : allocations.map(
-                    item => ({
-                      ...item,
-                      allocated_count:
-                        item.count,
-                      eligible: true
-                    })
-                  )
-            )
+            [
+              ...allPreviewItems.filter(
+                item =>
+                  Number(
+                    item.allocated_count ??
+                    item.count ??
+                    0
+                  ) > 0
+              ),
+              ...allPreviewItems.filter(
+                item =>
+                  Number(
+                    item.allocated_count ??
+                    item.count ??
+                    0
+                  ) <= 0
+              )
+            ]
               .slice(0, 2);
 
           const previewText =
