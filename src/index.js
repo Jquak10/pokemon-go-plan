@@ -564,6 +564,236 @@ async function syncDerivedMaxRotations(env) {
   return derived.length;
 }
 
+export function currentMaxBattleTiersFromPayload(
+  payload
+) {
+  const current =
+    payload?.currentList;
+
+  if (
+    !current ||
+    typeof current !== "object" ||
+    Array.isArray(current)
+  ) {
+    return [];
+  }
+
+  const byName =
+    new Map();
+
+  for (
+    const [tierKey, bosses] of
+    Object.entries(current)
+  ) {
+    const tierMatch =
+      String(tierKey).match(
+        /^tier_([1-6])$/i
+      );
+
+    const tier =
+      Number(
+        tierMatch?.[1] || 0
+      );
+
+    if (
+      !tier ||
+      !Array.isArray(bosses)
+    ) {
+      continue;
+    }
+
+    for (const boss of bosses) {
+      const name =
+        englishName(boss);
+
+      if (!name) {
+        continue;
+      }
+
+      byName.set(
+        normalizeName(name),
+        {
+          pokemon_name:
+            name,
+          max_battle_tier:
+            tier
+        }
+      );
+    }
+  }
+
+  return [...byName.values()];
+}
+
+async function syncCurrentMaxBattleTierEvidence(
+  env
+) {
+  const response =
+    await fetch(
+      POGO_API_MAX_BATTLES,
+      {
+        headers: {
+          accept:
+            "application/json"
+        }
+      }
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `pokemon-go-api Max Battles returned ${response.status}`
+    );
+  }
+
+  const bosses =
+    currentMaxBattleTiersFromPayload(
+      await response.json()
+    );
+
+  if (!bosses.length) {
+    return {
+      matched_events: 0,
+      bosses: 0
+    };
+  }
+
+  const today =
+    todayUtc();
+
+  const { results } =
+    await env.DB.prepare(`
+      SELECT *
+      FROM events
+      WHERE status = 'active'
+        AND source_type IN (?, ?, ?)
+        AND COALESCE(start_date, '0000-01-01') <= ?
+        AND COALESCE(end_date, start_date, '9999-12-31') >= ?
+      ORDER BY start_date, summary
+    `).bind(
+      "max_battles",
+      "max_mondays",
+      MAX_ROTATION_SOURCE_TYPE,
+      today,
+      today
+    ).all();
+
+  const statements = [];
+  const timestamp =
+    nowIso();
+
+  for (const event of results || []) {
+    const otherLines =
+      String(
+        event.other_lines || ""
+      );
+
+    // Official evidence has higher precedence and must never be replaced by
+    // the lower-precedence current-boss reference feed.
+    if (
+      /(?:^|\n)X-POGO-MAX-EVIDENCE:official(?:\n|$)/i.test(
+        otherLines
+      )
+    ) {
+      continue;
+    }
+
+    const eventName =
+      normalizeName(
+        event.summary
+      );
+
+    const matches =
+      bosses.filter(
+        boss =>
+          eventName.includes(
+            normalizeName(
+              boss.pokemon_name
+            )
+          )
+      );
+
+    if (!matches.length) {
+      continue;
+    }
+
+    const tiers =
+      [
+        ...new Set(
+          matches.map(
+            boss =>
+              boss.max_battle_tier
+          )
+        )
+      ];
+
+    // An event-level evidence line can only be applied safely when every
+    // matched Pokémon in that event has the same tier.
+    if (tiers.length !== 1) {
+      continue;
+    }
+
+    const tier =
+      tiers[0];
+
+    const lines =
+      otherLines
+        .split("\n")
+        .filter(
+          line =>
+            line &&
+            !/^X-POGO-MAX-(?:EVIDENCE|EVIDENCE-URL|BATTLE-TIER):pokemon_go_api_current/i.test(
+              line
+            )
+        );
+
+    // Do not overwrite any generic tier evidence already attached by a
+    // higher-confidence source.
+    if (
+      lines.some(
+        line =>
+          /^X-POGO-MAX-BATTLE-TIER:/i.test(
+            line
+          )
+      )
+    ) {
+      continue;
+    }
+
+    lines.push(
+      "X-POGO-MAX-EVIDENCE:pokemon_go_api_current",
+      `X-POGO-MAX-BATTLE-TIER:${tier}`,
+      `X-POGO-MAX-EVIDENCE-URL:${POGO_API_MAX_BATTLES}`
+    );
+
+    statements.push(
+      env.DB.prepare(`
+        UPDATE events
+        SET other_lines = ?,
+            updated_at = ?
+        WHERE id = ?
+      `).bind(
+        lines.join("\n"),
+        timestamp,
+        event.id
+      )
+    );
+  }
+
+  if (statements.length) {
+    await env.DB.batch(
+      statements
+    );
+  }
+
+  return {
+    matched_events:
+      statements.length,
+    bosses:
+      bosses.length
+  };
+}
+
+
 async function syncAllEvents(env) {
   const results = [];
   for (const [sourceType, url] of Object.entries(SOURCES)) {
@@ -584,6 +814,30 @@ async function syncAllEvents(env) {
       ok: false,
       derived: true,
       error: String(error.message || error)
+    });
+  }
+
+  try {
+    const currentMaxTiers =
+      await syncCurrentMaxBattleTierEvidence(
+        env
+      );
+    results.push({
+      source:
+        "pokemon_go_api_current_max_battles",
+      ok: true,
+      ...currentMaxTiers
+    });
+  } catch (error) {
+    results.push({
+      source:
+        "pokemon_go_api_current_max_battles",
+      ok: false,
+      error:
+        String(
+          error.message ||
+          error
+        )
     });
   }
 
