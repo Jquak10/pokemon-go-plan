@@ -103,7 +103,7 @@ The override is used only when automatic cost evidence is unavailable. It does n
 - Targets for Mega Energy, raid counts, Candy XL, Candy, and custom goals, with priority, progress, notes, completion state, search, filters, card/list views, and bulk deletion.
 - A Hundo CP calculator for the loaded Pokémon GO Pokédex, common encounter levels, and custom levels. Catalog loading has explicit loading/error/retry states and can fall back to the last successfully saved public catalog when the live catalog endpoint is temporarily unavailable.
 - A live month calendar and private ICS feed with user-selectable event categories.
-- GO Calendar data, higher-priority official Pokémon GO schedule supplements, and suppression rules.
+- GO Calendar data, higher-priority official Pokémon GO schedule supplements, and suppression rules. Still-upcoming official supplement source pages are retained and revisited through their event horizon even after they fall outside the newest-news discovery window; a failed refresh preserves the last-known future supplement instead of erasing it.
 - Automated PvPoke Master League data and Pokémon GO API-based analytical inputs, with visible source precedence and freshness.
 - Responsive desktop and mobile interfaces.
 - Administration views for synchronization, official raid supplements, Remote Raid limits, suppressions, meta assessments, and raid-ranking refreshes.
