@@ -104,9 +104,21 @@ Each planner has private credentials represented by non-guessable links/tokens:
 
 Calendar URLs are bearer credentials. Management URLs are also sensitive. They must not be logged, printed into tests, committed to the repository, or pasted into support prompts.
 
+The management capability remains in the private `/manage/<token>` URL so existing saved links keep working, but the current Planner UI does not repeat that token in API query strings or JSON bodies. Same-origin management API requests send it as an `Authorization: Bearer` header. The Worker accepts that header first while retaining the historical query/body token forms for older clients and bookmarks. Admin browser requests similarly use `X-Admin-Key`, with legacy query/body key forms accepted server-side for compatibility.
+
+Private/browser surfaces receive defense-in-depth response headers in Worker routing:
+
+- `Referrer-Policy: no-referrer` prevents a capability URL from being disclosed as a navigation referrer.
+- HTML receives a Content Security Policy that restricts default/connect/form destinations to the app, blocks objects and framing, and allows HTTPS/data images required by Pokémon sprites.
+- `X-Frame-Options: DENY`, a restrictive Permissions Policy, `X-Content-Type-Options: nosniff`, and same-origin opener/resource policies protect HTML surfaces.
+- Management and Admin HTML are `private, no-store`; authenticated JSON is also no-store by default.
+- Calendar feeds keep their private ETag/revalidation behavior for calendar-client compatibility while also receiving no-referrer/nosniff protection.
+
+The current static-client architecture still contains inline JavaScript and styles, so the CSP deliberately permits inline script/style execution while applying the stronger origin, frame, object, base, and form restrictions above. Tightening that portion requires a separate code-organization change rather than silently breaking the current UI.
+
 Secrets such as ADMIN_KEY, FEED_LINK_KEY, GitHub credentials, Cloudflare credentials, management tokens, and private ICS URLs must never be requested or committed.
 
-Legacy calendar subscription URLs must remain compatible when calendar internals evolve.
+Legacy management API credential forms and legacy calendar subscription URLs must remain compatible when internals evolve.
 
 ## 5. Front-end structure
 
@@ -149,25 +161,23 @@ Mobile invariants:
 
 ### 5.2 Desktop information architecture
 
-Desktop uses the available width to reduce vertical scrolling.
+Desktop uses the available width to reduce vertical scrolling, but dense split panes are enabled only when enough horizontal space actually exists.
 
-Preferred structure:
+Width behavior:
 
-- Fixed left navigation.
-- Wider central work area.
-- Contextual right-side status/summary rail where useful.
-- Compact/list Target layouts.
-- Split Hundo search/results.
-- Sticky Calendar detail regions.
-- Density-aware compact presentation.
+- Intermediate desktop/tablet widths from 761–1179 px keep the Today briefing, Battle Resources, Calendar details, and other dense panels stacked rather than forcing narrow side-by-side columns.
+- The seven-day forecast uses a four-column intermediate layout instead of squeezing all seven days into one row.
+- Wide desktop behavior begins at 1180 px: fixed left navigation, contextual Quick Status rail, compact Target list mode, split Hundo search/results, and sticky Calendar details can use the larger canvas.
+- Expanded forecast Pokémon names and recent battle Pokémon names wrap instead of being clipped. Ellipsis is reserved for compact preview text where the full value is available in a corresponding detail surface.
+- Density-aware compact presentation remains available on wide desktop.
 
-Sticky elements must begin at their natural section position and must not cover content that precedes them.
+Sticky elements must begin at their natural section position and must not cover content that precedes them. No desktop or intermediate layout may introduce horizontal page scrolling.
 
 ### 5.3 CSS cache discipline
 
 Whenever public/styles.css changes, every page that references it must have its CSS cache/version reference bumped. This prevents stale production styling after deployment.
 
-The current consolidated UI work through Part 8 uses the post-Part-8 cache generation. Future CSS changes must continue the version bump.
+The current cache generation is v41 after the BL-009 intermediate-width hardening. Future CSS changes must continue the version bump.
 
 ## 6. Server modules
 
