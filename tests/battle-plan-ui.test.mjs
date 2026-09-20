@@ -16,6 +16,7 @@ const plannerClient = read("../public/planner-client.js");
 const plannerTargetLogic = read("../public/planner-target-logic.js");
 const plannerCalendarLogic = read("../public/planner-calendar-logic.js");
 const plannerHundoLogic = read("../public/planner-hundo-logic.js");
+const plannerBattlePlanLogic = read("../public/planner-battle-plan-logic.js");
 const battleTargetsClient = read("../public/battle-targets.js");
 const styles = read("../public/styles.css");
 const worker = read("../src/index.js");
@@ -28,6 +29,11 @@ assert.match(manage, /<script src="\/planner-client\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=1"><\/script>/);
+assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
+assert.match(manage, /PlannerBattlePlanLogic\.create/);
+assert.doesNotMatch(manage, /function scoreTone\(/);
+assert.doesNotMatch(manage, /function compactZeroAllocationReason\(/);
+assert.doesNotMatch(manage, /function maxTierCostLabel\(/);
 assert.match(manage, /PlannerHundoLogic/);
 assert.doesNotMatch(manage, /const CP_MULTIPLIERS =/);
 assert.doesNotMatch(manage, /function hundoCp\(/);
@@ -52,12 +58,12 @@ assert.match(manage, /battlePlanFilter/);
 assert.match(manage, /remoteRaidZeroDetails/);
 assert.match(manage, /Battles receiving 0 Remote allocation/);
 assert.match(manage, /function zeroAllocationItems/);
-assert.match(manage, /function compactZeroAllocationReason/);
+assert.match(plannerBattlePlanLogic, /function compactZeroAllocationReason/);
 assert.match(manage, /function renderZeroAllocationDetails/);
 assert.match(manage, /No Remote Max allocation/);
 assert.match(manage, /No Remote Raid allocation/);
-assert.match(manage, /max_particle_cost_unknown/);
-assert.match(manage, /Priority set to Skip/);
+assert.match(plannerBattlePlanLogic, /max_particle_cost_unknown/);
+assert.match(plannerBattlePlanLogic, /Priority set to Skip/);
 assert.doesNotMatch(manage, /Raid bosses receiving 0 Remote Raids/);
 
 assert.match(manage, /function remoteRuleWindowLabel/);
@@ -177,6 +183,14 @@ new vm.Script(
   {
     filename:
       "planner-hundo-logic.js"
+  }
+);
+
+new vm.Script(
+  plannerBattlePlanLogic,
+  {
+    filename:
+      "planner-battle-plan-logic.js"
   }
 );
 
@@ -309,6 +323,286 @@ assert.equal(
     "not-a-number"
   ),
   "—"
+);
+
+const battlePlanContext = {};
+vm.createContext(
+  battlePlanContext
+);
+
+new vm.Script(
+  battleTargetsClient,
+  {
+    filename:
+      "battle-targets.js"
+  }
+).runInContext(
+  battlePlanContext
+);
+
+new vm.Script(
+  plannerBattlePlanLogic,
+  {
+    filename:
+      "planner-battle-plan-logic.js"
+  }
+).runInContext(
+  battlePlanContext
+);
+
+const battlePlanLogic =
+  battlePlanContext
+    .PlannerBattlePlanLogic
+    .create({
+      battleTargets:
+        battlePlanContext
+          .BattleTargets,
+      normalizeName:
+        value =>
+          String(
+            value || ""
+          )
+            .toLowerCase()
+            .trim(),
+      formatNumber:
+        value =>
+          Number(value)
+            .toLocaleString(
+              "en-US"
+            )
+    });
+
+assert.equal(
+  battlePlanLogic.scoreTone(
+    85
+  ),
+  "tone-fire"
+);
+
+assert.equal(
+  battlePlanLogic.scoreTone(
+    74
+  ),
+  "tone-good"
+);
+
+assert.equal(
+  battlePlanLogic.maxTierCostLabel({
+    max_battle_tier: 5,
+    max_particle_cost: 800
+  }),
+  "Tier 5 · 800 MP"
+);
+
+assert.equal(
+  battlePlanLogic.maxTierCostLabel({}),
+  "MP cost unknown"
+);
+
+const mergedZeroItems =
+  battlePlanLogic
+    .mergeZeroAllocationItems({
+      remoteRaidPlan: {
+        not_allocated: [
+          {
+            pokemon_name:
+              "Moltres",
+            reason:
+              "Legacy reason"
+          }
+        ]
+      },
+      battleResourcePlan: {
+        not_allocated: [
+          {
+            pokemon_name:
+              "Moltres",
+            battle_system:
+              "raid",
+            reason_code:
+              "priority_skip",
+            reason:
+              "Personal priority is set to Skip."
+          },
+          {
+            pokemon_name:
+              "Dynamax Zapdos",
+            battle_system:
+              "max",
+            battle_variant:
+              "dynamax",
+            reason_code:
+              "max_particle_cost_unknown",
+            reason:
+              "Max Particle cost is unknown."
+          }
+        ]
+      }
+    });
+
+assert.equal(
+  mergedZeroItems.length,
+  2,
+  "Shared Battle Resource entries must override the legacy Raid fallback by battle identity"
+);
+
+assert.equal(
+  battlePlanLogic.compactZeroAllocationReason(
+    mergedZeroItems.find(
+      item =>
+        item.pokemon_name ===
+        "Moltres"
+    )
+  ),
+  "Priority set to Skip"
+);
+
+assert.equal(
+  battlePlanLogic.compactZeroAllocationReason(
+    mergedZeroItems.find(
+      item =>
+        item.battle_system ===
+        "max"
+    )
+  ),
+  "MP cost unknown"
+);
+
+assert.equal(
+  battlePlanLogic.zeroAllocationSystemLabel({
+    battle_system:
+      "max"
+  }),
+  "Max Battle"
+);
+
+const battlePlanView =
+  battlePlanLogic
+    .recommendationViewModel({
+      recommendations: [
+        {
+          pokemon_name:
+            "Mega Venusaur",
+          battle_system:
+            "raid"
+        },
+        {
+          pokemon_name:
+            "Dynamax Zapdos",
+          battle_system:
+            "max",
+          battle_variant:
+            "dynamax"
+        },
+        {
+          pokemon_name:
+            "Moltres",
+          battle_system:
+            "raid"
+        },
+        {
+          pokemon_name:
+            "Dynamax Articuno",
+          battle_system:
+            "max",
+          battle_variant:
+            "dynamax"
+        },
+        {
+          pokemon_name:
+            "Shadow Thundurus",
+          battle_system:
+            "raid"
+        }
+      ],
+      filter:
+        "all",
+      remoteRaidPlan: {
+        allocations: [
+          {
+            pokemon_name:
+              "Mega Venusaur",
+            count: 1
+          }
+        ],
+        not_allocated: []
+      },
+      battleResourcePlan: {
+        allocations: [
+          {
+            pokemon_name:
+              "Dynamax Zapdos",
+            battle_system:
+              "max",
+            battle_variant:
+              "dynamax",
+            count: 2
+          }
+        ],
+        not_allocated:
+          mergedZeroItems
+    }
+  });
+
+assert.deepEqual(
+  JSON.parse(
+    JSON.stringify(
+      battlePlanView.counts
+    )
+  ),
+  {
+    all: 5,
+    raid: 3,
+    max: 2
+  }
+);
+
+assert.equal(
+  battlePlanView.primary.length,
+  4
+);
+
+assert.equal(
+  battlePlanView.additional.length,
+  1
+);
+
+assert.equal(
+  battlePlanView
+    .legacyAllocationByName
+    .get(
+      "mega venusaur"
+    )
+    .count,
+  1
+);
+
+assert.equal(
+  battlePlanView
+    .sharedAllocationByKey
+    .get(
+      battlePlanContext
+        .BattleTargets
+        .key({
+          pokemon_name:
+            "Dynamax Zapdos",
+          battle_system:
+            "max",
+          battle_variant:
+            "dynamax"
+        })
+    )
+    .count,
+  2
+);
+
+assert.equal(
+  battlePlanLogic
+    .filterRecommendations(
+      battlePlanView.visible,
+      "max"
+    ).length,
+  2
 );
 
 const hundoLogicContext = {};
