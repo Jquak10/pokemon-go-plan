@@ -6539,6 +6539,94 @@ async function syncOfficialRemoteRaidLimits(env) {
 }
 
 
+async function syncOfficialRemoteRaidLimitsWithHealth(
+  env
+) {
+  const attemptedAt =
+    nowIso();
+
+  try {
+    const result =
+      await syncOfficialRemoteRaidLimits(
+        env
+      );
+
+    const errors =
+      Array.isArray(
+        result?.errors
+      )
+        ? result.errors
+            .filter(Boolean)
+        : [];
+
+    const itemCount =
+      Number(
+        result?.rules_detected ||
+        0
+      ) +
+      Number(
+        result
+          ?.official_raid_supplements
+          ?.count ||
+        0
+      ) +
+      Number(
+        result
+          ?.official_max_battle_evidence
+          ?.detected ||
+        0
+      ) +
+      Number(
+        result
+          ?.mega_finale_supplements
+          ?.count ||
+        0
+      ) +
+      Number(
+        result
+          ?.armored_mewtwo_supplements
+          ?.count ||
+        0
+      ) +
+      Number(
+        result
+          ?.suppression_rules
+          ?.count ||
+        0
+      );
+
+    await recordSyncSourceHealth(
+      env,
+      OFFICIAL_SYNC_SOURCE,
+      {
+        ok:
+          errors.length === 0,
+        itemCount,
+        error:
+          errors.length
+            ? errors.join(" | ")
+            : null,
+        attemptedAt
+      }
+    );
+
+    return result;
+  } catch (error) {
+    await recordSyncSourceHealth(
+      env,
+      OFFICIAL_SYNC_SOURCE,
+      {
+        ok: false,
+        error,
+        attemptedAt
+      }
+    );
+
+    throw error;
+  }
+}
+
+
 function localDateForTimezone(timezone) {
   const validatedTimezone =
     canonicalTimeZone(
@@ -10566,7 +10654,10 @@ async function adminSyncRemoteLimits(request, env) {
   const auth = await readAdminKey(request, env);
   if (!auth.ok) return auth.response;
 
-  const remoteRaidLimits = await syncOfficialRemoteRaidLimits(env);
+  const remoteRaidLimits =
+    await syncOfficialRemoteRaidLimitsWithHealth(
+      env
+    );
 
   return json({
     ok: true,
@@ -10860,7 +10951,10 @@ export default {
     if (cron === "33 */6 * * *") {
       ctx.waitUntil(
         (async () => {
-          const result = await syncOfficialRemoteRaidLimits(env);
+          const result =
+            await syncOfficialRemoteRaidLimitsWithHealth(
+              env
+            );
           console.log(
             "Scheduled official Remote Raid limit sync:",
             JSON.stringify(result)
