@@ -3988,7 +3988,10 @@ export async function retainedOfficialEventPageUrls(
       FROM events
       WHERE source_uid LIKE
           'official-supplement:%'
-        AND status = 'active'
+        AND status IN (
+          'active',
+          'stale'
+        )
         AND source_url IS NOT NULL
         AND TRIM(source_url) != ''
         AND COALESCE(
