@@ -781,6 +781,7 @@ The following sequence is retained as a compact repository implementation/change
 | #49 | BL-011B Target logic extraction | Continued incremental BL-011 modularization by moving pure Target progress, availability, filtering, sorting, status counts, grouping, and view-model logic into `public/planner-target-logic.js` while keeping rendering and mutations in `manage.html`. |
 | #50 | BL-011C Calendar logic extraction | Continued incremental BL-011 modularization by moving pure UTC date/month helpers, event-range matching, source-class normalization, and Monday-first month-grid projection into `public/planner-calendar-logic.js` while keeping Calendar rendering/fetch/cache state in `manage.html`. |
 | #51 | BL-011D Hundo logic extraction | Continued incremental BL-011 modularization by moving Hundo CP multiplier/formula logic, standard benchmark generation, and Hundo search ranking into `public/planner-hundo-logic.js` while keeping catalog loading, recent selections, and DOM/input state in `manage.html`. |
+| #52 | BL-011E Battle Plan resource logic extraction | Continued incremental BL-011 modularization by moving recommendation filtering/counts, allocation lookup maps, zero-allocation compatibility/reason labels, score tone, and Max tier/cost metadata into `public/planner-battle-plan-logic.js` while keeping card DOM/actions in `manage.html`. |
 
 ## Supersession map
 
