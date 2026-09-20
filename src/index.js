@@ -127,6 +127,7 @@ const PINNED_OFFICIAL_EVENT_PAGES = [
 ];
 
 const MAX_OFFICIAL_EVENT_PAGES_PER_SYNC = 8;
+const MAX_RETAINED_OFFICIAL_EVENT_PAGES_PER_SYNC = 48;
 
 const PVPOKE_MASTER_LEAGUE =
   "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-10000.json";
@@ -3807,6 +3808,55 @@ function htmlToPlainText(html) {
     .trim();
 }
 
+function normalizedOfficialEventPageUrl(
+  value,
+  baseUrl = OFFICIAL_POKEMON_GO_NEWS_URL
+) {
+  try {
+    const url =
+      new URL(
+        String(value || ""),
+        baseUrl
+      );
+
+    if (
+      ![
+        "pokemongo.com",
+        "www.pokemongo.com",
+        "pokemongolive.com",
+        "www.pokemongolive.com"
+      ].includes(
+        url.hostname.toLowerCase()
+      )
+    ) {
+      return null;
+    }
+
+    const path =
+      url.pathname.toLowerCase();
+
+    const looksRelevant =
+      path.startsWith("/post/") ||
+      path.startsWith("/news/") ||
+      path.startsWith("/gofest/") ||
+      path.includes("/events/") ||
+      path.includes("/event/");
+
+    if (!looksRelevant) {
+      return null;
+    }
+
+    url.hash = "";
+    url.search = "";
+
+    return url
+      .toString()
+      .replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
 function officialEventLinksFromHtml(html, baseUrl) {
   const maxBattleLinks = [];
   const otherLinks = [];
@@ -3815,60 +3865,162 @@ function officialEventLinksFromHtml(html, baseUrl) {
   let match;
 
   while ((match = hrefRegex.exec(String(html || "")))) {
-    try {
-      const url = new URL(match[1], baseUrl);
+    const normalizedUrl =
+      normalizedOfficialEventPageUrl(
+        match[1],
+        baseUrl
+      );
 
-      if (!["pokemongo.com", "www.pokemongo.com", "pokemongolive.com", "www.pokemongolive.com"].includes(url.hostname)) {
-        continue;
-      }
+    if (!normalizedUrl) {
+      continue;
+    }
 
-      const path = url.pathname.toLowerCase();
+    const path =
+      new URL(
+        normalizedUrl
+      ).pathname.toLowerCase();
 
-      // Favor event/news detail pages; avoid account/store/legal/navigation pages.
-      const looksRelevant =
-        path.startsWith("/post/") ||
-        path.startsWith("/news/") ||
-        path.startsWith("/gofest/") ||
-        path.includes("/events/") ||
-        path.includes("/event/");
-
-      if (!looksRelevant) continue;
-
-      url.hash = "";
-      url.search = "";
-
-      const normalizedUrl =
-        url.toString().replace(/\/$/, "");
-
-      if (
-        /(?:max[-_]?battle|gigantamax|dynamax)/i.test(
-          path
-        )
-      ) {
-        maxBattleLinks.push(
-          normalizedUrl
-        );
-      } else {
-        otherLinks.push(
-          normalizedUrl
-        );
-      }
-    } catch {}
+    if (
+      /(?:max[-_]?battle|gigantamax|dynamax)/i.test(
+        path
+      )
+    ) {
+      maxBattleLinks.push(
+        normalizedUrl
+      );
+    } else {
+      otherLinks.push(
+        normalizedUrl
+      );
+    }
   }
 
   // Max-event articles often carry the only official difficulty evidence
-  // needed to derive a safe standard MP entry cost. Prioritize them without
-  // increasing the number of official pages fetched per sync.
+  // needed to derive a safe standard MP entry cost. Prioritize them before
+  // general news pages. The overall discovery budget is applied later so
+  // retained future-event source pages can be added without displacing them.
   return [
     ...new Set([
       ...PINNED_OFFICIAL_EVENT_PAGES,
       ...maxBattleLinks,
       ...otherLinks
     ])
-  ].slice(
-    0,
-    MAX_OFFICIAL_EVENT_PAGES_PER_SYNC
-  );
+  ];
+}
+
+export function officialEventPageUrlsForSync(
+  discoveredUrls,
+  retainedUrls,
+  {
+    discoveryLimit =
+      MAX_OFFICIAL_EVENT_PAGES_PER_SYNC,
+    retainedLimit =
+      MAX_RETAINED_OFFICIAL_EVENT_PAGES_PER_SYNC
+  } = {}
+) {
+  const discovered =
+    [...new Set(
+      (Array.isArray(discoveredUrls)
+        ? discoveredUrls
+        : []
+      )
+        .map(
+          url =>
+            normalizedOfficialEventPageUrl(
+              url
+            )
+        )
+        .filter(Boolean)
+    )]
+      .slice(
+        0,
+        Math.max(
+          0,
+          Number(discoveryLimit) || 0
+        )
+      );
+
+  const retained =
+    [...new Set(
+      (Array.isArray(retainedUrls)
+        ? retainedUrls
+        : []
+      )
+        .map(
+          url =>
+            normalizedOfficialEventPageUrl(
+              url
+            )
+        )
+        .filter(Boolean)
+    )]
+      .slice(
+        0,
+        Math.max(
+          0,
+          Number(retainedLimit) || 0
+        )
+      );
+
+  return [
+    ...new Set([
+      ...discovered,
+      ...retained
+    ])
+  ];
+}
+
+export async function retainedOfficialEventPageUrls(
+  env,
+  day = todayUtc()
+) {
+  const { results } =
+    await env.DB.prepare(`
+      SELECT
+        source_url,
+        MIN(
+          COALESCE(
+            end_date,
+            start_date,
+            '9999-12-31'
+          )
+        ) AS nearest_end_date
+      FROM events
+      WHERE source_uid LIKE
+          'official-supplement:%'
+        AND status IN (
+          'active',
+          'stale'
+        )
+        AND source_url IS NOT NULL
+        AND TRIM(source_url) != ''
+        AND COALESCE(
+          end_date,
+          start_date,
+          '9999-12-31'
+        ) >= ?
+      GROUP BY source_url
+      ORDER BY
+        nearest_end_date,
+        source_url
+      LIMIT ?
+    `).bind(
+      day,
+      MAX_RETAINED_OFFICIAL_EVENT_PAGES_PER_SYNC
+    ).all();
+
+  return [
+    ...new Set(
+      (results || [])
+        .map(
+          row =>
+            normalizedOfficialEventPageUrl(
+              row.source_url
+            )
+        )
+        .filter(Boolean)
+    )
+  ];
 }
 
 function isoDate(year, month, day) {
@@ -5004,21 +5156,54 @@ async function officialMegaFinaleSupplementStatements(
 }
 
 
-async function officialRaidSupplementStatements(env, supplements, timestamp) {
+export async function officialRaidSupplementStatements(
+  env,
+  supplements,
+  timestamp,
+  refreshedPageUrls = []
+) {
   const statements = [];
 
-  // Only stale rows created by the official supplement importer.
-  statements.push(
-    env.DB.prepare(`
-      UPDATE events
-      SET status = 'stale',
-          sequence = sequence + 1,
-          updated_at = ?
-      WHERE source_uid LIKE 'official-supplement:%'
-        AND status = 'active'
-        AND COALESCE(end_date, start_date, '9999-12-31') >= date('now', '-1 day')
-    `).bind(timestamp)
-  );
+  const refreshedSources =
+    [
+      ...new Set(
+        refreshedPageUrls
+          .map(
+            url =>
+              normalizedOfficialEventPageUrl(
+                url
+              )
+          )
+          .filter(Boolean)
+      )
+    ];
+
+  // Replace only last-known-good data from official pages that were fully
+  // refreshed during this sync. If a retained page temporarily fails to
+  // fetch or parse, its still-future supplement rows remain active rather
+  // than disappearing simply because another official page succeeded.
+  if (refreshedSources.length) {
+    const placeholders =
+      refreshedSources
+        .map(() => "?")
+        .join(", ");
+
+    statements.push(
+      env.DB.prepare(`
+        UPDATE events
+        SET status = 'stale',
+            sequence = sequence + 1,
+            updated_at = ?
+        WHERE source_uid LIKE 'official-supplement:%'
+          AND status = 'active'
+          AND source_url IN (${placeholders})
+          AND COALESCE(end_date, start_date, '9999-12-31') >= date('now', '-1 day')
+      `).bind(
+        timestamp,
+        ...refreshedSources
+      )
+    );
+  }
 
   for (const item of supplements) {
     const sourceUid = [
@@ -5589,15 +5774,30 @@ async function syncOfficialRemoteRaidLimits(env) {
     OFFICIAL_POKEMON_GO_NEWS_URL
   );
 
-  for (const pinned of PINNED_OFFICIAL_EVENT_PAGES) {
-    if (!urls.includes(pinned)) urls.unshift(pinned);
+  let retainedPageUrls = [];
+
+  try {
+    retainedPageUrls =
+      await retainedOfficialEventPageUrls(
+        env
+      );
+  } catch (error) {
+    errors.push(
+      `retained official sources: ${String(
+        error.message || error
+      )}`
+    );
   }
 
-  const pageUrls = [...new Set(urls)]
-    .slice(0, MAX_OFFICIAL_EVENT_PAGES_PER_SYNC);
+  const pageUrls =
+    officialEventPageUrlsForSync(
+      urls,
+      retainedPageUrls
+    );
 
   const timestamp = nowIso();
   const dbStatements = [];
+  const refreshedPageUrls = [];
 
   for (const url of pageUrls) {
     try {
@@ -5821,6 +6021,10 @@ async function syncOfficialRemoteRaidLimits(env) {
           officialRaidSupplements.push(item);
         }
       }
+
+      refreshedPageUrls.push(
+        url
+      );
     } catch (error) {
       errors.push(String(error.message || error));
     }
@@ -5888,7 +6092,8 @@ async function syncOfficialRemoteRaidLimits(env) {
     await officialRaidSupplementStatements(
       env,
       officialRaidSupplements,
-      timestamp
+      timestamp,
+      refreshedPageUrls
     );
 
   dbStatements.push(...supplementStatements);
@@ -5930,6 +6135,10 @@ async function syncOfficialRemoteRaidLimits(env) {
 
   return {
     pages_checked: pageUrls.length,
+    pages_refreshed:
+      refreshedPageUrls.length,
+    retained_pages:
+      retainedPageUrls.length,
     rules_detected: detected.length,
     detected,
     official_raid_supplements: {

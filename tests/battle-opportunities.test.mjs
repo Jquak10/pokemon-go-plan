@@ -26,7 +26,10 @@ import {
   calendarDisplaySourceType,
   calendarSourceTypesForUser,
   findMatches,
+  officialEventPageUrlsForSync,
   officialMaxBattleSupplementsFromText,
+  officialRaidSupplementStatements,
+  retainedOfficialEventPageUrls,
   suppressionSourceTypesForEvent
 } from "../src/index.js";
 
@@ -527,6 +530,178 @@ assert.deepEqual(
   []
 );
 
+const discoveredOfficialPages =
+  Array.from(
+    { length: 8 },
+    (_value, index) =>
+      `https://pokemongo.com/news/current-${index + 1}`
+  );
+
+const retainedLongLeadPage =
+  "https://pokemongo.com/news/long-lead-event";
+
+assert.deepEqual(
+  officialEventPageUrlsForSync(
+    discoveredOfficialPages,
+    [
+      retainedLongLeadPage,
+      discoveredOfficialPages[0],
+      "https://example.com/not-official"
+    ]
+  ),
+  [
+    ...discoveredOfficialPages,
+    retainedLongLeadPage
+  ],
+  "A still-upcoming retained official source must survive beyond the newest-news discovery budget"
+);
+
+assert.deepEqual(
+  officialEventPageUrlsForSync(
+    [
+      ...discoveredOfficialPages,
+      "https://pokemongo.com/news/current-9"
+    ],
+    [],
+    {
+      discoveryLimit: 8
+    }
+  ),
+  discoveredOfficialPages,
+  "Fresh discovery remains bounded independently from retained future sources"
+);
+
+const retainedQueries = [];
+const retainedSourceEnv = {
+  DB: {
+    prepare(sql) {
+      return {
+        bind(...args) {
+          retainedQueries.push({
+            sql,
+            args
+          });
+
+          return {
+            async all() {
+              return {
+                results: [
+                  {
+                    source_url:
+                      retainedLongLeadPage
+                  },
+                  {
+                    source_url:
+                      "https://example.com/not-official"
+                  }
+                ]
+              };
+            }
+          };
+        }
+      };
+    }
+  }
+};
+
+assert.deepEqual(
+  await retainedOfficialEventPageUrls(
+    retainedSourceEnv,
+    "2026-09-21"
+  ),
+  [
+    retainedLongLeadPage
+  ],
+  "Retained future-source recovery must reject non-official stored URLs"
+);
+assert.match(
+  retainedQueries[0].sql,
+  /status IN \([\s\S]*'active',[\s\S]*'stale'/
+);
+assert.deepEqual(
+  retainedQueries[0].args,
+  [
+    "2026-09-21",
+    48
+  ],
+  "Retained official-source lookup must cover the future event horizon with its independent safety cap"
+);
+
+const preparedStatements = [];
+const supplementEnv = {
+  DB: {
+    prepare(sql) {
+      return {
+        bind(...args) {
+          const statement = {
+            sql,
+            args
+          };
+
+          preparedStatements.push(
+            statement
+          );
+
+          return statement;
+        }
+      };
+    }
+  }
+};
+
+const preservedStatements =
+  await officialRaidSupplementStatements(
+    supplementEnv,
+    [],
+    "2026-09-21T00:00:00.000Z",
+    []
+  );
+
+assert.equal(
+  preservedStatements.length,
+  0,
+  "If no official page refreshed successfully, last-known future supplements must not be blanket-staled"
+);
+
+const scopedStatements =
+  await officialRaidSupplementStatements(
+    supplementEnv,
+    [],
+    "2026-09-21T00:00:00.000Z",
+    [
+      retainedLongLeadPage
+    ]
+  );
+
+assert.equal(
+  scopedStatements.length,
+  1
+);
+assert.match(
+  preparedStatements.at(-1).sql,
+  /source_url IN \(\?\)/
+);
+assert.deepEqual(
+  preparedStatements.at(-1).args,
+  [
+    "2026-09-21T00:00:00.000Z",
+    retainedLongLeadPage
+  ],
+  "Only a fully refreshed official source page is eligible to stale its previous supplement rows"
+);
+
+assert.match(
+  workerSource,
+  /retainedOfficialEventPageUrls/
+);
+assert.match(
+  workerSource,
+  /status IN \([\s\S]*'active',[\s\S]*'stale'/
+);
+assert.match(
+  workerSource,
+  /refreshedPageUrls/
+);
 assert.match(
   workerSource,
   /officialMaxBattleEvidenceStatements/
