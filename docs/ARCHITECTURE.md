@@ -184,7 +184,7 @@ Sticky elements must begin at their natural section position and must not cover 
 
 Whenever public/styles.css changes, every page that references it must have its CSS cache/version reference bumped. This prevents stale production styling after deployment.
 
-The current cache generation is v41 after the BL-009 intermediate-width hardening. Future CSS changes must continue the version bump.
+The current shared CSS cache generation is v42 after the BL-011G Planner stylesheet split. Future `styles.css` changes must continue the version bump. Planner-only overrides are loaded separately from `planner.css`.
 
 ## 6. Server modules
 
@@ -199,6 +199,7 @@ Important modules:
 - src/raid-rankings.js — type-specific PvE Raid attacker analysis and method-versioned ranking profiles.
 - src/max-rankings.js — Max-specific attacker analysis with Max-appropriate weighting and eligibility.
 - src/remote-raid-rules.js — exact temporary Remote-limit time-window parsing and timezone projection.
+- src/http-security.js — shared JSON/error responses, management/admin credential extraction with legacy compatibility, and static/private response hardening (CSP, frame protection, referrer policy, and no-store behavior). `src/index.js` imports these helpers and re-exports the established security helper API for compatibility.
 
 Keep pure, testable domain logic in these modules where practical. src/index.js should integrate data sources, persistence, APIs, synchronization, and rendering payloads rather than duplicating every algorithm.
 

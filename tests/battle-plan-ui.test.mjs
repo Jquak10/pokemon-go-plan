@@ -6,6 +6,13 @@ import {
   hardenResponse,
   manageTokenFromRequest
 } from "../src/index.js";
+import {
+  adminKeyFromRequest as directAdminKeyFromRequest,
+  bad as securityBad,
+  hardenResponse as directHardenResponse,
+  json as securityJson,
+  manageTokenFromRequest as directManageTokenFromRequest
+} from "../src/http-security.js";
 
 function read(relative) {
   return readFileSync(new URL(relative, import.meta.url), "utf8");
@@ -22,6 +29,7 @@ const battleTargetsClient = read("../public/battle-targets.js");
 const styles = read("../public/styles.css");
 const plannerStyles = read("../public/planner.css");
 const worker = read("../src/index.js");
+const httpSecurity = read("../src/http-security.js");
 
 assert.match(manage, /Pokémon GO Battle Planner/);
 assert.match(manage, /PERSONAL BATTLE STRATEGY/);
@@ -1407,14 +1415,70 @@ assert.doesNotMatch(admin, /\/api\/admin\/remote-limits\?key=/);
 assert.doesNotMatch(admin, /\/api\/admin\/official-raids\?key=/);
 assert.doesNotMatch(admin, /\/api\/admin\/suppressions\?key=/);
 
+assert.match(worker, /from "\.\/http-security\.js"/);
 assert.match(worker, /manageTokenFromRequest/);
 assert.match(worker, /adminKeyFromRequest/);
-assert.match(worker, /content-security-policy/);
-assert.match(worker, /frame-ancestors 'none'/);
-assert.match(worker, /referrer-policy/);
-assert.match(worker, /x-frame-options/);
-assert.match(worker, /permissions-policy/);
-assert.match(worker, /private, no-store, max-age=0/);
+assert.doesNotMatch(worker, /const HTML_CONTENT_SECURITY_POLICY/);
+assert.match(httpSecurity, /content-security-policy/);
+assert.match(httpSecurity, /frame-ancestors 'none'/);
+assert.match(httpSecurity, /referrer-policy/);
+assert.match(httpSecurity, /x-frame-options/);
+assert.match(httpSecurity, /permissions-policy/);
+assert.match(httpSecurity, /private, no-store, max-age=0/);
+
+assert.equal(
+  manageTokenFromRequest,
+  directManageTokenFromRequest,
+  "src/index.js must preserve the management-token helper re-export"
+);
+assert.equal(
+  adminKeyFromRequest,
+  directAdminKeyFromRequest,
+  "src/index.js must preserve the admin-key helper re-export"
+);
+assert.equal(
+  hardenResponse,
+  directHardenResponse,
+  "src/index.js must preserve the response-hardening helper re-export"
+);
+
+const securityJsonResponse =
+  securityJson({
+    ok: true
+  });
+assert.equal(
+  securityJsonResponse.status,
+  200
+);
+assert.match(
+  securityJsonResponse.headers.get(
+    "content-type"
+  ) || "",
+  /application\/json/
+);
+assert.equal(
+  securityJsonResponse.headers.get(
+    "referrer-policy"
+  ),
+  "no-referrer"
+);
+
+const securityBadResponse =
+  securityBad(
+    "Fixture error",
+    418
+  );
+assert.equal(
+  securityBadResponse.status,
+  418
+);
+assert.deepEqual(
+  await securityBadResponse.json(),
+  {
+    error:
+      "Fixture error"
+  }
+);
 
 assert.equal(
   manageTokenFromRequest(
