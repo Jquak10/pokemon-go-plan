@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Battle Planner</title>
-  <link rel="stylesheet" href="/styles.css?v=40">
+  <link rel="stylesheet" href="/styles.css?v=41">
 </head>
 
 <body class="manage-page">
@@ -1555,8 +1555,92 @@ function targetPriorityTone(priority, completed) {
   return "badge-skip";
 }
 
+function managedApiRequest(
+  path,
+  options = {}
+) {
+  const url =
+    new URL(
+      path,
+      location.origin
+    );
+
+  // Legacy callers may still construct ?token= URLs or include token in JSON.
+  // Strip both before the browser sends the request; the Worker continues to
+  // accept those legacy forms for compatibility with older clients.
+  url.searchParams.delete(
+    "token"
+  );
+
+  const headers =
+    new Headers(
+      options.headers || {}
+    );
+
+  headers.set(
+    "authorization",
+    `Bearer ${token}`
+  );
+
+  let body =
+    options.body;
+
+  if (
+    typeof body === "string" &&
+    /application\/json/i.test(
+      headers.get(
+        "content-type"
+      ) || ""
+    )
+  ) {
+    try {
+      const parsed =
+        JSON.parse(
+          body
+        );
+
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(
+          parsed
+        )
+      ) {
+        delete parsed.token;
+        body =
+          JSON.stringify(
+            parsed
+          );
+      }
+    } catch {}
+  }
+
+  return {
+    url:
+      `${url.pathname}${url.search}${url.hash}`,
+    options: {
+      ...options,
+      headers,
+      body,
+      referrerPolicy:
+        "no-referrer"
+    }
+  };
+}
+
 async function api(path, options = {}) {
-  const response = await fetch(path, options);
+  const request =
+    managedApiRequest(
+      path,
+      options
+    );
+
+  const response =
+    await fetch(
+      request.url,
+      request.options
+    );
+
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Request failed.");
   return data;
@@ -1564,7 +1648,7 @@ async function api(path, options = {}) {
 
 async function load() {
   try {
-    state = await api(`/api/me?token=${encodeURIComponent(token)}`);
+    state = await api("/api/me");
     render();
 
     ensurePokemonCatalogLoaded().catch(() => {});
@@ -7563,7 +7647,7 @@ async function loadCalendarMonth(force = false) {
 
   try {
     const data = await api(
-      `/api/calendar-events?token=${encodeURIComponent(token)}&month=${encodeURIComponent(month)}`
+      `/api/calendar-events?month=${encodeURIComponent(month)}`
     );
 
     calendarMonthCache.set(month, data);
@@ -7599,7 +7683,7 @@ async function loadRecoverableFeedLink() {
   try {
     const data =
       await api(
-        `/api/feed-link?token=${encodeURIComponent(token)}`
+        "/api/feed-link"
       );
 
     recoverableFeedUrl =
@@ -8295,7 +8379,7 @@ async function removeTarget(id) {
   if (!confirm(`Delete the target for ${target.pokemon_name}?`)) return;
 
   await api(
-    `/api/targets?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`,
+    `/api/targets?id=${encodeURIComponent(id)}`,
     { method: "DELETE" }
   );
 

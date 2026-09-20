@@ -48,7 +48,8 @@ Production configuration lives in wrangler.jsonc and should be treated as protec
 
 ## ADR-003 — Use capability links instead of password accounts
 
-Status: Current
+Status: Current  
+Introduced in the original architecture; hardened in PR #47.
 
 Planner access is based on private management and calendar bearer URLs rather than email/password accounts.
 
@@ -58,7 +59,14 @@ Reasons:
 - Avoid unnecessary identity/account infrastructure.
 - Calendar clients already work naturally with secret subscription URLs.
 
-Consequence: tokens/URLs are credentials and must never be exposed in logs, code, tests, or support messages.
+Security consequences:
+
+- Tokens/URLs are credentials and must never be exposed in logs, code, tests, or support messages.
+- The management URL remains the durable sign-in capability, but the current Planner sends that capability to same-origin APIs in an `Authorization: Bearer` header instead of repeating it in query strings or JSON bodies.
+- The current Admin UI sends `ADMIN_KEY` in `X-Admin-Key`, not URL query parameters or JSON request bodies.
+- The Worker accepts the new headers first while preserving legacy query/body credential forms for older callers.
+- Browser/private responses use no-referrer plus CSP/frame/content/permissions defenses; Planner/Admin HTML is no-store. Calendar feeds retain private ETag caching for client compatibility.
+- Because the static frontend still contains inline JavaScript/styles, CSP permits inline execution while strictly blocking framing, objects, foreign base URLs, and non-self API/form destinations. A stricter no-inline policy would require a separate frontend extraction rather than a breaking header-only change.
 
 ## ADR-004 — Treat the repository as the durable source of truth
 
@@ -768,6 +776,7 @@ The following sequence is retained as a compact repository implementation/change
 | #44 | Ordinary Dynamax sprite fallback | Centralized battle sprite resolution so ordinary Dynamax reuses the exact underlying species/form sprite across recommendations, forecasts, Targets, and recent logs while regional forms remain exact and Gigantamax stays exact-only. |
 | #45 | Zero-Remote allocation explanations | Closed BL-008 by adding structured shared-plan non-allocation reasons, surfacing compact system-aware reasons directly on Raid/Max cards, and replacing the Raid-only zero-allocation section with a shared filtered collapsible Battle list. |
 | #46 | Max tier fallbacks + editable Target identity | Added current structured Max tier ingestion plus private per-opportunity tier overrides for unknown MP costs, and allowed Pokémon/Battle/Target type corrections on existing targets while keeping stable IDs/history links and duplicate protection. |
+| #47 | Intermediate desktop + private-surface hardening | Closed BL-009/BL-010 by delaying dense desktop splits until 1180px, adding width-boundary browser regressions, moving current Planner/Admin API credentials into headers with legacy compatibility, and adding no-referrer/CSP/frame/content/no-store response protections. |
 
 ## Supersession map
 

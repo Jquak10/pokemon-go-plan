@@ -414,6 +414,8 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
         path = parsed.path
 
         if path == "/api/me":
+            self.server.last_manage_api_path = self.path
+            self.server.last_manage_authorization = self.headers.get("authorization")
             return self._json(MOCK_STATE)
 
         if path == "/api/pokemon-catalog":
@@ -483,6 +485,8 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
 
     def setUp(self):
         self.server.catalog_failures_remaining = 0
+        self.server.last_manage_api_path = None
+        self.server.last_manage_authorization = None
 
     def open_planner(self, width: int, height: int):
         context = self.browser.new_context(
@@ -512,6 +516,20 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             dimensions["viewport"] + 1,
             f"Unexpected horizontal overflow: {dimensions}",
         )
+
+    def test_management_api_uses_header_without_query_token(self):
+        page = self.open_planner(1024, 800)
+
+        self.assertEqual(
+            self.server.last_manage_authorization,
+            "Bearer browser-test-token",
+        )
+        self.assertEqual(
+            self.server.last_manage_api_path,
+            "/api/me",
+        )
+
+        self.assert_no_horizontal_overflow(page)
 
     def test_catalog_failure_exits_loading_state_and_retry_recovers(self):
         self.server.catalog_failures_remaining = 1
@@ -592,9 +610,11 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         )
 
         saved_override = {}
+        saved_override_headers = {}
 
         def capture_override(route):
             saved_override.update(json.loads(route.request.post_data or "{}"))
+            saved_override_headers.update(route.request.headers)
             route.fulfill(
                 status=200,
                 content_type="application/json",
@@ -611,6 +631,11 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertEqual(saved_override.get("pokemon_name"), "Dynamax Rhyhorn")
         self.assertEqual(saved_override.get("max_battle_tier"), "5")
         self.assertEqual(saved_override.get("start_date"), "2026-09-18")
+        self.assertNotIn("token", saved_override)
+        self.assertEqual(
+            saved_override_headers.get("authorization"),
+            "Bearer browser-test-token",
+        )
 
         zero_details = page.locator("#remoteRaidZeroDetails")
         self.assertFalse(zero_details.evaluate("element => element.classList.contains('hidden')"))
@@ -673,6 +698,80 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertIn("Grass", intel)
 
         self.assert_no_horizontal_overflow(page)
+
+    def test_intermediate_widths_keep_dense_panels_stacked(self):
+        for width in (768, 900, 1024, 1179, 1180, 1280):
+            with self.subTest(width=width):
+                page = self.open_planner(width, 900)
+
+                self.assert_no_horizontal_overflow(page)
+
+                today_layout = page.locator(".today-command-card").evaluate(
+                    """element => {
+                        const card = getComputedStyle(element);
+                        const main = getComputedStyle(
+                            element.querySelector(".today-command-main")
+                        );
+                        return {
+                            display: card.display,
+                            mainColumns: main.gridTemplateColumns
+                        };
+                    }"""
+                )
+
+                forecast_columns = page.locator("#budgetForecast").evaluate(
+                    """element => getComputedStyle(element).gridTemplateColumns
+                        .split(" ")
+                        .filter(Boolean).length"""
+                )
+
+                if width < 1180:
+                    self.assertEqual(today_layout["display"], "block")
+                    self.assertEqual(
+                        len(today_layout["mainColumns"].split()),
+                        1,
+                        f"Today briefing should stay stacked at {width}px",
+                    )
+                    self.assertEqual(
+                        forecast_columns,
+                        4,
+                        f"Forecast should use four columns at {width}px",
+                    )
+                else:
+                    self.assertEqual(today_layout["display"], "grid")
+                    self.assertEqual(forecast_columns, 7)
+
+                page.locator('.tab-button[data-tab="calendar"]').click()
+                page.wait_for_selector("#calendarMonthGrid")
+
+                calendar_columns = page.locator(".calendar-view-layout").evaluate(
+                    """element => getComputedStyle(element).gridTemplateColumns
+                        .split(" ")
+                        .filter(Boolean).length"""
+                )
+
+                if width < 1180:
+                    self.assertEqual(
+                        calendar_columns,
+                        1,
+                        f"Calendar detail should stack below the month at {width}px",
+                    )
+                else:
+                    self.assertEqual(calendar_columns, 2)
+
+                page.locator('.tab-button[data-tab="plan"]').click()
+                page.locator("[data-forecast-day-index='1']").click()
+                detail_name = page.locator(
+                    "#budgetForecastDetails .forecast-detail-main strong"
+                ).first
+                self.assertEqual(
+                    detail_name.evaluate(
+                        "element => getComputedStyle(element).whiteSpace"
+                    ),
+                    "normal",
+                )
+
+                self.assert_no_horizontal_overflow(page)
 
     def test_dynamax_sprites_render_in_forecast_and_targets(self):
         page = self.open_planner(1024, 800)

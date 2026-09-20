@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import {
+  adminKeyFromRequest,
+  hardenResponse,
+  manageTokenFromRequest
+} from "../src/index.js";
 
 function read(relative) {
   return readFileSync(new URL(relative, import.meta.url), "utf8");
@@ -93,7 +98,7 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=40/);
+  assert.match(read(page), /styles\.css\?v=41/);
 }
 
 assert.match(worker, /BATTLE_SOURCE_TYPES/);
@@ -170,6 +175,165 @@ assert.match(worker, /POGO_API_MAX_BATTLES/);
 assert.match(worker, /currentMaxBattleTiersFromPayload/);
 assert.match(worker, /max_battle_cost_overrides/);
 assert.match(worker, /updateMaxBattleCostOverrideApi/);
+
+assert.match(manage, /headers\.set\([\s\S]*"authorization"[\s\S]*Bearer/);
+assert.match(manage, /url\.searchParams\.delete\([\s\S]*"token"/);
+assert.match(manage, /delete parsed\.token/);
+assert.doesNotMatch(manage, /\/api\/me\?token=/);
+assert.doesNotMatch(manage, /\/api\/calendar-events\?token=/);
+assert.doesNotMatch(manage, /\/api\/feed-link\?token=/);
+assert.doesNotMatch(manage, /\/api\/targets\?token=/);
+
+const admin = read("../public/admin.html");
+assert.match(admin, /"x-admin-key"/);
+assert.match(admin, /delete parsed\.key/);
+assert.doesNotMatch(admin, /\/api\/admin\/meta\?key=/);
+assert.doesNotMatch(admin, /\/api\/admin\/remote-limits\?key=/);
+assert.doesNotMatch(admin, /\/api\/admin\/official-raids\?key=/);
+assert.doesNotMatch(admin, /\/api\/admin\/suppressions\?key=/);
+
+assert.match(worker, /manageTokenFromRequest/);
+assert.match(worker, /adminKeyFromRequest/);
+assert.match(worker, /content-security-policy/);
+assert.match(worker, /frame-ancestors 'none'/);
+assert.match(worker, /referrer-policy/);
+assert.match(worker, /x-frame-options/);
+assert.match(worker, /permissions-policy/);
+assert.match(worker, /private, no-store, max-age=0/);
+
+assert.equal(
+  manageTokenFromRequest(
+    new Request(
+      "https://planner.example/api/me?token=legacy-query",
+      {
+        headers: {
+          authorization:
+            "Bearer header-token"
+        }
+      }
+    ),
+    {
+      token:
+        "legacy-body"
+    }
+  ),
+  "header-token",
+  "Authorization header must take precedence over legacy token locations"
+);
+
+assert.equal(
+  manageTokenFromRequest(
+    new Request(
+      "https://planner.example/api/me?token=legacy-query"
+    )
+  ),
+  "legacy-query",
+  "Legacy query-token clients must remain compatible"
+);
+
+assert.equal(
+  adminKeyFromRequest(
+    new Request(
+      "https://planner.example/api/admin/meta?key=legacy-admin",
+      {
+        headers: {
+          "x-admin-key":
+            "header-admin"
+        }
+      }
+    )
+  ),
+  "header-admin",
+  "Admin header must take precedence over the legacy query key"
+);
+
+assert.equal(
+  adminKeyFromRequest(
+    new Request(
+      "https://planner.example/api/admin/meta?key=legacy-admin"
+    )
+  ),
+  "legacy-admin",
+  "Legacy admin query-key clients must remain compatible"
+);
+
+const hardenedHtml =
+  hardenResponse(
+    new Response(
+      "<!doctype html><title>Private</title>",
+      {
+        headers: {
+          "content-type":
+            "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=3600"
+        }
+      }
+    ),
+    {
+      noStore: true
+    }
+  );
+
+assert.equal(
+  hardenedHtml.headers.get(
+    "referrer-policy"
+  ),
+  "no-referrer"
+);
+assert.equal(
+  hardenedHtml.headers.get(
+    "x-frame-options"
+  ),
+  "DENY"
+);
+assert.match(
+  hardenedHtml.headers.get(
+    "content-security-policy"
+  ) || "",
+  /frame-ancestors 'none'/
+);
+assert.match(
+  hardenedHtml.headers.get(
+    "cache-control"
+  ) || "",
+  /no-store/
+);
+
+const hardenedCalendar =
+  hardenResponse(
+    new Response(
+      "BEGIN:VCALENDAR",
+      {
+        headers: {
+          "content-type":
+            "text/calendar; charset=utf-8",
+          "cache-control":
+            "private, max-age=60"
+        }
+      }
+    )
+  );
+
+assert.equal(
+  hardenedCalendar.headers.get(
+    "cache-control"
+  ),
+  "private, max-age=60",
+  "Calendar ETag/private cache semantics should remain intact"
+);
+assert.equal(
+  hardenedCalendar.headers.get(
+    "referrer-policy"
+  ),
+  "no-referrer"
+);
+assert.equal(
+  hardenedCalendar.headers.get(
+    "content-security-policy"
+  ),
+  null
+);
 assert.match(read("../src/resource-planning.js"), /reason_code:/);
 assert.match(read("../src/resource-planning.js"), /remote_capacity_exhausted/);
 assert.match(read("../src/resource-planning.js"), /lower_marginal_value/);
@@ -212,3 +376,10 @@ assert.match(manage, /querySelectorAll\("\.tab-button\[data-tab\]"\)/);
 
 assert.match(styles, /Desktop text visibility \+ Max battle-intel hardening · v37/);
 assert.match(styles, /@media \(min-width: 900px\)[\s\S]*\.battle-resource-advice \{[\s\S]*display: grid;[\s\S]*overflow: visible;/);
+assert.match(styles, /@media \(min-width: 1180px\)[\s\S]*\.dashboard-shell \{[\s\S]*calc\(100% - 224px\)/);
+assert.match(styles, /BL-009 — INTERMEDIATE-WIDTH DESKTOP HARDENING · v41/);
+assert.match(styles, /@media \(min-width: 761px\) and \(max-width: 1179px\)/);
+assert.match(styles, /\.today-command-main \{[\s\S]*grid-template-columns: 1fr;/);
+assert.match(styles, /\.budget-forecast-strip \{[\s\S]*repeat\(4, minmax\(0, 1fr\)\)/);
+assert.match(styles, /\.calendar-view-layout \{[\s\S]*grid-template-columns: 1fr;/);
+assert.match(styles, /\.forecast-detail-main strong,[\s\S]*\.recent-raid-main strong[\s\S]*white-space: normal;/);
