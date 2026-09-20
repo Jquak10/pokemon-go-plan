@@ -1412,6 +1412,7 @@
 <script src="/planner-target-logic.js?v=1"></script>
 <script src="/planner-calendar-logic.js?v=1"></script>
 <script src="/planner-hundo-logic.js?v=1"></script>
+<script src="/planner-battle-plan-logic.js?v=1"></script>
 <script>
 const {
   token,
@@ -1560,13 +1561,23 @@ const targetLogic =
     formatNumber
   });
 
-function scoreTone(score) {
-  const value = Number(score || 0);
-  if (value >= 85) return "tone-fire";
-  if (value >= 75) return "tone-high";
-  if (value >= 60) return "tone-good";
-  return "tone-low";
-}
+const battlePlanLogic =
+  PlannerBattlePlanLogic.create({
+    battleTargets:
+      BattleTargets,
+    normalizeName:
+      normalizePickerName,
+    formatNumber
+  });
+
+const {
+  scoreTone,
+  zeroAllocationKey,
+  compactZeroAllocationReason,
+  zeroAllocationSystemLabel,
+  maxTierCostLabel
+} =
+  battlePlanLogic;
 
 function targetPriorityTone(priority, completed) {
   if (Number(completed)) return "badge-complete";
@@ -5734,159 +5745,14 @@ function battleSystemBadgeHtml(rec) {
   `;
 }
 
-function zeroAllocationKey(
-  item
-) {
-  return BattleTargets.key({
-    pokemon_name:
-      item?.pokemon_name || "",
-    battle_system:
-      item?.battle_system || "raid",
-    battle_variant:
-      item?.battle_variant || null
-  });
-}
-
 function zeroAllocationItems() {
-  const byKey =
-    new Map();
-
-  // Keep the legacy Raid-only plan as a compatibility fallback for older
-  // payload shapes, then let the shared Battle Resource plan override it.
-  for (
-    const item of
-    state.remote_raid_plan
-      ?.not_allocated || []
-  ) {
-    const normalized = {
-      ...item,
-      battle_system:
-        item?.battle_system ||
-        "raid",
-      battle_variant:
-        item?.battle_variant ||
-        null,
-      reason:
-        item?.reason ||
-        item?.exclusion_reason ||
-        "Marginal value fell below the allocation threshold."
-    };
-
-    byKey.set(
-      zeroAllocationKey(
-        normalized
-      ),
-      normalized
-    );
-  }
-
-  for (
-    const item of
-    state.battle_resource_plan
-      ?.not_allocated || []
-  ) {
-    byKey.set(
-      zeroAllocationKey(
-        item
-      ),
-      item
-    );
-  }
-
-  return [...byKey.values()];
-}
-
-function compactZeroAllocationReason(
-  item
-) {
-  const code =
-    String(
-      item?.reason_code || ""
-    );
-
-  const labels = {
-    priority_skip:
-      "Priority set to Skip",
-    target_complete:
-      "Target complete",
-    below_threshold:
-      "Below your paid-battle threshold",
-    no_worthwhile_attempts:
-      "No worthwhile paid attempts remain",
-    remote_ineligible:
-      "Not remotely eligible",
-    remote_access_unconfirmed:
-      "Remote access not confirmed",
-    max_particle_cost_unknown:
-      "MP cost unknown",
-    remote_capacity_exhausted:
-      "No Remote Pass capacity remains today",
-    raid_plan_zero:
-      "No additional Remote Raid uses planned today",
-    max_plan_zero:
-      "No additional Remote Max uses planned today",
-    max_particles_reserved:
-      "MP reserved for a stronger future opportunity",
-    max_particles_insufficient:
-      "Not enough spendable MP remains today",
-    lower_marginal_value:
-      "Higher-priority battles use today's worthwhile capacity"
-  };
-
-  if (
-    code === "future_reserve" &&
-    item?.reason
-  ) {
-    return item.reason;
-  }
-
-  if (labels[code]) {
-    return labels[code];
-  }
-
-  const reason =
-    String(
-      item?.reason ||
-      item?.exclusion_reason ||
-      ""
-    ).trim();
-
-  if (/max particle cost is unknown/i.test(reason)) {
-    return "MP cost unknown";
-  }
-
-  if (/priority is set to skip/i.test(reason)) {
-    return "Priority set to Skip";
-  }
-
-  if (/target is marked complete/i.test(reason)) {
-    return "Target complete";
-  }
-
-  if (/below your .*threshold/i.test(reason)) {
-    return "Below your paid-battle threshold";
-  }
-
-  if (/not remotely eligible/i.test(reason)) {
-    return "Not remotely eligible";
-  }
-
-  if (/not confirmed as remotely accessible/i.test(reason)) {
-    return "Remote access not confirmed";
-  }
-
-  return (
-    reason ||
-    "No paid Remote use is planned for this opportunity today."
-  );
-}
-
-function zeroAllocationSystemLabel(
-  item
-) {
-  return item?.battle_system === "max"
-    ? "Max Battle"
-    : "Raid";
+  return battlePlanLogic
+    .mergeZeroAllocationItems({
+      remoteRaidPlan:
+        state.remote_raid_plan,
+      battleResourcePlan:
+        state.battle_resource_plan
+    });
 }
 
 function renderZeroAllocationDetails() {
@@ -5905,13 +5771,13 @@ function renderZeroAllocationDetails() {
   }
 
   const visible =
-    zeroAllocationItems()
-      .filter(
-        item =>
-          battlePlanFilter === "all" ||
-          (item.battle_system || "raid") ===
-            battlePlanFilter
-      );
+    battlePlanLogic
+      .visibleZeroAllocationItems({
+        items:
+          zeroAllocationItems(),
+        filter:
+          battlePlanFilter
+      });
 
   details.classList.toggle(
     "hidden",
@@ -5937,31 +5803,6 @@ function renderZeroAllocationDetails() {
           </div>
         `).join("")
       : "";
-}
-
-function maxTierCostLabel(
-  item
-) {
-  const tier =
-    Number(
-      item?.max_battle_tier ||
-      0
-    );
-
-  const cost =
-    Number(
-      item?.max_particle_cost ??
-      item?.max_particle_cost_each ??
-      0
-    );
-
-  if (!cost) {
-    return "MP cost unknown";
-  }
-
-  return tier
-    ? `Tier ${formatNumber(tier)} · ${formatNumber(cost)} MP`
-    : `${formatNumber(cost)} MP each`;
 }
 
 function maxTierOverrideControlHtml(
@@ -6305,14 +6146,32 @@ function renderRecommendations() {
       "recommendations"
     );
 
-  const allRecommendations =
-    state.recommendations || [];
+  const battlePlanView =
+    battlePlanLogic
+      .recommendationViewModel({
+        recommendations:
+          state.recommendations ||
+          [],
+        filter:
+          battlePlanFilter,
+        remoteRaidPlan:
+          state.remote_raid_plan,
+        battleResourcePlan:
+          state.battle_resource_plan
+      });
 
-  const counts = {
-    all: allRecommendations.length,
-    raid: allRecommendations.filter(rec => (rec.battle_system || "raid") === "raid").length,
-    max: allRecommendations.filter(rec => rec.battle_system === "max").length
-  };
+  const {
+    counts,
+    visible:
+      recommendations,
+    primary,
+    additional,
+    legacyAllocationByName:
+      allocationByName,
+    sharedAllocationByKey,
+    zeroAllocationByKey
+  } =
+    battlePlanView;
 
   document.getElementById("battleFilterAllCount").textContent = formatNumber(counts.all);
   document.getElementById("battleFilterRaidCount").textContent = formatNumber(counts.raid);
@@ -6327,52 +6186,6 @@ function renderRecommendations() {
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", active ? "true" : "false");
     });
-
-  const recommendations =
-    allRecommendations.filter(rec =>
-      battlePlanFilter === "all" ||
-      (rec.battle_system || "raid") === battlePlanFilter
-    );
-
-  const allocations =
-    state.remote_raid_plan
-      ?.allocations || [];
-
-  const allocationByName =
-    new Map(
-      allocations.map(
-        allocation => [
-          normalizePickerName(
-            allocation.pokemon_name
-          ),
-          allocation
-        ]
-      )
-    );
-
-  const sharedAllocations =
-    state.battle_resource_plan
-      ?.allocations || [];
-
-  const sharedAllocationByKey =
-    new Map(
-      sharedAllocations.map(
-        allocation => [
-          BattleTargets.key(allocation),
-          allocation
-        ]
-      )
-    );
-
-  const zeroAllocationByKey =
-    new Map(
-      zeroAllocationItems().map(
-        item => [
-          zeroAllocationKey(item),
-          item
-        ]
-      )
-    );
 
   renderZeroAllocationDetails();
 
@@ -6393,17 +6206,6 @@ function renderRecommendations() {
     `;
     return;
   }
-
-  const primary =
-    recommendations.slice(
-      0,
-      4
-    );
-
-  const additional =
-    recommendations.slice(
-      4
-    );
 
   const renderCard =
     rec => {

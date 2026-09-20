@@ -130,6 +130,7 @@ The main public files are:
 - public/planner-target-logic.js — pure Target progress, availability, non-status/status filtering, sorting, counts, and grouping/view-model logic. It accepts BattleTargets and normalization/formatting helpers as dependencies and contains no DOM or API mutation code.
 - public/planner-calendar-logic.js — pure UTC date/month helpers, day-event range matching, source-class normalization, and six-week Monday-first month-grid projection. Calendar DOM rendering, fetch/cache state, and selected date/month state remain in manage.html.
 - public/planner-hundo-logic.js — pure Hundo CP multiplier/formula logic, standard benchmark generation, and search ranking. Pokémon catalog loading/cache, recent selections, DOM rendering, and input events remain in manage.html.
+- public/planner-battle-plan-logic.js — pure Battle Plan/resource view-model logic: recommendation system counts/filtering, primary/additional split, legacy/shared allocation lookup maps, zero-allocation compatibility merging/reason labels, score tone, and Max tier/cost display metadata. Recommendation-card DOM and actions remain in manage.html.
 - public/admin.html — administration/synchronization controls.
 - public/sources.html — data-source explanation.
 - public/styles.css — shared responsive styling.
