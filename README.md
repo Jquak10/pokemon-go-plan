@@ -94,6 +94,18 @@ npx wrangler d1 execute DB --remote --file=migrations/0005_max_battle_cost_overr
 
 The override is used only when automatic cost evidence is unavailable. It does not replace official event evidence or trusted current tier data.
 
+### Sync source health migration
+
+`migrations/0006_sync_source_health.sql` adds per-source synchronization health for event feeds, official schedules, and meta inputs. It stores the latest attempt, latest successful attempt, last error, and last successful item count. The migration is additive and idempotent.
+
+Apply it to an existing production D1 database with the existing binding:
+
+```bash
+npx wrangler d1 execute DB --remote --file=migrations/0006_sync_source_health.sql
+```
+
+The Worker is intentionally backward compatible with deployment order: if the new Worker runs before migration 0006 is applied, synchronization continues and the Planner falls back to its legacy freshness timestamps. Once the table exists and the next synchronization runs, per-source health begins populating automatically.
+
 ## Features
 
 - Personalized raid recommendations based on event availability, shared meta scores, user-defined weights, targets, progress, and priority.
@@ -104,7 +116,7 @@ The override is used only when automatic cost evidence is unavailable. It does n
 - A Hundo CP calculator for the loaded Pokémon GO Pokédex, common encounter levels, and custom levels. Catalog loading has explicit loading/error/retry states and can fall back to the last successfully saved public catalog when the live catalog endpoint is temporarily unavailable.
 - A live month calendar and private ICS feed with user-selectable event categories.
 - GO Calendar data, higher-priority official Pokémon GO schedule supplements, and suppression rules. Still-upcoming official supplement source pages are retained and revisited through their event horizon even after they fall outside the newest-news discovery window; a failed refresh preserves the last-known future supplement instead of erasing it.
-- Automated PvPoke Master League data and Pokémon GO API-based analytical inputs, with visible source precedence and freshness.
+- Automated PvPoke Master League data and Pokémon GO API-based analytical inputs, with visible source precedence and per-source synchronization health. The freshness strip warns when a source relevant to the current planner is degraded instead of letting a different successful source make the entire layer appear fresh.
 - Responsive desktop and mobile interfaces.
 - Administration views for synchronization, official raid supplements, Remote Raid limits, suppressions, meta assessments, and raid-ranking refreshes.
 - Capability-link access without a conventional email/password account.
@@ -317,6 +329,7 @@ Manual `wrangler deploy` is available as an npm script, but it is not the normal
 ├── src/
 │   ├── calendar-ics.js        # Pure iCalendar parsing/date helpers
 │   ├── http-security.js       # HTTP auth extraction + response hardening
+│   ├── sync-health.js         # Pure per-source sync-health summarization
 │   └── index.js               # Worker orchestration, APIs, routes, scheduled jobs
 ├── AGENTS.md                  # Persistent Codex workflow instructions
 ├── package.json               # npm scripts and dependency declaration
