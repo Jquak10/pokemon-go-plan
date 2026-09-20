@@ -138,7 +138,7 @@ The main public files are:
 - public/planner.css — Planner-only responsive shell, feature styling, and regression-hardening overrides. It is loaded after styles.css only by manage.html, preserving the original cascade order while keeping unrelated pages out of Planner-specific CSS.
 - public/battle-targets.js — shared client-side target identity helpers.
 
-The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. BL-011 modularization is incremental: cohesive infrastructure/domain slices move into classic-script modules while `manage.html` remains the orchestration surface. The Planner client module owns the PR #47 management-auth transport contract, so feature code should call its `api` helper rather than reimplementing token/query/body handling. Target list business logic is likewise kept in the pure Planner Target Logic module; `manage.html` continues to own Target DOM rendering, selection state, modal interactions, and API mutations. Planner-specific CSS now follows the same boundary: shared base rules stay in `styles.css`, while Planner-only responsive/feature overrides live in `planner.css` and load after the base stylesheet.
+The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. The completed BL-011 modularization established explicit boundaries around reusable Planner logic while keeping `manage.html` as the DOM/state orchestration surface. The Planner client module owns the PR #47 management-auth transport contract, so feature code should call its `api` helper rather than reimplementing token/query/body handling. Target list business logic is likewise kept in the pure Planner Target Logic module; `manage.html` continues to own Target DOM rendering, selection state, modal interactions, and API mutations. Planner-specific CSS follows the same boundary: shared base rules stay in `styles.css`, while Planner-only responsive/feature overrides live in `planner.css` and load after the base stylesheet.
 
 ### 5.1 Mobile information architecture
 
@@ -200,8 +200,9 @@ Important modules:
 - src/max-rankings.js — Max-specific attacker analysis with Max-appropriate weighting and eligibility.
 - src/remote-raid-rules.js — exact temporary Remote-limit time-window parsing and timezone projection.
 - src/http-security.js — shared JSON/error responses, management/admin credential extraction with legacy compatibility, and static/private response hardening (CSP, frame protection, referrer policy, and no-store behavior). `src/index.js` imports these helpers and re-exports the established security helper API for compatibility.
+- src/calendar-ics.js — pure RFC 5545-oriented parsing/date helpers: folded-line normalization, property extraction, escaping/unescaping, compact date parsing, all-day exclusive-DTEND conversion, and VEVENT normalization. Fetching, persistence, suppression, personalization, and feed routing remain in `src/index.js`.
 
-Keep pure, testable domain logic in these modules where practical. src/index.js should integrate data sources, persistence, APIs, synchronization, and rendering payloads rather than duplicating every algorithm.
+Keep pure, testable domain logic in these modules where practical. `src/index.js` is intentionally the integration/orchestration layer for data sources, persistence, APIs, synchronization, and rendering payloads; further splitting should be driven by a concrete cohesive domain need rather than file length alone.
 
 ## 7. Data model
 
