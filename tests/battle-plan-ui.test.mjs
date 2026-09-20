@@ -400,9 +400,19 @@ const targetOptions = {
   ]
 };
 
+const plainTargetValue =
+  value =>
+    JSON.parse(
+      JSON.stringify(
+        value
+      )
+    );
+
 assert.deepEqual(
-  targetLogic.progress(
-    targetFixtures[0]
+  plainTargetValue(
+    targetLogic.progress(
+      targetFixtures[0]
+    )
   ),
   {
     percent: 40,
@@ -444,7 +454,9 @@ const dynamaxView =
   });
 
 assert.deepEqual(
-  dynamaxView.counts,
+  plainTargetValue(
+    dynamaxView.counts
+  ),
   {
     active: 1,
     completed: 1,
@@ -454,12 +466,14 @@ assert.deepEqual(
 );
 
 assert.deepEqual(
-  dynamaxView
-    .visibleTargets
-    .map(
-      target =>
-        target.id
-    ),
+  plainTargetValue(
+    dynamaxView
+      .visibleTargets
+      .map(
+        target =>
+          target.id
+      )
+  ),
   ["a"]
 );
 
@@ -480,46 +494,52 @@ const allDynamaxView =
   });
 
 assert.deepEqual(
-  allDynamaxView
-    .visibleTargets
-    .map(
-      target =>
-        target.id
-    ),
+  plainTargetValue(
+    allDynamaxView
+      .visibleTargets
+      .map(
+        target =>
+          target.id
+      )
+  ),
   ["a", "b"]
 );
 
 assert.deepEqual(
-  allDynamaxView
-    .groups
-    .needsAttention
-    .map(
-      target =>
-        target.id
-    ),
+  plainTargetValue(
+    allDynamaxView
+      .groups
+      .needsAttention
+      .map(
+        target =>
+          target.id
+      )
+  ),
   ["a"]
 );
 
 assert.deepEqual(
-  targetLogic
-    .sortTargets({
-      targets:
-        targetFixtures,
-      filterState: {
-        status: "all",
-        search: "",
-        type: "all",
-        battle: "all",
-        priority: "all",
-        availability: "all",
-        sort: "closest"
-      },
-      targetOptions
-    })
-    .map(
-      target =>
-        target.id
-    ),
+  plainTargetValue(
+    targetLogic
+      .sortTargets({
+        targets:
+          targetFixtures,
+        filterState: {
+          status: "all",
+          search: "",
+          type: "all",
+          battle: "all",
+          priority: "all",
+          availability: "all",
+          sort: "closest"
+        },
+        targetOptions
+      })
+      .map(
+        target =>
+          target.id
+      )
+  ),
   ["b", "c", "a"]
 );
 
