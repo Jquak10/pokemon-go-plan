@@ -674,6 +674,80 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
 
         self.assert_no_horizontal_overflow(page)
 
+    def test_intermediate_widths_keep_dense_panels_stacked(self):
+        for width in (768, 900, 1024, 1179, 1180, 1280):
+            with self.subTest(width=width):
+                page = self.open_planner(width, 900)
+
+                self.assert_no_horizontal_overflow(page)
+
+                today_layout = page.locator(".today-command-card").evaluate(
+                    """element => {
+                        const card = getComputedStyle(element);
+                        const main = getComputedStyle(
+                            element.querySelector(".today-command-main")
+                        );
+                        return {
+                            display: card.display,
+                            mainColumns: main.gridTemplateColumns
+                        };
+                    }"""
+                )
+
+                forecast_columns = page.locator("#budgetForecast").evaluate(
+                    """element => getComputedStyle(element).gridTemplateColumns
+                        .split(" ")
+                        .filter(Boolean).length"""
+                )
+
+                if width < 1180:
+                    self.assertEqual(today_layout["display"], "block")
+                    self.assertEqual(
+                        len(today_layout["mainColumns"].split()),
+                        1,
+                        f"Today briefing should stay stacked at {width}px",
+                    )
+                    self.assertEqual(
+                        forecast_columns,
+                        4,
+                        f"Forecast should use four columns at {width}px",
+                    )
+                else:
+                    self.assertEqual(today_layout["display"], "grid")
+                    self.assertEqual(forecast_columns, 7)
+
+                page.locator('.tab-button[data-tab="calendar"]').click()
+                page.wait_for_selector("#calendarMonthGrid")
+
+                calendar_columns = page.locator(".calendar-view-layout").evaluate(
+                    """element => getComputedStyle(element).gridTemplateColumns
+                        .split(" ")
+                        .filter(Boolean).length"""
+                )
+
+                if width < 1180:
+                    self.assertEqual(
+                        calendar_columns,
+                        1,
+                        f"Calendar detail should stack below the month at {width}px",
+                    )
+                else:
+                    self.assertEqual(calendar_columns, 2)
+
+                page.locator('.tab-button[data-tab="plan"]').click()
+                page.locator("[data-forecast-day-index='1']").click()
+                detail_name = page.locator(
+                    "#budgetForecastDetails .forecast-detail-main strong"
+                ).first
+                self.assertEqual(
+                    detail_name.evaluate(
+                        "element => getComputedStyle(element).whiteSpace"
+                    ),
+                    "normal",
+                )
+
+                self.assert_no_horizontal_overflow(page)
+
     def test_dynamax_sprites_render_in_forecast_and_targets(self):
         page = self.open_planner(1024, 800)
 
