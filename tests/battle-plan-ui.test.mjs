@@ -15,6 +15,7 @@ const manage = read("../public/manage.html");
 const plannerClient = read("../public/planner-client.js");
 const plannerTargetLogic = read("../public/planner-target-logic.js");
 const plannerCalendarLogic = read("../public/planner-calendar-logic.js");
+const plannerHundoLogic = read("../public/planner-hundo-logic.js");
 const battleTargetsClient = read("../public/battle-targets.js");
 const styles = read("../public/styles.css");
 const worker = read("../src/index.js");
@@ -26,6 +27,11 @@ assert.match(manage, /nav-label-mobile">Plan/);
 assert.match(manage, /<script src="\/planner-client\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
+assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=1"><\/script>/);
+assert.match(manage, /PlannerHundoLogic/);
+assert.doesNotMatch(manage, /const CP_MULTIPLIERS =/);
+assert.doesNotMatch(manage, /function hundoCp\(/);
+assert.doesNotMatch(manage, /function hundoBenchmarkData\(/);
 assert.match(manage, /PlannerCalendarLogic/);
 assert.doesNotMatch(manage, /function parseIsoDate\(/);
 assert.doesNotMatch(manage, /function monthKeyFromDate\(/);
@@ -166,6 +172,14 @@ new vm.Script(
   }
 );
 
+new vm.Script(
+  plannerHundoLogic,
+  {
+    filename:
+      "planner-hundo-logic.js"
+  }
+);
+
 const plannerClientContext = {
   location: {
     pathname:
@@ -295,6 +309,154 @@ assert.equal(
     "not-a-number"
   ),
   "—"
+);
+
+const hundoLogicContext = {};
+vm.createContext(
+  hundoLogicContext
+);
+
+new vm.Script(
+  plannerHundoLogic,
+  {
+    filename:
+      "planner-hundo-logic.js"
+  }
+).runInContext(
+  hundoLogicContext
+);
+
+const hundoLogic =
+  hundoLogicContext
+    .PlannerHundoLogic;
+
+const mewtwoStats = {
+  name: "Mewtwo",
+  dex_nr: 150,
+  attack: 300,
+  defense: 182,
+  stamina: 214
+};
+
+assert.equal(
+  hundoLogic.hundoCp(
+    mewtwoStats,
+    20
+  ),
+  2387,
+  "Mewtwo Lv20 Hundo raid CP must remain 2387"
+);
+
+assert.equal(
+  hundoLogic.hundoCp(
+    mewtwoStats,
+    25
+  ),
+  2984,
+  "Mewtwo Lv25 weather-boosted Hundo raid CP must remain 2984"
+);
+
+assert.equal(
+  hundoLogic.hundoCp(
+    mewtwoStats,
+    20.25
+  ),
+  null,
+  "Custom Hundo levels only support 0.5-level steps"
+);
+
+assert.equal(
+  hundoLogic.cpMultiplierForLevel(
+    50.5
+  ),
+  null
+);
+
+const hundoBenchmarks =
+  hundoLogic.benchmarkData(
+    mewtwoStats
+  );
+
+assert.deepEqual(
+  JSON.parse(
+    JSON.stringify(
+      hundoBenchmarks.map(
+        item => [
+          item.level,
+          item.cp
+        ]
+      )
+    )
+  ),
+  [
+    [15, 1790],
+    [20, 2387],
+    [25, 2984],
+    [30, 3582],
+    [35, 3879],
+    [40, 4178],
+    [50, 4724]
+  ]
+);
+
+const hundoCatalog = [
+  {
+    key: "mewtwo",
+    name: "Mewtwo",
+    dex_nr: 150
+  },
+  {
+    key: "mew",
+    name: "Mew",
+    dex_nr: 151
+  },
+  {
+    key: "mewtwo-armored",
+    name: "Armored Mewtwo",
+    dex_nr: 150
+  }
+];
+
+assert.deepEqual(
+  JSON.parse(
+    JSON.stringify(
+      hundoLogic
+        .searchMatches(
+          hundoCatalog,
+          "#150"
+        )
+        .map(
+          entry =>
+            entry.key
+        )
+    )
+  ),
+  [
+    "mewtwo",
+    "mewtwo-armored"
+  ]
+);
+
+assert.deepEqual(
+  JSON.parse(
+    JSON.stringify(
+      hundoLogic
+        .searchMatches(
+          hundoCatalog,
+          "mew"
+        )
+        .map(
+          entry =>
+            entry.key
+        )
+    )
+  ),
+  [
+    "mew",
+    "mewtwo",
+    "mewtwo-armored"
+  ],
+  "Exact Hundo search matches must rank ahead of prefixes and contains matches"
 );
 
 const calendarLogicContext = {};
