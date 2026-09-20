@@ -1,6 +1,6 @@
 # Pokémon GO Planner — Backlog
 
-Last reviewed: 20 September 2026
+Last reviewed: 21 September 2026
 
 This file is the durable home for **confirmed but unshipped work** and explicitly deferred/rejected ideas that would otherwise exist only in project chats.
 
@@ -26,10 +26,6 @@ It is intentionally different from the other repository references:
 7. Never create a production migration solely because an item appears here. Inspect current production state and follow the normal migration/release workflow.
 
 ## Active
-
-### BL-014 — Track synchronization health per source
-
-Persist last attempt, last success, last error, and item count for each event/official/meta source. Surface degraded relevant sources instead of representing the newest successful source timestamp as freshness for the whole layer.
 
 ### BL-015 — Add management and calendar credential rotation
 
@@ -77,6 +73,6 @@ A follow-up repository audit on 18 September 2026 identified the improvement wor
 
 BL-011 was completed through the incremental Planner/Worker modularization series ending with the iCalendar parsing extraction. The resulting boundaries cover Planner client/auth, Targets, Calendar, Hundo, Battle Plan/resources, Battle Intel, Planner-only CSS, Worker HTTP security, and pure iCalendar parsing. Remaining large integration files are intentionally orchestration surfaces rather than backlog items based on size alone.
 
-A fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57. BL-013 (durable official schedule discovery) is implemented by the current change and is therefore removed from Active; BL-014 through BL-018 remain recorded above for future prioritization.
+A fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57 and BL-013 shipped in PR #58. BL-014 (per-source synchronization health) is implemented by the current change and is therefore removed from Active; BL-015 through BL-018 remain recorded above for future prioritization.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
