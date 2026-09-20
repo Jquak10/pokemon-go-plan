@@ -311,8 +311,9 @@ Manual `wrangler deploy` is available as an npm script, but it is not the normal
 │   ├── planner-hundo-logic.js    # Pure Hundo CP/search/benchmark logic
 │   ├── planner-battle-plan-logic.js # Battle Plan/resource view-model logic
 │   ├── planner-battle-intel.js # Pure type-effectiveness/Battle Intel logic
+│   ├── planner.css            # Planner-only responsive/feature overrides
 │   ├── sources.html           # Data-source and precedence information
-│   └── styles.css             # Shared responsive styles
+│   └── styles.css             # Shared base styles
 ├── src/index.js               # Worker, APIs, routes, and scheduled jobs
 ├── AGENTS.md                  # Persistent Codex workflow instructions
 ├── package.json               # npm scripts and dependency declaration

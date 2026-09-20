@@ -134,10 +134,11 @@ The main public files are:
 - public/planner-battle-intel.js — pure Pokémon GO type-effectiveness, compounded weakness/resistance grouping, type symbols, and battle/encounter Intel aggregation. Exact catalog/form resolution and Intel DOM rendering remain in manage.html so Mega/Primal/Max battle-form versus encounter-form rules stay explicit.
 - public/admin.html — administration/synchronization controls.
 - public/sources.html — data-source explanation.
-- public/styles.css — shared responsive styling.
+- public/styles.css — shared base styling used by the public, admin, sources, and Planner surfaces.
+- public/planner.css — Planner-only responsive shell, feature styling, and regression-hardening overrides. It is loaded after styles.css only by manage.html, preserving the original cascade order while keeping unrelated pages out of Planner-specific CSS.
 - public/battle-targets.js — shared client-side target identity helpers.
 
-The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. BL-011 modularization is incremental: cohesive infrastructure/domain slices move into classic-script modules while `manage.html` remains the orchestration surface until later slices are extracted. The Planner client module owns the PR #47 management-auth transport contract, so feature code should call its `api` helper rather than reimplementing token/query/body handling. Target list business logic is likewise kept in the pure Planner Target Logic module; `manage.html` continues to own Target DOM rendering, selection state, modal interactions, and API mutations.
+The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. BL-011 modularization is incremental: cohesive infrastructure/domain slices move into classic-script modules while `manage.html` remains the orchestration surface. The Planner client module owns the PR #47 management-auth transport contract, so feature code should call its `api` helper rather than reimplementing token/query/body handling. Target list business logic is likewise kept in the pure Planner Target Logic module; `manage.html` continues to own Target DOM rendering, selection state, modal interactions, and API mutations. Planner-specific CSS now follows the same boundary: shared base rules stay in `styles.css`, while Planner-only responsive/feature overrides live in `planner.css` and load after the base stylesheet.
 
 ### 5.1 Mobile information architecture
 
