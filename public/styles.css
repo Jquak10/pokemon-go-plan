@@ -5356,7 +5356,7 @@ details[open] > summary .details-chevron {
 
 @media (min-width: 1180px) {
   .dashboard-shell {
-    width: min(1420px, calc(100% - 220px));
+    width: min(1420px, calc(100% - 224px));
     margin-left: 200px;
     margin-right: 24px;
   }
