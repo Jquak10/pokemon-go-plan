@@ -265,7 +265,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 - **Cloudflare Workers** runs the backend and serves static frontend assets.
 - **Cloudflare D1** stores planners, targets, events, meta data, Remote Raid usage, and limit overrides.
 - **Static frontend files** in `public/` provide the landing page, planner, administration, data-source, and responsive UI.
-- **Worker code** in `src/index.js` implements APIs, private routes, scheduled synchronization, recommendations, and asset routing.
+- **Worker code** in `src/index.js` orchestrates APIs, private routes, scheduled synchronization, recommendations, and asset routing; focused helpers such as `src/http-security.js` keep reusable infrastructure out of the entry point.
 - **Cron Triggers** run separate event, official Remote Raid limit, and automatic meta synchronization jobs every six hours; the meta sync also refreshes versioned raid-ranking profiles.
 - **GitHub and Cloudflare** provide the production path: feature branch → PR → `main` → the existing Cloudflare deployment pipeline.
 - **VS Code Dev Containers** provide the development toolchain while source remains on Windows.
@@ -314,7 +314,9 @@ Manual `wrangler deploy` is available as an npm script, but it is not the normal
 │   ├── planner.css            # Planner-only responsive/feature overrides
 │   ├── sources.html           # Data-source and precedence information
 │   └── styles.css             # Shared base styles
-├── src/index.js               # Worker, APIs, routes, and scheduled jobs
+├── src/
+│   ├── http-security.js       # HTTP auth extraction + response hardening
+│   └── index.js               # Worker orchestration, APIs, routes, scheduled jobs
 ├── AGENTS.md                  # Persistent Codex workflow instructions
 ├── package.json               # npm scripts and dependency declaration
 ├── package-lock.json          # Reproducible dependency lock
