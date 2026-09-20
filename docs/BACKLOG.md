@@ -27,18 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-009 — Harden intermediate-width desktop responsiveness
-
-The latest desktop fix removes Battle Resources text clipping, but the desktop two-column layout still activates at a relatively narrow width and other intentional ellipses/clamps remain throughout the UI.
-
-Audit intermediate desktop widths using content/container-based breakpoints where useful. Keep dense panels stacked until adequate width exists and restrict truncation to secondary text whose full value remains available elsewhere.
-
-### BL-010 — Harden bearer-token and private-surface security headers
-
-Management links and calendar links are bearer credentials. Management API calls still pass the management token in some query strings, and private/static surfaces do not currently add a dedicated Referrer-Policy/CSP/frame-protection layer in Worker routing.
-
-Add defense-in-depth headers such as a strict referrer policy and appropriate frame/content policies, move authenticated API requests toward headers while preserving legacy compatibility, and avoid introducing any logging or exposure of management/calendar/admin credentials.
-
 ### BL-011 — Incrementally modularize large Planner/Worker files
 
 `public/manage.html`, `public/styles.css`, and `src/index.js` have grown into large integration files. They remain functional, but continued feature work increases regression and review cost.
