@@ -853,9 +853,18 @@
 
               <div class="full-span">
                 <label for="timezone">Timezone</label>
-                <input id="timezone" autocomplete="off" placeholder="Asia/Singapore">
-                <p class="field-help">
-                  Controls local event dates and when daily Raid, Remote Max, and Max Particle counters roll over.
+                <input
+                  id="timezone"
+                  autocomplete="off"
+                  placeholder="Asia/Singapore"
+                  list="timezoneOptions"
+                  spellcheck="false"
+                  aria-describedby="timezoneHelp"
+                >
+                <datalist id="timezoneOptions"></datalist>
+                <p id="timezoneHelp" class="field-help">
+                  Choose a valid IANA timezone. It controls local event dates and when daily Raid,
+                  Remote Max, and Max Particle counters roll over.
                 </p>
               </div>
             </div>
@@ -1408,6 +1417,7 @@
     </section>
   </div>
 
+<script src="/timezone-validation.js?v=1"></script>
 <script src="/battle-targets.js?v=1"></script>
 <script src="/planner-client.js?v=1"></script>
 <script src="/planner-target-logic.js?v=1"></script>
@@ -1445,6 +1455,18 @@ const {
   PlannerHundoLogic;
 const app = document.getElementById("app");
 const loadStatus = document.getElementById("loadStatus");
+const timezoneInput =
+  document.getElementById(
+    "timezone"
+  );
+
+TimezoneValidation.attachSuggestions(
+  timezoneInput,
+  document.getElementById(
+    "timezoneOptions"
+  )
+);
+
 let state = null;
 let battlePlanFilter =
   ["all", "raid", "max"].includes(
@@ -7103,7 +7125,32 @@ function renderPreferences() {
   document.getElementById("pveWeight").value = state.user.pve_weight;
   document.getElementById("pvpWeight").value = state.user.pvp_weight;
   document.getElementById("collectorWeight").value = state.user.collector_weight;
-  document.getElementById("timezone").value = state.user.timezone;
+  timezoneInput.value =
+    state.user.timezone;
+
+  if (
+    state.user.timezone_valid ===
+      false
+  ) {
+    timezoneInput.setCustomValidity(
+      TimezoneValidation.MESSAGE
+    );
+
+    const timezoneStatus =
+      document.getElementById(
+        "settingsStatus"
+      );
+
+    timezoneStatus.textContent =
+      "Your saved timezone is invalid. Choose a valid IANA timezone before changing time-based preferences.";
+    timezoneStatus.className =
+      "save-status error";
+  } else {
+    timezoneInput.setCustomValidity(
+      ""
+    );
+  }
+
   document.getElementById("remoteRaidBudget").value = state.user.remote_raid_budget ?? "";
   document.getElementById("remoteRaidMinScore").value = state.user.remote_raid_min_score ?? 60;
 
@@ -7130,7 +7177,25 @@ function render() {
 
 async function savePreferences() {
   const status = document.getElementById("settingsStatus");
+  const timezoneResult =
+    TimezoneValidation.validateInput(
+      timezoneInput,
+      {
+        report: true
+      }
+    );
+
+  if (!timezoneResult.valid) {
+    status.textContent =
+      timezoneResult.message;
+    status.className =
+      "save-status error";
+    timezoneInput.focus();
+    return;
+  }
+
   status.textContent = "Saving…";
+  status.className = "save-status";
 
   try {
     await api("/api/settings", {
@@ -7141,7 +7206,8 @@ async function savePreferences() {
         pve_weight: Number(document.getElementById("pveWeight").value),
         pvp_weight: Number(document.getElementById("pvpWeight").value),
         collector_weight: Number(document.getElementById("collectorWeight").value),
-        timezone: document.getElementById("timezone").value,
+        timezone:
+          timezoneResult.timezone,
         remote_raid_budget: document.getElementById("remoteRaidBudget").value,
         remote_raid_min_score: Number(document.getElementById("remoteRaidMinScore").value)
       })
@@ -7151,6 +7217,8 @@ async function savePreferences() {
     await load();
   } catch (error) {
     status.textContent = error.message;
+    status.className =
+      "save-status error";
   }
 }
 
