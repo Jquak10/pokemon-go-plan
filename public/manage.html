@@ -1408,8 +1408,14 @@
   </div>
 
 <script src="/battle-targets.js?v=1"></script>
+<script src="/planner-client.js?v=1"></script>
 <script>
-const token = location.pathname.split("/").filter(Boolean)[1];
+const {
+  token,
+  api,
+  esc,
+  formatNumber
+} = PlannerClient;
 const app = document.getElementById("app");
 const loadStatus = document.getElementById("loadStatus");
 let state = null;
@@ -1521,24 +1527,6 @@ const targetTypeLabels = {
   custom: "Custom"
 };
 
-function esc(value) {
-  return String(value ?? "").replace(
-    /[&<>"']/g,
-    c => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    }[c])
-  );
-}
-
-function formatNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number.toLocaleString() : "—";
-}
-
 function scoreTone(score) {
   const value = Number(score || 0);
   if (value >= 85) return "tone-fire";
@@ -1553,97 +1541,6 @@ function targetPriorityTone(priority, completed) {
   if (priority === "medium") return "badge-blue";
   if (priority === "low") return "badge-neutral";
   return "badge-skip";
-}
-
-function managedApiRequest(
-  path,
-  options = {}
-) {
-  const url =
-    new URL(
-      path,
-      location.origin
-    );
-
-  // Legacy callers may still construct ?token= URLs or include token in JSON.
-  // Strip both before the browser sends the request; the Worker continues to
-  // accept those legacy forms for compatibility with older clients.
-  url.searchParams.delete(
-    "token"
-  );
-
-  const headers =
-    new Headers(
-      options.headers || {}
-    );
-
-  headers.set(
-    "authorization",
-    `Bearer ${token}`
-  );
-
-  let body =
-    options.body;
-
-  if (
-    typeof body === "string" &&
-    /application\/json/i.test(
-      headers.get(
-        "content-type"
-      ) || ""
-    )
-  ) {
-    try {
-      const parsed =
-        JSON.parse(
-          body
-        );
-
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        !Array.isArray(
-          parsed
-        )
-      ) {
-        delete parsed.token;
-        body =
-          JSON.stringify(
-            parsed
-          );
-      }
-    } catch {}
-  }
-
-  return {
-    url:
-      `${url.pathname}${url.search}${url.hash}`,
-    options: {
-      ...options,
-      headers,
-      body,
-      referrerPolicy:
-        "no-referrer"
-    }
-  };
-}
-
-async function api(path, options = {}) {
-  const request =
-    managedApiRequest(
-      path,
-      options
-    );
-
-  const response =
-    await fetch(
-      request.url,
-      request.options
-    );
-
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Request failed.");
-  return data;
 }
 
 async function load() {

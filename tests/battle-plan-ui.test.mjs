@@ -12,6 +12,7 @@ function read(relative) {
 }
 
 const manage = read("../public/manage.html");
+const plannerClient = read("../public/planner-client.js");
 const styles = read("../public/styles.css");
 const worker = read("../src/index.js");
 
@@ -19,6 +20,12 @@ assert.match(manage, /Pokémon GO Battle Planner/);
 assert.match(manage, /PERSONAL BATTLE STRATEGY/);
 assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
+assert.match(manage, /<script src="\/planner-client\.js\?v=1"><\/script>/);
+assert.match(manage, /const \{[\s\S]*token,[\s\S]*api,[\s\S]*esc,[\s\S]*formatNumber[\s\S]*\} = PlannerClient;/);
+assert.doesNotMatch(manage, /function managedApiRequest/);
+assert.doesNotMatch(manage, /function api\(path, options/);
+assert.doesNotMatch(manage, /function esc\(value\)/);
+assert.doesNotMatch(manage, /function formatNumber\(value\)/);
 
 assert.match(manage, /data-battle-filter="all"/);
 assert.match(manage, /data-battle-filter="raid"/);
@@ -124,6 +131,178 @@ for (const [index, script] of inlineScripts.entries()) {
   new vm.Script(script, { filename: `manage-inline-${index + 1}.js` });
 }
 
+new vm.Script(
+  plannerClient,
+  {
+    filename:
+      "planner-client.js"
+  }
+);
+
+const plannerClientContext = {
+  location: {
+    pathname:
+      "/manage/browser-test-token",
+    origin:
+      "https://planner.example"
+  },
+  URL,
+  Headers,
+  fetch:
+    async (
+      url,
+      options
+    ) => ({
+      ok: true,
+      json:
+        async () => ({
+          url,
+          authorization:
+            options.headers.get(
+              "authorization"
+            ),
+          body:
+            options.body
+        })
+    })
+};
+
+vm.createContext(
+  plannerClientContext
+);
+
+new vm.Script(
+  plannerClient,
+  {
+    filename:
+      "planner-client.js"
+  }
+).runInContext(
+  plannerClientContext
+);
+
+const plannerClientApi =
+  plannerClientContext
+    .PlannerClient;
+
+assert.equal(
+  plannerClientApi.token,
+  "browser-test-token"
+);
+
+assert.equal(
+  plannerClientApi.managementTokenFromPath(
+    "/manage/example-token/"
+  ),
+  "example-token"
+);
+
+const preparedManagedRequest =
+  plannerClientApi
+    .buildManagedApiRequest({
+      token:
+        "header-token",
+      path:
+        "/api/example?token=query-token&month=2026-09",
+      origin:
+        "https://planner.example",
+      options: {
+        method:
+          "POST",
+        headers: {
+          "content-type":
+            "application/json"
+        },
+        body:
+          JSON.stringify({
+            token:
+              "body-token",
+            value:
+              7
+          })
+      }
+    });
+
+assert.equal(
+  preparedManagedRequest.url,
+  "/api/example?month=2026-09"
+);
+
+assert.equal(
+  preparedManagedRequest
+    .options
+    .headers
+    .get(
+      "authorization"
+    ),
+  "Bearer header-token"
+);
+
+assert.deepEqual(
+  JSON.parse(
+    preparedManagedRequest
+      .options
+      .body
+  ),
+  {
+    value: 7
+  }
+);
+
+assert.equal(
+  preparedManagedRequest
+    .options
+    .referrerPolicy,
+  "no-referrer"
+);
+
+assert.equal(
+  plannerClientApi.esc(
+    "<&\"'"
+  ),
+  "&lt;&amp;&quot;&#39;"
+);
+
+assert.equal(
+  plannerClientApi.formatNumber(
+    "not-a-number"
+  ),
+  "—"
+);
+
+const plannerApiResponse =
+  await plannerClientApi.api(
+    "/api/me?token=legacy"
+  );
+
+assert.equal(
+  plannerApiResponse.url,
+  "/api/me"
+);
+
+assert.equal(
+  plannerApiResponse.authorization,
+  "Bearer browser-test-token"
+);
+
+plannerClientContext.fetch =
+  async () => ({
+    ok: false,
+    json:
+      async () => ({
+        error:
+          "Fixture request failed."
+      })
+  });
+
+await assert.rejects(
+  () =>
+    plannerClientApi.api(
+      "/api/failure"
+    ),
+  /Fixture request failed\./
+);
+
 console.log("Battle Plan UI integration tests passed");
 
 
@@ -176,9 +355,12 @@ assert.match(worker, /currentMaxBattleTiersFromPayload/);
 assert.match(worker, /max_battle_cost_overrides/);
 assert.match(worker, /updateMaxBattleCostOverrideApi/);
 
-assert.match(manage, /headers\.set\([\s\S]*"authorization"[\s\S]*Bearer/);
-assert.match(manage, /url\.searchParams\.delete\([\s\S]*"token"/);
-assert.match(manage, /delete parsed\.token/);
+assert.match(plannerClient, /headers\.set\([\s\S]*"authorization"[\s\S]*Bearer/);
+assert.match(plannerClient, /url\.searchParams\.delete\([\s\S]*"token"/);
+assert.match(plannerClient, /delete parsed\.token/);
+assert.match(plannerClient, /globalThis\.PlannerClient/);
+assert.match(plannerClient, /function buildManagedApiRequest/);
+assert.match(plannerClient, /function createApiClient/);
 assert.doesNotMatch(manage, /\/api\/me\?token=/);
 assert.doesNotMatch(manage, /\/api\/calendar-events\?token=/);
 assert.doesNotMatch(manage, /\/api\/feed-link\?token=/);
