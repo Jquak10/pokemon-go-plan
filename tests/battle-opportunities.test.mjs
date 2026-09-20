@@ -439,7 +439,10 @@ assert.match(
 );
 assert.match(workerSource, /async function syncDerivedMaxRotations\(env\)/);
 assert.match(workerSource, /source_type = 'max_mondays'/);
-assert.match(workerSource, /source: MAX_ROTATION_SOURCE_TYPE, ok: true, count, derived: true/);
+assert.match(
+  workerSource,
+  /source:\s*MAX_ROTATION_SOURCE_TYPE,[\s\S]*?ok:\s*true,[\s\S]*?count,[\s\S]*?derived:\s*true/
+);
 assert.doesNotMatch(
   workerSource.match(/const SOURCES = \{[\s\S]*?\n\};/)?.[0] || "",
   /max_rotation\s*:/
