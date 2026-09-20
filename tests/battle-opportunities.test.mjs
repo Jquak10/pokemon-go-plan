@@ -25,6 +25,7 @@ import {
 import {
   calendarDisplaySourceType,
   calendarSourceTypesForUser,
+  eventSyncHealthSourcesForUser,
   findMatches,
   officialEventPageUrlsForSync,
   officialMaxBattleSupplementsFromText,
@@ -95,6 +96,35 @@ assert.equal(
     MAX_ROTATION_SOURCE_TYPE
   ),
   "max_battles"
+);
+
+const maxHealthSources =
+  eventSyncHealthSourcesForUser({
+    included_sources:
+      JSON.stringify([
+        "max_battles"
+      ])
+  });
+
+assert.deepEqual(
+  maxHealthSources.map(
+    source =>
+      source.source_key
+  ),
+  [
+    "event:max_battles",
+    `event:${MAX_ROTATION_SOURCE_TYPE}`,
+    "event:pokemon_go_api_current_max_battles"
+  ],
+  "Per-source freshness must include only selected event feeds plus their Max-derived dependencies"
+);
+assert.equal(
+  maxHealthSources.some(
+    source =>
+      source.source_key ===
+      "event:community_day"
+  ),
+  false
 );
 assert.deepEqual(
   suppressionSourceTypesForEvent({
