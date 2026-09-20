@@ -7228,8 +7228,9 @@ body.modal-open {
 /* ============================================================
    Battle Plan compact desktop polish — v35
    Keep the decision summary useful without burying battle cards.
+   Wide-only since BL-009: intermediate desktop keeps dense panels stacked.
    ============================================================ */
-@media (min-width: 900px) {
+@media (min-width: 1180px) {
   .today-command-card {
     display: grid;
     grid-template-columns: minmax(0, 1.55fr) minmax(340px, .8fr);
@@ -7637,5 +7638,79 @@ body.modal-open {
 
   .forecast-detail-row > small {
     text-align: left;
+  }
+}
+
+
+/* ============================================================
+   BL-009 — INTERMEDIATE-WIDTH DESKTOP HARDENING · v41
+   Keep dense panels stacked until the wide desktop canvas exists.
+   ============================================================ */
+
+.forecast-detail-main strong,
+.recent-raid-main strong {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 761px) and (max-width: 1179px) {
+  .today-command-main {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .battle-resource-grid,
+  .battle-resource-editor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .budget-forecast-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .daily-budget-override {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-budget-override-controls {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+
+  .daily-budget-override-controls .secondary {
+    grid-column: 1 / -1;
+  }
+
+  .daily-budget-override .save-status {
+    text-align: left;
+  }
+
+  .calendar-view-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-day-details {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 980px) {
+  .recommendation-footer-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .recommendation-footer-row .compact-details {
+    grid-column: 1 / -1;
+  }
+
+  .recommendation-footer-row .log-raid-button,
+  .recommendation-footer-row .small-button {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
   }
 }
