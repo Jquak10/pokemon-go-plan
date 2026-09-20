@@ -1212,7 +1212,7 @@ assert.match(manage, /const systemCountLabel =/);
 assert.match(manage, /\.join\("\ \+ "\)/);
 
 assert.match(manage, /item\.exclusion_reason/);
-assert.match(manage, /MP cost unknown/);
+assert.match(plannerBattlePlanLogic, /MP cost unknown/);
 assert.match(styles, /PAID BATTLE FORECAST EXPANSION · v38/);
 assert.match(styles, /\.forecast-expand-button/);
 assert.match(styles, /\.forecast-detail-row/);
@@ -1238,7 +1238,7 @@ assert.match(manage, /maxParticlesCollectedToday/);
 assert.match(manage, /remoteMaxPassesUsed/);
 assert.match(manage, /saveBattleResources/);
 assert.match(manage, /\/api\/battle-resources/);
-assert.match(manage, /MP cost unknown/);
+assert.match(plannerBattlePlanLogic, /MP cost unknown/);
 assert.match(manage, /Remote Max battle/);
 assert.match(styles, /Battle resource planning — v32/);
 assert.match(worker, /battle_resource_plan/);
