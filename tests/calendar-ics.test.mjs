@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   addDaysIso,
   dateFromPropertyLine,
@@ -9,6 +10,28 @@ import {
   unescapeIcs,
   unfoldIcs
 } from "../src/calendar-ics.js";
+
+const worker =
+  readFileSync(
+    new URL(
+      "../src/index.js",
+      import.meta.url
+    ),
+    "utf8"
+  );
+
+assert.match(
+  worker,
+  /from "\.\/calendar-ics\.js"/
+);
+assert.doesNotMatch(
+  worker,
+  /function parseIcsEvents\(/
+);
+assert.doesNotMatch(
+  worker,
+  /function addDaysIso\(/
+);
 
 assert.equal(
   addDaysIso(
