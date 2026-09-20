@@ -778,6 +778,7 @@ The following sequence is retained as a compact repository implementation/change
 | #46 | Max tier fallbacks + editable Target identity | Added current structured Max tier ingestion plus private per-opportunity tier overrides for unknown MP costs, and allowed Pokémon/Battle/Target type corrections on existing targets while keeping stable IDs/history links and duplicate protection. |
 | #47 | Intermediate desktop + private-surface hardening | Closed BL-009/BL-010 by delaying dense desktop splits until 1180px, adding width-boundary browser regressions, moving current Planner/Admin API credentials into headers with legacy compatibility, and adding no-referrer/CSP/frame/content/no-store response protections. |
 | #48 | BL-011A Planner client extraction | Began incremental BL-011 modularization by moving management capability/API transport plus shared escaping/number formatting out of `public/manage.html` into `public/planner-client.js`, preserving the PR #47 auth/security contract and existing Planner behavior. |
+| #49 | BL-011B Target logic extraction | Continued incremental BL-011 modularization by moving pure Target progress, availability, filtering, sorting, status counts, grouping, and view-model logic into `public/planner-target-logic.js` while keeping rendering and mutations in `manage.html`. |
 
 ## Supersession map
 
