@@ -20,6 +20,7 @@ const plannerBattlePlanLogic = read("../public/planner-battle-plan-logic.js");
 const plannerBattleIntel = read("../public/planner-battle-intel.js");
 const battleTargetsClient = read("../public/battle-targets.js");
 const styles = read("../public/styles.css");
+const plannerStyles = read("../public/planner.css");
 const worker = read("../src/index.js");
 
 assert.match(manage, /Pokémon GO Battle Planner/);
@@ -120,12 +121,12 @@ assert.match(manage, /isMax \? maxRankingsHtml\(rec\.meta\?\.max_rankings_json\)
 assert.match(manage, /rec\.battle_system === "max"\s*\? null/);
 assert.doesNotMatch(manage, /battle-plan-ui\.js/);
 
-assert.match(styles, /Battle Plan \/ Max Battle UI — v31/);
-assert.match(styles, /\.battle-plan-filter/);
-assert.match(styles, /\.battle-filter-button/);
-assert.match(styles, /min-height:\s*44px/);
-assert.match(styles, /\.nav-label-mobile/);
-assert.match(styles, /@media \(max-width: 700px\)/);
+assert.match(plannerStyles, /Battle Plan \/ Max Battle UI — v31/);
+assert.match(plannerStyles, /\.battle-plan-filter/);
+assert.match(plannerStyles, /\.battle-filter-button/);
+assert.match(plannerStyles, /min-height:\s*44px/);
+assert.match(plannerStyles, /\.nav-label-mobile/);
+assert.match(plannerStyles, /@media \(max-width: 700px\)/);
 
 for (const page of [
   "../public/manage.html",
@@ -133,7 +134,22 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=41/);
+  assert.match(read(page), /styles\.css\?v=42/);
+}
+
+assert.match(
+  manage,
+  /<link rel="stylesheet" href="\/planner\.css\?v=1">/
+);
+for (const page of [
+  "../public/index.html",
+  "../public/admin.html",
+  "../public/sources.html"
+]) {
+  assert.doesNotMatch(
+    read(page),
+    /planner\.css/
+  );
 }
 
 assert.match(worker, /BATTLE_SOURCE_TYPES/);
@@ -1335,9 +1351,9 @@ assert.match(manage, /\.join\("\ \+ "\)/);
 
 assert.match(manage, /item\.exclusion_reason/);
 assert.match(plannerBattlePlanLogic, /MP cost unknown/);
-assert.match(styles, /PAID BATTLE FORECAST EXPANSION · v38/);
-assert.match(styles, /\.forecast-expand-button/);
-assert.match(styles, /\.forecast-detail-row/);
+assert.match(plannerStyles, /PAID BATTLE FORECAST EXPANSION · v38/);
+assert.match(plannerStyles, /\.forecast-expand-button/);
+assert.match(plannerStyles, /\.forecast-detail-row/);
 assert.match(worker, /function calendarSourceTypesForUser/);
 assert.match(worker, /included\.includes\("max_battles"\)[\s\S]*MAX_ROTATION_SOURCE_TYPE/);
 assert.match(worker, /calendarDisplaySourceType/);
@@ -1362,7 +1378,7 @@ assert.match(manage, /saveBattleResources/);
 assert.match(manage, /\/api\/battle-resources/);
 assert.match(plannerBattlePlanLogic, /MP cost unknown/);
 assert.match(manage, /Remote Max battle/);
-assert.match(styles, /Battle resource planning — v32/);
+assert.match(plannerStyles, /Battle resource planning — v32/);
 assert.match(worker, /battle_resource_plan/);
 assert.match(worker, /battleResourcePlanForUser/);
 assert.match(worker, /updateBattleResourcesApi/);
@@ -1546,9 +1562,9 @@ assert.match(styles, /BL-008 — direct zero-Remote allocation explanations · v
 assert.match(styles, /\.allocation-reason-inline/);
 assert.match(styles, /\.allocation-reason-max/);
 
-assert.match(styles, /Battle Plan compact desktop polish — v35/);
-assert.match(styles, /grid-template-areas:[\s\S]*today-main resources[\s\S]*today-metrics resources/);
-assert.match(styles, /battle-resource-panel[\s\S]*border-left:/);
+assert.match(plannerStyles, /Battle Plan compact desktop polish — v35/);
+assert.match(plannerStyles, /grid-template-areas:[\s\S]*today-main resources[\s\S]*today-metrics resources/);
+assert.match(plannerStyles, /battle-resource-panel[\s\S]*border-left:/);
 
 
 // Part 8: shared-resource UX must stay battle-system aware.
@@ -1561,24 +1577,34 @@ assert.match(manage, /role="tablist"/);
 assert.match(manage, /role="tabpanel"/);
 assert.match(manage, /function lockPageForMobileMore/);
 assert.match(manage, /function unlockPageForMobileMore/);
-assert.match(styles, /PART 8 UX POLISH \+ REGRESSION HARDENING · v36/);
-assert.match(styles, /html\.mobile-more-open/);
-assert.match(styles, /\.battle-card-max[\s\S]*border-top-color/);
-assert.match(styles, /recommendation-footer-row[\s\S]*grid-template-columns/);
+assert.match(plannerStyles, /PART 8 UX POLISH \+ REGRESSION HARDENING · v36/);
+assert.match(plannerStyles, /html\.mobile-more-open/);
+assert.match(plannerStyles, /\.battle-card-max[\s\S]*border-top-color/);
+assert.match(plannerStyles, /recommendation-footer-row[\s\S]*grid-template-columns/);
 assert.doesNotMatch(manage, /daily participation cap is not verified here/i);
 assert.doesNotMatch(manage, /separate Raid-only rule/i);
 
 // Part 8 mobile actions remain 44px+ and only real tabs receive tab state.
-assert.match(styles, /recommendation-footer-row \.log-raid-button,[\s\S]*min-height:\s*44px/);
+assert.match(plannerStyles, /recommendation-footer-row \.log-raid-button,[\s\S]*min-height:\s*44px/);
 assert.match(manage, /querySelectorAll\("\.tab-button\[data-tab\]"\)/);
 
 
-assert.match(styles, /Desktop text visibility \+ Max battle-intel hardening · v37/);
-assert.match(styles, /@media \(min-width: 900px\)[\s\S]*\.battle-resource-advice \{[\s\S]*display: grid;[\s\S]*overflow: visible;/);
-assert.match(styles, /@media \(min-width: 1180px\)[\s\S]*\.dashboard-shell \{[\s\S]*calc\(100% - 224px\)/);
-assert.match(styles, /BL-009 — INTERMEDIATE-WIDTH DESKTOP HARDENING · v41/);
-assert.match(styles, /@media \(min-width: 761px\) and \(max-width: 1179px\)/);
-assert.match(styles, /\.today-command-main \{[\s\S]*grid-template-columns: 1fr;/);
-assert.match(styles, /\.budget-forecast-strip \{[\s\S]*repeat\(4, minmax\(0, 1fr\)\)/);
-assert.match(styles, /\.calendar-view-layout \{[\s\S]*grid-template-columns: 1fr;/);
-assert.match(styles, /\.forecast-detail-main strong,[\s\S]*\.recent-raid-main strong[\s\S]*white-space: normal;/);
+assert.match(plannerStyles, /Desktop text visibility \+ Max battle-intel hardening · v37/);
+assert.match(plannerStyles, /@media \(min-width: 900px\)[\s\S]*\.battle-resource-advice \{[\s\S]*display: grid;[\s\S]*overflow: visible;/);
+assert.match(plannerStyles, /@media \(min-width: 1180px\)[\s\S]*\.dashboard-shell \{[\s\S]*calc\(100% - 224px\)/);
+assert.match(plannerStyles, /BL-009 — INTERMEDIATE-WIDTH DESKTOP HARDENING · v41/);
+assert.match(plannerStyles, /@media \(min-width: 761px\) and \(max-width: 1179px\)/);
+assert.match(plannerStyles, /\.today-command-main \{[\s\S]*grid-template-columns: 1fr;/);
+assert.match(plannerStyles, /\.budget-forecast-strip \{[\s\S]*repeat\(4, minmax\(0, 1fr\)\)/);
+assert.match(plannerStyles, /\.calendar-view-layout \{[\s\S]*grid-template-columns: 1fr;/);
+assert.match(plannerStyles, /\.forecast-detail-main strong,[\s\S]*\.recent-raid-main strong[\s\S]*white-space: normal;/);
+
+assert.doesNotMatch(
+  styles,
+  /RESPONSIVE APP SHELL — DESKTOP \/ MOBILE/,
+  "Planner-only responsive overrides must stay out of shared styles.css"
+);
+assert.match(
+  plannerStyles,
+  /RESPONSIVE APP SHELL — DESKTOP \/ MOBILE/
+);
