@@ -258,7 +258,7 @@ assert.equal(
 
 assert.equal(
   plannerClientApi.esc(
-    `<&"'\`
+    "<&\"'"
   ),
   "&lt;&amp;&quot;&#39;"
 );
