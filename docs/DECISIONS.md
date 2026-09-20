@@ -784,6 +784,7 @@ The following sequence is retained as a compact repository implementation/change
 | #52 | BL-011E Battle Plan resource logic extraction | Continued incremental BL-011 modularization by moving recommendation filtering/counts, allocation lookup maps, zero-allocation compatibility/reason labels, score tone, and Max tier/cost metadata into `public/planner-battle-plan-logic.js` while keeping card DOM/actions in `manage.html`. |
 | #53 | BL-011F Battle Intel extraction | Continued incremental BL-011 modularization by moving Pokémon GO type-effectiveness and Battle Intel aggregation into `public/planner-battle-intel.js`, while keeping exact catalog/form resolution and Intel DOM rendering in `manage.html`. |
 | #54 | BL-011G Planner stylesheet split | Continued incremental BL-011 modularization by moving the Planner-only responsive/feature tail of `public/styles.css` into `public/planner.css`, loaded after the shared base stylesheet only by `manage.html`; bumped shared CSS cache generation to v42. |
+| #55 | BL-011H Worker HTTP security extraction | Continued incremental BL-011 modularization by moving JSON/error responses, management/admin credential parsing, and response-hardening policy into `src/http-security.js` while preserving the established `src/index.js` helper re-exports and legacy credential compatibility. |
 
 ## Supersession map
 
