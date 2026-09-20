@@ -376,6 +376,7 @@ assert.match(manage, /querySelectorAll\("\.tab-button\[data-tab\]"\)/);
 
 assert.match(styles, /Desktop text visibility \+ Max battle-intel hardening · v37/);
 assert.match(styles, /@media \(min-width: 900px\)[\s\S]*\.battle-resource-advice \{[\s\S]*display: grid;[\s\S]*overflow: visible;/);
+assert.match(styles, /@media \(min-width: 1180px\)[\s\S]*\.dashboard-shell \{[\s\S]*calc\(100% - 224px\)/);
 assert.match(styles, /BL-009 — INTERMEDIATE-WIDTH DESKTOP HARDENING · v41/);
 assert.match(styles, /@media \(min-width: 761px\) and \(max-width: 1179px\)/);
 assert.match(styles, /\.today-command-main \{[\s\S]*grid-template-columns: 1fr;/);
