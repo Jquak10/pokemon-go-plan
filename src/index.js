@@ -2822,10 +2822,17 @@ async function createUser(request, env) {
   const feedHash = await sha256Hex(feedToken);
   const timestamp = nowIso();
 
+  const requestedTimezone =
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "timezone"
+    )
+      ? body.timezone
+      : DEFAULT_TIMEZONE;
+
   const timezone =
     canonicalTimeZone(
-      body.timezone ||
-      DEFAULT_TIMEZONE
+      requestedTimezone
     );
 
   if (!timezone) {
