@@ -306,6 +306,7 @@ Manual `wrangler deploy` is available as an npm script, but it is not the normal
 │   ├── index.html             # Planner creation page
 │   ├── manage.html            # Personalized planner dashboard/orchestration
 │   ├── planner-client.js      # Planner API/auth + shared client utilities
+│   ├── planner-target-logic.js # Pure Target filtering/progress/sorting/grouping
 │   ├── sources.html           # Data-source and precedence information
 │   └── styles.css             # Shared responsive styles
 ├── src/index.js               # Worker, APIs, routes, and scheduled jobs
