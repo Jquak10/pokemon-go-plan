@@ -50,6 +50,12 @@ import {
   inclusiveEndDateFromPropertyLine,
   parseIcsEvents
 } from "./calendar-ics.js";
+import {
+  DEFAULT_TIMEZONE,
+  TIMEZONE_ERROR,
+  canonicalTimeZone,
+  isValidTimeZone
+} from "./timezone.js";
 
 export {
   adminKeyFromRequest,
@@ -2816,7 +2822,25 @@ async function createUser(request, env) {
   const feedHash = await sha256Hex(feedToken);
   const timestamp = nowIso();
 
-  const timezone = String(body.timezone || "Asia/Singapore").slice(0, 80);
+  const requestedTimezone =
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "timezone"
+    )
+      ? body.timezone
+      : DEFAULT_TIMEZONE;
+
+  const timezone =
+    canonicalTimeZone(
+      requestedTimezone
+    );
+
+  if (!timezone) {
+    return bad(
+      TIMEZONE_ERROR
+    );
+  }
+
   const included = Array.isArray(body.included_sources)
     ? body.included_sources.filter((x) => SOURCES[x])
     : DEFAULT_SOURCES;
@@ -5947,9 +5971,25 @@ async function syncOfficialRemoteRaidLimits(env) {
 
 
 function localDateForTimezone(timezone) {
+  const validatedTimezone =
+    canonicalTimeZone(
+      timezone
+    );
+
+  if (!validatedTimezone) {
+    console.warn(
+      "Invalid stored timezone; falling back to UTC:",
+      String(
+        timezone || ""
+      )
+    );
+  }
+
   try {
     const formatter = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone || "UTC",
+      timeZone:
+        validatedTimezone ||
+        "UTC",
       year: "numeric",
       month: "2-digit",
       day: "2-digit"
@@ -8936,6 +8976,10 @@ async function getMe(request, env) {
   return json({
     user: {
       timezone: user.timezone,
+      timezone_valid:
+        isValidTimeZone(
+          user.timezone
+        ),
       included_sources: parseSources(user),
       pve_weight: user.pve_weight,
       pvp_weight: user.pvp_weight,
@@ -8998,7 +9042,32 @@ async function updateSettings(request, env) {
   const pve = clamp(Number(body.pve_weight ?? user.pve_weight), 0, 2);
   const pvp = clamp(Number(body.pvp_weight ?? user.pvp_weight), 0, 2);
   const collector = clamp(Number(body.collector_weight ?? user.collector_weight), 0, 2);
-  const timezone = String(body.timezone || user.timezone).slice(0, 80);
+  let timezone =
+    String(
+      user.timezone ||
+      DEFAULT_TIMEZONE
+    ).trim();
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      body,
+      "timezone"
+    )
+  ) {
+    const validatedTimezone =
+      canonicalTimeZone(
+        body.timezone
+      );
+
+    if (!validatedTimezone) {
+      return bad(
+        TIMEZONE_ERROR
+      );
+    }
+
+    timezone =
+      validatedTimezone;
+  }
 
   let remoteRaidBudget = null;
   if (body.remote_raid_budget !== "" && body.remote_raid_budget != null) {

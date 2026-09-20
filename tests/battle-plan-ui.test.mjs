@@ -18,7 +18,9 @@ function read(relative) {
   return readFileSync(new URL(relative, import.meta.url), "utf8");
 }
 
+const portal = read("../public/index.html");
 const manage = read("../public/manage.html");
+const timezoneValidation = read("../public/timezone-validation.js");
 const plannerClient = read("../public/planner-client.js");
 const plannerTargetLogic = read("../public/planner-target-logic.js");
 const plannerCalendarLogic = read("../public/planner-calendar-logic.js");
@@ -30,6 +32,60 @@ const styles = read("../public/styles.css");
 const plannerStyles = read("../public/planner.css");
 const worker = read("../src/index.js");
 const httpSecurity = read("../src/http-security.js");
+
+const timezoneValidationContext =
+  vm.createContext({
+    Intl
+  });
+
+timezoneValidationContext.globalThis =
+  timezoneValidationContext;
+
+vm.runInContext(
+  timezoneValidation,
+  timezoneValidationContext
+);
+
+assert.equal(
+  timezoneValidationContext
+    .TimezoneValidation
+    .parse("Asia/Singapore")
+    .valid,
+  true
+);
+
+assert.equal(
+  timezoneValidationContext
+    .TimezoneValidation
+    .parse("Asia/Singapor")
+    .valid,
+  false
+);
+
+assert.match(
+  portal,
+  /<script src="\/timezone-validation\.js\?v=1"><\/script>/
+);
+assert.match(
+  manage,
+  /<script src="\/timezone-validation\.js\?v=1"><\/script>/
+);
+assert.match(
+  manage,
+  /timezone_valid/
+);
+assert.match(
+  worker,
+  /from "\.\/timezone\.js"/
+);
+assert.match(
+  worker,
+  /canonicalTimeZone\([\s\S]*body\.timezone/
+);
+assert.match(
+  worker,
+  /timezone_valid:[\s\S]*isValidTimeZone/
+);
 
 assert.match(manage, /Pokémon GO Battle Planner/);
 assert.match(manage, /PERSONAL BATTLE STRATEGY/);

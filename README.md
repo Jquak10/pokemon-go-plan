@@ -116,7 +116,7 @@ The project is independent and is not affiliated with Niantic, The Pokémon Comp
 ### Create or open a planner
 
 1. Open the [production app](https://pogo-plan.jquak-10.workers.dev).
-2. Enter a timezone. It controls local event dates, temporary event limits, and when daily Remote Raid usage resets.
+2. Enter or choose a valid IANA timezone (for example, `Asia/Singapore`). The browser suggests supported timezones, and both the Planner UI and Worker reject invalid timezone names instead of silently treating them as UTC. The saved timezone controls local event dates, temporary event limits, and when daily Remote Raid/Max Particle usage resets.
 3. Select **Create my planner**.
 4. Save the **Management link** somewhere private. It is the sign-in link for that planner.
 5. Save the separate calendar link only in a trusted calendar client.

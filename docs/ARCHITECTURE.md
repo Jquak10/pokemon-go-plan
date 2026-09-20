@@ -65,6 +65,12 @@ Do not invent missing availability. Event and battle availability follows the pr
 
 Logging that changes target progress, Remote usage, or Max Particle state must be applied and undone as a coherent transaction. Partial Undo is not acceptable.
 
+### 2.7 Timezone correctness is explicit
+
+Planner timezones are IANA timezone identifiers such as `Asia/Singapore`. Creation and Preferences validate them in the browser for immediate feedback and independently in the Worker before persistence. The Worker canonicalizes valid identifiers through `Intl.DateTimeFormat`; invalid timezone input is rejected rather than stored.
+
+The Planner API exposes whether an already-stored timezone is valid so a legacy malformed value can be surfaced for correction. Core date calculations retain a UTC fallback only as a defensive compatibility path for pre-validation legacy rows, and that fallback is logged rather than treated as normal behavior. Unrelated settings updates do not become blocked solely because a historical row contains an invalid timezone.
+
 ## 3. Production topology
 
 Repository: Jquak10/pokemon-go-plan  

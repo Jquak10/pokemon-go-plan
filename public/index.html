@@ -93,14 +93,23 @@
       <div>
         <label for="timezone">Timezone</label>
         <div class="portal-form-row">
-          <input id="timezone" value="Asia/Singapore" autocomplete="off">
+          <input
+            id="timezone"
+            value="Asia/Singapore"
+            autocomplete="off"
+            list="timezoneOptions"
+            spellcheck="false"
+            aria-describedby="timezoneHelp"
+          >
+          <datalist id="timezoneOptions"></datalist>
 
           <button id="create" type="button" class="portal-create-button">
             Create my planner
           </button>
         </div>
-        <p class="field-help">
-          Used for local event dates, daily Remote Raid usage, and temporary event limits.
+        <p id="timezoneHelp" class="field-help">
+          Choose a valid IANA timezone such as Asia/Singapore. It controls local event dates,
+          daily Remote Raid usage, and temporary event limits.
         </p>
       </div>
 
@@ -161,12 +170,24 @@
     </footer>
   </main>
 
+<script src="/timezone-validation.js?v=1"></script>
 <script>
 const createButton = document.getElementById("create");
 const status = document.getElementById("status");
 const result = document.getElementById("result");
+const timezoneInput =
+  document.getElementById(
+    "timezone"
+  );
 
-document.getElementById("timezone").addEventListener("keydown", event => {
+TimezoneValidation.attachSuggestions(
+  timezoneInput,
+  document.getElementById(
+    "timezoneOptions"
+  )
+);
+
+timezoneInput.addEventListener("keydown", event => {
   if (event.key !== "Enter") return;
 
   event.preventDefault();
@@ -200,6 +221,23 @@ async function copyText(value, button, normalLabel) {
 }
 
 createButton.addEventListener("click", async () => {
+  const timezoneResult =
+    TimezoneValidation.validateInput(
+      timezoneInput,
+      {
+        report: true
+      }
+    );
+
+  if (!timezoneResult.valid) {
+    status.textContent =
+      timezoneResult.message;
+    status.className =
+      "save-status error";
+    timezoneInput.focus();
+    return;
+  }
+
   createButton.disabled = true;
   status.textContent = "Creating your private planner…";
   status.className = "save-status";
@@ -212,10 +250,7 @@ createButton.addEventListener("click", async () => {
       },
       body: JSON.stringify({
         timezone:
-          document
-            .getElementById("timezone")
-            .value
-            .trim()
+          timezoneResult.timezone
       })
     });
 

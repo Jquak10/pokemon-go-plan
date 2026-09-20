@@ -786,6 +786,7 @@ The following sequence is retained as a compact repository implementation/change
 | #54 | BL-011G Planner stylesheet split | Continued incremental BL-011 modularization by moving the Planner-only responsive/feature tail of `public/styles.css` into `public/planner.css`, loaded after the shared base stylesheet only by `manage.html`; bumped shared CSS cache generation to v42. |
 | #55 | BL-011H Worker HTTP security extraction | Continued incremental BL-011 modularization by moving JSON/error responses, management/admin credential parsing, and response-hardening policy into `src/http-security.js` while preserving the established `src/index.js` helper re-exports and legacy credential compatibility. |
 | #56 | BL-011I iCalendar parsing extraction + BL-011 closure | Completed the BL-011 modularization series by moving pure RFC 5545/date-property parsing into `src/calendar-ics.js`, adding dedicated regression coverage, and removing BL-011 from Active after confirming the remaining large Planner/Worker files are orchestration surfaces rather than unbounded modularization work. |
+| #57 | BL-012 timezone validation | Validates and canonicalizes IANA timezone identifiers at browser and Worker ingress, surfaces malformed legacy timezone state for correction, preserves a logged UTC fallback only for legacy compatibility, and records BL-013 through BL-018 from the 21 September 2026 product audit. |
 
 ## Supersession map
 

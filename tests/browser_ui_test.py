@@ -447,6 +447,23 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
 
         self.send_error(404)
 
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        if path == "/api/settings":
+            self.server.settings_post_count = (
+                getattr(
+                    self.server,
+                    "settings_post_count",
+                    0,
+                )
+                + 1
+            )
+            return self._json({"ok": True})
+
+        self.send_error(404)
+
     def _json(self, value, status=200):
         payload = json.dumps(value).encode("utf-8")
         self.send_response(status)
@@ -527,6 +544,56 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertEqual(
             self.server.last_manage_api_path,
             "/api/me",
+        )
+
+        self.assert_no_horizontal_overflow(page)
+
+    def test_invalid_timezone_is_blocked_before_preferences_save(self):
+        page = self.open_planner(1024, 800)
+        page.locator('.tab-button[data-tab="preferences"]').click()
+
+        timezone = page.locator("#timezone")
+        suggestions = page.locator("#timezoneOptions option")
+        self.assertGreater(
+            suggestions.count(),
+            100,
+            "Modern Chromium should receive searchable IANA timezone suggestions",
+        )
+
+        starting_posts = getattr(
+            self.server,
+            "settings_post_count",
+            0,
+        )
+
+        timezone.fill("Asia/Singapor")
+        page.locator("#saveSettings").click()
+        page.wait_for_timeout(50)
+
+        self.assertEqual(
+            getattr(
+                self.server,
+                "settings_post_count",
+                0,
+            ),
+            starting_posts,
+            "Invalid timezones must be blocked before an API request is sent",
+        )
+        self.assertIn(
+            "valid IANA timezone",
+            page.locator("#settingsStatus").inner_text(),
+        )
+        self.assertTrue(
+            timezone.evaluate(
+                "element => Boolean(element.validationMessage)"
+            )
+        )
+
+        timezone.fill("Asia/Singapore")
+        self.assertFalse(
+            timezone.evaluate(
+                "element => Boolean(element.validationMessage)"
+            )
         )
 
         self.assert_no_horizontal_overflow(page)

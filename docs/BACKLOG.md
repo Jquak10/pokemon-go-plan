@@ -27,7 +27,29 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-No confirmed active backlog items are currently recorded.
+### BL-013 — Make official schedule discovery durable
+
+Still-upcoming official supplements should not disappear merely because their source article falls outside the newest-news discovery window. Retain/revisit official source URLs through the relevant event horizon while preserving replacement and suppression precedence.
+
+### BL-014 — Track synchronization health per source
+
+Persist last attempt, last success, last error, and item count for each event/official/meta source. Surface degraded relevant sources instead of representing the newest successful source timestamp as freshness for the whole layer.
+
+### BL-015 — Add management and calendar credential rotation
+
+Add explicit recovery controls for rotating the private management capability and regenerating/revoking the preferred signed calendar subscription URL. Preserve legacy URL compatibility while making leaked bearer credentials individually recoverable.
+
+### BL-016 — Finish keyboard and modal accessibility
+
+Centralize dialog keyboard behavior: focus containment, Escape handling, focus restoration, background isolation, visible keyboard focus, and reduced-motion handling. Add deterministic browser regressions for those interactions.
+
+### BL-017 — Tighten Planner script CSP
+
+Move the remaining large inline Planner application script and inline event handler into external same-origin code so `script-src 'unsafe-inline'` can be removed without reopening modularization based on file size alone.
+
+### BL-018 — Normalize Planner API and transport failures
+
+Make the Planner API client handle structured JSON errors, non-JSON 5xx responses, empty responses, and network failures with actionable user messages instead of assuming every response is valid JSON.
 
 ## Deferred
 
@@ -58,5 +80,7 @@ BL-001 was resolved after the production D1 definitions for `event_suppression_r
 A follow-up repository audit on 18 September 2026 identified the improvement work tracked here. Automated browser regression coverage and broad PR CI shipped in PR #36, failure-safe Pokémon catalog loading shipped in PR #37, canonical Battle Plan priority scoring shipped in PR #38, and verified Max Particle cost evidence shipped in PR #39. Completed items are removed from Active and retained in `docs/DECISIONS.md` instead.
 
 BL-011 was completed through the incremental Planner/Worker modularization series ending with the iCalendar parsing extraction. The resulting boundaries cover Planner client/auth, Targets, Calendar, Hundo, Battle Plan/resources, Battle Intel, Planner-only CSS, Worker HTTP security, and pure iCalendar parsing. Remaining large integration files are intentionally orchestration surfaces rather than backlog items based on size alone.
+
+A fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 (timezone validation) is implemented by the current change and is therefore not retained as unshipped Active work; BL-013 through BL-018 remain recorded above for future prioritization.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
