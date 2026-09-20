@@ -170,6 +170,9 @@ function json(data, status = 200, headers = {}) {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
       ...headers
     }
   });
@@ -2816,6 +2819,103 @@ async function userByManageToken(env, token) {
   return env.DB.prepare(`SELECT * FROM users WHERE manage_hash = ?`)
     .bind(hash)
     .first();
+}
+
+export function manageTokenFromRequest(
+  request,
+  body = null
+) {
+  const authorization =
+    request.headers.get(
+      "authorization"
+    ) || "";
+
+  const bearer =
+    authorization.match(
+      /^Bearer\s+(.+)$/i
+    )?.[1]?.trim();
+
+  const headerToken =
+    request.headers.get(
+      "x-manage-token"
+    )?.trim();
+
+  if (bearer) return bearer;
+  if (headerToken) return headerToken;
+
+  const bodyToken =
+    body &&
+    typeof body === "object"
+      ? String(
+          body.token || ""
+        ).trim()
+      : "";
+
+  if (bodyToken) {
+    return bodyToken;
+  }
+
+  const url =
+    new URL(
+      request.url
+    );
+
+  return (
+    url.searchParams.get(
+      "token"
+    ) || ""
+  ).trim();
+}
+
+async function userByManageRequest(
+  request,
+  env,
+  body = null
+) {
+  return userByManageToken(
+    env,
+    manageTokenFromRequest(
+      request,
+      body
+    )
+  );
+}
+
+export function adminKeyFromRequest(
+  request,
+  body = null
+) {
+  const headerKey =
+    request.headers.get(
+      "x-admin-key"
+    )?.trim();
+
+  if (headerKey) {
+    return headerKey;
+  }
+
+  const bodyKey =
+    body &&
+    typeof body === "object"
+      ? String(
+          body.key || ""
+        ).trim()
+      : "";
+
+  if (bodyKey) {
+    return bodyKey;
+  }
+
+  const url =
+    new URL(
+      request.url
+    );
+
+  return (
+    url.searchParams.get(
+      "key"
+    ) || ""
+  ).trim();
 }
 
 async function userByFeedToken(env, token) {
@@ -6542,9 +6642,10 @@ export async function updateMaxBattleCostOverrideApi(
     await request.json();
 
   const user =
-    await userByManageToken(
+    await userByManageRequest(
+      request,
       env,
-      body.token
+      body
     );
 
   if (!user) {
@@ -6760,9 +6861,10 @@ async function updateBattleResourcesApi(
     await request.json();
 
   const user =
-    await userByManageToken(
+    await userByManageRequest(
+      request,
       env,
-      body.token
+      body
     );
 
   if (!user) {
@@ -7663,8 +7765,10 @@ function monthBounds(month) {
 
 async function calendarEventsApi(request, env) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token");
-  const user = await userByManageToken(env, token);
+  const user = await userByManageRequest(
+    request,
+    env
+  );
 
   if (!user) return bad("Invalid management link.", 401);
 
@@ -7826,8 +7930,10 @@ async function calendarEventsApi(request, env) {
 
 async function feedLinkApi(request, env) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token");
-  const user = await userByManageToken(env, token);
+  const user = await userByManageRequest(
+    request,
+    env
+  );
 
   if (!user) return bad("Invalid management link.", 401);
 
@@ -7870,9 +7976,10 @@ async function revokeLegacyFeedApi(
   } catch {}
 
   const user =
-    await userByManageToken(
+    await userByManageRequest(
+      request,
       env,
-      body.token
+      body
     );
 
   if (!user) {
@@ -7923,9 +8030,10 @@ async function updateRemoteRaidBudgetOverride(
     await request.json();
 
   const user =
-    await userByManageToken(
+    await userByManageRequest(
+      request,
       env,
-      body.token
+      body
     );
 
   if (!user) {
@@ -8095,7 +8203,11 @@ export async function raidActivityForUser(env, user, metas) {
 
 export async function logRaidApi(request, env) {
   const body = await request.json();
-  const user = await userByManageToken(env, body.token);
+  const user = await userByManageRequest(
+    request,
+    env,
+    body
+  );
   if (!user) return bad("Invalid management link.", 401);
   try {
     const targets = await getTargets(env, user.id);
@@ -8138,7 +8250,11 @@ export async function logRaidApi(request, env) {
 
 export async function undoRaidLogApi(request, env) {
   const body = await request.json();
-  const user = await userByManageToken(env, body.token);
+  const user = await userByManageRequest(
+    request,
+    env,
+    body
+  );
   if (!user) return bad("Invalid management link.", 401);
   if (!body.log_id) return bad("Battle log ID is required.");
   try {
@@ -8163,7 +8279,11 @@ export async function undoRaidLogApi(request, env) {
 
 export async function updateRemoteRaidUsage(request, env) {
   const body = await request.json();
-  const user = await userByManageToken(env, body.token);
+  const user = await userByManageRequest(
+    request,
+    env,
+    body
+  );
   if (!user) return bad("Invalid management link.", 401);
 
   const sharedCorrection = body.remote_battles_used != null;
@@ -8977,8 +9097,10 @@ async function pokemonCatalogApi(
 
 async function getMe(request, env) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token");
-  const user = await userByManageToken(env, token);
+  const user = await userByManageRequest(
+    request,
+    env
+  );
   if (!user) return bad("Invalid management link.", 401);
 
   const targets = await getTargets(env, user.id);
@@ -9074,7 +9196,11 @@ async function getMe(request, env) {
 
 async function updateSettings(request, env) {
   const body = await request.json();
-  const user = await userByManageToken(env, body.token);
+  const user = await userByManageRequest(
+    request,
+    env,
+    body
+  );
   if (!user) return bad("Invalid management link.", 401);
 
   const included = Array.isArray(body.included_sources)
@@ -9129,7 +9255,11 @@ async function updateSettings(request, env) {
 
 export async function upsertTarget(request, env) {
   const body = await request.json();
-  const user = await userByManageToken(env, body.token);
+  const user = await userByManageRequest(
+    request,
+    env,
+    body
+  );
   if (!user) return bad("Invalid management link.", 401);
   const name = String(body.pokemon_name || "").trim();
   if (!name || name.length > 200) return bad("Pokémon/form name is required (up to 200 characters).");
@@ -9212,9 +9342,11 @@ export async function upsertTarget(request, env) {
 
 async function deleteTarget(request, env) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token");
   const id = url.searchParams.get("id");
-  const user = await userByManageToken(env, token);
+  const user = await userByManageRequest(
+    request,
+    env
+  );
   if (!user) return bad("Invalid management link.", 401);
   if (!id) return bad("Target id is required.");
 
@@ -9234,7 +9366,11 @@ async function bulkDeleteTargets(request, env) {
     return bad("Invalid JSON body.");
   }
 
-  const user = await userByManageToken(env, body?.token);
+  const user = await userByManageRequest(
+    request,
+    env,
+    body
+  );
   if (!user) return bad("Invalid management link.", 401);
 
   const ids = [...new Set(
@@ -9834,8 +9970,11 @@ async function recoverableCalendarFeed(request, env, userId, signature) {
 
 
 async function adminMetaList(request, env) {
-  const url = new URL(request.url);
-  const key = url.searchParams.get("key");
+  const key =
+    adminKeyFromRequest(
+      request
+    );
+
   if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
     return bad("Invalid admin key.", 401);
   }
@@ -9868,8 +10007,10 @@ async function adminMetaList(request, env) {
 
 
 async function adminRemoteRaidLimits(request, env) {
-  const url = new URL(request.url);
-  const key = url.searchParams.get("key");
+  const key =
+    adminKeyFromRequest(
+      request
+    );
 
   if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
     return bad("Invalid admin key.", 401);
@@ -9899,8 +10040,10 @@ async function adminRemoteRaidLimits(request, env) {
 
 
 async function adminOfficialRaidSupplements(request, env) {
-  const url = new URL(request.url);
-  const key = url.searchParams.get("key");
+  const key =
+    adminKeyFromRequest(
+      request
+    );
 
   if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
     return bad("Invalid admin key.", 401);
@@ -9933,8 +10076,10 @@ async function adminOfficialRaidSupplements(request, env) {
 
 
 async function adminSuppressionRules(request, env) {
-  const url = new URL(request.url);
-  const key = url.searchParams.get("key");
+  const key =
+    adminKeyFromRequest(
+      request
+    );
 
   if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
     return bad("Invalid admin key.", 401);
@@ -9965,7 +10110,13 @@ async function readAdminKey(request, env) {
     body = await request.json();
   } catch {}
 
-  if (!env.ADMIN_KEY || body.key !== env.ADMIN_KEY) {
+  const key =
+    adminKeyFromRequest(
+      request,
+      body
+    );
+
+  if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
     return { ok: false, response: bad("Invalid admin key.", 401) };
   }
 
