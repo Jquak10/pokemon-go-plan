@@ -10173,10 +10173,123 @@ async function adminSyncLegacy(request, env) {
   }, 409);
 }
 
-async function asset(request, env, pathname) {
+const HTML_CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'none'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "frame-src 'none'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "manifest-src 'self'"
+].join("; ");
+
+export function hardenResponse(
+  response,
+  {
+    noStore = false
+  } = {}
+) {
+  const headers =
+    new Headers(
+      response.headers
+    );
+
+  headers.set(
+    "referrer-policy",
+    "no-referrer"
+  );
+
+  headers.set(
+    "x-content-type-options",
+    "nosniff"
+  );
+
+  if (noStore) {
+    headers.set(
+      "cache-control",
+      "private, no-store, max-age=0"
+    );
+    headers.set(
+      "pragma",
+      "no-cache"
+    );
+    headers.set(
+      "expires",
+      "0"
+    );
+  }
+
+  if (
+    /text\/html/i.test(
+      headers.get(
+        "content-type"
+      ) || ""
+    )
+  ) {
+    headers.set(
+      "content-security-policy",
+      HTML_CONTENT_SECURITY_POLICY
+    );
+    headers.set(
+      "x-frame-options",
+      "DENY"
+    );
+    headers.set(
+      "permissions-policy",
+      "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+    );
+    headers.set(
+      "cross-origin-opener-policy",
+      "same-origin"
+    );
+    headers.set(
+      "cross-origin-resource-policy",
+      "same-origin"
+    );
+  }
+
+  return new Response(
+    response.body,
+    {
+      status:
+        response.status,
+      statusText:
+        response.statusText,
+      headers
+    }
+  );
+}
+
+async function asset(
+  request,
+  env,
+  pathname,
+  {
+    noStore = false
+  } = {}
+) {
   const url = new URL(request.url);
   url.pathname = pathname;
-  return env.ASSETS.fetch(new Request(url.toString(), request));
+
+  const response =
+    await env.ASSETS.fetch(
+      new Request(
+        url.toString(),
+        request
+      )
+    );
+
+  return hardenResponse(
+    response,
+    {
+      noStore
+    }
+  );
 }
 
 async function handleFetch(request, env) {
@@ -10327,32 +10440,58 @@ async function handleFetch(request, env) {
       path.match(/^\/calendar\/recover\/([0-9a-fA-F-]{36})\.([A-Za-z0-9_-]+)\.ics$/);
 
     if (request.method === "GET" && recoverableCalendarMatch) {
-      return recoverableCalendarFeed(
-        request,
-        env,
-        recoverableCalendarMatch[1],
-        recoverableCalendarMatch[2]
+      return hardenResponse(
+        await recoverableCalendarFeed(
+          request,
+          env,
+          recoverableCalendarMatch[1],
+          recoverableCalendarMatch[2]
+        )
       );
     }
 
     const calendarMatch = path.match(/^\/calendar\/([A-Za-z0-9_-]+)\.ics$/);
     if (request.method === "GET" && calendarMatch) {
-      return calendarFeed(request, env, calendarMatch[1]);
+      return hardenResponse(
+        await calendarFeed(
+          request,
+          env,
+          calendarMatch[1]
+        )
+      );
     }
 
     if (request.method === "GET" && /^\/manage\/[A-Za-z0-9_-]+\/?$/.test(path)) {
-      return asset(request, env, "/manage");
+      return asset(
+        request,
+        env,
+        "/manage",
+        {
+          noStore: true
+        }
+      );
     }
 
     if (request.method === "GET" && path === "/admin") {
-      return asset(request, env, "/admin");
+      return asset(
+        request,
+        env,
+        "/admin",
+        {
+          noStore: true
+        }
+      );
     }
 
     if (request.method === "GET" && path === "/sources") {
       return asset(request, env, "/sources");
     }
 
-    return env.ASSETS.fetch(request);
+    return hardenResponse(
+      await env.ASSETS.fetch(
+        request
+      )
+    );
   } catch (error) {
     console.error(error);
     return json(
