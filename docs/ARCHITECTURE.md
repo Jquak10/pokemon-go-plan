@@ -127,12 +127,13 @@ The main public files are:
 - public/index.html — landing/create-planner experience.
 - public/manage.html — primary authenticated Planner UI and remaining feature/domain integration logic.
 - public/planner-client.js — shared Planner capability-token parsing, authenticated API request preparation, API error handling, HTML escaping, and numeric formatting.
+- public/planner-target-logic.js — pure Target progress, availability, non-status/status filtering, sorting, counts, and grouping/view-model logic. It accepts BattleTargets and normalization/formatting helpers as dependencies and contains no DOM or API mutation code.
 - public/admin.html — administration/synchronization controls.
 - public/sources.html — data-source explanation.
 - public/styles.css — shared responsive styling.
 - public/battle-targets.js — shared client-side target identity helpers.
 
-The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. BL-011 modularization is incremental: cohesive infrastructure/domain slices move into classic-script modules while `manage.html` remains the orchestration surface until later slices are extracted. The Planner client module owns the PR #47 management-auth transport contract, so feature code should call its `api` helper rather than reimplementing token/query/body handling.
+The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. BL-011 modularization is incremental: cohesive infrastructure/domain slices move into classic-script modules while `manage.html` remains the orchestration surface until later slices are extracted. The Planner client module owns the PR #47 management-auth transport contract, so feature code should call its `api` helper rather than reimplementing token/query/body handling. Target list business logic is likewise kept in the pure Planner Target Logic module; `manage.html` continues to own Target DOM rendering, selection state, modal interactions, and API mutations.
 
 ### 5.1 Mobile information architecture
 

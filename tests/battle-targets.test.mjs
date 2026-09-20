@@ -258,7 +258,13 @@ const ui=vm.createContext({BattleTargets:T,document:{getElementById:element,quer
 targetFilterState:{status:'active',search:'gengar',type:'candy',battle:'gigantamax',priority:'high',availability:'now',sort:'name'},
 normalizePickerName:v=>String(v).toLowerCase(),formatNumber:String,esc:String,targetById:new Map(),
 syncTargetSelectionUi(){},syncTargetViewUi(){},targetCardHtml:t=>t.id});
-for(const name of ['targetAvailability','targetPriorityRank','targetProgress','targetsMatchingNonStatusFilters','sortTargets','filteredTargets','activeTargetFilterCount','renderTargets']){
+vm.runInContext(read('../public/planner-target-logic.js'),ui);
+ui.targetLogic=ui.PlannerTargetLogic.create({
+  battleTargets:T,
+  normalizeName:ui.normalizePickerName,
+  formatNumber:ui.formatNumber
+});
+for(const name of ['targetAvailability','targetProgress','targetsMatchingNonStatusFilters','sortTargets','filteredTargets','activeTargetFilterCount','renderTargets']){
   const start=script.indexOf(`function ${name}(`);assert.ok(start>=0,name);
   const tail=script.slice(start);const end=tail.slice(1).search(/\n(?:async )?function /);
   vm.runInContext(tail.slice(0,end+1),ui);

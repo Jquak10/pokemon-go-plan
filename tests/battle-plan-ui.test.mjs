@@ -13,6 +13,8 @@ function read(relative) {
 
 const manage = read("../public/manage.html");
 const plannerClient = read("../public/planner-client.js");
+const plannerTargetLogic = read("../public/planner-target-logic.js");
+const battleTargetsClient = read("../public/battle-targets.js");
 const styles = read("../public/styles.css");
 const worker = read("../src/index.js");
 
@@ -21,6 +23,9 @@ assert.match(manage, /PERSONAL BATTLE STRATEGY/);
 assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
 assert.match(manage, /<script src="\/planner-client\.js\?v=1"><\/script>/);
+assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
+assert.match(manage, /PlannerTargetLogic\.create/);
+assert.doesNotMatch(manage, /function targetPriorityRank/);
 assert.match(manage, /const \{[\s\S]*token,[\s\S]*api,[\s\S]*esc,[\s\S]*formatNumber[\s\S]*\} = PlannerClient;/);
 assert.doesNotMatch(manage, /function managedApiRequest/);
 assert.doesNotMatch(manage, /function api\(path, options/);
@@ -136,6 +141,14 @@ new vm.Script(
   {
     filename:
       "planner-client.js"
+  }
+);
+
+new vm.Script(
+  plannerTargetLogic,
+  {
+    filename:
+      "planner-target-logic.js"
   }
 );
 
@@ -268,6 +281,266 @@ assert.equal(
     "not-a-number"
   ),
   "—"
+);
+
+const targetLogicContext = {};
+vm.createContext(
+  targetLogicContext
+);
+
+new vm.Script(
+  battleTargetsClient,
+  {
+    filename:
+      "battle-targets.js"
+  }
+).runInContext(
+  targetLogicContext
+);
+
+new vm.Script(
+  plannerTargetLogic,
+  {
+    filename:
+      "planner-target-logic.js"
+  }
+).runInContext(
+  targetLogicContext
+);
+
+const normalizeTargetName =
+  value =>
+    String(
+      value || ""
+    )
+      .toLowerCase()
+      .trim();
+
+const targetLogic =
+  targetLogicContext
+    .PlannerTargetLogic
+    .create({
+      battleTargets:
+        targetLogicContext
+          .BattleTargets,
+      normalizeName:
+        normalizeTargetName,
+      formatNumber:
+        value =>
+          Number(value)
+            .toLocaleString(
+              "en-US"
+            )
+    });
+
+const targetFixtures = [
+  {
+    id: "a",
+    pokemon_name:
+      "Dynamax Moltres",
+    battle_kind:
+      "dynamax",
+    target_type:
+      "battles",
+    current_value: 2,
+    target_value: 5,
+    priority: "high",
+    completed: 0,
+    updated_at:
+      "2026-09-20T10:00:00Z"
+  },
+  {
+    id: "b",
+    pokemon_name:
+      "Dynamax Zapdos",
+    battle_kind:
+      "dynamax",
+    target_type:
+      "battles",
+    current_value: 5,
+    target_value: 5,
+    priority: "medium",
+    completed: 1,
+    updated_at:
+      "2026-09-20T11:00:00Z"
+  },
+  {
+    id: "c",
+    pokemon_name:
+      "Mega Venusaur",
+    battle_kind:
+      "raid",
+    target_type:
+      "mega_energy",
+    current_value: 100,
+    target_value: 200,
+    priority: "low",
+    completed: 0,
+    updated_at:
+      "2026-09-20T12:00:00Z"
+  }
+];
+
+const targetOptions = {
+  current: [
+    {
+      pokemon_name:
+        "Dynamax Moltres",
+      battle_kind:
+        "dynamax"
+    }
+  ],
+  upcoming: [
+    {
+      pokemon_name:
+        "Mega Venusaur",
+      battle_kind:
+        "raid"
+    }
+  ]
+};
+
+const plainTargetValue =
+  value =>
+    JSON.parse(
+      JSON.stringify(
+        value
+      )
+    );
+
+assert.deepEqual(
+  plainTargetValue(
+    targetLogic.progress(
+      targetFixtures[0]
+    )
+  ),
+  {
+    percent: 40,
+    label: "2 / 5",
+    known: true
+  }
+);
+
+assert.equal(
+  targetLogic.availability(
+    targetFixtures[0],
+    targetOptions
+  ),
+  "now"
+);
+
+assert.equal(
+  targetLogic.availability(
+    targetFixtures[2],
+    targetOptions
+  ),
+  "upcoming"
+);
+
+const dynamaxView =
+  targetLogic.viewModel({
+    targets:
+      targetFixtures,
+    targetOptions,
+    filterState: {
+      status: "active",
+      search: "",
+      type: "all",
+      battle: "dynamax",
+      priority: "all",
+      availability: "all",
+      sort: "priority"
+    }
+  });
+
+assert.deepEqual(
+  plainTargetValue(
+    dynamaxView.counts
+  ),
+  {
+    active: 1,
+    completed: 1,
+    all: 2
+  },
+  "Target status counts must reflect the current non-status filters"
+);
+
+assert.deepEqual(
+  plainTargetValue(
+    dynamaxView
+      .visibleTargets
+      .map(
+        target =>
+          target.id
+      )
+  ),
+  ["a"]
+);
+
+const allDynamaxView =
+  targetLogic.viewModel({
+    targets:
+      targetFixtures,
+    targetOptions,
+    filterState: {
+      status: "all",
+      search: "",
+      type: "all",
+      battle: "dynamax",
+      priority: "all",
+      availability: "all",
+      sort: "priority"
+    }
+  });
+
+assert.deepEqual(
+  plainTargetValue(
+    allDynamaxView
+      .visibleTargets
+      .map(
+        target =>
+          target.id
+      )
+  ),
+  ["a", "b"]
+);
+
+assert.deepEqual(
+  plainTargetValue(
+    allDynamaxView
+      .groups
+      .needsAttention
+      .map(
+        target =>
+          target.id
+      )
+  ),
+  ["a"]
+);
+
+assert.deepEqual(
+  plainTargetValue(
+    targetLogic
+      .sortTargets({
+        targets:
+          targetFixtures,
+        filterState: {
+          status: "all",
+          search: "",
+          type: "all",
+          battle: "all",
+          priority: "all",
+          availability: "all",
+          sort: "closest"
+        },
+        targetOptions
+      })
+      .map(
+        target =>
+          target.id
+      )
+  ),
+  ["b", "c", "a"]
 );
 
 const plannerApiResponse =
