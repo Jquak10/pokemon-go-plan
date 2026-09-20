@@ -17,6 +17,7 @@ const plannerTargetLogic = read("../public/planner-target-logic.js");
 const plannerCalendarLogic = read("../public/planner-calendar-logic.js");
 const plannerHundoLogic = read("../public/planner-hundo-logic.js");
 const plannerBattlePlanLogic = read("../public/planner-battle-plan-logic.js");
+const plannerBattleIntel = read("../public/planner-battle-intel.js");
 const battleTargetsClient = read("../public/battle-targets.js");
 const styles = read("../public/styles.css");
 const worker = read("../src/index.js");
@@ -30,6 +31,10 @@ assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/)
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
+assert.match(manage, /<script src="\/planner-battle-intel\.js\?v=1"><\/script>/);
+assert.match(manage, /PlannerBattleIntel/);
+assert.doesNotMatch(manage, /const TYPE_RELATIONS =/);
+assert.doesNotMatch(manage, /function defendingTypeMultipliers\(/);
 assert.match(manage, /PlannerBattlePlanLogic\.create/);
 assert.doesNotMatch(manage, /function scoreTone\(/);
 assert.doesNotMatch(manage, /function compactZeroAllocationReason\(/);
@@ -194,6 +199,14 @@ new vm.Script(
   }
 );
 
+new vm.Script(
+  plannerBattleIntel,
+  {
+    filename:
+      "planner-battle-intel.js"
+  }
+);
+
 const plannerClientContext = {
   location: {
     pathname:
@@ -323,6 +336,115 @@ assert.equal(
     "not-a-number"
   ),
   "—"
+);
+
+const battleIntelContext = {};
+vm.createContext(
+  battleIntelContext
+);
+
+new vm.Script(
+  plannerBattleIntel,
+  {
+    filename:
+      "planner-battle-intel.js"
+  }
+).runInContext(
+  battleIntelContext
+);
+
+const battleIntel =
+  battleIntelContext
+    .PlannerBattleIntel;
+
+const rhyhornMatchups =
+  battleIntel.matchupGroups([
+    "Ground",
+    "Rock"
+  ]);
+
+assert.deepEqual(
+  JSON.parse(
+    JSON.stringify(
+      rhyhornMatchups
+        .extraWeak
+        .map(
+          item => [
+            item.type,
+            item.multiplier
+          ]
+        )
+    )
+  ),
+  [
+    ["Water", 2.5600000000000005],
+    ["Grass", 2.5600000000000005]
+  ],
+  "Ground/Rock must retain the compounded 2.56x Water and Grass weaknesses"
+);
+
+assert.equal(
+  rhyhornMatchups
+    .resist
+    .find(
+      item =>
+        item.type ===
+        "Electric"
+    )
+    .multiplier,
+  0.390625,
+  "Ground immunity should remain represented by the Pokémon GO immunity multiplier"
+);
+
+const bossFixture = {
+  name: "Dynamax Rhyhorn",
+  types: [
+    "Ground",
+    "Rock"
+  ]
+};
+
+const encounterFixture = {
+  name: "Rhyhorn",
+  attack: 140,
+  defense: 127,
+  stamina: 190,
+  types: [
+    "Ground",
+    "Rock"
+  ]
+};
+
+const builtIntel =
+  battleIntel.buildBattleIntel({
+    boss:
+      bossFixture,
+    encounter:
+      encounterFixture,
+    hundoCp:
+      (entry, level) =>
+        `${entry.name}-${level}`
+  });
+
+assert.equal(
+  builtIntel.boss,
+  bossFixture
+);
+
+assert.equal(
+  builtIntel.encounter,
+  encounterFixture
+);
+
+assert.equal(
+  builtIntel.normalCp,
+  "Rhyhorn-20",
+  "Hundo CP must use the encounter form rather than the Max battle-form object"
+);
+
+assert.equal(
+  builtIntel.boostedCp,
+  "Rhyhorn-25"
 );
 
 const battlePlanContext = {};

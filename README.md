@@ -310,6 +310,7 @@ Manual `wrangler deploy` is available as an npm script, but it is not the normal
 │   ├── planner-calendar-logic.js # Pure Calendar date/month/event-grid logic
 │   ├── planner-hundo-logic.js    # Pure Hundo CP/search/benchmark logic
 │   ├── planner-battle-plan-logic.js # Battle Plan/resource view-model logic
+│   ├── planner-battle-intel.js # Pure type-effectiveness/Battle Intel logic
 │   ├── sources.html           # Data-source and precedence information
 │   └── styles.css             # Shared responsive styles
 ├── src/index.js               # Worker, APIs, routes, and scheduled jobs
