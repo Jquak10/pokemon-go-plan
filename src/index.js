@@ -9177,7 +9177,67 @@ function dashboardOverview(
   };
 }
 
-async function dataFreshnessForDashboard(env) {
+export function eventSyncHealthSourcesForUser(
+  user
+) {
+  const included =
+    calendarSourceTypesForUser(
+      user
+    );
+
+  const sources =
+    included
+      .filter(
+        sourceType =>
+          Boolean(
+            SOURCES[sourceType]
+          ) ||
+          sourceType ===
+            MAX_ROTATION_SOURCE_TYPE
+      )
+      .map(
+        sourceType =>
+          eventSyncSource(
+            sourceType,
+            SOURCES[
+              sourceType
+            ] ||
+            null
+          )
+      );
+
+  if (
+    included.includes(
+      "max_battles"
+    ) ||
+    included.includes(
+      MAX_ROTATION_SOURCE_TYPE
+    )
+  ) {
+    sources.push(
+      eventSyncSource(
+        "pokemon_go_api_current_max_battles",
+        POGO_API_MAX_BATTLES
+      )
+    );
+  }
+
+  return [
+    ...new Map(
+      sources.map(
+        source => [
+          source.source_key,
+          source
+        ]
+      )
+    ).values()
+  ];
+}
+
+async function dataFreshnessForDashboard(
+  env,
+  user
+) {
   const row =
     await env.DB.prepare(`
       SELECT
@@ -9219,16 +9279,94 @@ async function dataFreshnessForDashboard(env) {
     .filter(Boolean)
     .sort();
 
-  return {
+  const legacy = {
     event_feeds:
-      row?.event_feeds_updated_at || null,
+      row?.event_feeds_updated_at ||
+      null,
     official_schedules:
       officialCandidates.length
-        ? officialCandidates[officialCandidates.length - 1]
+        ? officialCandidates[
+            officialCandidates.length -
+            1
+          ]
         : null,
     raid_assessments:
-      row?.meta_updated_at || null
+      row?.meta_updated_at ||
+      null
   };
+
+  try {
+    const { results } =
+      await env.DB.prepare(`
+        SELECT
+          source_key,
+          source_group,
+          source_label,
+          source_url,
+          last_attempt_at,
+          last_success_at,
+          last_error,
+          item_count
+        FROM sync_source_health
+        ORDER BY
+          source_group,
+          source_label
+      `).all();
+
+    const rows =
+      results || [];
+
+    return {
+      ...legacy,
+      source_health_available:
+        true,
+      groups: {
+        event_feeds:
+          summarizeSyncHealth(
+            rows,
+            eventSyncHealthSourcesForUser(
+              user
+            ),
+            legacy.event_feeds
+          ),
+        official_schedules:
+          summarizeSyncHealth(
+            rows,
+            [
+              OFFICIAL_SYNC_SOURCE
+            ],
+            legacy.official_schedules
+          ),
+        raid_assessments:
+          summarizeSyncHealth(
+            rows,
+            [
+              META_SYNC_SOURCES.pokedex,
+              META_SYNC_SOURCES.pvpoke,
+              META_SYNC_SOURCES.assessments
+            ],
+            legacy.raid_assessments
+          )
+      }
+    };
+  } catch (error) {
+    // Migration 0006 is intentionally backward compatible with deploy order.
+    // Until the table exists, retain the legacy timestamps rather than
+    // breaking the Planner payload.
+    console.warn(
+      "Sync source health unavailable:",
+      syncHealthErrorMessage(
+        error
+      )
+    );
+
+    return {
+      ...legacy,
+      source_health_available:
+        false,
+      groups: null
+    };
+  }
 }
 
 
@@ -9615,7 +9753,10 @@ async function getMe(request, env) {
   );
 
   const dataFreshness =
-    await dataFreshnessForDashboard(env);
+    await dataFreshnessForDashboard(
+      env,
+      user
+    );
 
   const raidActivity =
     await raidActivityForUser(
