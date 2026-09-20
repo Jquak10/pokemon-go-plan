@@ -131,6 +131,7 @@ The main public files are:
 - public/planner-calendar-logic.js — pure UTC date/month helpers, day-event range matching, source-class normalization, and six-week Monday-first month-grid projection. Calendar DOM rendering, fetch/cache state, and selected date/month state remain in manage.html.
 - public/planner-hundo-logic.js — pure Hundo CP multiplier/formula logic, standard benchmark generation, and search ranking. Pokémon catalog loading/cache, recent selections, DOM rendering, and input events remain in manage.html.
 - public/planner-battle-plan-logic.js — pure Battle Plan/resource view-model logic: recommendation system counts/filtering, primary/additional split, legacy/shared allocation lookup maps, zero-allocation compatibility merging/reason labels, score tone, and Max tier/cost display metadata. Recommendation-card DOM and actions remain in manage.html.
+- public/planner-battle-intel.js — pure Pokémon GO type-effectiveness, compounded weakness/resistance grouping, type symbols, and battle/encounter Intel aggregation. Exact catalog/form resolution and Intel DOM rendering remain in manage.html so Mega/Primal/Max battle-form versus encounter-form rules stay explicit.
 - public/admin.html — administration/synchronization controls.
 - public/sources.html — data-source explanation.
 - public/styles.css — shared responsive styling.
