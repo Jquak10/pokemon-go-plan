@@ -308,6 +308,7 @@ Manual `wrangler deploy` is available as an npm script, but it is not the normal
 │   ├── planner-client.js       # Planner API/auth + shared client utilities
 │   ├── planner-target-logic.js # Pure Target filtering/progress/sorting/grouping
 │   ├── planner-calendar-logic.js # Pure Calendar date/month/event-grid logic
+│   ├── planner-hundo-logic.js    # Pure Hundo CP/search/benchmark logic
 │   ├── sources.html           # Data-source and precedence information
 │   └── styles.css             # Shared responsive styles
 ├── src/index.js               # Worker, APIs, routes, and scheduled jobs
