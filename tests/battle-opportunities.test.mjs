@@ -29,6 +29,7 @@ import {
   officialEventPageUrlsForSync,
   officialMaxBattleSupplementsFromText,
   officialRaidSupplementStatements,
+  retainedOfficialEventPageUrls,
   suppressionSourceTypesForEvent
 } from "../src/index.js";
 
@@ -568,6 +569,62 @@ assert.deepEqual(
   ),
   discoveredOfficialPages,
   "Fresh discovery remains bounded independently from retained future sources"
+);
+
+const retainedQueries = [];
+const retainedSourceEnv = {
+  DB: {
+    prepare(sql) {
+      return {
+        bind(...args) {
+          retainedQueries.push({
+            sql,
+            args
+          });
+
+          return {
+            async all() {
+              return {
+                results: [
+                  {
+                    source_url:
+                      retainedLongLeadPage
+                  },
+                  {
+                    source_url:
+                      "https://example.com/not-official"
+                  }
+                ]
+              };
+            }
+          };
+        }
+      };
+    }
+  }
+};
+
+assert.deepEqual(
+  await retainedOfficialEventPageUrls(
+    retainedSourceEnv,
+    "2026-09-21"
+  ),
+  [
+    retainedLongLeadPage
+  ],
+  "Retained future-source recovery must reject non-official stored URLs"
+);
+assert.match(
+  retainedQueries[0].sql,
+  /status IN \([\s\S]*'active',[\s\S]*'stale'/
+);
+assert.deepEqual(
+  retainedQueries[0].args,
+  [
+    "2026-09-21",
+    48
+  ],
+  "Retained official-source lookup must cover the future event horizon with its independent safety cap"
 );
 
 const preparedStatements = [];
