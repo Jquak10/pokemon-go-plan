@@ -380,6 +380,48 @@ MOCK_STATE = {
         "event_feeds": "2026-09-18T06:00:00.000Z",
         "official_schedules": "2026-09-18T06:00:00.000Z",
         "raid_assessments": "2026-09-18T06:00:00.000Z",
+        "source_health_available": True,
+        "groups": {
+            "event_feeds": {
+                "status": "degraded",
+                "updated_at": "2026-09-18T05:00:00.000Z",
+                "source_count": 2,
+                "degraded_count": 1,
+                "missing_count": 0,
+                "degraded_sources": [
+                    {
+                        "source_key": "event:max_battles",
+                        "source_label": "Max Battles",
+                        "last_attempt_at": "2026-09-18T06:00:00.000Z",
+                        "last_success_at": "2026-09-18T00:00:00.000Z",
+                        "last_error": "max_battles: upstream returned 503",
+                        "item_count": 4,
+                    }
+                ],
+                "missing_sources": [],
+                "sources": [],
+            },
+            "official_schedules": {
+                "status": "healthy",
+                "updated_at": "2026-09-18T06:00:00.000Z",
+                "source_count": 1,
+                "degraded_count": 0,
+                "missing_count": 0,
+                "degraded_sources": [],
+                "missing_sources": [],
+                "sources": [],
+            },
+            "raid_assessments": {
+                "status": "healthy",
+                "updated_at": "2026-09-18T06:00:00.000Z",
+                "source_count": 3,
+                "degraded_count": 0,
+                "missing_count": 0,
+                "degraded_sources": [],
+                "missing_sources": [],
+                "sources": [],
+            },
+        },
     },
     "available_sources": [],
 }
@@ -544,6 +586,30 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertEqual(
             self.server.last_manage_api_path,
             "/api/me",
+        )
+
+        self.assert_no_horizontal_overflow(page)
+
+    def test_degraded_sync_source_is_visible_in_freshness_strip(self):
+        page = self.open_planner(1024, 800)
+
+        freshness = page.locator("#freshnessStrip")
+        self.assertIn(
+            "⚠ Max Battles",
+            freshness.inner_text(),
+        )
+        self.assertIn(
+            "max_battles: upstream returned 503",
+            freshness.locator(
+                ".freshness-item"
+            ).first.get_attribute(
+                "title"
+            ),
+        )
+        self.assertNotIn(
+            "Community Day",
+            freshness.inner_text(),
+            "The compact warning should name only the relevant degraded source supplied by the API",
         )
 
         self.assert_no_horizontal_overflow(page)

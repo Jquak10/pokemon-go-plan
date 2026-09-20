@@ -268,6 +268,24 @@ pokemon_meta stores shared Pokémon-level planning/meta values. meta_sources sto
 
 Generated ranking profiles are method-versioned. A stale method version must not be displayed as though it were current.
 
+### sync_source_health
+
+Stores synchronization health separately from the content tables so a successful source cannot hide a failed sibling source behind a newer aggregate timestamp.
+
+Each logical source row records:
+
+- source key/group and display label;
+- optional source URL;
+- last attempt time;
+- last successful attempt time;
+- last error;
+- item count from the last successful attempt;
+- update time.
+
+Event feeds are recorded independently, including derived weekly Max rotation and the current Max Battle tier reference. Official Pokémon GO schedule detection has its own health record. Meta health records Pokémon GO API Pokédex, PvPoke Master League, and the automatic assessment pipeline separately.
+
+Failed attempts update the attempt/error fields but preserve the previous successful timestamp and successful item count. Health recording is diagnostic and must never cause the underlying event/official/meta synchronization itself to fail.
+
 ### remote_raid_usage
 
 Stores the ordinary Remote Raid portion of daily shared Remote participation usage.
@@ -309,6 +327,7 @@ Current explicit migrations are:
 - migrations/0003_target_battle_kind.sql — battle-aware Targets.
 - migrations/0004_schema_baseline_operational_tables.sql — idempotent operational-table/index repair.
 - migrations/0005_max_battle_cost_overrides.sql — private per-opportunity Max tier/cost fallback.
+- migrations/0006_sync_source_health.sql — additive per-source synchronization health and group index.
 
 Production migrations are deliberate manual steps. Do not initialize production by applying the entire schema.sql over an existing D1 database.
 
@@ -842,6 +861,10 @@ The admin surface supports operations such as:
 - Max-ranking/meta maintenance.
 
 Administrative actions must use existing secret/binding infrastructure. Never embed management secrets in client code.
+
+Synchronization health is persisted per logical source rather than inferred from the newest row written to events/meta tables. The Planner keeps the legacy layer timestamps for API compatibility, but also receives health summaries for event feeds relevant to the user's current calendar selection, official schedules, and meta/assessment inputs. A group is degraded when a relevant source's latest attempt failed; a never-recorded source is reported as pending/unknown rather than healthy. Healthy group freshness uses the oldest successful timestamp among its relevant dependencies, preventing one recent success from masking another stale dependency.
+
+Migration 0006 is deployment-order tolerant. Before the table exists, health writes are best-effort and the Planner falls back to legacy freshness timestamps instead of failing synchronization or `/api/me`.
 
 ## 26. Testing strategy
 

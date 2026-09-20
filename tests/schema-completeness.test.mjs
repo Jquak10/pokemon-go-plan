@@ -6,6 +6,7 @@ const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const schema = read('../schema.sql');
 const migration = read('../migrations/0004_schema_baseline_operational_tables.sql');
 const maxCostMigration = read('../migrations/0005_max_battle_cost_overrides.sql');
+const syncHealthMigration = read('../migrations/0006_sync_source_health.sql');
 
 const expectedColumns = {
   event_suppression_rules: [
@@ -33,6 +34,32 @@ const expectedIndexes = {
   event_suppression_rules: 'idx_event_suppression_dates',
   remote_raid_daily_budget_overrides: 'idx_remote_raid_daily_budget_overrides_date'
 };
+
+const syncHealthColumns = [
+  ['source_key', 'TEXT', 0, null, 1],
+  ['source_group', 'TEXT', 1, null, 0],
+  ['source_label', 'TEXT', 1, null, 0],
+  ['source_url', 'TEXT', 0, null, 0],
+  ['last_attempt_at', 'TEXT', 1, null, 0],
+  ['last_success_at', 'TEXT', 0, null, 0],
+  ['last_error', 'TEXT', 0, null, 0],
+  ['item_count', 'INTEGER', 0, null, 0],
+  ['updated_at', 'TEXT', 1, null, 0]
+];
+
+function assertSyncHealthShape(db) {
+  assert.deepEqual(
+    columnShape(db, 'sync_source_health'),
+    syncHealthColumns,
+    'sync_source_health columns must match migration 0006'
+  );
+
+  const indexes = db.prepare('PRAGMA index_list(sync_source_health)').all().map(row => row.name);
+  assert.ok(
+    indexes.includes('idx_sync_source_health_group'),
+    'sync_source_health must include its group index'
+  );
+}
 
 const maxCostOverrideColumns = [
   ['user_id', 'TEXT', 1, null, 1],
@@ -80,8 +107,11 @@ assertOperationalShape(fresh);
 fresh.exec(migration);
 assertOperationalShape(fresh);
 assertMaxCostOverrideShape(fresh);
+assertSyncHealthShape(fresh);
 fresh.exec(maxCostMigration);
 assertMaxCostOverrideShape(fresh);
+fresh.exec(syncHealthMigration);
+assertSyncHealthShape(fresh);
 
 const existing = new DatabaseSync(':memory:');
 existing.exec(`
@@ -92,6 +122,10 @@ existing.exec(migration);
 assertOperationalShape(existing);
 existing.exec(maxCostMigration);
 assertMaxCostOverrideShape(existing);
+existing.exec(syncHealthMigration);
+assertSyncHealthShape(existing);
+existing.exec(syncHealthMigration);
+assertSyncHealthShape(existing);
 
 existing.prepare(`
   INSERT INTO event_suppression_rules (

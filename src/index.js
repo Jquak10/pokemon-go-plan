@@ -56,6 +56,10 @@ import {
   canonicalTimeZone,
   isValidTimeZone
 } from "./timezone.js";
+import {
+  SYNC_HEALTH_GROUPS,
+  summarizeSyncHealth
+} from "./sync-health.js";
 
 export {
   adminKeyFromRequest,
@@ -94,6 +98,40 @@ const DEFAULT_SOURCES = [
   "raid_hour",
   "research"
 ];
+
+const EVENT_SYNC_LABELS =
+  Object.freeze({
+    community_day:
+      "Community Day",
+    event:
+      "General events",
+    go_battle_league:
+      "GO Battle League",
+    go_pass:
+      "GO Pass",
+    max_battles:
+      "Max Battles",
+    max_mondays:
+      "Max Mondays",
+    pokemon_go_fest:
+      "Pokémon GO Fest",
+    pokemon_spotlight_hour:
+      "Spotlight Hour",
+    raid_battles:
+      "Raid Battles",
+    raid_day:
+      "Raid Day",
+    raid_hour:
+      "Raid Hour",
+    research:
+      "Research",
+    season:
+      "Season",
+    [MAX_ROTATION_SOURCE_TYPE]:
+      "Weekly Max rotation",
+    pokemon_go_api_current_max_battles:
+      "Current Max Battle tiers"
+  });
 
 // Battle recommendations include standard Raids plus Max Battles.
 // Keep the legacy constant name here so the existing meta/calendar plumbing
@@ -137,6 +175,51 @@ const POGO_API_POKEDEX =
 
 const POGO_API_MAX_BATTLES =
   "https://pokemon-go-api.github.io/pokemon-go-api/api/maxbattles.json";
+
+const OFFICIAL_SYNC_SOURCE =
+  Object.freeze({
+    source_key:
+      "official:pokemon-go-schedules",
+    source_group:
+      SYNC_HEALTH_GROUPS.OFFICIAL,
+    source_label:
+      "Official Pokémon GO schedules",
+    source_url:
+      OFFICIAL_POKEMON_GO_NEWS_URL
+  });
+
+const META_SYNC_SOURCES =
+  Object.freeze({
+    pokedex: {
+      source_key:
+        "meta:pokemon-go-api-pokedex",
+      source_group:
+        SYNC_HEALTH_GROUPS.META,
+      source_label:
+        "Pokémon GO API Pokédex",
+      source_url:
+        POGO_API_POKEDEX
+    },
+    pvpoke: {
+      source_key:
+        "meta:pvpoke-master-league",
+      source_group:
+        SYNC_HEALTH_GROUPS.META,
+      source_label:
+        "PvPoke Master League",
+      source_url:
+        PVPOKE_MASTER_LEAGUE
+    },
+    assessments: {
+      source_key:
+        "meta:automatic-assessments",
+      source_group:
+        SYNC_HEALTH_GROUPS.META,
+      source_label:
+        "Raid assessments",
+      source_url: null
+    }
+  });
 
 const BATTLE_MATCH_POKEDEX_TTL_MS = 6 * 60 * 60 * 1000;
 let battleMatchPokedex = [];
@@ -193,6 +276,170 @@ const MAX_MAX_RANK_BACKFILLS_PER_SYNC = 80;
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function eventSyncSource(
+  sourceType,
+  sourceUrl = null
+) {
+  return {
+    source_key:
+      `event:${sourceType}`,
+    source_group:
+      SYNC_HEALTH_GROUPS.EVENT,
+    source_label:
+      EVENT_SYNC_LABELS[
+        sourceType
+      ] ||
+      String(sourceType || "")
+        .replace(/_/g, " "),
+    source_url:
+      sourceUrl || null
+  };
+}
+
+function syncHealthErrorMessage(
+  error
+) {
+  return String(
+    error?.message ||
+    error ||
+    "Unknown synchronization error."
+  ).slice(
+    0,
+    1200
+  );
+}
+
+async function recordSyncSourceHealth(
+  env,
+  source,
+  {
+    ok,
+    itemCount = null,
+    error = null,
+    attemptedAt = nowIso()
+  }
+) {
+  try {
+    await env.DB.prepare(`
+      INSERT INTO sync_source_health (
+        source_key,
+        source_group,
+        source_label,
+        source_url,
+        last_attempt_at,
+        last_success_at,
+        last_error,
+        item_count,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(source_key) DO UPDATE SET
+        source_group =
+          excluded.source_group,
+        source_label =
+          excluded.source_label,
+        source_url =
+          excluded.source_url,
+        last_attempt_at =
+          excluded.last_attempt_at,
+        last_success_at = CASE
+          WHEN excluded.last_error IS NULL
+          THEN excluded.last_attempt_at
+          ELSE sync_source_health.last_success_at
+        END,
+        last_error =
+          excluded.last_error,
+        item_count = CASE
+          WHEN excluded.last_error IS NULL
+          THEN excluded.item_count
+          ELSE sync_source_health.item_count
+        END,
+        updated_at =
+          excluded.updated_at
+    `).bind(
+      source.source_key,
+      source.source_group,
+      source.source_label,
+      source.source_url || null,
+      attemptedAt,
+      ok ? attemptedAt : null,
+      ok
+        ? null
+        : syncHealthErrorMessage(
+            error
+          ),
+      ok && itemCount != null
+        ? Math.max(
+            0,
+            Number(
+              itemCount
+            ) || 0
+          )
+        : null,
+      attemptedAt
+    ).run();
+
+    return true;
+  } catch (healthError) {
+    // Migration 0006 is additive and may be applied immediately after a
+    // Worker deploy. Health persistence must never break the underlying sync.
+    console.warn(
+      "Sync health persistence unavailable:",
+      syncHealthErrorMessage(
+        healthError
+      )
+    );
+
+    return false;
+  }
+}
+
+async function withSyncSourceHealth(
+  env,
+  source,
+  work,
+  itemCountFromResult =
+    result =>
+      typeof result === "number"
+        ? result
+        : null
+) {
+  const attemptedAt =
+    nowIso();
+
+  try {
+    const result =
+      await work();
+
+    await recordSyncSourceHealth(
+      env,
+      source,
+      {
+        ok: true,
+        itemCount:
+          itemCountFromResult(
+            result
+          ),
+        attemptedAt
+      }
+    );
+
+    return result;
+  } catch (error) {
+    await recordSyncSourceHealth(
+      env,
+      source,
+      {
+        ok: false,
+        error,
+        attemptedAt
+      }
+    );
+
+    throw error;
+  }
 }
 
 function todayUtc() {
@@ -692,32 +939,93 @@ async function syncCurrentMaxBattleTierEvidence(
 
 async function syncAllEvents(env) {
   const results = [];
-  for (const [sourceType, url] of Object.entries(SOURCES)) {
+
+  for (
+    const [sourceType, url] of
+    Object.entries(SOURCES)
+  ) {
     try {
-      const count = await syncOneSource(env, sourceType, url);
-      results.push({ source: sourceType, ok: true, count });
+      const count =
+        await withSyncSourceHealth(
+          env,
+          eventSyncSource(
+            sourceType,
+            url
+          ),
+          () =>
+            syncOneSource(
+              env,
+              sourceType,
+              url
+            )
+        );
+
+      results.push({
+        source: sourceType,
+        ok: true,
+        count
+      });
     } catch (error) {
-      results.push({ source: sourceType, ok: false, error: String(error.message || error) });
+      results.push({
+        source: sourceType,
+        ok: false,
+        error:
+          syncHealthErrorMessage(
+            error
+          )
+      });
     }
   }
 
   try {
-    const count = await syncDerivedMaxRotations(env);
-    results.push({ source: MAX_ROTATION_SOURCE_TYPE, ok: true, count, derived: true });
+    const count =
+      await withSyncSourceHealth(
+        env,
+        eventSyncSource(
+          MAX_ROTATION_SOURCE_TYPE
+        ),
+        () =>
+          syncDerivedMaxRotations(
+            env
+          )
+      );
+
+    results.push({
+      source:
+        MAX_ROTATION_SOURCE_TYPE,
+      ok: true,
+      count,
+      derived: true
+    });
   } catch (error) {
     results.push({
-      source: MAX_ROTATION_SOURCE_TYPE,
+      source:
+        MAX_ROTATION_SOURCE_TYPE,
       ok: false,
       derived: true,
-      error: String(error.message || error)
+      error:
+        syncHealthErrorMessage(
+          error
+        )
     });
   }
 
   try {
     const currentMaxTiers =
-      await syncCurrentMaxBattleTierEvidence(
-        env
+      await withSyncSourceHealth(
+        env,
+        eventSyncSource(
+          "pokemon_go_api_current_max_battles",
+          POGO_API_MAX_BATTLES
+        ),
+        () =>
+          syncCurrentMaxBattleTierEvidence(
+            env
+          ),
+        result =>
+          result?.bosses ?? 0
       );
+
     results.push({
       source:
         "pokemon_go_api_current_max_battles",
@@ -730,8 +1038,7 @@ async function syncAllEvents(env) {
         "pokemon_go_api_current_max_battles",
       ok: false,
       error:
-        String(
-          error.message ||
+        syncHealthErrorMessage(
           error
         )
     });
@@ -1815,6 +2122,34 @@ async function fetchJson(url, label) {
   return response.json();
 }
 
+async function fetchJsonWithSyncHealth(
+  env,
+  source,
+  url,
+  label
+) {
+  return withSyncSourceHealth(
+    env,
+    source,
+    () =>
+      fetchJson(
+        url,
+        label
+      ),
+    result =>
+      Array.isArray(result)
+        ? result.length
+        : (
+            result &&
+            typeof result === "object"
+              ? Object.keys(
+                  result
+                ).length
+              : 0
+          )
+  );
+}
+
 async function raidEventsForMeta(env) {
   const placeholders = [...RAID_SOURCE_TYPES].map(() => "?").join(",");
 
@@ -1954,8 +2289,18 @@ async function syncAutomaticMeta(env) {
     raidEvents,
     maxEligibilityEvents
   ] = await Promise.all([
-    fetchJson(POGO_API_POKEDEX, "Pokémon GO API"),
-    fetchJson(PVPOKE_MASTER_LEAGUE, "PvPoke"),
+    fetchJsonWithSyncHealth(
+      env,
+      META_SYNC_SOURCES.pokedex,
+      POGO_API_POKEDEX,
+      "Pokémon GO API"
+    ),
+    fetchJsonWithSyncHealth(
+      env,
+      META_SYNC_SOURCES.pvpoke,
+      PVPOKE_MASTER_LEAGUE,
+      "PvPoke"
+    ),
     raidEventsForMeta(env),
     maxEligibilityEventsForMeta(env)
   ]);
@@ -2704,6 +3049,21 @@ async function syncAutomaticMeta(env) {
           MAX_META_POKEMON_PER_SYNC
         : 0
   };
+}
+
+async function syncAutomaticMetaWithHealth(
+  env
+) {
+  return withSyncSourceHealth(
+    env,
+    META_SYNC_SOURCES.assessments,
+    () =>
+      syncAutomaticMeta(
+        env
+      ),
+    result =>
+      result?.updated ?? 0
+  );
 }
 
 async function userByManageToken(env, token) {
@@ -6179,6 +6539,94 @@ async function syncOfficialRemoteRaidLimits(env) {
 }
 
 
+async function syncOfficialRemoteRaidLimitsWithHealth(
+  env
+) {
+  const attemptedAt =
+    nowIso();
+
+  try {
+    const result =
+      await syncOfficialRemoteRaidLimits(
+        env
+      );
+
+    const errors =
+      Array.isArray(
+        result?.errors
+      )
+        ? result.errors
+            .filter(Boolean)
+        : [];
+
+    const itemCount =
+      Number(
+        result?.rules_detected ||
+        0
+      ) +
+      Number(
+        result
+          ?.official_raid_supplements
+          ?.count ||
+        0
+      ) +
+      Number(
+        result
+          ?.official_max_battle_evidence
+          ?.detected ||
+        0
+      ) +
+      Number(
+        result
+          ?.mega_finale_supplements
+          ?.count ||
+        0
+      ) +
+      Number(
+        result
+          ?.armored_mewtwo_supplements
+          ?.count ||
+        0
+      ) +
+      Number(
+        result
+          ?.suppression_rules
+          ?.count ||
+        0
+      );
+
+    await recordSyncSourceHealth(
+      env,
+      OFFICIAL_SYNC_SOURCE,
+      {
+        ok:
+          errors.length === 0,
+        itemCount,
+        error:
+          errors.length
+            ? errors.join(" | ")
+            : null,
+        attemptedAt
+      }
+    );
+
+    return result;
+  } catch (error) {
+    await recordSyncSourceHealth(
+      env,
+      OFFICIAL_SYNC_SOURCE,
+      {
+        ok: false,
+        error,
+        attemptedAt
+      }
+    );
+
+    throw error;
+  }
+}
+
+
 function localDateForTimezone(timezone) {
   const validatedTimezone =
     canonicalTimeZone(
@@ -8729,7 +9177,67 @@ function dashboardOverview(
   };
 }
 
-async function dataFreshnessForDashboard(env) {
+export function eventSyncHealthSourcesForUser(
+  user
+) {
+  const included =
+    calendarSourceTypesForUser(
+      user
+    );
+
+  const sources =
+    included
+      .filter(
+        sourceType =>
+          Boolean(
+            SOURCES[sourceType]
+          ) ||
+          sourceType ===
+            MAX_ROTATION_SOURCE_TYPE
+      )
+      .map(
+        sourceType =>
+          eventSyncSource(
+            sourceType,
+            SOURCES[
+              sourceType
+            ] ||
+            null
+          )
+      );
+
+  if (
+    included.includes(
+      "max_battles"
+    ) ||
+    included.includes(
+      MAX_ROTATION_SOURCE_TYPE
+    )
+  ) {
+    sources.push(
+      eventSyncSource(
+        "pokemon_go_api_current_max_battles",
+        POGO_API_MAX_BATTLES
+      )
+    );
+  }
+
+  return [
+    ...new Map(
+      sources.map(
+        source => [
+          source.source_key,
+          source
+        ]
+      )
+    ).values()
+  ];
+}
+
+async function dataFreshnessForDashboard(
+  env,
+  user
+) {
   const row =
     await env.DB.prepare(`
       SELECT
@@ -8771,16 +9279,94 @@ async function dataFreshnessForDashboard(env) {
     .filter(Boolean)
     .sort();
 
-  return {
+  const legacy = {
     event_feeds:
-      row?.event_feeds_updated_at || null,
+      row?.event_feeds_updated_at ||
+      null,
     official_schedules:
       officialCandidates.length
-        ? officialCandidates[officialCandidates.length - 1]
+        ? officialCandidates[
+            officialCandidates.length -
+            1
+          ]
         : null,
     raid_assessments:
-      row?.meta_updated_at || null
+      row?.meta_updated_at ||
+      null
   };
+
+  try {
+    const { results } =
+      await env.DB.prepare(`
+        SELECT
+          source_key,
+          source_group,
+          source_label,
+          source_url,
+          last_attempt_at,
+          last_success_at,
+          last_error,
+          item_count
+        FROM sync_source_health
+        ORDER BY
+          source_group,
+          source_label
+      `).all();
+
+    const rows =
+      results || [];
+
+    return {
+      ...legacy,
+      source_health_available:
+        true,
+      groups: {
+        event_feeds:
+          summarizeSyncHealth(
+            rows,
+            eventSyncHealthSourcesForUser(
+              user
+            ),
+            legacy.event_feeds
+          ),
+        official_schedules:
+          summarizeSyncHealth(
+            rows,
+            [
+              OFFICIAL_SYNC_SOURCE
+            ],
+            legacy.official_schedules
+          ),
+        raid_assessments:
+          summarizeSyncHealth(
+            rows,
+            [
+              META_SYNC_SOURCES.pokedex,
+              META_SYNC_SOURCES.pvpoke,
+              META_SYNC_SOURCES.assessments
+            ],
+            legacy.raid_assessments
+          )
+      }
+    };
+  } catch (error) {
+    // Migration 0006 is intentionally backward compatible with deploy order.
+    // Until the table exists, retain the legacy timestamps rather than
+    // breaking the Planner payload.
+    console.warn(
+      "Sync source health unavailable:",
+      syncHealthErrorMessage(
+        error
+      )
+    );
+
+    return {
+      ...legacy,
+      source_health_available:
+        false,
+      groups: null
+    };
+  }
 }
 
 
@@ -9167,7 +9753,10 @@ async function getMe(request, env) {
   );
 
   const dataFreshness =
-    await dataFreshnessForDashboard(env);
+    await dataFreshnessForDashboard(
+      env,
+      user
+    );
 
   const raidActivity =
     await raidActivityForUser(
@@ -10206,7 +10795,10 @@ async function adminSyncRemoteLimits(request, env) {
   const auth = await readAdminKey(request, env);
   if (!auth.ok) return auth.response;
 
-  const remoteRaidLimits = await syncOfficialRemoteRaidLimits(env);
+  const remoteRaidLimits =
+    await syncOfficialRemoteRaidLimitsWithHealth(
+      env
+    );
 
   return json({
     ok: true,
@@ -10219,7 +10811,10 @@ async function adminSyncMeta(request, env) {
   const auth = await readAdminKey(request, env);
   if (!auth.ok) return auth.response;
 
-  const automaticMeta = await syncAutomaticMeta(env);
+  const automaticMeta =
+    await syncAutomaticMetaWithHealth(
+      env
+    );
 
   return json({
     ok: true,
@@ -10497,7 +11092,10 @@ export default {
     if (cron === "33 */6 * * *") {
       ctx.waitUntil(
         (async () => {
-          const result = await syncOfficialRemoteRaidLimits(env);
+          const result =
+            await syncOfficialRemoteRaidLimitsWithHealth(
+              env
+            );
           console.log(
             "Scheduled official Remote Raid limit sync:",
             JSON.stringify(result)
@@ -10510,7 +11108,10 @@ export default {
     if (cron === "43 */6 * * *") {
       ctx.waitUntil(
         (async () => {
-          const result = await syncAutomaticMeta(env);
+          const result =
+            await syncAutomaticMetaWithHealth(
+              env
+            );
           console.log("Scheduled automatic meta sync:", JSON.stringify(result));
         })()
       );
