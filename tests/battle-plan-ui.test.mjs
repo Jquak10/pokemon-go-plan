@@ -14,6 +14,7 @@ function read(relative) {
 const manage = read("../public/manage.html");
 const plannerClient = read("../public/planner-client.js");
 const plannerTargetLogic = read("../public/planner-target-logic.js");
+const plannerCalendarLogic = read("../public/planner-calendar-logic.js");
 const battleTargetsClient = read("../public/battle-targets.js");
 const styles = read("../public/styles.css");
 const worker = read("../src/index.js");
@@ -24,6 +25,11 @@ assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
 assert.match(manage, /<script src="\/planner-client\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
+assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
+assert.match(manage, /PlannerCalendarLogic/);
+assert.doesNotMatch(manage, /function parseIsoDate\(/);
+assert.doesNotMatch(manage, /function monthKeyFromDate\(/);
+assert.doesNotMatch(manage, /function addMonthsUtc\(/);
 assert.match(manage, /PlannerTargetLogic\.create/);
 assert.doesNotMatch(manage, /function targetPriorityRank/);
 assert.match(manage, /const \{[\s\S]*token,[\s\S]*api,[\s\S]*esc,[\s\S]*formatNumber[\s\S]*\} = PlannerClient;/);
@@ -149,6 +155,14 @@ new vm.Script(
   {
     filename:
       "planner-target-logic.js"
+  }
+);
+
+new vm.Script(
+  plannerCalendarLogic,
+  {
+    filename:
+      "planner-calendar-logic.js"
   }
 );
 
@@ -281,6 +295,158 @@ assert.equal(
     "not-a-number"
   ),
   "—"
+);
+
+const calendarLogicContext = {};
+vm.createContext(
+  calendarLogicContext
+);
+
+new vm.Script(
+  plannerCalendarLogic,
+  {
+    filename:
+      "planner-calendar-logic.js"
+  }
+).runInContext(
+  calendarLogicContext
+);
+
+const calendarLogic =
+  calendarLogicContext
+    .PlannerCalendarLogic;
+
+assert.equal(
+  calendarLogic.isoDateFromUtc(
+    calendarLogic.parseIsoDate(
+      "2026-09-20"
+    )
+  ),
+  "2026-09-20"
+);
+
+assert.equal(
+  calendarLogic.monthKeyFromDate(
+    calendarLogic.parseIsoDate(
+      "2026-09-20"
+    )
+  ),
+  "2026-09"
+);
+
+assert.equal(
+  calendarLogic.monthTitleFromDate(
+    calendarLogic.parseIsoDate(
+      "2026-09-20"
+    )
+  ),
+  "September 2026"
+);
+
+assert.equal(
+  calendarLogic.isoDateFromUtc(
+    calendarLogic.addMonthsUtc(
+      calendarLogic.parseIsoDate(
+        "2026-09-20"
+      ),
+      1
+    )
+  ),
+  "2026-10-01"
+);
+
+const calendarEvents = [
+  {
+    id: "multi",
+    title: "Multi-day Event",
+    start_date: "2026-09-19",
+    end_date: "2026-09-21",
+    source_type: "max_battles"
+  },
+  {
+    id: "single",
+    title: "Single Day",
+    start_date: "2026-09-20",
+    end_date: "2026-09-20",
+    source_type: "raid_hour"
+  }
+];
+
+assert.deepEqual(
+  JSON.parse(
+    JSON.stringify(
+      calendarLogic
+        .eventsForDate(
+          calendarEvents,
+          "2026-09-20"
+        )
+        .map(
+          event =>
+            event.id
+        )
+    )
+  ),
+  ["multi", "single"]
+);
+
+assert.equal(
+  calendarLogic.sourceClass(
+    "Max Battles!"
+  ),
+  "calendar-source-MaxBattles"
+);
+
+const septemberGrid =
+  calendarLogic.monthGrid({
+    monthDate:
+      calendarLogic.parseIsoDate(
+        "2026-09-01"
+      ),
+    events:
+      calendarEvents,
+    todayIso:
+      "2026-09-20",
+    selectedDate:
+      "2026-09-21"
+  });
+
+assert.equal(
+  septemberGrid.length,
+  42
+);
+
+assert.equal(
+  calendarLogic.isoDateFromUtc(
+    septemberGrid[0].date
+  ),
+  "2026-08-31",
+  "Month grid must begin on Monday"
+);
+
+const september20 =
+  septemberGrid.find(
+    cell =>
+      cell.dateIso ===
+      "2026-09-20"
+  );
+
+assert.equal(
+  september20.isToday,
+  true
+);
+
+assert.equal(
+  september20.events.length,
+  2
+);
+
+assert.equal(
+  septemberGrid.find(
+    cell =>
+      cell.dateIso ===
+      "2026-09-21"
+  ).selected,
+  true
 );
 
 const targetLogicContext = {};

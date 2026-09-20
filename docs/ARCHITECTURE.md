@@ -128,6 +128,7 @@ The main public files are:
 - public/manage.html — primary authenticated Planner UI and remaining feature/domain integration logic.
 - public/planner-client.js — shared Planner capability-token parsing, authenticated API request preparation, API error handling, HTML escaping, and numeric formatting.
 - public/planner-target-logic.js — pure Target progress, availability, non-status/status filtering, sorting, counts, and grouping/view-model logic. It accepts BattleTargets and normalization/formatting helpers as dependencies and contains no DOM or API mutation code.
+- public/planner-calendar-logic.js — pure UTC date/month helpers, day-event range matching, source-class normalization, and six-week Monday-first month-grid projection. Calendar DOM rendering, fetch/cache state, and selected date/month state remain in manage.html.
 - public/admin.html — administration/synchronization controls.
 - public/sources.html — data-source explanation.
 - public/styles.css — shared responsive styling.
