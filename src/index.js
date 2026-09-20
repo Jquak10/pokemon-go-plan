@@ -133,6 +133,49 @@ const EVENT_SYNC_LABELS =
       "Current Max Battle tiers"
   });
 
+// Battle recommendations include standard Raids plus Max Battles.
+// Keep the legacy constant name here so the existing meta/calendar plumbing
+// remains stable while the UI migrates to the shared battle model.
+const RAID_SOURCE_TYPES = BATTLE_SOURCE_TYPES;
+
+// Only ordinary Raid events are candidates for the legacy Raid allocator.
+// Daily Remote participation usage is shared with Remote Max Battles and is
+// summed from the two existing ledgers before applying the official limit.
+const REMOTE_RAID_SOURCE_TYPES = new Set([
+  "raid_battles",
+  "raid_day",
+  "raid_hour"
+]);
+
+const DEFAULT_REMOTE_RAID_LIMIT = 10;
+const DEFAULT_REMOTE_RAID_MIN_SCORE = 60;
+const REMOTE_RAID_DECAY_PER_RAID = 3;
+const REMOTE_BUDGET_LOOKAHEAD_DAYS = 7;
+const REMOTE_BUDGET_HEAVY_RATIO = 0.67;
+const REMOTE_BUDGET_LIGHT_RATIO = 0.33;
+const DEFAULT_REMOTE_RAID_LIMIT_SOURCE =
+  "https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/2487-joining-battles-remotely/";
+
+const OFFICIAL_POKEMON_GO_NEWS_URL =
+  "https://pokemongo.com/news";
+
+const PINNED_OFFICIAL_EVENT_PAGES = [
+  "https://pokemongo.com/gofest/megafinale",
+  "https://pokemongo.com/news/megafinale-2026-armored-mewtwo"
+];
+
+const MAX_OFFICIAL_EVENT_PAGES_PER_SYNC = 8;
+const MAX_RETAINED_OFFICIAL_EVENT_PAGES_PER_SYNC = 48;
+
+const PVPOKE_MASTER_LEAGUE =
+  "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-10000.json";
+
+const POGO_API_POKEDEX =
+  "https://pokemon-go-api.github.io/pokemon-go-api/api/pokedex.json";
+
+const POGO_API_MAX_BATTLES =
+  "https://pokemon-go-api.github.io/pokemon-go-api/api/maxbattles.json";
+
 const OFFICIAL_SYNC_SOURCE =
   Object.freeze({
     source_key:
@@ -177,49 +220,6 @@ const META_SYNC_SOURCES =
       source_url: null
     }
   });
-
-// Battle recommendations include standard Raids plus Max Battles.
-// Keep the legacy constant name here so the existing meta/calendar plumbing
-// remains stable while the UI migrates to the shared battle model.
-const RAID_SOURCE_TYPES = BATTLE_SOURCE_TYPES;
-
-// Only ordinary Raid events are candidates for the legacy Raid allocator.
-// Daily Remote participation usage is shared with Remote Max Battles and is
-// summed from the two existing ledgers before applying the official limit.
-const REMOTE_RAID_SOURCE_TYPES = new Set([
-  "raid_battles",
-  "raid_day",
-  "raid_hour"
-]);
-
-const DEFAULT_REMOTE_RAID_LIMIT = 10;
-const DEFAULT_REMOTE_RAID_MIN_SCORE = 60;
-const REMOTE_RAID_DECAY_PER_RAID = 3;
-const REMOTE_BUDGET_LOOKAHEAD_DAYS = 7;
-const REMOTE_BUDGET_HEAVY_RATIO = 0.67;
-const REMOTE_BUDGET_LIGHT_RATIO = 0.33;
-const DEFAULT_REMOTE_RAID_LIMIT_SOURCE =
-  "https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/2487-joining-battles-remotely/";
-
-const OFFICIAL_POKEMON_GO_NEWS_URL =
-  "https://pokemongo.com/news";
-
-const PINNED_OFFICIAL_EVENT_PAGES = [
-  "https://pokemongo.com/gofest/megafinale",
-  "https://pokemongo.com/news/megafinale-2026-armored-mewtwo"
-];
-
-const MAX_OFFICIAL_EVENT_PAGES_PER_SYNC = 8;
-const MAX_RETAINED_OFFICIAL_EVENT_PAGES_PER_SYNC = 48;
-
-const PVPOKE_MASTER_LEAGUE =
-  "https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/rankings/all/overall/rankings-10000.json";
-
-const POGO_API_POKEDEX =
-  "https://pokemon-go-api.github.io/pokemon-go-api/api/pokedex.json";
-
-const POGO_API_MAX_BATTLES =
-  "https://pokemon-go-api.github.io/pokemon-go-api/api/maxbattles.json";
 
 const BATTLE_MATCH_POKEDEX_TTL_MS = 6 * 60 * 60 * 1000;
 let battleMatchPokedex = [];
