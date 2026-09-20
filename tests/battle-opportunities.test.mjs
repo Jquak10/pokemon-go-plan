@@ -639,6 +639,10 @@ assert.match(
 );
 assert.match(
   workerSource,
+  /status IN \([\s\S]*'active',[\s\S]*'stale'/
+);
+assert.match(
+  workerSource,
   /refreshedPageUrls/
 );
 assert.match(
