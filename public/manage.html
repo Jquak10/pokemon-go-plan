@@ -1410,6 +1410,7 @@
 <script src="/battle-targets.js?v=1"></script>
 <script src="/planner-client.js?v=1"></script>
 <script src="/planner-target-logic.js?v=1"></script>
+<script src="/planner-calendar-logic.js?v=1"></script>
 <script>
 const {
   token,
@@ -1417,6 +1418,19 @@ const {
   esc,
   formatNumber
 } = PlannerClient;
+const {
+  parseIsoDate,
+  monthKeyFromDate,
+  monthTitleFromDate,
+  addMonthsUtc,
+  eventsForDate:
+    calendarEventsForDate,
+  sourceClass:
+    calendarSourceClass,
+  monthGrid:
+    buildCalendarMonthGrid
+} =
+  PlannerCalendarLogic;
 const app = document.getElementById("app");
 const loadStatus = document.getElementById("loadStatus");
 let state = null;
@@ -7139,66 +7153,13 @@ function renderCalendar() {
     `${included.size} enabled`;
 }
 
-function parseIsoDate(value) {
-  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return null;
-
-  return new Date(
-    Date.UTC(
-      Number(match[1]),
-      Number(match[2]) - 1,
-      Number(match[3]),
-      12
-    )
+function eventsForCalendarDate(
+  dateIso
+) {
+  return calendarEventsForDate(
+    calendarMonthData?.events,
+    dateIso
   );
-}
-
-function isoDateFromUtc(date) {
-  return [
-    date.getUTCFullYear(),
-    String(date.getUTCMonth() + 1).padStart(2, "0"),
-    String(date.getUTCDate()).padStart(2, "0")
-  ].join("-");
-}
-
-function monthKeyFromDate(date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-function monthTitleFromDate(date) {
-  return new Intl.DateTimeFormat(
-    "en",
-    {
-      month: "long",
-      year: "numeric",
-      timeZone: "UTC"
-    }
-  ).format(date);
-}
-
-function addMonthsUtc(date, amount) {
-  return new Date(
-    Date.UTC(
-      date.getUTCFullYear(),
-      date.getUTCMonth() + amount,
-      1,
-      12
-    )
-  );
-}
-
-function eventsForCalendarDate(dateIso) {
-  if (!calendarMonthData) return [];
-
-  return calendarMonthData.events.filter(event => {
-    const start = event.start_date;
-    const end = event.end_date || event.start_date;
-    return start <= dateIso && end >= dateIso;
-  });
-}
-
-function calendarSourceClass(source) {
-  return `calendar-source-${String(source || "event").replace(/[^a-z0-9_-]/gi, "")}`;
 }
 
 function renderCalendarDayDetails(dateIso) {
@@ -7296,60 +7257,64 @@ function renderCalendarDayDetails(dateIso) {
 }
 
 function renderMonthCalendar() {
-  if (!calendarMonthDate || !calendarMonthData) return;
-
-  document.getElementById("calendarMonthTitle").textContent =
-    monthTitleFromDate(calendarMonthDate);
-
-  const year = calendarMonthDate.getUTCFullYear();
-  const month = calendarMonthDate.getUTCMonth();
-  const firstOfMonth = new Date(Date.UTC(year, month, 1, 12));
-
-  const mondayOffset = (firstOfMonth.getUTCDay() + 6) % 7;
-  const gridStart = new Date(
-    Date.UTC(year, month, 1 - mondayOffset, 12)
-  );
-
-  const todayIso = state.remote_raid_plan.local_date;
-  const cells = [];
-
-  for (let index = 0; index < 42; index++) {
-    const date = new Date(gridStart.getTime() + index * 86400000);
-    const dateIso = isoDateFromUtc(date);
-    const dayEvents = eventsForCalendarDate(dateIso);
-    const inMonth = date.getUTCMonth() === month;
-    const visibleEvents = dayEvents.slice(0, 3);
-    const extra = Math.max(0, dayEvents.length - visibleEvents.length);
-
-    cells.push(`
-      <button
-        type="button"
-        class="calendar-day-cell
-          ${inMonth ? "" : "outside-month"}
-          ${dateIso === todayIso ? "today" : ""}
-          ${dateIso === selectedCalendarDate ? "selected" : ""}"
-        data-date="${dateIso}"
-        aria-label="${esc(dateIso)} · ${dayEvents.length} event${dayEvents.length === 1 ? "" : "s"}"
-      >
-        <span class="calendar-day-number">${date.getUTCDate()}</span>
-
-        <span class="calendar-day-events">
-          ${visibleEvents.map(event => `
-            <span
-              class="calendar-event-pill ${calendarSourceClass(event.source_type)}"
-              title="${esc(event.title)}"
-            >
-              ${esc(event.title)}
-            </span>
-          `).join("")}
-
-          ${extra > 0 ? `<span class="calendar-more-events">+${extra} more</span>` : ""}
-        </span>
-      </button>
-    `);
+  if (
+    !calendarMonthDate ||
+    !calendarMonthData
+  ) {
+    return;
   }
 
-  document.getElementById("calendarMonthGrid").innerHTML = cells.join("");
+  document.getElementById(
+    "calendarMonthTitle"
+  ).textContent =
+    monthTitleFromDate(
+      calendarMonthDate
+    );
+
+  const cells =
+    buildCalendarMonthGrid({
+      monthDate:
+        calendarMonthDate,
+      events:
+        calendarMonthData.events,
+      todayIso:
+        state.remote_raid_plan
+          .local_date,
+      selectedDate:
+        selectedCalendarDate
+    });
+
+  document.getElementById(
+    "calendarMonthGrid"
+  ).innerHTML =
+    cells.map(
+      cell => `
+        <button
+          type="button"
+          class="calendar-day-cell
+            ${cell.inMonth ? "" : "outside-month"}
+            ${cell.isToday ? "today" : ""}
+            ${cell.selected ? "selected" : ""}"
+          data-date="${cell.dateIso}"
+          aria-label="${esc(cell.dateIso)} · ${cell.events.length} event${cell.events.length === 1 ? "" : "s"}"
+        >
+          <span class="calendar-day-number">${cell.dayNumber}</span>
+
+          <span class="calendar-day-events">
+            ${cell.visibleEvents.map(event => `
+              <span
+                class="calendar-event-pill ${calendarSourceClass(event.source_type)}"
+                title="${esc(event.title)}"
+              >
+                ${esc(event.title)}
+              </span>
+            `).join("")}
+
+            ${cell.extra > 0 ? `<span class="calendar-more-events">+${cell.extra} more</span>` : ""}
+          </span>
+        </button>
+      `
+    ).join("");
 }
 
 async function loadCalendarMonth(force = false) {
