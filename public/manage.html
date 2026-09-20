@@ -6948,27 +6948,28 @@ function renderTargets() {
       )
     );
 
+  const targetView =
+    targetLogic.viewModel({
+      targets:
+        state.targets,
+      filterState:
+        targetFilterState,
+      targetOptions:
+        state.target_options
+    });
+
   const matchingTargets =
-    targetsMatchingNonStatusFilters();
+    targetView.matchingTargets;
 
-  const activeCount =
-    matchingTargets.filter(
-      target =>
-        !Number(
-          target.completed
-        )
-    ).length;
-
-  const completedCount =
-    matchingTargets.filter(
-      target =>
-        Number(
-          target.completed
-        )
-    ).length;
-
-  const allCount =
-    matchingTargets.length;
+  const {
+    active:
+      activeCount,
+    completed:
+      completedCount,
+    all:
+      allCount
+  } =
+    targetView.counts;
 
   document.getElementById(
     "targetActiveCount"
@@ -7006,9 +7007,7 @@ function renderTargets() {
     );
 
   const list =
-    filteredTargets(
-      matchingTargets
-    );
+    targetView.visibleTargets;
 
   syncTargetSelectionUi(list);
 
@@ -7055,37 +7054,12 @@ function renderTargets() {
     return;
   }
 
-  const active =
-    list.filter(
-      target =>
-        !Number(
-          target.completed
-        )
-    );
-
-  const needsAttention =
-    active.filter(
-      target =>
-        target.priority === "high" ||
-        targetAvailability(target) ===
-          "now"
-    );
-
-  const tracking =
-    active.filter(
-      target =>
-        !needsAttention.includes(
-          target
-        )
-    );
-
-  const completed =
-    list.filter(
-      target =>
-        Number(
-          target.completed
-        )
-    );
+  const {
+    needsAttention,
+    tracking,
+    completed
+  } =
+    targetView.groups;
 
   const sections = [];
 
