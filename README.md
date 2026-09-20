@@ -234,9 +234,9 @@ Select **Save preferences** after making changes. These settings can make the pl
 
 ### Management and administration
 
-The management dashboard is accessed through each planner's private capability link. It controls that planner's Raid Plan, targets, logs, preferences, and calendar; it is not a public account profile.
+The management dashboard is accessed through each planner's private capability link. It controls that planner's Battle Plan, targets, logs, preferences, and calendar; it is not a public account profile. Keep the management URL private. The current UI sends its capability to management APIs in an authorization header rather than repeating it in request URLs or JSON bodies; the Worker still accepts the older token forms so existing integrations are not broken. Private Planner/Admin HTML is served no-store with no-referrer, frame protection, CSP/content restrictions, and related defense-in-depth headers.
 
-The separate **Planner Admin** interface is for authorized maintainers. It can run and inspect event, official-schedule, Remote-limit, suppression, meta-assessment, and raid-ranking synchronization. Its data actions require the configured admin credential. Never share that credential or include it in a URL, README, issue, log, commit, or chat.
+The separate **Planner Admin** interface is for authorized maintainers. It can run and inspect event, official-schedule, Remote-limit, suppression, meta-assessment, and raid-ranking synchronization. Its browser requests send the configured admin credential in a request header; older query/body-key API calls remain compatible. Never share that credential or include it in a URL, README, issue, log, commit, or chat.
 
 The public **Data Sources & Precedence** page explains why explicit official schedules take priority over suppression/replacement notices and general GO Calendar data, and identifies the analytical inputs and versioned computation used for raid value and attacker rankings.
 
@@ -253,8 +253,8 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 
 ### Mobile and desktop experience
 
-- On wide desktop screens, the planner uses fixed left-side navigation and a sticky **Quick status** rail with top priority, activity totals, **+ Log raid**, quick search, and a **Compact density** toggle. Targets also offer **Cards** and **Compact list**.
-- Tablet widths use segmented navigation above the content.
+- On wide desktop screens (1180 px and above), the planner uses fixed left-side navigation and a sticky **Quick status** rail with top priority, activity totals, **+ Log battle**, quick search, and a **Compact density** toggle. Targets also offer **Cards** and **Compact list**.
+- Intermediate desktop/tablet widths keep dense Today/Battle Resources and Calendar panels stacked, use a four-column Paid Battle Forecast, wrap primary detail names, and retain segmented navigation above the content instead of prematurely squeezing the wide-desktop layout.
 - Mobile uses a fixed bottom navigation for **Raid Plan**, **Targets**, **Hundo CP**, **Calendar**, and **More**. **Preferences** and **Data sources** are in the **More options** sheet.
 - Mobile provides a floating **+ Log raid** action, presents the raid logger as a bottom sheet, and moves advanced Target filters into the **Organize targets** drawer.
 - On mobile, **More levels** expands the additional Hundo benchmarks, and Calendar day details flow beneath the month view.
@@ -593,7 +593,7 @@ The repository does not currently include a script that initializes the local D1
 
 Every pull request and every push to `main` runs the deterministic Planner regression workflow. Pull requests run the Node regression suite and real Chromium browser suite; the upstream live-contract job is intentionally excluded from PR gating so an external outage or upstream drift cannot make an otherwise deterministic UI/code PR flaky. Pushes to `main`, scheduled runs, and manual workflow runs still exercise the live contract. The browser job installs Chromium in CI and the test itself starts and stops its own local fixture server, so **you do not need to start Wrangler or any other server for browser tests**.
 
-The browser suite currently protects intermediate-desktop text visibility, asynchronous Dynamax battle-intel rendering, mobile modal containment, and horizontal-overflow regressions. Its Pokémon/event records are fixed regression fixtures rather than live schedule data, so a Pokémon leaving the current Raid/Max rotation does not make the test stale or flaky.
+The browser suite protects the 768/900/1024/1179/1180/1280 responsive boundaries, intermediate-desktop text visibility, management-header credential transport, asynchronous Dynamax battle-intel rendering, mobile modal containment, and horizontal-overflow regressions. Its Pokémon/event records are fixed regression fixtures rather than live schedule data, so a Pokémon leaving the current Raid/Max rotation does not make the test stale or flaky.
 
 For an optional local browser run, install Playwright once in the Dev Container and then run the test directly:
 
