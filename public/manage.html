@@ -1835,6 +1835,106 @@ function relativeFreshness(value) {
 }
 
 
+function freshnessHealthPresentation(
+  group,
+  fallbackValue
+) {
+  if (!group) {
+    return {
+      text:
+        relativeFreshness(
+          fallbackValue
+        ),
+      title: ""
+    };
+  }
+
+  if (
+    group.status ===
+      "not_applicable"
+  ) {
+    return {
+      text: "Not used",
+      title:
+        "This source group is not used by the current planner filters."
+    };
+  }
+
+  if (
+    group.status ===
+      "degraded"
+  ) {
+    const degraded =
+      group
+        .degraded_sources ||
+      [];
+    const first =
+      degraded[0];
+    const count =
+      Number(
+        group
+          .degraded_count ||
+        degraded.length ||
+        0
+      );
+    const extra =
+      count > 1
+        ? ` +${count - 1}`
+        : "";
+
+    return {
+      text:
+        `⚠ ${first?.source_label || "Source issue"}${extra}`,
+      title:
+        degraded
+          .map(
+            source =>
+              `${source.source_label}: ${source.last_error || "No successful sync recorded."}`
+          )
+          .join("\n")
+    };
+  }
+
+  if (
+    group.status ===
+      "unknown"
+  ) {
+    const count =
+      Number(
+        group
+          .missing_count ||
+        0
+      );
+
+    return {
+      text:
+        count > 0
+          ? `Health pending · ${count} source${count === 1 ? "" : "s"}`
+          : "Health pending",
+      title:
+        group
+          .missing_sources
+          ?.map(
+            source =>
+              source.source_label
+          )
+          .join(", ") ||
+        "Per-source health has not been recorded yet."
+    };
+  }
+
+  return {
+    text:
+      relativeFreshness(
+        group.updated_at ||
+        fallbackValue
+      ),
+    title:
+      `${group.source_count || 0} source${group.source_count === 1 ? "" : "s"} healthy`
+  };
+}
+
+
 function spriteImg(
   url,
   name,
@@ -2067,16 +2167,22 @@ function renderTodayBriefing() {
               : "Within the current forecast window"
           );
 
+  const freshnessGroups =
+    freshness.groups || {};
+
   const freshnessItems = [
     {
+      key: "event_feeds",
       label: "Event feeds",
       value: freshness.event_feeds
     },
     {
+      key: "official_schedules",
       label: "Official schedules",
       value: freshness.official_schedules
     },
     {
+      key: "raid_assessments",
       label: "Raid assessments",
       value: freshness.raid_assessments
     }
@@ -2086,13 +2192,26 @@ function renderTodayBriefing() {
     .getElementById("freshnessStrip")
     .innerHTML =
       freshnessItems
-        .map(item => `
-          <span class="freshness-item">
-            <i aria-hidden="true"></i>
-            <strong>${esc(item.label)}</strong>
-            <small>${esc(relativeFreshness(item.value))}</small>
-          </span>
-        `)
+        .map(item => {
+          const presentation =
+            freshnessHealthPresentation(
+              freshnessGroups[
+                item.key
+              ],
+              item.value
+            );
+
+          return `
+            <span
+              class="freshness-item"
+              title="${esc(presentation.title)}"
+            >
+              <i aria-hidden="true"></i>
+              <strong>${esc(item.label)}</strong>
+              <small>${esc(presentation.text)}</small>
+            </span>
+          `;
+        })
         .join("") +
       `
         <a href="/sources" target="_blank" rel="noopener" class="freshness-source-link">
