@@ -2122,6 +2122,34 @@ async function fetchJson(url, label) {
   return response.json();
 }
 
+async function fetchJsonWithSyncHealth(
+  env,
+  source,
+  url,
+  label
+) {
+  return withSyncSourceHealth(
+    env,
+    source,
+    () =>
+      fetchJson(
+        url,
+        label
+      ),
+    result =>
+      Array.isArray(result)
+        ? result.length
+        : (
+            result &&
+            typeof result === "object"
+              ? Object.keys(
+                  result
+                ).length
+              : 0
+          )
+  );
+}
+
 async function raidEventsForMeta(env) {
   const placeholders = [...RAID_SOURCE_TYPES].map(() => "?").join(",");
 
@@ -2261,8 +2289,18 @@ async function syncAutomaticMeta(env) {
     raidEvents,
     maxEligibilityEvents
   ] = await Promise.all([
-    fetchJson(POGO_API_POKEDEX, "Pokémon GO API"),
-    fetchJson(PVPOKE_MASTER_LEAGUE, "PvPoke"),
+    fetchJsonWithSyncHealth(
+      env,
+      META_SYNC_SOURCES.pokedex,
+      POGO_API_POKEDEX,
+      "Pokémon GO API"
+    ),
+    fetchJsonWithSyncHealth(
+      env,
+      META_SYNC_SOURCES.pvpoke,
+      PVPOKE_MASTER_LEAGUE,
+      "PvPoke"
+    ),
     raidEventsForMeta(env),
     maxEligibilityEventsForMeta(env)
   ]);
@@ -3011,6 +3049,21 @@ async function syncAutomaticMeta(env) {
           MAX_META_POKEMON_PER_SYNC
         : 0
   };
+}
+
+async function syncAutomaticMetaWithHealth(
+  env
+) {
+  return withSyncSourceHealth(
+    env,
+    META_SYNC_SOURCES.assessments,
+    () =>
+      syncAutomaticMeta(
+        env
+      ),
+    result =>
+      result?.updated ?? 0
+  );
 }
 
 async function userByManageToken(env, token) {
@@ -10526,7 +10579,10 @@ async function adminSyncMeta(request, env) {
   const auth = await readAdminKey(request, env);
   if (!auth.ok) return auth.response;
 
-  const automaticMeta = await syncAutomaticMeta(env);
+  const automaticMeta =
+    await syncAutomaticMetaWithHealth(
+      env
+    );
 
   return json({
     ok: true,
@@ -10817,7 +10873,10 @@ export default {
     if (cron === "43 */6 * * *") {
       ctx.waitUntil(
         (async () => {
-          const result = await syncAutomaticMeta(env);
+          const result =
+            await syncAutomaticMetaWithHealth(
+              env
+            );
           console.log("Scheduled automatic meta sync:", JSON.stringify(result));
         })()
       );
