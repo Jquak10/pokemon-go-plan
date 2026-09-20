@@ -33,7 +33,7 @@ It is intentionally different from the other repository references:
 
 Extract cohesive modules incrementally—Battle Plan/intel, Targets, Calendar, Hundo, resource UI, and Worker domain orchestration—without a big-bang framework rewrite. Preserve current routes, bindings, D1 behavior, and responsive UX during decomposition.
 
-Progress: **BL-011A** extracts the Planner capability/API/auth layer plus shared escaping/number-format utilities from `public/manage.html` into `public/planner-client.js`. BL-011 remains active for the remaining feature/domain and Worker modularization slices.
+Progress: **BL-011A** extracted the Planner capability/API/auth layer plus shared escaping/number-format utilities into `public/planner-client.js`. **BL-011B** extracts pure Target progress, availability, filtering, sorting, status counts, and grouping/view-model logic into `public/planner-target-logic.js`; Target DOM rendering and mutations remain in `manage.html`. BL-011 remains active for the remaining feature/domain and Worker modularization slices.
 
 ## Deferred
 
