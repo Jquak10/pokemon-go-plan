@@ -27,13 +27,7 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-011 — Incrementally modularize large Planner/Worker files
-
-`public/manage.html`, `public/styles.css`, and `src/index.js` have grown into large integration files. They remain functional, but continued feature work increases regression and review cost.
-
-Extract cohesive modules incrementally—Battle Plan/intel, Targets, Calendar, Hundo, resource UI, and Worker domain orchestration—without a big-bang framework rewrite. Preserve current routes, bindings, D1 behavior, and responsive UX during decomposition.
-
-Progress: **BL-011A** extracted Planner API/auth/shared client utilities. **BL-011B** extracted pure Target logic. **BL-011C** extracted pure Calendar logic. **BL-011D** extracted pure Hundo logic. **BL-011E** extracted Battle Plan/resource view-model logic. **BL-011F** extracted Pokémon GO type-effectiveness and Battle Intel aggregation. **BL-011G** split Planner-only responsive/feature CSS into `public/planner.css`. **BL-011H** extracts HTTP credential parsing, JSON/error responses, and private/static response hardening into `src/http-security.js` while preserving `src/index.js` helper re-exports. Reassessment found one additional cohesive pure Worker cluster worth extracting before closure: ICS parsing/date-property normalization. BL-011 remains active for that final BL-011I slice and closure review.
+No confirmed active backlog items are currently recorded.
 
 ## Deferred
 
@@ -62,5 +56,7 @@ The Max Battle work that was discussed in the long-running project conversation 
 BL-001 was resolved after the production D1 definitions for `event_suppression_rules` and `remote_raid_daily_budget_overrides` were inspected directly and reconciled into the repository schema, migration path, and regression coverage.
 
 A follow-up repository audit on 18 September 2026 identified the improvement work tracked here. Automated browser regression coverage and broad PR CI shipped in PR #36, failure-safe Pokémon catalog loading shipped in PR #37, canonical Battle Plan priority scoring shipped in PR #38, and verified Max Particle cost evidence shipped in PR #39. Completed items are removed from Active and retained in `docs/DECISIONS.md` instead.
+
+BL-011 was completed through the incremental Planner/Worker modularization series ending with the iCalendar parsing extraction. The resulting boundaries cover Planner client/auth, Targets, Calendar, Hundo, Battle Plan/resources, Battle Intel, Planner-only CSS, Worker HTTP security, and pure iCalendar parsing. Remaining large integration files are intentionally orchestration surfaces rather than backlog items based on size alone.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
