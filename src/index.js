@@ -939,32 +939,93 @@ async function syncCurrentMaxBattleTierEvidence(
 
 async function syncAllEvents(env) {
   const results = [];
-  for (const [sourceType, url] of Object.entries(SOURCES)) {
+
+  for (
+    const [sourceType, url] of
+    Object.entries(SOURCES)
+  ) {
     try {
-      const count = await syncOneSource(env, sourceType, url);
-      results.push({ source: sourceType, ok: true, count });
+      const count =
+        await withSyncSourceHealth(
+          env,
+          eventSyncSource(
+            sourceType,
+            url
+          ),
+          () =>
+            syncOneSource(
+              env,
+              sourceType,
+              url
+            )
+        );
+
+      results.push({
+        source: sourceType,
+        ok: true,
+        count
+      });
     } catch (error) {
-      results.push({ source: sourceType, ok: false, error: String(error.message || error) });
+      results.push({
+        source: sourceType,
+        ok: false,
+        error:
+          syncHealthErrorMessage(
+            error
+          )
+      });
     }
   }
 
   try {
-    const count = await syncDerivedMaxRotations(env);
-    results.push({ source: MAX_ROTATION_SOURCE_TYPE, ok: true, count, derived: true });
+    const count =
+      await withSyncSourceHealth(
+        env,
+        eventSyncSource(
+          MAX_ROTATION_SOURCE_TYPE
+        ),
+        () =>
+          syncDerivedMaxRotations(
+            env
+          )
+      );
+
+    results.push({
+      source:
+        MAX_ROTATION_SOURCE_TYPE,
+      ok: true,
+      count,
+      derived: true
+    });
   } catch (error) {
     results.push({
-      source: MAX_ROTATION_SOURCE_TYPE,
+      source:
+        MAX_ROTATION_SOURCE_TYPE,
       ok: false,
       derived: true,
-      error: String(error.message || error)
+      error:
+        syncHealthErrorMessage(
+          error
+        )
     });
   }
 
   try {
     const currentMaxTiers =
-      await syncCurrentMaxBattleTierEvidence(
-        env
+      await withSyncSourceHealth(
+        env,
+        eventSyncSource(
+          "pokemon_go_api_current_max_battles",
+          POGO_API_MAX_BATTLES
+        ),
+        () =>
+          syncCurrentMaxBattleTierEvidence(
+            env
+          ),
+        result =>
+          result?.bosses ?? 0
       );
+
     results.push({
       source:
         "pokemon_go_api_current_max_battles",
@@ -977,8 +1038,7 @@ async function syncAllEvents(env) {
         "pokemon_go_api_current_max_battles",
       ok: false,
       error:
-        String(
-          error.message ||
+        syncHealthErrorMessage(
           error
         )
     });
