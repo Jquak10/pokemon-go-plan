@@ -33,7 +33,7 @@ It is intentionally different from the other repository references:
 
 Extract cohesive modules incrementally—Battle Plan/intel, Targets, Calendar, Hundo, resource UI, and Worker domain orchestration—without a big-bang framework rewrite. Preserve current routes, bindings, D1 behavior, and responsive UX during decomposition.
 
-Progress: **BL-011A** extracted Planner API/auth/shared client utilities. **BL-011B** extracted pure Target logic. **BL-011C** extracted pure Calendar logic. **BL-011D** extracted pure Hundo logic. **BL-011E** extracted Battle Plan/resource view-model logic. **BL-011F** extracts Pokémon GO type-effectiveness and Battle Intel aggregation into `public/planner-battle-intel.js`, while exact catalog/form resolution and DOM rendering remain in `manage.html`. BL-011 remains active for CSS organization and Worker orchestration slices.
+Progress: **BL-011A** extracted Planner API/auth/shared client utilities. **BL-011B** extracted pure Target logic. **BL-011C** extracted pure Calendar logic. **BL-011D** extracted pure Hundo logic. **BL-011E** extracted Battle Plan/resource view-model logic. **BL-011F** extracted Pokémon GO type-effectiveness and Battle Intel aggregation into `public/planner-battle-intel.js`, while exact catalog/form resolution and DOM rendering remain in `manage.html`. **BL-011G** splits the Planner-only responsive/feature tail out of `public/styles.css` into `public/planner.css`, loaded after the shared base stylesheet only on `manage.html`. BL-011 remains active for the final Worker orchestration extraction/reassessment slice.
 
 ## Deferred
 
