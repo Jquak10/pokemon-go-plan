@@ -56,6 +56,10 @@ import {
   canonicalTimeZone,
   isValidTimeZone
 } from "./timezone.js";
+import {
+  SYNC_HEALTH_GROUPS,
+  summarizeSyncHealth
+} from "./sync-health.js";
 
 export {
   adminKeyFromRequest,
@@ -94,6 +98,85 @@ const DEFAULT_SOURCES = [
   "raid_hour",
   "research"
 ];
+
+const EVENT_SYNC_LABELS =
+  Object.freeze({
+    community_day:
+      "Community Day",
+    event:
+      "General events",
+    go_battle_league:
+      "GO Battle League",
+    go_pass:
+      "GO Pass",
+    max_battles:
+      "Max Battles",
+    max_mondays:
+      "Max Mondays",
+    pokemon_go_fest:
+      "Pokémon GO Fest",
+    pokemon_spotlight_hour:
+      "Spotlight Hour",
+    raid_battles:
+      "Raid Battles",
+    raid_day:
+      "Raid Day",
+    raid_hour:
+      "Raid Hour",
+    research:
+      "Research",
+    season:
+      "Season",
+    [MAX_ROTATION_SOURCE_TYPE]:
+      "Weekly Max rotation",
+    pokemon_go_api_current_max_battles:
+      "Current Max Battle tiers"
+  });
+
+const OFFICIAL_SYNC_SOURCE =
+  Object.freeze({
+    source_key:
+      "official:pokemon-go-schedules",
+    source_group:
+      SYNC_HEALTH_GROUPS.OFFICIAL,
+    source_label:
+      "Official Pokémon GO schedules",
+    source_url:
+      OFFICIAL_POKEMON_GO_NEWS_URL
+  });
+
+const META_SYNC_SOURCES =
+  Object.freeze({
+    pokedex: {
+      source_key:
+        "meta:pokemon-go-api-pokedex",
+      source_group:
+        SYNC_HEALTH_GROUPS.META,
+      source_label:
+        "Pokémon GO API Pokédex",
+      source_url:
+        POGO_API_POKEDEX
+    },
+    pvpoke: {
+      source_key:
+        "meta:pvpoke-master-league",
+      source_group:
+        SYNC_HEALTH_GROUPS.META,
+      source_label:
+        "PvPoke Master League",
+      source_url:
+        PVPOKE_MASTER_LEAGUE
+    },
+    assessments: {
+      source_key:
+        "meta:automatic-assessments",
+      source_group:
+        SYNC_HEALTH_GROUPS.META,
+      source_label:
+        "Raid assessments",
+      source_url: null
+    }
+  });
 
 // Battle recommendations include standard Raids plus Max Battles.
 // Keep the legacy constant name here so the existing meta/calendar plumbing
@@ -193,6 +276,170 @@ const MAX_MAX_RANK_BACKFILLS_PER_SYNC = 80;
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function eventSyncSource(
+  sourceType,
+  sourceUrl = null
+) {
+  return {
+    source_key:
+      `event:${sourceType}`,
+    source_group:
+      SYNC_HEALTH_GROUPS.EVENT,
+    source_label:
+      EVENT_SYNC_LABELS[
+        sourceType
+      ] ||
+      String(sourceType || "")
+        .replace(/_/g, " "),
+    source_url:
+      sourceUrl || null
+  };
+}
+
+function syncHealthErrorMessage(
+  error
+) {
+  return String(
+    error?.message ||
+    error ||
+    "Unknown synchronization error."
+  ).slice(
+    0,
+    1200
+  );
+}
+
+async function recordSyncSourceHealth(
+  env,
+  source,
+  {
+    ok,
+    itemCount = null,
+    error = null,
+    attemptedAt = nowIso()
+  }
+) {
+  try {
+    await env.DB.prepare(`
+      INSERT INTO sync_source_health (
+        source_key,
+        source_group,
+        source_label,
+        source_url,
+        last_attempt_at,
+        last_success_at,
+        last_error,
+        item_count,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(source_key) DO UPDATE SET
+        source_group =
+          excluded.source_group,
+        source_label =
+          excluded.source_label,
+        source_url =
+          excluded.source_url,
+        last_attempt_at =
+          excluded.last_attempt_at,
+        last_success_at = CASE
+          WHEN excluded.last_error IS NULL
+          THEN excluded.last_attempt_at
+          ELSE sync_source_health.last_success_at
+        END,
+        last_error =
+          excluded.last_error,
+        item_count = CASE
+          WHEN excluded.last_error IS NULL
+          THEN excluded.item_count
+          ELSE sync_source_health.item_count
+        END,
+        updated_at =
+          excluded.updated_at
+    `).bind(
+      source.source_key,
+      source.source_group,
+      source.source_label,
+      source.source_url || null,
+      attemptedAt,
+      ok ? attemptedAt : null,
+      ok
+        ? null
+        : syncHealthErrorMessage(
+            error
+          ),
+      ok && itemCount != null
+        ? Math.max(
+            0,
+            Number(
+              itemCount
+            ) || 0
+          )
+        : null,
+      attemptedAt
+    ).run();
+
+    return true;
+  } catch (healthError) {
+    // Migration 0006 is additive and may be applied immediately after a
+    // Worker deploy. Health persistence must never break the underlying sync.
+    console.warn(
+      "Sync health persistence unavailable:",
+      syncHealthErrorMessage(
+        healthError
+      )
+    );
+
+    return false;
+  }
+}
+
+async function withSyncSourceHealth(
+  env,
+  source,
+  work,
+  itemCountFromResult =
+    result =>
+      typeof result === "number"
+        ? result
+        : null
+) {
+  const attemptedAt =
+    nowIso();
+
+  try {
+    const result =
+      await work();
+
+    await recordSyncSourceHealth(
+      env,
+      source,
+      {
+        ok: true,
+        itemCount:
+          itemCountFromResult(
+            result
+          ),
+        attemptedAt
+      }
+    );
+
+    return result;
+  } catch (error) {
+    await recordSyncSourceHealth(
+      env,
+      source,
+      {
+        ok: false,
+        error,
+        attemptedAt
+      }
+    );
+
+    throw error;
+  }
 }
 
 function todayUtc() {
