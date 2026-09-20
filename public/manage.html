@@ -1409,6 +1409,7 @@
 
 <script src="/battle-targets.js?v=1"></script>
 <script src="/planner-client.js?v=1"></script>
+<script src="/planner-target-logic.js?v=1"></script>
 <script>
 const {
   token,
@@ -1526,6 +1527,15 @@ const targetTypeLabels = {
   candy: "Candy",
   custom: "Custom"
 };
+
+const targetLogic =
+  PlannerTargetLogic.create({
+    battleTargets:
+      BattleTargets,
+    normalizeName:
+      normalizePickerName,
+    formatNumber
+  });
 
 function scoreTone(score) {
   const value = Number(score || 0);
@@ -6651,42 +6661,21 @@ function renderRecommendations() {
   `;
 }
 
-function targetProgress(target) {
-  const current = Number(target.current_value || 0);
-  const desired = Number(target.target_value);
-
-  if (!Number.isFinite(desired) || desired <= 0) {
-    return {
-      percent: 0,
-      label: `${formatNumber(current)} tracked`,
-      known: false
-    };
-  }
-
-  const percent = Math.max(0, Math.min(100, (current / desired) * 100));
-
-  return {
-    percent,
-    label: `${formatNumber(current)} / ${formatNumber(desired)}`,
-    known: true
-  };
+function targetProgress(
+  target
+) {
+  return targetLogic.progress(
+    target
+  );
 }
 
-function targetAvailability(target) {
-  if ((state.target_options?.current || []).some(item => BattleTargets.matches(target,item))) return "now";
-  if ((state.target_options?.upcoming || []).some(item => BattleTargets.matches(target,item))) return "upcoming";
-  return "not_raiding";
-}
-
-function targetPriorityRank(priority) {
-  return {
-    high: 0,
-    medium: 1,
-    low: 2,
-    skip: 3
-  }[
-    String(priority || "medium")
-  ] ?? 4;
+function targetAvailability(
+  target
+) {
+  return targetLogic.availability(
+    target,
+    state.target_options
+  );
 }
 
 function targetCardHtml(target) {
@@ -6825,170 +6814,42 @@ function targetCardHtml(target) {
 }
 
 function targetsMatchingNonStatusFilters() {
-  const search =
-    normalizePickerName(
-      targetFilterState.search
-    );
-
-  return state.targets
-    .filter(
-      target => {
-        if (
-          search &&
-          !normalizePickerName(
-            target.pokemon_name
-          ).includes(
-            search
-          )
-        ) {
-          return false;
-        }
-
-        if (targetFilterState.battle !== "all" && BattleTargets.kind(target) !== targetFilterState.battle) return false;
-
-        if (
-          targetFilterState.type !==
-            "all" &&
-          String(
-            target.target_type
-          ) !==
-            targetFilterState.type
-        ) {
-          return false;
-        }
-
-        if (
-          targetFilterState.priority !==
-            "all" &&
-          String(
-            target.priority
-          ) !==
-            targetFilterState.priority
-        ) {
-          return false;
-        }
-
-        if (
-          targetFilterState.availability !==
-            "all" &&
-          targetAvailability(
-            target
-          ) !==
-            targetFilterState.availability
-        ) {
-          return false;
-        }
-
-        return true;
-      }
-    );
+  return targetLogic
+    .matchingNonStatusFilters({
+      targets:
+        state.targets,
+      filterState:
+        targetFilterState,
+      targetOptions:
+        state.target_options
+    });
 }
 
 function sortTargets(
   list
 ) {
-  return [...list].sort(
-    (a, b) => {
-      if (
-        targetFilterState.sort ===
-        "name"
-      ) {
-        return a.pokemon_name.localeCompare(
-          b.pokemon_name
-        );
-      }
-
-      if (
-        targetFilterState.sort ===
-        "updated"
-      ) {
-        return String(
-          b.updated_at || ""
-        ).localeCompare(
-          String(
-            a.updated_at || ""
-          )
-        );
-      }
-
-      if (
-        targetFilterState.sort ===
-        "closest"
-      ) {
-        const aProgress =
-          targetProgress(a);
-
-        const bProgress =
-          targetProgress(b);
-
-        return (
-          bProgress.percent -
-          aProgress.percent
-        );
-      }
-
-      return (
-        Number(a.completed) -
-          Number(b.completed) ||
-        targetPriorityRank(
-          a.priority
-        ) -
-          targetPriorityRank(
-            b.priority
-          ) ||
-        (
-          targetAvailability(a) === "now"
-            ? -1
-            : 0
-        ) -
-        (
-          targetAvailability(b) === "now"
-            ? -1
-            : 0
-        ) ||
-        a.pokemon_name.localeCompare(
-          b.pokemon_name
-        )
-      );
-    }
-  );
+  return targetLogic.sortTargets({
+    targets:
+      list,
+    filterState:
+      targetFilterState,
+    targetOptions:
+      state.target_options
+  });
 }
 
 function filteredTargets(
   baseList =
     targetsMatchingNonStatusFilters()
 ) {
-  const statusFiltered =
-    baseList.filter(
-      target => {
-        const completed =
-          Number(
-            target.completed
-          );
-
-        if (
-          targetFilterState.status ===
-            "active"
-        ) {
-          return !completed;
-        }
-
-        if (
-          targetFilterState.status ===
-            "completed"
-        ) {
-          return Boolean(
-            completed
-          );
-        }
-
-        return true;
-      }
-    );
-
-  return sortTargets(
-    statusFiltered
-  );
+  return targetLogic.filteredTargets({
+    matchingTargets:
+      baseList,
+    filterState:
+      targetFilterState,
+    targetOptions:
+      state.target_options
+  });
 }
 
 function visibleTargetIdsForSelection() {
