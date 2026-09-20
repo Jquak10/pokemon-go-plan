@@ -364,6 +364,10 @@ When official Pokémon GO pages provide more precise or replacement scheduling t
 
 Official supplement rows take precedence in ordering and are identifiable by official source metadata/source_uid conventions.
 
+Official schedule discovery is durable across the event horizon. The newest Pokémon GO news index remains a bounded discovery input, but active still-future official supplement rows contribute their stored official `source_url` back into later syncs. Those retained URLs are normalized to approved Pokémon GO hosts, deduplicated, bounded independently from the newest-news discovery budget, and revisited until their stored event horizon ends.
+
+Replacement is source-scoped and last-known-good. A sync may stale prior official supplement rows only for a source page that completed its fetch and parsing pass successfully in that same sync. If a retained page temporarily fails to fetch or parse, its still-future supplement rows remain active. If a successfully refreshed page no longer yields the previous schedule, those rows can be staled normally so official replacements/removals still take effect. This durability rule does not override the source-precedence or suppression model.
+
 ### 9.4 Weekly Max rotation
 
 GO Calendar's max_battles feed contains special Max events such as Max Battle Days, while ordinary weekly Power Spot availability can be represented indirectly through Max Monday data and may disappear from the newest upstream feed after Monday passes.
