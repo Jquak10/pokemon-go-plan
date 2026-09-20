@@ -432,8 +432,8 @@ assert.deepEqual(
     )
   ),
   [
-    "mewtwo",
-    "mewtwo-armored"
+    "mewtwo-armored",
+    "mewtwo"
   ]
 );
 
