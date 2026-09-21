@@ -173,6 +173,44 @@ existing.prepare(`
   INSERT INTO users(id) VALUES (?)
 `).run('user');
 existing.prepare(`
+  INSERT INTO feed_link_credentials (
+    user_id,
+    updated_at
+  ) VALUES (?, ?)
+`).run(
+  'user',
+  'now'
+);
+
+const feedCredentialDefaults =
+  existing.prepare(`
+    SELECT
+      signed_generation,
+      signed_enabled
+    FROM feed_link_credentials
+    WHERE user_id = ?
+  `).get(
+    'user'
+  );
+
+assert.deepEqual(
+  [
+    Number(
+      feedCredentialDefaults
+        .signed_generation
+    ),
+    Number(
+      feedCredentialDefaults
+        .signed_enabled
+    )
+  ],
+  [
+    0,
+    1
+  ],
+  'feed credential defaults must preserve generation-zero signed URLs'
+);
+existing.prepare(`
   INSERT INTO max_battle_cost_overrides (
     user_id, opportunity_key, pokemon_name, battle_variant,
     start_date, end_date, max_battle_tier, max_particle_cost, updated_at
@@ -196,6 +234,23 @@ existing.prepare(`
 
 existing.exec(migration);
 existing.exec(maxCostMigration);
+existing.exec(feedCredentialMigration);
+assert.deepEqual(
+  existing.prepare(`
+    SELECT
+      signed_generation,
+      signed_enabled
+    FROM feed_link_credentials
+    WHERE user_id = ?
+  `).get(
+    'user'
+  ),
+  {
+    signed_generation: 0,
+    signed_enabled: 1
+  },
+  're-running migration 0007 must preserve existing credential state'
+);
 assert.equal(
   existing.prepare(`SELECT budget_override AS value FROM remote_raid_daily_budget_overrides WHERE user_id = 'user'`).get().value,
   7,
@@ -222,6 +277,16 @@ assert.equal(
   existing.prepare(`SELECT COUNT(*) AS count FROM max_battle_cost_overrides WHERE user_id = 'user'`).get().count,
   0,
   'Max Battle cost overrides must cascade when their user is deleted'
+);
+
+assert.equal(
+  existing.prepare(`
+    SELECT COUNT(*) AS count
+    FROM feed_link_credentials
+    WHERE user_id = 'user'
+  `).get().count,
+  0,
+  'feed credential state must cascade when its user is deleted'
 );
 
 console.log('schema completeness regression tests passed');
