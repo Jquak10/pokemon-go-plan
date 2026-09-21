@@ -137,6 +137,7 @@ The main public files are:
 - public/index.html — landing/create-planner experience.
 - public/manage.html — primary authenticated Planner UI and remaining feature/domain integration logic.
 - public/planner-client.js — shared Planner capability-token parsing, authenticated API request preparation, API error handling, HTML escaping, and numeric formatting.
+- public/planner-overlay.js — centralized modal/sheet/drawer keyboard containment, Escape dispatch, opener focus restoration, and background inert/aria-hidden isolation.
 - public/planner-target-logic.js — pure Target progress, availability, non-status/status filtering, sorting, counts, and grouping/view-model logic. It accepts BattleTargets and normalization/formatting helpers as dependencies and contains no DOM or API mutation code.
 - public/planner-calendar-logic.js — pure UTC date/month helpers, day-event range matching, source-class normalization, and six-week Monday-first month-grid projection. Calendar DOM rendering, fetch/cache state, and selected date/month state remain in manage.html.
 - public/planner-hundo-logic.js — pure Hundo CP multiplier/formula logic, standard benchmark generation, and search ranking. Pokémon catalog loading/cache, recent selections, DOM rendering, and input events remain in manage.html.
@@ -176,7 +177,26 @@ Mobile invariants:
 - Target advanced filters open in a bottom drawer.
 - Add Target and destructive actions must remain inside the viewport.
 
-### 5.2 Desktop information architecture
+### 5.2 Overlay and keyboard accessibility
+
+Foreground Planner overlays use one shared accessibility controller instead of independent Escape/focus implementations.
+
+Current invariants:
+
+- the active modal, sheet, drawer, or command palette contains Tab and Shift+Tab focus;
+- Escape is dispatched only to the top active overlay's close callback;
+- closing restores focus to the control that opened the overlay when that control still exists;
+- background body siblings are both `inert` and `aria-hidden` while an overlay is active, then restored to their previous state;
+- Ctrl/Cmd+K cannot stack the command palette on top of another active overlay;
+- hidden static overlays are inert while closed;
+- the mobile Targets filter drawer gains modal dialog semantics only while it is mounted/open as a mobile sheet and is removed from the keyboard flow while closed;
+- overlay-specific page scroll locks remain responsible for preventing background scrolling while foreground content can scroll;
+- Planner keyboard focus uses a visible `:focus-visible` ring;
+- `prefers-reduced-motion: reduce` collapses Planner animation/transition durations and disables smooth tab scrolling.
+
+`manage.html` remains responsible for overlay-specific open/close business state and scroll-lock mechanics; `planner-overlay.js` owns the cross-overlay keyboard/focus/isolation contract.
+
+### 5.3 Desktop information architecture
 
 Desktop uses the available width to reduce vertical scrolling, but dense split panes are enabled only when enough horizontal space actually exists.
 
@@ -190,11 +210,11 @@ Width behavior:
 
 Sticky elements must begin at their natural section position and must not cover content that precedes them. No desktop or intermediate layout may introduce horizontal page scrolling.
 
-### 5.3 CSS cache discipline
+### 5.4 CSS cache discipline
 
 Whenever public/styles.css changes, every page that references it must have its CSS cache/version reference bumped. This prevents stale production styling after deployment.
 
-The current shared CSS cache generation is v42 after the BL-011G Planner stylesheet split. Future `styles.css` changes must continue the version bump. Planner-only overrides are loaded separately from `planner.css`.
+The current shared CSS cache generation is v42 after the BL-011G Planner stylesheet split. Future `styles.css` changes must continue the version bump. Planner-only overrides are loaded separately from `planner.css`; BL-016 advances the Planner-only stylesheet reference to v2 for focus-visible and reduced-motion rules without changing shared `styles.css`.
 
 ## 6. Server modules
 
