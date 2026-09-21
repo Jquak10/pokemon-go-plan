@@ -7023,14 +7023,126 @@ async function loadCalendarMonth(force = false) {
   }
 }
 
-async function loadRecoverableFeedLink() {
-  if (recoverableFeedUrl) return;
+function setCalendarAppButtonsEnabled(
+  enabled
+) {
+  document
+    .querySelectorAll(
+      "[data-calendar-app]"
+    )
+    .forEach(
+      button => {
+        button.disabled =
+          !enabled;
+      }
+    );
+}
 
+function applyRecoverableFeedState(
+  data
+) {
   const input =
-    document.getElementById("icsFeedLink");
+    document.getElementById(
+      "icsFeedLink"
+    );
 
   const status =
-    document.getElementById("feedLinkStatus");
+    document.getElementById(
+      "feedLinkStatus"
+    );
+
+  const copyButton =
+    document.getElementById(
+      "copyFeedLink"
+    );
+
+  const rotateButton =
+    document.getElementById(
+      "rotateSignedFeed"
+    );
+
+  const revokeButton =
+    document.getElementById(
+      "revokeSignedFeed"
+    );
+
+  const rotationAvailable =
+    data?.rotation_available !==
+      false;
+
+  if (
+    data?.revoked ||
+    !data?.calendar_url
+  ) {
+    recoverableFeedUrl = "";
+
+    input.value =
+      "Preferred signed URL revoked";
+    copyButton.disabled = true;
+    setCalendarAppButtonsEnabled(
+      false
+    );
+
+    rotateButton.disabled =
+      !rotationAvailable;
+    revokeButton.disabled = true;
+
+    status.innerHTML = `
+      <span aria-hidden="true">🔒</span>
+      <span>
+        The preferred signed URL is revoked. Regenerate it before adding a new calendar subscription.
+      </span>
+    `;
+
+    return;
+  }
+
+  recoverableFeedUrl =
+    data.calendar_url;
+
+  input.value =
+    recoverableFeedUrl;
+
+  copyButton.disabled = false;
+  setCalendarAppButtonsEnabled(
+    true
+  );
+
+  rotateButton.disabled =
+    !rotationAvailable;
+  revokeButton.disabled =
+    !rotationAvailable;
+
+  status.innerHTML =
+    rotationAvailable
+      ? `
+        <span aria-hidden="true">🔒</span>
+        <span>
+          Private read-only subscription. Keep this link private because anyone with it can read your calendar.
+        </span>
+      `
+      : `
+        <span aria-hidden="true">🔒</span>
+        <span>
+          This private read-only subscription still works. Rotation controls become available after D1 migration 0007 is applied.
+        </span>
+      `;
+}
+
+async function loadRecoverableFeedLink() {
+  if (recoverableFeedUrl) {
+    return;
+  }
+
+  const input =
+    document.getElementById(
+      "icsFeedLink"
+    );
+
+  const status =
+    document.getElementById(
+      "feedLinkStatus"
+    );
 
   input.value =
     "Preparing your preferred subscription URL…";
@@ -7041,32 +7153,36 @@ async function loadRecoverableFeedLink() {
         "/api/feed-link"
       );
 
-    recoverableFeedUrl =
-      data.calendar_url;
-
-    input.value =
-      recoverableFeedUrl;
-
-    document
-      .getElementById("copyFeedLink")
-      .disabled = false;
-
-    document
-      .querySelectorAll("[data-calendar-app]")
-      .forEach(
-        button =>
-          button.disabled = false
-      );
-
-    status.innerHTML = `
-      <span aria-hidden="true">🔒</span>
-      <span>
-        Private read-only subscription. Keep this link private because anyone with it can read your calendar.
-      </span>
-    `;
+    applyRecoverableFeedState(
+      data
+    );
   } catch (error) {
+    recoverableFeedUrl = "";
+
     input.value =
       "Subscription link unavailable";
+
+    document
+      .getElementById(
+        "copyFeedLink"
+      )
+      .disabled = true;
+
+    document
+      .getElementById(
+        "rotateSignedFeed"
+      )
+      .disabled = true;
+
+    document
+      .getElementById(
+        "revokeSignedFeed"
+      )
+      .disabled = true;
+
+    setCalendarAppButtonsEnabled(
+      false
+    );
 
     status.innerHTML = `
       <span aria-hidden="true">!</span>
@@ -7075,6 +7191,232 @@ async function loadRecoverableFeedLink() {
   }
 }
 
+async function rotateSignedFeed() {
+  const confirmed =
+    window.confirm(
+      "Regenerate the preferred signed calendar URL? The current signed URL will stop working immediately, so calendar apps using it must be subscribed again with the new URL."
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const status =
+    document.getElementById(
+      "signedFeedStatus"
+    );
+
+  const button =
+    document.getElementById(
+      "rotateSignedFeed"
+    );
+
+  button.disabled = true;
+  status.textContent =
+    "Regenerating signed URL…";
+
+  try {
+    const data =
+      await api(
+        "/api/feed-link/rotate",
+        {
+          method: "POST",
+          headers: {
+            "content-type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              token
+            })
+        }
+      );
+
+    applyRecoverableFeedState(
+      {
+        ...data,
+        rotation_available:
+          true
+      }
+    );
+
+    status.textContent =
+      "New signed URL active. Previous signed URL revoked ✓";
+  } catch (error) {
+    status.textContent =
+      error.message;
+    button.disabled = false;
+  }
+}
+
+async function revokeSignedFeed() {
+  const confirmed =
+    window.confirm(
+      "Revoke the preferred signed calendar URL? Calendar apps using it will stop updating immediately. You can generate a new signed URL later."
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const status =
+    document.getElementById(
+      "signedFeedStatus"
+    );
+
+  const button =
+    document.getElementById(
+      "revokeSignedFeed"
+    );
+
+  button.disabled = true;
+  status.textContent =
+    "Revoking signed URL…";
+
+  try {
+    const data =
+      await api(
+        "/api/feed-link/revoke",
+        {
+          method: "POST",
+          headers: {
+            "content-type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              token
+            })
+        }
+      );
+
+    applyRecoverableFeedState({
+      calendar_url: null,
+      revoked: true,
+      generation:
+        data.generation,
+      rotation_available:
+        true
+    });
+
+    status.textContent =
+      "Signed calendar URL revoked ✓";
+  } catch (error) {
+    status.textContent =
+      error.message;
+    button.disabled = false;
+  }
+}
+
+async function copyManagementLink() {
+  const input =
+    document.getElementById(
+      "managementLinkValue"
+    );
+
+  const value =
+    input.value;
+
+  if (!value) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(
+      value
+    );
+  } catch {
+    input.focus();
+    input.select();
+    document.execCommand(
+      "copy"
+    );
+  }
+
+  const status =
+    document.getElementById(
+      "managementLinkStatus"
+    );
+
+  status.textContent =
+    "Management link copied ✓";
+}
+
+async function rotateManagementLink() {
+  const confirmed =
+    window.confirm(
+      "Rotate the private management link? The current management URL will stop working immediately. Calendar subscription URLs will not change."
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const button =
+    document.getElementById(
+      "rotateManagementLink"
+    );
+
+  const status =
+    document.getElementById(
+      "managementLinkStatus"
+    );
+
+  button.disabled = true;
+  status.textContent =
+    "Rotating management link…";
+
+  try {
+    const data =
+      await api(
+        "/api/manage-link/rotate",
+        {
+          method: "POST",
+          headers: {
+            "content-type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              token
+            })
+        }
+      );
+
+    const nextUrl =
+      new URL(
+        data.management_url
+      );
+
+    PlannerClient.setToken(
+      data.manage_token ||
+      PlannerClient
+        .managementTokenFromPath(
+          nextUrl.pathname
+        )
+    );
+
+    history.replaceState(
+      null,
+      "",
+      `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`
+    );
+
+    document
+      .getElementById(
+        "managementLinkValue"
+      )
+      .value =
+        data.management_url;
+
+    status.textContent =
+      "New management link active. Previous link revoked ✓";
+  } catch (error) {
+    status.textContent =
+      error.message;
+    button.disabled = false;
+  }
+}
 
 async function copySubscriptionUrl() {
   if (!recoverableFeedUrl) {
@@ -7309,6 +7651,13 @@ function ensureCalendarTabLoaded() {
 }
 
 function renderPreferences() {
+  document
+    .getElementById(
+      "managementLinkValue"
+    )
+    .value =
+      window.location.href;
+
   document.getElementById("pveWeight").value = state.user.pve_weight;
   document.getElementById("pvpWeight").value = state.user.pvp_weight;
   document.getElementById("collectorWeight").value = state.user.collector_weight;
@@ -7801,6 +8150,38 @@ updateSliderOutput("collectorWeight", "collectorWeightOutput", 1);
 updateSliderOutput("remoteRaidMinScore", "remoteRaidMinScoreOutput", 0);
 
 document.getElementById("saveSettings").addEventListener("click", savePreferences);
+document
+  .getElementById(
+    "copyManagementLink"
+  )
+  .addEventListener(
+    "click",
+    copyManagementLink
+  );
+document
+  .getElementById(
+    "rotateManagementLink"
+  )
+  .addEventListener(
+    "click",
+    rotateManagementLink
+  );
+document
+  .getElementById(
+    "rotateSignedFeed"
+  )
+  .addEventListener(
+    "click",
+    rotateSignedFeed
+  );
+document
+  .getElementById(
+    "revokeSignedFeed"
+  )
+  .addEventListener(
+    "click",
+    revokeSignedFeed
+  );
 document.getElementById("saveBattleResources").addEventListener("click", saveBattleResources);
 document.getElementById("saveCalendar").addEventListener("click", saveCalendarFilters);
 document
