@@ -112,6 +112,10 @@ Calendar URLs are bearer credentials. Management URLs are also sensitive. They m
 
 The management capability remains in the private `/manage/<token>` URL so existing saved links keep working, but the current Planner UI does not repeat that token in API query strings or JSON bodies. Same-origin management API requests send it as an `Authorization: Bearer` header. The Worker accepts that header first while retaining the historical query/body token forms for older clients and bookmarks. Admin browser requests similarly use `X-Admin-Key`, with legacy query/body key forms accepted server-side for compatibility.
 
+Management-link rotation replaces only `users.manage_hash`. The authenticated Planner immediately swaps its in-memory API credential and uses `history.replaceState` to replace the capability URL without navigating through the now-invalid old link. Calendar credentials are unchanged.
+
+The preferred signed calendar link is generation-scoped per planner. Generation 0 deliberately uses the exact pre-BL-015 HMAC payload and URL shape, so existing signed subscriptions remain valid without migration or user action. Migration 0007 adds `feed_link_credentials`; once present, regenerate/revoke advances only that planner's signed generation. A calendar request must match both the currently enabled generation and its HMAC signature. Revocation disables the current generation; regeneration advances again and re-enables it. The historical random-token `/calendar/<token>.ics` credential remains independent and is invalidated only by the existing legacy-feed revoke action.
+
 Private/browser surfaces receive defense-in-depth response headers in Worker routing:
 
 - `Referrer-Policy: no-referrer` prevents a capability URL from being disclosed as a navigation referrer.
@@ -262,6 +266,16 @@ Important fields include:
 - sequence.
 - active/stale status.
 
+### feed_link_credentials
+
+Stores per-planner state for the preferred signed calendar bearer credential:
+
+- current signed generation;
+- enabled/revoked state;
+- update time.
+
+A missing row means generation 0 and enabled, preserving all signed URLs issued before BL-015. This table never stores the plaintext management token, legacy feed token, signed URL, or HMAC secret.
+
 ### pokemon_meta and meta_sources
 
 pokemon_meta stores shared Pokémon-level planning/meta values. meta_sources stores source-specific evidence and generated profiles, including Raid and Max ranking profiles.
@@ -328,6 +342,7 @@ Current explicit migrations are:
 - migrations/0004_schema_baseline_operational_tables.sql — idempotent operational-table/index repair.
 - migrations/0005_max_battle_cost_overrides.sql — private per-opportunity Max tier/cost fallback.
 - migrations/0006_sync_source_health.sql — additive per-source synchronization health and group index.
+- migrations/0007_feed_link_credentials.sql — additive per-planner signed calendar generation/revocation state.
 
 Production migrations are deliberate manual steps. Do not initialize production by applying the entire schema.sql over an existing D1 database.
 
