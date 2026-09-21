@@ -500,27 +500,229 @@ async function feedSigningKey(env) {
   );
 }
 
-async function recoverableFeedSignature(env, userId) {
+function recoverableFeedSignaturePayload(
+  userId,
+  generation = 0
+) {
+  const normalizedGeneration =
+    Math.max(
+      0,
+      Math.floor(
+        Number(generation) || 0
+      )
+    );
+
+  // Generation zero intentionally preserves the pre-BL-015 signature
+  // payload so every existing signed subscription keeps working until that
+  // planner explicitly rotates or revokes it.
+  return normalizedGeneration === 0
+    ? `pokemon-go-calendar-feed:${userId}`
+    : `pokemon-go-calendar-feed:${userId}:${normalizedGeneration}`;
+}
+
+async function recoverableFeedSignature(
+  env,
+  userId,
+  generation = 0
+) {
   const key = await feedSigningKey(env);
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
-    new TextEncoder().encode(`pokemon-go-calendar-feed:${userId}`)
+    new TextEncoder().encode(
+      recoverableFeedSignaturePayload(
+        userId,
+        generation
+      )
+    )
   );
 
   // 24 bytes is plenty for an unguessable read-only feed signature.
   return bytesToBase64Url(new Uint8Array(signature).slice(0, 24));
 }
 
-async function verifyRecoverableFeedSignature(env, userId, signature) {
-  const expected = await recoverableFeedSignature(env, userId);
-  if (expected.length !== String(signature || "").length) return false;
+async function verifyRecoverableFeedSignature(
+  env,
+  userId,
+  generation,
+  signature
+) {
+  const expected =
+    await recoverableFeedSignature(
+      env,
+      userId,
+      generation
+    );
+
+  if (
+    expected.length !==
+    String(
+      signature || ""
+    ).length
+  ) {
+    return false;
+  }
 
   let difference = 0;
-  for (let i = 0; i < expected.length; i++) {
-    difference |= expected.charCodeAt(i) ^ String(signature).charCodeAt(i);
+  for (
+    let index = 0;
+    index < expected.length;
+    index += 1
+  ) {
+    difference |=
+      expected.charCodeAt(index) ^
+      String(signature)
+        .charCodeAt(index);
   }
+
   return difference === 0;
+}
+
+function recoverableFeedPath(
+  userId,
+  generation,
+  signature
+) {
+  const normalizedGeneration =
+    Math.max(
+      0,
+      Math.floor(
+        Number(generation) || 0
+      )
+    );
+
+  return normalizedGeneration === 0
+    ? `/calendar/recover/${userId}.${signature}.ics`
+    : `/calendar/recover/${userId}.${normalizedGeneration}.${signature}.ics`;
+}
+
+async function feedLinkCredentialState(
+  env,
+  userId
+) {
+  try {
+    const row =
+      await env.DB.prepare(`
+        SELECT
+          signed_generation,
+          signed_enabled,
+          updated_at
+        FROM feed_link_credentials
+        WHERE user_id = ?
+      `).bind(
+        userId
+      ).first();
+
+    return {
+      generation:
+        Math.max(
+          0,
+          Math.floor(
+            Number(
+              row?.signed_generation
+            ) || 0
+          )
+        ),
+      enabled:
+        row == null
+          ? true
+          : Boolean(
+              Number(
+                row.signed_enabled
+              )
+            ),
+      updated_at:
+        row?.updated_at ||
+        null,
+      migration_ready:
+        true
+    };
+  } catch (error) {
+    if (
+      /no such table:\s*feed_link_credentials/i.test(
+        String(
+          error?.message ||
+          error
+        )
+      )
+    ) {
+      return {
+        generation: 0,
+        enabled: true,
+        updated_at: null,
+        migration_ready:
+          false
+      };
+    }
+
+    throw error;
+  }
+}
+
+async function advanceFeedLinkCredential(
+  env,
+  userId,
+  enabled
+) {
+  const timestamp =
+    nowIso();
+
+  try {
+    await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO feed_link_credentials (
+          user_id,
+          signed_generation,
+          signed_enabled,
+          updated_at
+        )
+        VALUES (?, 0, 1, ?)
+        ON CONFLICT(user_id) DO NOTHING
+      `).bind(
+        userId,
+        timestamp
+      ),
+      env.DB.prepare(`
+        UPDATE feed_link_credentials
+        SET
+          signed_generation =
+            signed_generation + 1,
+          signed_enabled = ?,
+          updated_at = ?
+        WHERE user_id = ?
+      `).bind(
+        enabled ? 1 : 0,
+        timestamp,
+        userId
+      )
+    ]);
+  } catch (error) {
+    if (
+      /no such table:\s*feed_link_credentials/i.test(
+        String(
+          error?.message ||
+          error
+        )
+      )
+    ) {
+      const migrationError =
+        new Error(
+          "Calendar credential rotation requires D1 migration 0007_feed_link_credentials.sql."
+        );
+
+      migrationError.code =
+        "feed_credentials_migration_required";
+
+      throw migrationError;
+    }
+
+    throw error;
+  }
+
+  return feedLinkCredentialState(
+    env,
+    userId
+  );
 }
 
 async function syncOneSource(env, sourceType, url) {
