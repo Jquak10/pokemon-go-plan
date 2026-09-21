@@ -206,7 +206,7 @@ for (const page of [
 
 assert.match(
   manage,
-  /<link rel="stylesheet" href="\/planner\.css\?v=1">/
+  /<link rel="stylesheet" href="\/planner\.css\?v=2">/
 );
 for (const page of [
   "../public/index.html",
