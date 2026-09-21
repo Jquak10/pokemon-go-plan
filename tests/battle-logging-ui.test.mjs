@@ -37,7 +37,7 @@ const context = vm.createContext({
   raidLogType:'remote',raidLogProgressDirty:false,raidLogExplicitTargetId:null,
   battleLogRecommendation:null,battleLogRequestId:null,battleLogBusy:false,battleLogWinsDirty:false,battleLogPassesDirty:false
 });
-for (const name of ['raidLogMatchingTarget','raidLogPokemonNames','setRaidLogType','raidLogDefaultProgress','populateRaidLogPokemon','syncRaidLogProgressDefault','battleLogSelection','battleLogLabel','battleLogParticleCostValue','setBattleLogParticleCost','syncBattleLogParticleCostControl','prefillBattleLog','updateRaidLogPreview','openRaidLogModal']) {
+for (const name of ['raidLogMatchingTarget','raidLogPokemonNames','setRaidLogType','raidLogDefaultProgress','populateRaidLogPokemon','syncRaidLogProgressDefault','battleLogSelection','battleLogLabel','battleLogParticleCostValue','setBattleLogParticleCost','syncBattleLogParticleCostControl','prefillBattleLog','updateRaidLogPreview','openRaidLogModal','closeRaidLogModal']) {
   const start=script.indexOf(`function ${name}(`);
   assert.ok(start>=0,name);
   const remainder=script.slice(start);
