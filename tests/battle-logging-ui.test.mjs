@@ -7,6 +7,7 @@ import { inferMaxParticleCost } from '../src/resource-planning.js';
 const manage = readFileSync(new URL('../public/manage.html',import.meta.url),'utf8');
 const script = readFileSync(new URL('../public/planner-app.js',import.meta.url),'utf8');
 new vm.Script(script);
+const plannerSource = `${manage}\n${script}`;
 const elements = new Map();
 function element(id) {
   if (!elements.has(id)) elements.set(id, {value:'',checked:true,disabled:false,textContent:'',innerHTML:'',
@@ -105,25 +106,25 @@ assert.equal(
   }).cost,
   250
 );
-assert.match(manage,/<select id="battleLogMp">/);
-assert.match(manage,/Tier 1 · 250 MP/);
-assert.match(manage,/Tier 2–3 · 400 MP/);
-assert.match(manage,/Tier 4–6 · 800 MP/);
-assert.match(manage,/verified_tier_standard_cost/);
-assert.match(manage,/official_explicit/);
-assert.match(manage,/max_particle_cost: battleLogParticleCostValue\(\)/);
-assert.match(manage,/remote_battles_used: Number\(document\.getElementById\("raidsUsedToday"\)\.value\)/);
-assert.match(manage,/official daily Remote limit is shared by ordinary Remote Raids and Remote Max Battles/i);
-assert.match(manage,/data-log-battle-key=/);
-assert.match(manage,/\/api\/battle-log/);
-assert.match(manage,/log_source: logSource/);
-assert.match(manage,/request_id: battleLogRequestId/);
-assert.match(manage,/if \(battleLogBusy\) return/);
-assert.match(manage,/lockPageForModal\(\)/);
-assert.match(manage,/unlockPageForModal\(\)/);
-assert.match(manage,/Today's Battle Activity/);
-assert.match(manage,/Recent battle logs/);
+assert.match(plannerSource,/<select id="battleLogMp">/);
+assert.match(plannerSource,/Tier 1 · 250 MP/);
+assert.match(plannerSource,/Tier 2–3 · 400 MP/);
+assert.match(plannerSource,/Tier 4–6 · 800 MP/);
+assert.match(plannerSource,/verified_tier_standard_cost/);
+assert.match(plannerSource,/official_explicit/);
+assert.match(plannerSource,/max_particle_cost: battleLogParticleCostValue\(\)/);
+assert.match(plannerSource,/remote_battles_used: Number\(document\.getElementById\("raidsUsedToday"\)\.value\)/);
+assert.match(plannerSource,/official daily Remote limit is shared by ordinary Remote Raids and Remote Max Battles/i);
+assert.match(plannerSource,/data-log-battle-key=/);
+assert.match(plannerSource,/\/api\/battle-log/);
+assert.match(plannerSource,/log_source: logSource/);
+assert.match(plannerSource,/request_id: battleLogRequestId/);
+assert.match(plannerSource,/if \(battleLogBusy\) return/);
+assert.match(plannerSource,/lockPageForModal\(\)/);
+assert.match(plannerSource,/unlockPageForModal\(\)/);
+assert.match(plannerSource,/Today's Battle Activity/);
+assert.match(plannerSource,/Recent battle logs/);
 console.log('Battle logger UI prefills, editable progress, unknown costs and form contracts passed');
 
-assert.match(manage,/Remote Raids and Remote Max Battles share the same official daily Remote participation limit/i);
-assert.doesNotMatch(manage,/check the in-game limit/i);
+assert.match(plannerSource,/Remote Raids and Remote Max Battles share the same official daily Remote participation limit/i);
+assert.doesNotMatch(plannerSource,/check the in-game limit/i);
