@@ -10,7 +10,7 @@ The engineering references above are the durable source for current architecture
 
 **Change logging policy:** every product improvement and bug fix is recorded in the PR lineage in [docs/DECISIONS.md](docs/DECISIONS.md). Changes to current system behavior or invariants also update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); confirmed unshipped work and technical debt update [docs/BACKLOG.md](docs/BACKLOG.md); user/developer-facing behavior updates this README; development automation/policy updates [AGENTS.md](AGENTS.md). Documentation is maintained in the same PR as the change rather than reconstructed from chat history later.
 
-Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner.
+Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner. The Planner includes recovery controls for rotating an exposed management link and regenerating or revoking the preferred signed calendar URL without changing the other credential.
 
 ## What the app does
 
@@ -106,6 +106,18 @@ npx wrangler d1 execute DB --remote --file=migrations/0006_sync_source_health.sq
 
 The Worker is intentionally backward compatible with deployment order: if the new Worker runs before migration 0006 is applied, synchronization continues and the Planner falls back to its legacy freshness timestamps. Once the table exists and the next synchronization runs, per-source health begins populating automatically.
 
+### Credential rotation migration
+
+`migrations/0007_feed_link_credentials.sql` adds per-planner generation/enable state for the preferred signed calendar subscription. It is additive and idempotent.
+
+Apply it to an existing production D1 database with the existing binding:
+
+```bash
+npx wrangler d1 execute DB --remote --file=migrations/0007_feed_link_credentials.sql
+```
+
+Deployment order is safe. Before migration 0007 exists, every existing generation-0 signed URL keeps working exactly as before and the Planner disables signed-feed rotation controls. After the migration is applied, regenerating or revoking the preferred signed URL advances only that planner's generation and immediately invalidates its previous signed URL. Legacy `/calendar/<random-token>.ics` subscriptions remain independently compatible until the existing legacy-revoke control is used. Management-link rotation does not require migration 0007 and does not alter either calendar credential.
+
 ## Features
 
 - Personalized raid recommendations based on event availability, shared meta scores, user-defined weights, targets, progress, and priority.
@@ -119,7 +131,7 @@ The Worker is intentionally backward compatible with deployment order: if the ne
 - Automated PvPoke Master League data and Pokémon GO API-based analytical inputs, with visible source precedence and per-source synchronization health. The freshness strip warns when a source relevant to the current planner is degraded instead of letting a different successful source make the entire layer appear fresh.
 - Responsive desktop and mobile interfaces.
 - Administration views for synchronization, official raid supplements, Remote Raid limits, suppressions, meta assessments, and raid-ranking refreshes.
-- Capability-link access without a conventional email/password account.
+- Capability-link access without a conventional email/password account, with independent recovery controls for management and preferred signed calendar credentials.
 
 The project is independent and is not affiliated with Niantic, The Pokémon Company, Nintendo, or GAME FREAK.
 
