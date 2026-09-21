@@ -235,7 +235,7 @@ existing.prepare(`
 existing.exec(migration);
 existing.exec(maxCostMigration);
 existing.exec(feedCredentialMigration);
-assert.deepEqual(
+const preservedFeedCredential =
   existing.prepare(`
     SELECT
       signed_generation,
@@ -244,11 +244,23 @@ assert.deepEqual(
     WHERE user_id = ?
   `).get(
     'user'
-  ),
-  {
-    signed_generation: 0,
-    signed_enabled: 1
-  },
+  );
+
+assert.deepEqual(
+  [
+    Number(
+      preservedFeedCredential
+        .signed_generation
+    ),
+    Number(
+      preservedFeedCredential
+        .signed_enabled
+    )
+  ],
+  [
+    0,
+    1
+  ],
   're-running migration 0007 must preserve existing credential state'
 );
 assert.equal(
