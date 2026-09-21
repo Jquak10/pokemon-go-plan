@@ -130,6 +130,7 @@ Deployment order is safe. Before migration 0007 exists, every existing generatio
 - GO Calendar data, higher-priority official Pokémon GO schedule supplements, and suppression rules. Still-upcoming official supplement source pages are retained and revisited through their event horizon even after they fall outside the newest-news discovery window; a failed refresh preserves the last-known future supplement instead of erasing it.
 - Automated PvPoke Master League data and Pokémon GO API-based analytical inputs, with visible source precedence and per-source synchronization health. The freshness strip warns when a source relevant to the current planner is degraded instead of letting a different successful source make the entire layer appear fresh.
 - Responsive desktop and mobile interfaces with centralized overlay keyboard behavior: modal/sheet focus containment, Escape-to-close, opener focus restoration, background isolation, visible keyboard focus, and reduced-motion support.
+- The private Planner management surface loads executable JavaScript only from same-origin external assets and is served with `script-src 'self'` (no `'unsafe-inline'` script allowance).
 - Administration views for synchronization, official raid supplements, Remote Raid limits, suppressions, meta assessments, and raid-ranking refreshes.
 - Capability-link access without a conventional email/password account, with independent recovery controls for management and preferred signed calendar credentials.
 
@@ -328,8 +329,9 @@ Manual `wrangler deploy` is available as an npm script, but it is not the normal
 ├── public/
 │   ├── admin.html             # Administration interface
 │   ├── index.html             # Planner creation page
-│   ├── manage.html            # Personalized planner dashboard/orchestration
-│   ├── planner-client.js       # Planner API/auth + shared client utilities
+│   ├── manage.html            # Personalized planner dashboard markup shell
+│   ├── planner-app.js         # Planner DOM/state/API orchestration
+│   ├── planner-client.js      # Planner API/auth + shared client utilities
 │   ├── planner-target-logic.js # Pure Target filtering/progress/sorting/grouping
 │   ├── planner-calendar-logic.js # Pure Calendar date/month/event-grid logic
 │   ├── planner-hundo-logic.js    # Pure Hundo CP/search/benchmark logic
@@ -628,7 +630,7 @@ The repository does not currently include a script that initializes the local D1
 
 Every pull request and every push to `main` runs the deterministic Planner regression workflow. Pull requests run the Node regression suite and real Chromium browser suite; the upstream live-contract job is intentionally excluded from PR gating so an external outage or upstream drift cannot make an otherwise deterministic UI/code PR flaky. Pushes to `main`, scheduled runs, and manual workflow runs still exercise the live contract. The browser job installs Chromium in CI and the test itself starts and stops its own local fixture server, so **you do not need to start Wrangler or any other server for browser tests**.
 
-The browser suite protects the 768/900/1024/1179/1180/1280 responsive boundaries, intermediate-desktop text visibility, management-header credential transport, asynchronous Dynamax battle-intel rendering, mobile modal containment, keyboard focus trapping/restoration, Escape handling, background isolation, reduced-motion overlay behavior, and horizontal-overflow regressions. Its Pokémon/event records are fixed regression fixtures rather than live schedule data, so a Pokémon leaving the current Raid/Max rotation does not make the test stale or flaky.
+The browser suite protects the 768/900/1024/1179/1180/1280 responsive boundaries, intermediate-desktop text visibility, management-header credential transport, asynchronous Dynamax battle-intel rendering, mobile modal containment, keyboard focus trapping/restoration, Escape handling, background isolation, reduced-motion overlay behavior, strict Planner `script-src 'self'` CSP execution, and horizontal-overflow regressions. Its Pokémon/event records are fixed regression fixtures rather than live schedule data, so a Pokémon leaving the current Raid/Max rotation does not make the test stale or flaky.
 
 For an optional local browser run, install Playwright once in the Dev Container and then run the test directly:
 
