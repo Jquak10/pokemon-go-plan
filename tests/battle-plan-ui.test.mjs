@@ -375,6 +375,10 @@ assert.equal(
   "The shared Planner API client must switch immediately to a rotated management capability"
 );
 
+plannerClientApi.setToken(
+  "browser-test-token"
+);
+
 const preparedManagedRequest =
   plannerClientApi
     .buildManagedApiRequest({
