@@ -3,7 +3,9 @@ import fs from "node:fs";
 
 const index = fs.readFileSync("src/index.js", "utf8");
 const resource = fs.readFileSync("src/resource-planning.js", "utf8");
-const manage = fs.readFileSync("public/manage.html", "utf8");
+const manageHtml = fs.readFileSync("public/manage.html", "utf8");
+const plannerApp = fs.readFileSync("public/planner-app.js", "utf8");
+const manage = `${manageHtml}\n${plannerApp}`;
 
 assert.match(index, /MAX_RANK_METHOD_VERSION/);
 assert.match(index, /MAX_RANK_SOURCE_NAME = "Max attacker rankings"/);

@@ -11344,7 +11344,8 @@ async function asset(
   env,
   pathname,
   {
-    noStore = false
+    noStore = false,
+    allowInlineScript = true
   } = {}
 ) {
   const url = new URL(request.url);
@@ -11361,7 +11362,8 @@ async function asset(
   return hardenResponse(
     response,
     {
-      noStore
+      noStore,
+      allowInlineScript
     }
   );
 }
@@ -11599,7 +11601,8 @@ async function handleFetch(request, env) {
         env,
         "/manage",
         {
-          noStore: true
+          noStore: true,
+          allowInlineScript: false
         }
       );
     }

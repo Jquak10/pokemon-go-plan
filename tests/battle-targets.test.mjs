@@ -246,8 +246,9 @@ const completedPlan=buildBattleResourcePlan({recommendations:[{...maxRec,target:
 assert.equal(completedPlan.allocations.length,0);
 
 // Exercise real UI filtering/rendering functions: counts honor every non-status filter.
-const html=read('../public/manage.html');
-const script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
+const htmlMarkup=read('../public/manage.html');
+const script=read('../public/planner-app.js');
+const html=`${htmlMarkup}\n${script}`;
 new vm.Script(script);
 const elements=new Map();
 const element=id=>{if(!elements.has(id)) elements.set(id,{value:'',textContent:'',innerHTML:'',classList:{toggle(){},add(){},remove(){}},setAttribute(){}});return elements.get(id);};

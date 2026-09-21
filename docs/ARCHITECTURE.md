@@ -124,7 +124,7 @@ Private/browser surfaces receive defense-in-depth response headers in Worker rou
 - Management and Admin HTML are `private, no-store`; authenticated JSON is also no-store by default.
 - Calendar feeds keep their private ETag/revalidation behavior for calendar-client compatibility while also receiving no-referrer/nosniff protection.
 
-The current static-client architecture still contains inline JavaScript and styles, so the CSP deliberately permits inline script/style execution while applying the stronger origin, frame, object, base, and form restrictions above. Tightening that portion requires a separate code-organization change rather than silently breaking the current UI.
+The HTML CSP is route-aware. The private Planner management route uses `script-src 'self'` with no `'unsafe-inline'` script allowance. Its executable application logic lives in same-origin external files, and generated Planner markup must not use inline `on*=...` handlers. The public creation page and Admin page still contain inline JavaScript, so their existing HTML responses retain the historical inline-script compatibility policy. `style-src 'unsafe-inline'` is unchanged across HTML surfaces because BL-017 is intentionally script-only and existing inline style usage remains. Chromium regression fixtures serve the Planner under the strict script policy so an accidental inline-script dependency fails browser CI.
 
 Secrets such as ADMIN_KEY, FEED_LINK_KEY, GitHub credentials, Cloudflare credentials, management tokens, and private ICS URLs must never be requested or committed.
 
@@ -135,7 +135,8 @@ Legacy management API credential forms and legacy calendar subscription URLs mus
 The main public files are:
 
 - public/index.html — landing/create-planner experience.
-- public/manage.html — primary authenticated Planner UI and remaining feature/domain integration logic.
+- public/manage.html — primary authenticated Planner markup shell and same-origin script/style references.
+- public/planner-app.js — Planner DOM/state/API orchestration that previously lived in the final inline `manage.html` application script. It remains one integration surface by design; BL-017 externalizes it for CSP correctness rather than reopening modularization based on file size.
 - public/planner-client.js — shared Planner capability-token parsing, authenticated API request preparation, API error handling, HTML escaping, and numeric formatting.
 - public/planner-overlay.js — centralized modal/sheet/drawer keyboard containment, Escape dispatch, opener focus restoration, and background inert/aria-hidden isolation.
 - public/planner-target-logic.js — pure Target progress, availability, non-status/status filtering, sorting, counts, and grouping/view-model logic. It accepts BattleTargets and normalization/formatting helpers as dependencies and contains no DOM or API mutation code.
@@ -149,7 +150,7 @@ The main public files are:
 - public/planner.css — Planner-only responsive shell, feature styling, and regression-hardening overrides. It is loaded after styles.css only by manage.html, preserving the original cascade order while keeping unrelated pages out of Planner-specific CSS.
 - public/battle-targets.js — shared client-side target identity helpers.
 
-The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. The completed BL-011 modularization established explicit boundaries around reusable Planner logic while keeping `manage.html` as the DOM/state orchestration surface. The Planner client module owns the PR #47 management-auth transport contract, so feature code should call its `api` helper rather than reimplementing token/query/body handling. Target list business logic is likewise kept in the pure Planner Target Logic module; `manage.html` continues to own Target DOM rendering, selection state, modal interactions, and API mutations. Planner-specific CSS follows the same boundary: shared base rules stay in `styles.css`, while Planner-only responsive/feature overrides live in `planner.css` and load after the base stylesheet.
+The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. The completed BL-011 modularization established explicit boundaries around reusable Planner logic. BL-017 moved the remaining integration script out of `manage.html` into `planner-app.js` solely so the Planner can run under a strict external-script CSP; this is not a new file-size-driven modularization requirement. The Planner client module owns the PR #47 management-auth transport contract, so feature code should call its `api` helper rather than reimplementing token/query/body handling. Target list business logic is likewise kept in the pure Planner Target Logic module; `planner-app.js` owns Target DOM rendering, selection state, modal interactions, and API mutations. Planner-specific CSS follows the same boundary: shared base rules stay in `styles.css`, while Planner-only responsive/feature overrides live in `planner.css` and load after the base stylesheet.
 
 ### 5.1 Mobile information architecture
 
@@ -229,7 +230,7 @@ Important modules:
 - src/raid-rankings.js — type-specific PvE Raid attacker analysis and method-versioned ranking profiles.
 - src/max-rankings.js — Max-specific attacker analysis with Max-appropriate weighting and eligibility.
 - src/remote-raid-rules.js — exact temporary Remote-limit time-window parsing and timezone projection.
-- src/http-security.js — shared JSON/error responses, management/admin credential extraction with legacy compatibility, and static/private response hardening (CSP, frame protection, referrer policy, and no-store behavior). `src/index.js` imports these helpers and re-exports the established security helper API for compatibility.
+- src/http-security.js — shared JSON/error responses, management/admin credential extraction with legacy compatibility, and static/private response hardening (route-aware CSP, frame protection, referrer policy, and no-store behavior). The default HTML policy preserves inline-script compatibility for legacy public/Admin surfaces, while the Planner route explicitly disables that allowance. `src/index.js` imports these helpers and re-exports the established security helper API for compatibility.
 - src/calendar-ics.js — pure RFC 5545-oriented parsing/date helpers: folded-line normalization, property extraction, escaping/unescaping, compact date parsing, all-day exclusive-DTEND conversion, and VEVENT normalization. Fetching, persistence, suppression, personalization, and feed routing remain in `src/index.js`.
 
 Keep pure, testable domain logic in these modules where practical. `src/index.js` is intentionally the integration/orchestration layer for data sources, persistence, APIs, synchronization, and rendering payloads; further splitting should be driven by a concrete cohesive domain need rather than file length alone.
