@@ -791,6 +791,27 @@ Current decision:
 
 The route-specific policy is intentionally additive to the existing response-hardening contract: no-store, no-referrer, frame/object/base restrictions, Permissions Policy, and same-origin opener/resource policies remain unchanged.
 
+## ADR-047 — Normalize Planner API failures at the shared client boundary
+
+Status: Current  
+Introduced in PR #63.
+
+Planner feature code should not need to know whether a failed request returned JSON, HTML, an empty body, or no HTTP response at all. The shared authenticated client is the transport boundary and owns that normalization.
+
+Current decision:
+
+- `PlannerClient.api()` is the only normal Planner feature transport path;
+- response bodies are read once as text and parsed as JSON when present;
+- failed HTTP responses preserve structured JSON `error` or `message` strings when supplied by the Worker;
+- non-JSON or empty failed responses use status-aware recovery messages rather than surfacing JSON parser errors or raw HTML;
+- empty or non-JSON successful responses are treated as malformed API responses because Planner APIs are JSON contracts;
+- fetch/connection failures become a stable connectivity message and do not expose browser-specific transport strings;
+- normalized failures use `PlannerApiError` with `kind`, optional HTTP `status`, and `retryable` metadata while retaining ordinary `error.message` compatibility for existing UI handlers;
+- authorization, not-found, throttling, and server failures receive distinct fallback guidance when no structured server message exists;
+- the browser asset reference for `planner-client.js` is versioned so deployments cannot leave a cached client on the pre-normalization response parser.
+
+This keeps feature UI simple: it can display `error.message` while the shared client preserves enough structured metadata for future recovery UX without duplicating parsing logic.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -859,6 +880,7 @@ The following sequence is retained as a compact repository implementation/change
 | #60 | BL-015 independent credential rotation | Rotates the management capability independently from calendar credentials and adds per-planner signed-calendar generations/revocation state while preserving generation-zero signed URLs and legacy random-token calendar compatibility until each credential is explicitly rotated or revoked. |
 | #61 | BL-016 keyboard and modal accessibility | Centralizes focus containment, Escape dispatch, opener focus restoration, background inert/aria-hidden isolation, visible keyboard focus, reduced-motion handling, and real-browser regressions across Planner modals, sheets, drawers, and the command palette. |
 | #62 | BL-017 Planner script CSP hardening | Externalizes the remaining Planner integration script, removes generated inline event handlers, and applies `script-src 'self'` without `'unsafe-inline'` to the private management route while preserving compatibility policy on other HTML surfaces. |
+| #63 (open) | BL-018 Planner API and transport failure normalization | Centralizes response parsing and transport failure handling in `planner-client.js`, preserving structured server errors while turning non-JSON, empty, and network failures into stable actionable messages with typed metadata. |
 
 ## Supersession map
 
