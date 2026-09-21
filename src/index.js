@@ -500,7 +500,7 @@ async function feedSigningKey(env) {
   );
 }
 
-function recoverableFeedSignaturePayload(
+export function recoverableFeedSignaturePayload(
   userId,
   generation = 0
 ) {
@@ -578,7 +578,7 @@ async function verifyRecoverableFeedSignature(
   return difference === 0;
 }
 
-function recoverableFeedPath(
+export function recoverableFeedPath(
   userId,
   generation,
   signature
