@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Battle Planner</title>
   <link rel="stylesheet" href="/styles.css?v=42">
-  <link rel="stylesheet" href="/planner.css?v=1">
+  <link rel="stylesheet" href="/planner.css?v=2">
 </head>
 
 <body class="manage-page">
@@ -565,11 +565,11 @@
             </button>
           </div>
 
-          <div id="targetFilterDrawer" class="target-filter-drawer">
+          <div id="targetFilterDrawer" class="target-filter-drawer" inert aria-hidden="true">
             <div class="target-filter-drawer-head">
               <div>
                 <span class="section-eyebrow">FILTERS</span>
-                <strong>Organize targets</strong>
+                <strong id="targetFilterDrawerTitle">Organize targets</strong>
               </div>
 
               <button
@@ -1199,7 +1199,7 @@
   <!-- =========================================================
        MOBILE MORE SHEET
        ========================================================= -->
-  <div id="mobileMoreBackdrop" class="mobile-more-backdrop hidden">
+  <div id="mobileMoreBackdrop" class="mobile-more-backdrop hidden" inert aria-hidden="true">
     <section id="mobileMoreSheet" class="mobile-more-sheet" role="dialog" aria-modal="true" aria-labelledby="mobileMoreTitle">
       <div class="mobile-sheet-handle" aria-hidden="true"></div>
 
@@ -1233,7 +1233,7 @@
   <!-- =========================================================
        DESKTOP COMMAND PALETTE
        ========================================================= -->
-  <div id="commandPaletteBackdrop" class="command-palette-backdrop hidden">
+  <div id="commandPaletteBackdrop" class="command-palette-backdrop hidden" inert aria-hidden="true">
     <section class="command-palette" role="dialog" aria-modal="true" aria-labelledby="commandPaletteTitle">
       <div class="command-palette-search">
         <span aria-hidden="true">⌕</span>
@@ -1254,7 +1254,7 @@
   <!-- =========================================================
        RAID LOG MODAL
        ========================================================= -->
-  <div id="raidLogModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="raidLogModalTitle">
+  <div id="raidLogModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="raidLogModalTitle" inert aria-hidden="true">
     <section class="target-modal raid-log-modal">
       <div class="modal-header">
         <div>
@@ -1374,7 +1374,7 @@
   <!-- =========================================================
        TARGET EDITOR MODAL
        ========================================================= -->
-  <div id="targetModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="targetModalTitle">
+  <div id="targetModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="targetModalTitle" inert aria-hidden="true">
     <section class="target-modal">
       <div class="modal-header">
         <div>
@@ -1488,6 +1488,7 @@
 <script src="/timezone-validation.js?v=1"></script>
 <script src="/battle-targets.js?v=1"></script>
 <script src="/planner-client.js?v=2"></script>
+<script src="/planner-overlay.js?v=1"></script>
 <script src="/planner-target-logic.js?v=1"></script>
 <script src="/planner-calendar-logic.js?v=1"></script>
 <script src="/planner-hundo-logic.js?v=1"></script>
@@ -1574,6 +1575,8 @@ let modalPageLocked = false;
 let modalTouchStartY = 0;
 let mobileMoreLockedScrollY = 0;
 let mobileMorePageLocked = false;
+let commandPaletteLockedScrollY = 0;
+let commandPalettePageLocked = false;
 let desktopQuickRailFrame = 0;
 
 const POKEMON_CATALOG_CACHE_KEY =
@@ -1747,7 +1750,12 @@ function activateTab(name, scroll = true) {
         `[data-panel="${CSS.escape(name)}"]`
       )
       ?.scrollIntoView({
-        behavior: "smooth",
+        behavior:
+          window.matchMedia(
+            "(prefers-reduced-motion: reduce)"
+          ).matches
+            ? "auto"
+            : "smooth",
         block: "start"
       });
   }
@@ -2791,20 +2799,49 @@ function openRaidLogModal(pokemonName = "", targetId = null, recommendation = nu
   prefillBattleLog(recommendation || matchingRec || (explicitTarget ? {...explicitTarget,...BattleTargets.metadata(explicitTarget)} : null));
   syncRaidLogProgressDefault();
   updateRaidLogPreview();
-  document.getElementById("raidLogModal").classList.remove("hidden");
+  const modal =
+    document.getElementById(
+      "raidLogModal"
+    );
+
+  modal.classList.remove(
+    "hidden"
+  );
+
   lockPageForModal();
-  setTimeout(() => document.getElementById("raidLogCount").focus(), 30);
+
+  PlannerOverlay.open({
+    overlay: modal,
+    close:
+      closeRaidLogModal,
+    initialFocus:
+      "#raidLogCount"
+  });
 }
 
 function closeRaidLogModal() {
   if (battleLogBusy) return;
-  document
-    .getElementById(
+
+  const modal =
+    document.getElementById(
       "raidLogModal"
-    )
-    .classList.add(
-      "hidden"
     );
+
+  if (
+    !PlannerOverlay.isOpen(
+      modal
+    )
+  ) {
+    return;
+  }
+
+  PlannerOverlay.close(
+    modal
+  );
+
+  modal.classList.add(
+    "hidden"
+  );
 
   unlockPageForModal();
 
@@ -3179,35 +3216,114 @@ function unlockPageForMobileMore() {
 }
 
 function closeMobileMoreSheet() {
-  const backdrop = document.getElementById("mobileMoreBackdrop");
-  const wasOpen = backdrop && !backdrop.classList.contains("hidden");
+  const backdrop =
+    document.getElementById(
+      "mobileMoreBackdrop"
+    );
 
-  backdrop?.classList.add("hidden");
-
-  const button = document.getElementById("mobileMoreButton");
-  button?.setAttribute("aria-expanded", "false");
-
-  if (wasOpen) {
-    unlockPageForMobileMore();
-    setTimeout(() => button?.focus(), 0);
+  if (
+    !backdrop ||
+    !PlannerOverlay.isOpen(
+      backdrop
+    )
+  ) {
+    return;
   }
+
+  PlannerOverlay.close(
+    backdrop
+  );
+
+  backdrop.classList.add(
+    "hidden"
+  );
+
+  document
+    .getElementById(
+      "mobileMoreButton"
+    )
+    ?.setAttribute(
+      "aria-expanded",
+      "false"
+    );
+
+  unlockPageForMobileMore();
 }
 
 function openMobileMoreSheet() {
-  const backdrop = document.getElementById("mobileMoreBackdrop");
-  if (!backdrop || !backdrop.classList.contains("hidden")) return;
+  const backdrop =
+    document.getElementById(
+      "mobileMoreBackdrop"
+    );
+
+  if (
+    !backdrop ||
+    PlannerOverlay.isOpen(
+      backdrop
+    )
+  ) {
+    return;
+  }
 
   lockPageForMobileMore();
-  backdrop.classList.remove("hidden");
+
+  backdrop.classList.remove(
+    "hidden"
+  );
 
   document
-    .getElementById("mobileMoreButton")
-    ?.setAttribute("aria-expanded", "true");
+    .getElementById(
+      "mobileMoreButton"
+    )
+    ?.setAttribute(
+      "aria-expanded",
+      "true"
+    );
 
-  setTimeout(
-    () => document.getElementById("closeMobileMore")?.focus(),
-    0
-  );
+  PlannerOverlay.open({
+    overlay: backdrop,
+    close:
+      closeMobileMoreSheet,
+    initialFocus:
+      "#closeMobileMore",
+    restoreFocus:
+      "#mobileMoreButton"
+  });
+}
+
+function syncTargetFilterDrawerRestState() {
+  const drawer =
+    document.getElementById(
+      "targetFilterDrawer"
+    );
+
+  if (
+    !drawer ||
+    PlannerOverlay.isOpen(
+      drawer
+    )
+  ) {
+    return;
+  }
+
+  const desktop =
+    window.matchMedia(
+      "(min-width: 761px)"
+    ).matches;
+
+  drawer.inert =
+    !desktop;
+
+  if (desktop) {
+    drawer.removeAttribute(
+      "aria-hidden"
+    );
+  } else {
+    drawer.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+  }
 }
 
 function mountTargetFilterDrawerForMobile() {
@@ -3273,6 +3389,35 @@ function restoreTargetFilterDrawerHome() {
       ? targetFilterHomeNextSibling
       : null
   );
+
+  if (
+    window.matchMedia(
+      "(min-width: 761px)"
+    ).matches
+  ) {
+    drawer.inert = false;
+    drawer.removeAttribute(
+      "aria-hidden"
+    );
+  } else {
+    drawer.inert = true;
+    drawer.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+  }
+
+  drawer.removeAttribute(
+    "role"
+  );
+
+  drawer.removeAttribute(
+    "aria-modal"
+  );
+
+  drawer.removeAttribute(
+    "aria-labelledby"
+  );
 }
 
 function lockPageForTargetDrawer() {
@@ -3323,16 +3468,6 @@ function unlockPageForTargetDrawer() {
   document.body.style.right = "";
   document.body.style.width = "";
 
-  document.removeEventListener(
-    "touchstart",
-    modalTouchStartGuard
-  );
-
-  document.removeEventListener(
-    "touchmove",
-    modalTouchMoveGuard
-  );
-
   setForegroundSheetOpen(
     false
   );
@@ -3349,15 +3484,18 @@ function closeTargetFilterDrawer() {
       "targetFilterDrawer"
     );
 
-  drawer?.classList.remove(
-    "open"
-  );
-
-  unlockPageForTargetDrawer();
-
-  setForegroundSheetOpen(
-    false
-  );
+  const wasOpen =
+    Boolean(
+      drawer &&
+      (
+        drawer.classList.contains(
+          "open"
+        ) ||
+        PlannerOverlay.isOpen(
+          drawer
+        )
+      )
+    );
 
   document
     .getElementById(
@@ -3368,14 +3506,53 @@ function closeTargetFilterDrawer() {
       "false"
     );
 
+  if (!wasOpen) {
+    return;
+  }
+
+  PlannerOverlay.close(
+    drawer
+  );
+
+  drawer.classList.remove(
+    "open"
+  );
+
+  drawer.inert = true;
+  drawer.setAttribute(
+    "aria-hidden",
+    "true"
+  );
+
+  drawer.removeAttribute(
+    "role"
+  );
+
+  drawer.removeAttribute(
+    "aria-modal"
+  );
+
+  drawer.removeAttribute(
+    "aria-labelledby"
+  );
+
+  unlockPageForTargetDrawer();
+
   clearTimeout(
     targetFilterRestoreTimer
   );
 
+  const restoreDelay =
+    window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches
+      ? 0
+      : 260;
+
   targetFilterRestoreTimer =
     setTimeout(
       restoreTargetFilterDrawerHome,
-      260
+      restoreDelay
     );
 }
 
@@ -3387,9 +3564,34 @@ function openTargetFilterDrawer() {
   const drawer =
     mountTargetFilterDrawerForMobile();
 
-  if (!drawer) {
+  if (
+    !drawer ||
+    window.matchMedia(
+      "(min-width: 761px)"
+    ).matches
+  ) {
     return;
   }
+
+  drawer.inert = false;
+  drawer.removeAttribute(
+    "aria-hidden"
+  );
+
+  drawer.setAttribute(
+    "role",
+    "dialog"
+  );
+
+  drawer.setAttribute(
+    "aria-modal",
+    "true"
+  );
+
+  drawer.setAttribute(
+    "aria-labelledby",
+    "targetFilterDrawerTitle"
+  );
 
   lockPageForTargetDrawer();
 
@@ -3411,10 +3613,21 @@ function openTargetFilterDrawer() {
   requestAnimationFrame(
     () =>
       requestAnimationFrame(
-        () =>
+        () => {
           drawer.classList.add(
             "open"
-          )
+          );
+
+          PlannerOverlay.open({
+            overlay: drawer,
+            close:
+              closeTargetFilterDrawer,
+            initialFocus:
+              "#closeTargetFilters",
+            restoreFocus:
+              "#openTargetFilters"
+          });
+        }
       )
   );
 }
@@ -3711,7 +3924,11 @@ function commandEntries() {
               )
               ?.scrollIntoView({
                 behavior:
-                  "smooth",
+                  window.matchMedia(
+                    "(prefers-reduced-motion: reduce)"
+                  ).matches
+                    ? "auto"
+                    : "smooth",
                 block:
                   "start"
               }),
@@ -3805,15 +4022,84 @@ function renderCommandPaletteResults() {
     entries;
 }
 
+function lockPageForCommandPalette() {
+  if (commandPalettePageLocked) {
+    return;
+  }
+
+  commandPalettePageLocked = true;
+  commandPaletteLockedScrollY =
+    window.scrollY ||
+    window.pageYOffset ||
+    0;
+
+  document.documentElement.classList.add(
+    "command-palette-open"
+  );
+
+  document.body.classList.add(
+    "command-palette-open"
+  );
+
+  document.body.style.position =
+    "fixed";
+
+  document.body.style.top =
+    `-${commandPaletteLockedScrollY}px`;
+
+  document.body.style.left = "0";
+  document.body.style.right = "0";
+  document.body.style.width = "100%";
+
+  setForegroundSheetOpen(true);
+}
+
+function unlockPageForCommandPalette() {
+  if (!commandPalettePageLocked) {
+    return;
+  }
+
+  const restoreY =
+    commandPaletteLockedScrollY;
+
+  commandPalettePageLocked = false;
+
+  document.documentElement.classList.remove(
+    "command-palette-open"
+  );
+
+  document.body.classList.remove(
+    "command-palette-open"
+  );
+
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  document.body.style.width = "";
+
+  setForegroundSheetOpen(false);
+
+  window.scrollTo(
+    0,
+    restoreY
+  );
+}
+
 function openCommandPalette() {
   const backdrop =
     document.getElementById(
       "commandPaletteBackdrop"
     );
 
-  backdrop.classList.remove(
-    "hidden"
-  );
+  if (
+    !backdrop ||
+    PlannerOverlay.isOpen(
+      backdrop
+    )
+  ) {
+    return;
+  }
 
   const input =
     document.getElementById(
@@ -3823,22 +4109,50 @@ function openCommandPalette() {
   input.value = "";
 
   renderCommandPaletteResults();
+  lockPageForCommandPalette();
 
-  setTimeout(
-    () =>
-      input.focus(),
-    25
+  backdrop.classList.remove(
+    "hidden"
   );
+
+  PlannerOverlay.open({
+    overlay: backdrop,
+    close:
+      closeCommandPalette,
+    initialFocus:
+      input
+  });
 }
 
-function closeCommandPalette() {
-  document
-    .getElementById(
+function closeCommandPalette(
+  restoreFocus = true
+) {
+  const backdrop =
+    document.getElementById(
       "commandPaletteBackdrop"
-    )
-    ?.classList.add(
-      "hidden"
     );
+
+  if (
+    !backdrop ||
+    !PlannerOverlay.isOpen(
+      backdrop
+    )
+  ) {
+    return;
+  }
+
+  PlannerOverlay.close(
+    backdrop,
+    {
+      restoreFocus
+    }
+  );
+
+  backdrop.classList.add(
+    "hidden"
+  );
+
+  unlockPageForCommandPalette();
 }
 
 
@@ -8070,15 +8384,48 @@ function openTargetModal(target = null, recommendation = null) {
     document.getElementById("targetType").value = recommendation.battle_system === "max" ? "battles" : "raids";
   }
   syncTargetBattleForm();
-  const modal = document.getElementById("targetModal");
-  modal.classList.remove("hidden");
+  const modal =
+    document.getElementById(
+      "targetModal"
+    );
+
+  modal.classList.remove(
+    "hidden"
+  );
+
   lockPageForModal();
 
-  setTimeout(() => document.getElementById("pokemonName").focus(), 30);
+  PlannerOverlay.open({
+    overlay: modal,
+    close:
+      closeTargetModal,
+    initialFocus:
+      "#pokemonName"
+  });
 }
 
 function closeTargetModal() {
-  document.getElementById("targetModal").classList.add("hidden");
+  const modal =
+    document.getElementById(
+      "targetModal"
+    );
+
+  if (
+    !PlannerOverlay.isOpen(
+      modal
+    )
+  ) {
+    return;
+  }
+
+  PlannerOverlay.close(
+    modal
+  );
+
+  modal.classList.add(
+    "hidden"
+  );
+
   unlockPageForModal();
 }
 
@@ -8383,7 +8730,11 @@ document
 
       if (entry) {
         closeCommandPalette();
-        entry.action();
+
+        requestAnimationFrame(
+          () =>
+            entry.action()
+        );
       }
     }
   );
@@ -8417,16 +8768,6 @@ document.addEventListener(
     ) {
       event.preventDefault();
       openCommandPalette();
-      return;
-    }
-
-    if (
-      event.key ===
-      "Escape"
-    ) {
-      closeCommandPalette();
-      closeMobileMoreSheet();
-      closeTargetFilterDrawer();
     }
   }
 );
@@ -8440,11 +8781,15 @@ window.addEventListener(
       ).matches
     ) {
       closeTargetFilterDrawer();
+      restoreTargetFilterDrawerHome();
     }
 
+    syncTargetFilterDrawerRestState();
     scheduleDesktopQuickRailAffix();
   }
 );
+
+syncTargetFilterDrawerRestState();
 
 window.addEventListener(
   "scroll",
@@ -8727,12 +9072,6 @@ document.getElementById("saveTarget").addEventListener("click", saveTarget);
 
 document.getElementById("targetModal").addEventListener("click", event => {
   if (event.target.id === "targetModal") closeTargetModal();
-});
-
-document.addEventListener("keydown", event => {
-  if (event.key === "Escape" && !document.getElementById("targetModal").classList.contains("hidden")) {
-    closeTargetModal();
-  }
 });
 
 document.getElementById("targets").addEventListener("click", event => {

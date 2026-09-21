@@ -13,8 +13,22 @@ function element(id) {
     dataset:{}, classList:{toggle(){},add(){},remove(){}},focus(){}});
   return elements.get(id);
 }
+const openOverlays = new Set();
+const PlannerOverlay = {
+  open({overlay}) {
+    openOverlays.add(overlay);
+    return {overlay};
+  },
+  close(overlay) {
+    return openOverlays.delete(overlay);
+  },
+  isOpen(overlay) {
+    return openOverlays.has(overlay);
+  }
+};
 const context = vm.createContext({
   BattleTargets:globalThis.BattleTargets, targetTypeLabels:{candy:'Candy'},
+  PlannerOverlay,
   document:{getElementById:element,querySelector:element,querySelectorAll:()=>[]},
   localStorage:{setItem(){},getItem(){return 'remote';}}, crypto:{randomUUID(){return 'test-request-id-12345';}},
   setTimeout(){},lockPageForModal(){},unlockPageForModal(){},
@@ -23,7 +37,7 @@ const context = vm.createContext({
   raidLogType:'remote',raidLogProgressDirty:false,raidLogExplicitTargetId:null,
   battleLogRecommendation:null,battleLogRequestId:null,battleLogBusy:false,battleLogWinsDirty:false,battleLogPassesDirty:false
 });
-for (const name of ['raidLogMatchingTarget','raidLogPokemonNames','setRaidLogType','raidLogDefaultProgress','populateRaidLogPokemon','syncRaidLogProgressDefault','battleLogSelection','battleLogLabel','battleLogParticleCostValue','setBattleLogParticleCost','syncBattleLogParticleCostControl','prefillBattleLog','updateRaidLogPreview','openRaidLogModal']) {
+for (const name of ['raidLogMatchingTarget','raidLogPokemonNames','setRaidLogType','raidLogDefaultProgress','populateRaidLogPokemon','syncRaidLogProgressDefault','battleLogSelection','battleLogLabel','battleLogParticleCostValue','setBattleLogParticleCost','syncBattleLogParticleCostControl','prefillBattleLog','updateRaidLogPreview','openRaidLogModal','closeRaidLogModal']) {
   const start=script.indexOf(`function ${name}(`);
   assert.ok(start>=0,name);
   const remainder=script.slice(start);
