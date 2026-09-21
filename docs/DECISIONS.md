@@ -769,7 +769,27 @@ Current decision:
 - keyboard focus is visibly indicated by Planner-only `:focus-visible` styling;
 - reduced-motion preference removes meaningful transition/animation delays and avoids smooth programmatic scrolling.
 
-The controller owns cross-overlay keyboard/focus/isolation mechanics only. Feature-specific form state, save/cancel behavior, and scroll-lock details remain in `manage.html`.
+The controller owns cross-overlay keyboard/focus/isolation mechanics only. Feature-specific form state, save/cancel behavior, and scroll-lock details remain in `planner-app.js`.
+
+## ADR-046 — Enforce a same-origin external-script CSP on the private Planner
+
+Status: Current  
+Introduced in PR #62.
+
+The private Planner previously depended on one large inline application script plus a generated inline image error handler. That forced the shared HTML Content Security Policy to permit inline script execution even though the Planner already used same-origin static assets for its other modules.
+
+Current decision:
+
+- `manage.html` contains markup and external same-origin script references only; it must not contain executable inline `<script>` blocks;
+- Planner-generated markup must not use inline `on*=...` event handlers;
+- the Planner integration/orchestration code lives in `public/planner-app.js`;
+- this extraction is a CSP boundary change, not a requirement to split `planner-app.js` further based on file size;
+- the private `/manage/<token>` route is hardened with `script-src 'self'` and no `'unsafe-inline'` script source;
+- `src/http-security.js` retains an inline-script-compatible default policy for other existing HTML surfaces that still contain inline JavaScript;
+- `style-src 'unsafe-inline'` remains unchanged because the scope of BL-017 is executable script, not style refactoring;
+- Chromium Planner fixtures run under the strict script policy, so accidental inline-script dependencies fail browser regression tests.
+
+The route-specific policy is intentionally additive to the existing response-hardening contract: no-store, no-referrer, frame/object/base restrictions, Permissions Policy, and same-origin opener/resource policies remain unchanged.
 
 ## PR lineage
 
@@ -838,6 +858,7 @@ The following sequence is retained as a compact repository implementation/change
 | #59 | BL-014 per-source synchronization health | Adds additive D1-backed health for event, official, and meta synchronization sources; preserves last-success/item-count across failed attempts; filters event warnings to the user's relevant sources; and keeps legacy freshness timestamps as a deployment-order fallback until migration 0006 is applied. |
 | #60 | BL-015 independent credential rotation | Rotates the management capability independently from calendar credentials and adds per-planner signed-calendar generations/revocation state while preserving generation-zero signed URLs and legacy random-token calendar compatibility until each credential is explicitly rotated or revoked. |
 | #61 | BL-016 keyboard and modal accessibility | Centralizes focus containment, Escape dispatch, opener focus restoration, background inert/aria-hidden isolation, visible keyboard focus, reduced-motion handling, and real-browser regressions across Planner modals, sheets, drawers, and the command palette. |
+| #62 (open) | BL-017 Planner script CSP hardening | Externalizes the remaining Planner integration script, removes generated inline event handlers, and applies `script-src 'self'` without `'unsafe-inline'` to the private management route while preserving compatibility policy on other HTML surfaces. |
 
 ## Supersession map
 
