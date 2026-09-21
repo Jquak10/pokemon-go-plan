@@ -875,6 +875,52 @@
             </div>
           </section>
 
+          <section class="dashboard-card">
+            <span class="section-eyebrow">PRIVATE ACCESS</span>
+            <h2>Management Link</h2>
+            <p class="section-subtitle">
+              This page URL is the private credential that can read and change your planner.
+              Rotate it immediately if you think the link has been exposed.
+            </p>
+
+            <div class="subscription-url-row">
+              <input
+                id="managementLinkValue"
+                type="text"
+                readonly
+                aria-label="Private planner management URL"
+              >
+
+              <button
+                id="copyManagementLink"
+                type="button"
+                class="secondary"
+              >
+                Copy link
+              </button>
+            </div>
+
+            <div class="legacy-revoke-box">
+              <div>
+                <strong>Invalidate the current management link</strong>
+                <p>
+                  Rotating creates a new private management URL and immediately disables the old one.
+                  Calendar subscription credentials are not changed.
+                </p>
+              </div>
+
+              <button
+                id="rotateManagementLink"
+                type="button"
+                class="danger-soft"
+              >
+                Rotate management link
+              </button>
+            </div>
+
+            <span id="managementLinkStatus" class="save-status"></span>
+          </section>
+
         </div>
       </section>
 
@@ -927,6 +973,28 @@
               <span>
                 Keep this link private. Anyone who has it can read this calendar.
               </span>
+            </div>
+
+            <div class="save-row">
+              <button
+                id="rotateSignedFeed"
+                type="button"
+                class="secondary"
+                disabled
+              >
+                Regenerate signed URL
+              </button>
+
+              <button
+                id="revokeSignedFeed"
+                type="button"
+                class="danger-soft"
+                disabled
+              >
+                Revoke signed URL
+              </button>
+
+              <span id="signedFeedStatus" class="save-status"></span>
             </div>
           </div>
 
@@ -1419,7 +1487,7 @@
 
 <script src="/timezone-validation.js?v=1"></script>
 <script src="/battle-targets.js?v=1"></script>
-<script src="/planner-client.js?v=1"></script>
+<script src="/planner-client.js?v=2"></script>
 <script src="/planner-target-logic.js?v=1"></script>
 <script src="/planner-calendar-logic.js?v=1"></script>
 <script src="/planner-hundo-logic.js?v=1"></script>
