@@ -7,6 +7,7 @@ const schema = read('../schema.sql');
 const migration = read('../migrations/0004_schema_baseline_operational_tables.sql');
 const maxCostMigration = read('../migrations/0005_max_battle_cost_overrides.sql');
 const syncHealthMigration = read('../migrations/0006_sync_source_health.sql');
+const feedCredentialMigration = read('../migrations/0007_feed_link_credentials.sql');
 
 const expectedColumns = {
   event_suppression_rules: [
@@ -61,6 +62,21 @@ function assertSyncHealthShape(db) {
   );
 }
 
+const feedCredentialColumns = [
+  ['user_id', 'TEXT', 0, null, 1],
+  ['signed_generation', 'INTEGER', 1, '0', 0],
+  ['signed_enabled', 'INTEGER', 1, '1', 0],
+  ['updated_at', 'TEXT', 1, null, 0]
+];
+
+function assertFeedCredentialShape(db) {
+  assert.deepEqual(
+    columnShape(db, 'feed_link_credentials'),
+    feedCredentialColumns,
+    'feed_link_credentials columns must match migration 0007'
+  );
+}
+
 const maxCostOverrideColumns = [
   ['user_id', 'TEXT', 1, null, 1],
   ['opportunity_key', 'TEXT', 1, null, 2],
@@ -108,10 +124,15 @@ fresh.exec(migration);
 assertOperationalShape(fresh);
 assertMaxCostOverrideShape(fresh);
 assertSyncHealthShape(fresh);
+assertFeedCredentialShape(fresh);
 fresh.exec(maxCostMigration);
 assertMaxCostOverrideShape(fresh);
 fresh.exec(syncHealthMigration);
 assertSyncHealthShape(fresh);
+fresh.exec(feedCredentialMigration);
+assertFeedCredentialShape(fresh);
+fresh.exec(feedCredentialMigration);
+assertFeedCredentialShape(fresh);
 
 const existing = new DatabaseSync(':memory:');
 existing.exec(`
@@ -126,6 +147,10 @@ existing.exec(syncHealthMigration);
 assertSyncHealthShape(existing);
 existing.exec(syncHealthMigration);
 assertSyncHealthShape(existing);
+existing.exec(feedCredentialMigration);
+assertFeedCredentialShape(existing);
+existing.exec(feedCredentialMigration);
+assertFeedCredentialShape(existing);
 
 existing.prepare(`
   INSERT INTO event_suppression_rules (
@@ -147,6 +172,44 @@ assert.deepEqual(
 existing.prepare(`
   INSERT INTO users(id) VALUES (?)
 `).run('user');
+existing.prepare(`
+  INSERT INTO feed_link_credentials (
+    user_id,
+    updated_at
+  ) VALUES (?, ?)
+`).run(
+  'user',
+  'now'
+);
+
+const feedCredentialDefaults =
+  existing.prepare(`
+    SELECT
+      signed_generation,
+      signed_enabled
+    FROM feed_link_credentials
+    WHERE user_id = ?
+  `).get(
+    'user'
+  );
+
+assert.deepEqual(
+  [
+    Number(
+      feedCredentialDefaults
+        .signed_generation
+    ),
+    Number(
+      feedCredentialDefaults
+        .signed_enabled
+    )
+  ],
+  [
+    0,
+    1
+  ],
+  'feed credential defaults must preserve generation-zero signed URLs'
+);
 existing.prepare(`
   INSERT INTO max_battle_cost_overrides (
     user_id, opportunity_key, pokemon_name, battle_variant,
@@ -171,6 +234,35 @@ existing.prepare(`
 
 existing.exec(migration);
 existing.exec(maxCostMigration);
+existing.exec(feedCredentialMigration);
+const preservedFeedCredential =
+  existing.prepare(`
+    SELECT
+      signed_generation,
+      signed_enabled
+    FROM feed_link_credentials
+    WHERE user_id = ?
+  `).get(
+    'user'
+  );
+
+assert.deepEqual(
+  [
+    Number(
+      preservedFeedCredential
+        .signed_generation
+    ),
+    Number(
+      preservedFeedCredential
+        .signed_enabled
+    )
+  ],
+  [
+    0,
+    1
+  ],
+  're-running migration 0007 must preserve existing credential state'
+);
 assert.equal(
   existing.prepare(`SELECT budget_override AS value FROM remote_raid_daily_budget_overrides WHERE user_id = 'user'`).get().value,
   7,
@@ -197,6 +289,16 @@ assert.equal(
   existing.prepare(`SELECT COUNT(*) AS count FROM max_battle_cost_overrides WHERE user_id = 'user'`).get().count,
   0,
   'Max Battle cost overrides must cascade when their user is deleted'
+);
+
+assert.equal(
+  existing.prepare(`
+    SELECT COUNT(*) AS count
+    FROM feed_link_credentials
+    WHERE user_id = 'user'
+  `).get().count,
+  0,
+  'feed credential state must cascade when its user is deleted'
 );
 
 console.log('schema completeness regression tests passed');

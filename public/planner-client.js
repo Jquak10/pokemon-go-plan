@@ -113,6 +113,7 @@
 
   function createApiClient({
     token,
+    tokenProvider = null,
     origin,
     fetchImpl
   }) {
@@ -122,7 +123,10 @@
     ) {
       const request =
         buildManagedApiRequest({
-          token,
+          token:
+            tokenProvider
+              ? tokenProvider()
+              : token,
           path,
           options,
           origin
@@ -148,10 +152,29 @@
     };
   }
 
-  const token =
+  let token =
     managementTokenFromPath(
       globalThis.location?.pathname
     );
+
+  function setToken(
+    nextToken
+  ) {
+    const value =
+      String(
+        nextToken || ""
+      ).trim();
+
+    if (!value) {
+      throw new Error(
+        "A management token is required."
+      );
+    }
+
+    token = value;
+
+    return token;
+  }
 
   const origin =
     globalThis.location?.origin ||
@@ -159,7 +182,8 @@
 
   const api =
     createApiClient({
-      token,
+      tokenProvider:
+        () => token,
       origin,
       fetchImpl:
         (...args) =>
@@ -170,7 +194,10 @@
 
   globalThis.PlannerClient =
     Object.freeze({
-      token,
+      get token() {
+        return token;
+      },
+      setToken,
       api,
       esc,
       formatNumber,

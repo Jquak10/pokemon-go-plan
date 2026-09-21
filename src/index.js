@@ -500,27 +500,229 @@ async function feedSigningKey(env) {
   );
 }
 
-async function recoverableFeedSignature(env, userId) {
+export function recoverableFeedSignaturePayload(
+  userId,
+  generation = 0
+) {
+  const normalizedGeneration =
+    Math.max(
+      0,
+      Math.floor(
+        Number(generation) || 0
+      )
+    );
+
+  // Generation zero intentionally preserves the pre-BL-015 signature
+  // payload so every existing signed subscription keeps working until that
+  // planner explicitly rotates or revokes it.
+  return normalizedGeneration === 0
+    ? `pokemon-go-calendar-feed:${userId}`
+    : `pokemon-go-calendar-feed:${userId}:${normalizedGeneration}`;
+}
+
+async function recoverableFeedSignature(
+  env,
+  userId,
+  generation = 0
+) {
   const key = await feedSigningKey(env);
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
-    new TextEncoder().encode(`pokemon-go-calendar-feed:${userId}`)
+    new TextEncoder().encode(
+      recoverableFeedSignaturePayload(
+        userId,
+        generation
+      )
+    )
   );
 
   // 24 bytes is plenty for an unguessable read-only feed signature.
   return bytesToBase64Url(new Uint8Array(signature).slice(0, 24));
 }
 
-async function verifyRecoverableFeedSignature(env, userId, signature) {
-  const expected = await recoverableFeedSignature(env, userId);
-  if (expected.length !== String(signature || "").length) return false;
+async function verifyRecoverableFeedSignature(
+  env,
+  userId,
+  generation,
+  signature
+) {
+  const expected =
+    await recoverableFeedSignature(
+      env,
+      userId,
+      generation
+    );
+
+  if (
+    expected.length !==
+    String(
+      signature || ""
+    ).length
+  ) {
+    return false;
+  }
 
   let difference = 0;
-  for (let i = 0; i < expected.length; i++) {
-    difference |= expected.charCodeAt(i) ^ String(signature).charCodeAt(i);
+  for (
+    let index = 0;
+    index < expected.length;
+    index += 1
+  ) {
+    difference |=
+      expected.charCodeAt(index) ^
+      String(signature)
+        .charCodeAt(index);
   }
+
   return difference === 0;
+}
+
+export function recoverableFeedPath(
+  userId,
+  generation,
+  signature
+) {
+  const normalizedGeneration =
+    Math.max(
+      0,
+      Math.floor(
+        Number(generation) || 0
+      )
+    );
+
+  return normalizedGeneration === 0
+    ? `/calendar/recover/${userId}.${signature}.ics`
+    : `/calendar/recover/${userId}.${normalizedGeneration}.${signature}.ics`;
+}
+
+async function feedLinkCredentialState(
+  env,
+  userId
+) {
+  try {
+    const row =
+      await env.DB.prepare(`
+        SELECT
+          signed_generation,
+          signed_enabled,
+          updated_at
+        FROM feed_link_credentials
+        WHERE user_id = ?
+      `).bind(
+        userId
+      ).first();
+
+    return {
+      generation:
+        Math.max(
+          0,
+          Math.floor(
+            Number(
+              row?.signed_generation
+            ) || 0
+          )
+        ),
+      enabled:
+        row == null
+          ? true
+          : Boolean(
+              Number(
+                row.signed_enabled
+              )
+            ),
+      updated_at:
+        row?.updated_at ||
+        null,
+      migration_ready:
+        true
+    };
+  } catch (error) {
+    if (
+      /no such table:\s*feed_link_credentials/i.test(
+        String(
+          error?.message ||
+          error
+        )
+      )
+    ) {
+      return {
+        generation: 0,
+        enabled: true,
+        updated_at: null,
+        migration_ready:
+          false
+      };
+    }
+
+    throw error;
+  }
+}
+
+async function advanceFeedLinkCredential(
+  env,
+  userId,
+  enabled
+) {
+  const timestamp =
+    nowIso();
+
+  try {
+    await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO feed_link_credentials (
+          user_id,
+          signed_generation,
+          signed_enabled,
+          updated_at
+        )
+        VALUES (?, 0, 1, ?)
+        ON CONFLICT(user_id) DO NOTHING
+      `).bind(
+        userId,
+        timestamp
+      ),
+      env.DB.prepare(`
+        UPDATE feed_link_credentials
+        SET
+          signed_generation =
+            signed_generation + 1,
+          signed_enabled = ?,
+          updated_at = ?
+        WHERE user_id = ?
+      `).bind(
+        enabled ? 1 : 0,
+        timestamp,
+        userId
+      )
+    ]);
+  } catch (error) {
+    if (
+      /no such table:\s*feed_link_credentials/i.test(
+        String(
+          error?.message ||
+          error
+        )
+      )
+    ) {
+      const migrationError =
+        new Error(
+          "Calendar credential rotation requires D1 migration 0007_feed_link_credentials.sql."
+        );
+
+      migrationError.code =
+        "feed_credentials_migration_required";
+
+      throw migrationError;
+    }
+
+    throw error;
+  }
+
+  return feedLinkCredentialState(
+    env,
+    userId
+  );
 }
 
 async function syncOneSource(env, sourceType, url) {
@@ -8414,13 +8616,18 @@ async function calendarEventsApi(request, env) {
 }
 
 async function feedLinkApi(request, env) {
-  const url = new URL(request.url);
-  const user = await userByManageRequest(
-    request,
-    env
-  );
+  const user =
+    await userByManageRequest(
+      request,
+      env
+    );
 
-  if (!user) return bad("Invalid management link.", 401);
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
 
   if (!env.FEED_LINK_KEY) {
     return bad(
@@ -8429,7 +8636,34 @@ async function feedLinkApi(request, env) {
     );
   }
 
-  const signature = await recoverableFeedSignature(env, user.id);
+  const credentialState =
+    await feedLinkCredentialState(
+      env,
+      user.id
+    );
+
+  if (!credentialState.enabled) {
+    return json({
+      calendar_url: null,
+      read_only: true,
+      preferred: true,
+      format: "signed",
+      revoked: true,
+      generation:
+        credentialState.generation,
+      rotation_available:
+        credentialState.migration_ready,
+      note:
+        "The preferred signed calendar URL is revoked. Regenerate it before adding a new subscription."
+    });
+  }
+
+  const signature =
+    await recoverableFeedSignature(
+      env,
+      user.id,
+      credentialState.generation
+    );
 
   const baseUrl =
     publicBaseUrl(
@@ -8439,15 +8673,229 @@ async function feedLinkApi(request, env) {
 
   return json({
     calendar_url:
-      `${baseUrl}/calendar/recover/${user.id}.${signature}.ics`,
+      `${baseUrl}${recoverableFeedPath(
+        user.id,
+        credentialState.generation,
+        signature
+      )}`,
     read_only: true,
     preferred: true,
     format: "signed",
+    revoked: false,
+    generation:
+      credentialState.generation,
+    rotation_available:
+      credentialState.migration_ready,
     note:
       "Private read-only calendar subscription URL."
   });
 }
 
+async function rotateSignedFeedApi(
+  request,
+  env
+) {
+  let body = {};
+
+  try {
+    body =
+      await request.json();
+  } catch {}
+
+  const user =
+    await userByManageRequest(
+      request,
+      env,
+      body
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  if (!env.FEED_LINK_KEY) {
+    return bad(
+      "ICS link recovery is not enabled yet. Add the FEED_LINK_KEY Worker runtime secret.",
+      503
+    );
+  }
+
+  let credentialState;
+
+  try {
+    credentialState =
+      await advanceFeedLinkCredential(
+        env,
+        user.id,
+        true
+      );
+  } catch (error) {
+    if (
+      error?.code ===
+      "feed_credentials_migration_required"
+    ) {
+      return bad(
+        error.message,
+        503
+      );
+    }
+
+    throw error;
+  }
+
+  const signature =
+    await recoverableFeedSignature(
+      env,
+      user.id,
+      credentialState.generation
+    );
+
+  const baseUrl =
+    publicBaseUrl(
+      request,
+      env
+    );
+
+  return json({
+    ok: true,
+    calendar_url:
+      `${baseUrl}${recoverableFeedPath(
+        user.id,
+        credentialState.generation,
+        signature
+      )}`,
+    read_only: true,
+    preferred: true,
+    format: "signed",
+    revoked: false,
+    generation:
+      credentialState.generation,
+    note:
+      "A new preferred signed calendar URL is active. The previous signed URL is now invalid."
+  });
+}
+
+async function revokeSignedFeedApi(
+  request,
+  env
+) {
+  let body = {};
+
+  try {
+    body =
+      await request.json();
+  } catch {}
+
+  const user =
+    await userByManageRequest(
+      request,
+      env,
+      body
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  try {
+    const credentialState =
+      await advanceFeedLinkCredential(
+        env,
+        user.id,
+        false
+      );
+
+    return json({
+      ok: true,
+      signed_feed_revoked:
+        true,
+      generation:
+        credentialState.generation,
+      note:
+        "The preferred signed calendar URL is revoked. Regenerate it when you are ready to subscribe again."
+    });
+  } catch (error) {
+    if (
+      error?.code ===
+      "feed_credentials_migration_required"
+    ) {
+      return bad(
+        error.message,
+        503
+      );
+    }
+
+    throw error;
+  }
+}
+
+async function rotateManagementLinkApi(
+  request,
+  env
+) {
+  let body = {};
+
+  try {
+    body =
+      await request.json();
+  } catch {}
+
+  const user =
+    await userByManageRequest(
+      request,
+      env,
+      body
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  const manageToken =
+    randomToken(32);
+
+  const manageHash =
+    await sha256Hex(
+      manageToken
+    );
+
+  await env.DB.prepare(`
+    UPDATE users
+    SET
+      manage_hash = ?,
+      updated_at = ?
+    WHERE id = ?
+  `).bind(
+    manageHash,
+    nowIso(),
+    user.id
+  ).run();
+
+  const baseUrl =
+    publicBaseUrl(
+      request,
+      env
+    );
+
+  return json({
+    ok: true,
+    management_url:
+      `${baseUrl}/manage/${manageToken}`,
+    manage_token:
+      manageToken,
+    note:
+      "The new management link is active. The previous management link is now invalid."
+  });
+}
 
 async function revokeLegacyFeedApi(
   request,
@@ -10595,32 +11043,89 @@ async function calendarFeed(request, env, feedToken) {
   return calendarFeedForUser(request, env, user);
 }
 
-async function recoverableCalendarFeed(request, env, userId, signature) {
+async function recoverableCalendarFeed(
+  request,
+  env,
+  userId,
+  generation,
+  signature
+) {
   if (!env.FEED_LINK_KEY) {
-    return new Response("Calendar not found.", { status: 404 });
+    return new Response(
+      "Calendar not found.",
+      {
+        status: 404
+      }
+    );
   }
 
-  const valid = await verifyRecoverableFeedSignature(
-    env,
-    userId,
-    signature
-  );
+  const credentialState =
+    await feedLinkCredentialState(
+      env,
+      userId
+    );
+
+  const requestedGeneration =
+    Math.max(
+      0,
+      Math.floor(
+        Number(generation) || 0
+      )
+    );
+
+  if (
+    !credentialState.enabled ||
+    credentialState.generation !==
+      requestedGeneration
+  ) {
+    return new Response(
+      "Calendar not found.",
+      {
+        status: 404
+      }
+    );
+  }
+
+  const valid =
+    await verifyRecoverableFeedSignature(
+      env,
+      userId,
+      requestedGeneration,
+      signature
+    );
 
   if (!valid) {
-    return new Response("Calendar not found.", { status: 404 });
+    return new Response(
+      "Calendar not found.",
+      {
+        status: 404
+      }
+    );
   }
 
-  const user = await env.DB.prepare(`
-    SELECT *
-    FROM users
-    WHERE id = ?
-  `).bind(userId).first();
+  const user =
+    await env.DB.prepare(`
+      SELECT *
+      FROM users
+      WHERE id = ?
+    `).bind(
+      userId
+    ).first();
 
   if (!user) {
-    return new Response("Calendar not found.", { status: 404 });
+    return new Response(
+      "Calendar not found.",
+      {
+        status: 404
+      }
+    );
   }
 
-  return calendarFeedForUser(request, env, user);
+  return calendarFeedForUser(
+    request,
+    env,
+    user
+  );
 }
 
 
@@ -10902,6 +11407,36 @@ async function handleFetch(request, env) {
       );
     }
 
+    if (
+      request.method === "POST" &&
+      path === "/api/feed-link/rotate"
+    ) {
+      return rotateSignedFeedApi(
+        request,
+        env
+      );
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/feed-link/revoke"
+    ) {
+      return revokeSignedFeedApi(
+        request,
+        env
+      );
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/manage-link/rotate"
+    ) {
+      return rotateManagementLinkApi(
+        request,
+        env
+      );
+    }
+
     if (request.method === "POST" && path === "/api/settings") {
       return updateSettings(request, env);
     }
@@ -11005,15 +11540,43 @@ async function handleFetch(request, env) {
       return adminSyncLegacy(request, env);
     }
 
-    const recoverableCalendarMatch =
-      path.match(/^\/calendar\/recover\/([0-9a-fA-F-]{36})\.([A-Za-z0-9_-]+)\.ics$/);
+    const versionedRecoverableCalendarMatch =
+      path.match(
+        /^\/calendar\/recover\/([0-9a-fA-F-]{36})\.(\d+)\.([A-Za-z0-9_-]+)\.ics$/
+      );
 
-    if (request.method === "GET" && recoverableCalendarMatch) {
+    if (
+      request.method === "GET" &&
+      versionedRecoverableCalendarMatch
+    ) {
+      return hardenResponse(
+        await recoverableCalendarFeed(
+          request,
+          env,
+          versionedRecoverableCalendarMatch[1],
+          Number(
+            versionedRecoverableCalendarMatch[2]
+          ),
+          versionedRecoverableCalendarMatch[3]
+        )
+      );
+    }
+
+    const recoverableCalendarMatch =
+      path.match(
+        /^\/calendar\/recover\/([0-9a-fA-F-]{36})\.([A-Za-z0-9_-]+)\.ics$/
+      );
+
+    if (
+      request.method === "GET" &&
+      recoverableCalendarMatch
+    ) {
       return hardenResponse(
         await recoverableCalendarFeed(
           request,
           env,
           recoverableCalendarMatch[1],
+          0,
           recoverableCalendarMatch[2]
         )
       );

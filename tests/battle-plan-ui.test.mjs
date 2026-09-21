@@ -91,7 +91,7 @@ assert.match(manage, /Pokémon GO Battle Planner/);
 assert.match(manage, /PERSONAL BATTLE STRATEGY/);
 assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
-assert.match(manage, /<script src="\/planner-client\.js\?v=1"><\/script>/);
+assert.match(manage, /<script src="\/planner-client\.js\?v=2"><\/script>/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=1"><\/script>/);
@@ -343,6 +343,40 @@ assert.equal(
     "/manage/example-token/"
   ),
   "example-token"
+);
+
+const initialManagedApiResult =
+  await plannerClientApi.api(
+    "/api/example"
+  );
+
+assert.equal(
+  initialManagedApiResult.authorization,
+  "Bearer browser-test-token"
+);
+
+plannerClientApi.setToken(
+  "rotated-browser-token"
+);
+
+assert.equal(
+  plannerClientApi.token,
+  "rotated-browser-token"
+);
+
+const rotatedManagedApiResult =
+  await plannerClientApi.api(
+    "/api/example"
+  );
+
+assert.equal(
+  rotatedManagedApiResult.authorization,
+  "Bearer rotated-browser-token",
+  "The shared Planner API client must switch immediately to a rotated management capability"
+);
+
+plannerClientApi.setToken(
+  "browser-test-token"
 );
 
 const preparedManagedRequest =
@@ -1458,6 +1492,8 @@ assert.match(plannerClient, /delete parsed\.token/);
 assert.match(plannerClient, /globalThis\.PlannerClient/);
 assert.match(plannerClient, /function buildManagedApiRequest/);
 assert.match(plannerClient, /function createApiClient/);
+assert.match(plannerClient, /function setToken/);
+assert.match(plannerClient, /tokenProvider/);
 assert.doesNotMatch(manage, /\/api\/me\?token=/);
 assert.doesNotMatch(manage, /\/api\/calendar-events\?token=/);
 assert.doesNotMatch(manage, /\/api\/feed-link\?token=/);

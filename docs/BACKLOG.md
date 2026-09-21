@@ -27,10 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-015 — Add management and calendar credential rotation
-
-Add explicit recovery controls for rotating the private management capability and regenerating/revoking the preferred signed calendar subscription URL. Preserve legacy URL compatibility while making leaked bearer credentials individually recoverable.
-
 ### BL-016 — Finish keyboard and modal accessibility
 
 Centralize dialog keyboard behavior: focus containment, Escape handling, focus restoration, background isolation, visible keyboard focus, and reduced-motion handling. Add deterministic browser regressions for those interactions.
@@ -73,6 +69,6 @@ A follow-up repository audit on 18 September 2026 identified the improvement wor
 
 BL-011 was completed through the incremental Planner/Worker modularization series ending with the iCalendar parsing extraction. The resulting boundaries cover Planner client/auth, Targets, Calendar, Hundo, Battle Plan/resources, Battle Intel, Planner-only CSS, Worker HTTP security, and pure iCalendar parsing. Remaining large integration files are intentionally orchestration surfaces rather than backlog items based on size alone.
 
-A fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57 and BL-013 shipped in PR #58. BL-014 (per-source synchronization health) is implemented by the current change and is therefore removed from Active; BL-015 through BL-018 remain recorded above for future prioritization.
+A fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, and BL-014 in PR #59. BL-015 (management and calendar credential rotation) is implemented by the current change and is therefore removed from Active; BL-016 through BL-018 remain recorded above for future prioritization.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
