@@ -137,20 +137,20 @@ The main public files are:
 - public/index.html — landing/create-planner experience.
 - public/manage.html — primary authenticated Planner markup shell and same-origin script/style references.
 - public/planner-app.js — Planner DOM/state/API orchestration that previously lived in the final inline `manage.html` application script. It remains one integration surface by design; BL-017 externalizes it for CSP correctness rather than reopening modularization based on file size.
-- public/planner-client.js — shared Planner capability-token parsing, authenticated API request preparation, API error handling, HTML escaping, and numeric formatting.
+- public/planner-client.js — shared Planner capability-token parsing, authenticated API request preparation, response parsing/failure normalization, HTML escaping, and numeric formatting. All Planner feature calls use this boundary rather than calling `response.json()` directly.
 - public/planner-overlay.js — centralized modal/sheet/drawer keyboard containment, Escape dispatch, opener focus restoration, and background inert/aria-hidden isolation.
 - public/planner-target-logic.js — pure Target progress, availability, non-status/status filtering, sorting, counts, and grouping/view-model logic. It accepts BattleTargets and normalization/formatting helpers as dependencies and contains no DOM or API mutation code.
-- public/planner-calendar-logic.js — pure UTC date/month helpers, day-event range matching, source-class normalization, and six-week Monday-first month-grid projection. Calendar DOM rendering, fetch/cache state, and selected date/month state remain in manage.html.
-- public/planner-hundo-logic.js — pure Hundo CP multiplier/formula logic, standard benchmark generation, and search ranking. Pokémon catalog loading/cache, recent selections, DOM rendering, and input events remain in manage.html.
-- public/planner-battle-plan-logic.js — pure Battle Plan/resource view-model logic: recommendation system counts/filtering, primary/additional split, legacy/shared allocation lookup maps, zero-allocation compatibility merging/reason labels, score tone, and Max tier/cost display metadata. Recommendation-card DOM and actions remain in manage.html.
-- public/planner-battle-intel.js — pure Pokémon GO type-effectiveness, compounded weakness/resistance grouping, type symbols, and battle/encounter Intel aggregation. Exact catalog/form resolution and Intel DOM rendering remain in manage.html so Mega/Primal/Max battle-form versus encounter-form rules stay explicit.
+- public/planner-calendar-logic.js — pure UTC date/month helpers, day-event range matching, source-class normalization, and six-week Monday-first month-grid projection. Calendar DOM rendering, fetch/cache state, and selected date/month state remain in planner-app.js.
+- public/planner-hundo-logic.js — pure Hundo CP multiplier/formula logic, standard benchmark generation, and search ranking. Pokémon catalog loading/cache, recent selections, DOM rendering, and input events remain in planner-app.js.
+- public/planner-battle-plan-logic.js — pure Battle Plan/resource view-model logic: recommendation system counts/filtering, primary/additional split, legacy/shared allocation lookup maps, zero-allocation compatibility merging/reason labels, score tone, and Max tier/cost display metadata. Recommendation-card DOM and actions remain in planner-app.js.
+- public/planner-battle-intel.js — pure Pokémon GO type-effectiveness, compounded weakness/resistance grouping, type symbols, and battle/encounter Intel aggregation. Exact catalog/form resolution and Intel DOM rendering remain in planner-app.js so Mega/Primal/Max battle-form versus encounter-form rules stay explicit.
 - public/admin.html — administration/synchronization controls.
 - public/sources.html — data-source explanation.
 - public/styles.css — shared base styling used by the public, admin, sources, and Planner surfaces.
 - public/planner.css — Planner-only responsive shell, feature styling, and regression-hardening overrides. It is loaded after styles.css only by manage.html, preserving the original cascade order while keeping unrelated pages out of Planner-specific CSS.
 - public/battle-targets.js — shared client-side target identity helpers.
 
-The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. The completed BL-011 modularization established explicit boundaries around reusable Planner logic. BL-017 moved the remaining integration script out of `manage.html` into `planner-app.js` solely so the Planner can run under a strict external-script CSP; this is not a new file-size-driven modularization requirement. The Planner client module owns the PR #47 management-auth transport contract, so feature code should call its `api` helper rather than reimplementing token/query/body handling. Target list business logic is likewise kept in the pure Planner Target Logic module; `planner-app.js` owns Target DOM rendering, selection state, modal interactions, and API mutations. Planner-specific CSS follows the same boundary: shared base rules stay in `styles.css`, while Planner-only responsive/feature overrides live in `planner.css` and load after the base stylesheet.
+The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. The completed BL-011 modularization established explicit boundaries around reusable Planner logic. BL-017 moved the remaining integration script out of `manage.html` into `planner-app.js` solely so the Planner can run under a strict external-script CSP; this is not a new file-size-driven modularization requirement. The Planner client module owns both the PR #47 management-auth transport contract and BL-018 response/failure normalization, so feature code calls its `api` helper rather than reimplementing token/query/body handling or assuming every response is valid JSON. Structured JSON `error`/`message` fields are preserved on failed HTTP responses; non-JSON or empty failures use status-aware recovery messages; empty/non-JSON successful responses are treated as malformed API responses; and fetch/connection failures become a stable connectivity message. Normalized `PlannerApiError` instances also expose `kind`, HTTP `status` when available, and a `retryable` flag while existing feature UI continues to display `error.message`. Target list business logic is likewise kept in the pure Planner Target Logic module; `planner-app.js` owns Target DOM rendering, selection state, modal interactions, and API mutations. Planner-specific CSS follows the same boundary: shared base rules stay in `styles.css`, while Planner-only responsive/feature overrides live in `planner.css` and load after the base stylesheet.
 
 ### 5.1 Mobile information architecture
 
@@ -195,7 +195,7 @@ Current invariants:
 - Planner keyboard focus uses a visible `:focus-visible` ring;
 - `prefers-reduced-motion: reduce` collapses Planner animation/transition durations and disables smooth tab scrolling.
 
-`manage.html` remains responsible for overlay-specific open/close business state and scroll-lock mechanics; `planner-overlay.js` owns the cross-overlay keyboard/focus/isolation contract.
+`planner-app.js` remains responsible for overlay-specific open/close business state and scroll-lock mechanics; `planner-overlay.js` owns the cross-overlay keyboard/focus/isolation contract.
 
 ### 5.3 Desktop information architecture
 
@@ -216,6 +216,8 @@ Sticky elements must begin at their natural section position and must not cover 
 Whenever public/styles.css changes, every page that references it must have its CSS cache/version reference bumped. This prevents stale production styling after deployment.
 
 The current shared CSS cache generation is v42 after the BL-011G Planner stylesheet split. Future `styles.css` changes must continue the version bump. Planner-only overrides are loaded separately from `planner.css`; BL-016 advances the Planner-only stylesheet reference to v2 for focus-visible and reduced-motion rules without changing shared `styles.css`.
+
+JavaScript assets use explicit query-version bumps when their browser contract changes. BL-018 advances the `planner-client.js` reference from v2 to v3 so cached clients cannot retain the old unconditional-`response.json()` behavior after deployment.
 
 ## 6. Server modules
 

@@ -94,7 +94,7 @@ assert.match(manage, /Pokémon GO Battle Planner/);
 assert.match(manage, /PERSONAL BATTLE STRATEGY/);
 assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
-assert.match(manage, /<script src="\/planner-client\.js\?v=2"><\/script>/);
+assert.match(manage, /<script src="\/planner-client\.js\?v=3"><\/script>/);
 assert.match(manage, /<script src="\/planner-overlay\.js\?v=1"><\/script>/);
 assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=2">/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
@@ -342,14 +342,14 @@ const plannerClientContext = {
   },
   URL,
   Headers,
+  Response,
   fetch:
     async (
       url,
       options
-    ) => ({
-      ok: true,
-      json:
-        async () => ({
+    ) =>
+      new Response(
+        JSON.stringify({
           url,
           authorization:
             options.headers.get(
@@ -357,8 +357,15 @@ const plannerClientContext = {
             ),
           body:
             options.body
-        })
-    })
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type":
+              "application/json"
+          }
+        }
+      )
 };
 
 vm.createContext(
@@ -482,6 +489,232 @@ assert.equal(
     .options
     .referrerPolicy,
   "no-referrer"
+);
+
+assert.match(
+  plannerClient,
+  /class PlannerApiError/
+);
+assert.match(
+  plannerClient,
+  /async function readApiResponse/
+);
+assert.match(
+  plannerClient,
+  /Could not reach the Planner service/
+);
+assert.match(
+  plannerClient,
+  /returned an empty response/
+);
+assert.match(
+  plannerClient,
+  /returned an unreadable response/
+);
+
+async function plannerApiFailure(
+  responseOrError
+) {
+  const api =
+    plannerClientApi
+      .createApiClient({
+        token:
+          "failure-test-token",
+        origin:
+          "https://planner.example",
+        fetchImpl:
+          async () => {
+            if (
+              responseOrError instanceof
+                Error
+            ) {
+              throw responseOrError;
+            }
+
+            return responseOrError;
+          }
+      });
+
+  try {
+    await api(
+      "/api/failure"
+    );
+  } catch (error) {
+    return error;
+  }
+
+  assert.fail(
+    "Expected Planner API failure"
+  );
+}
+
+const structuredApiError =
+  await plannerApiFailure(
+    new Response(
+      JSON.stringify({
+        error:
+          "Fixture validation failed."
+      }),
+      {
+        status: 400,
+        headers: {
+          "content-type":
+            "application/json"
+        }
+      }
+    )
+  );
+
+assert.equal(
+  structuredApiError.message,
+  "Fixture validation failed."
+);
+assert.equal(
+  structuredApiError.kind,
+  "http"
+);
+assert.equal(
+  structuredApiError.status,
+  400
+);
+assert.equal(
+  structuredApiError.retryable,
+  false
+);
+
+const htmlServerError =
+  await plannerApiFailure(
+    new Response(
+      "<!doctype html><title>Upstream failure</title>",
+      {
+        status: 503,
+        headers: {
+          "content-type":
+            "text/html"
+        }
+      }
+    )
+  );
+
+assert.equal(
+  htmlServerError.message,
+  "The Planner service is temporarily unavailable (HTTP 503). Please try again."
+);
+assert.equal(
+  htmlServerError.kind,
+  "http"
+);
+assert.equal(
+  htmlServerError.status,
+  503
+);
+assert.equal(
+  htmlServerError.retryable,
+  true
+);
+assert.doesNotMatch(
+  htmlServerError.message,
+  /Upstream failure/
+);
+
+const emptyServerError =
+  await plannerApiFailure(
+    new Response(
+      "",
+      {
+        status: 502
+      }
+    )
+  );
+
+assert.equal(
+  emptyServerError.message,
+  "The Planner service is temporarily unavailable (HTTP 502). Please try again."
+);
+
+const emptySuccessError =
+  await plannerApiFailure(
+    new Response(
+      "",
+      {
+        status: 200
+      }
+    )
+  );
+
+assert.equal(
+  emptySuccessError.kind,
+  "empty-response"
+);
+assert.equal(
+  emptySuccessError.message,
+  "The Planner service returned an empty response. Refresh the page and try again."
+);
+
+const invalidSuccessError =
+  await plannerApiFailure(
+    new Response(
+      "not json",
+      {
+        status: 200,
+        headers: {
+          "content-type":
+            "text/plain"
+        }
+      }
+    )
+  );
+
+assert.equal(
+  invalidSuccessError.kind,
+  "invalid-response"
+);
+assert.equal(
+  invalidSuccessError.message,
+  "The Planner service returned an unreadable response. Refresh the page and try again."
+);
+
+const networkApiError =
+  await plannerApiFailure(
+    new TypeError(
+      "fixture connection reset"
+    )
+  );
+
+assert.equal(
+  networkApiError.kind,
+  "network"
+);
+assert.equal(
+  networkApiError.status,
+  null
+);
+assert.equal(
+  networkApiError.retryable,
+  true
+);
+assert.equal(
+  networkApiError.message,
+  "Could not reach the Planner service. Check your internet connection and try again."
+);
+assert.doesNotMatch(
+  networkApiError.message,
+  /connection reset/
+);
+
+const unauthorizedApiError =
+  await plannerApiFailure(
+    new Response(
+      "",
+      {
+        status: 401
+      }
+    )
+  );
+
+assert.equal(
+  unauthorizedApiError.message,
+  "This Planner link is no longer authorized. Open your current private management link and try again."
 );
 
 assert.equal(
@@ -1463,14 +1696,20 @@ assert.equal(
 );
 
 plannerClientContext.fetch =
-  async () => ({
-    ok: false,
-    json:
-      async () => ({
+  async () =>
+    new Response(
+      JSON.stringify({
         error:
           "Fixture request failed."
-      })
-  });
+      }),
+      {
+        status: 400,
+        headers: {
+          "content-type":
+            "application/json"
+        }
+      }
+    );
 
 await assert.rejects(
   () =>

@@ -475,6 +475,27 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
         if path == "/api/me":
             self.server.last_manage_api_path = self.path
             self.server.last_manage_authorization = self.headers.get("authorization")
+
+            mode = getattr(
+                self.server,
+                "manage_api_mode",
+                "ok",
+            )
+
+            if mode == "html_503":
+                return self._raw(
+                    b"<!doctype html><title>Fixture gateway failure</title>",
+                    status=503,
+                    content_type="text/html; charset=utf-8",
+                )
+
+            if mode == "empty_502":
+                return self._raw(
+                    b"",
+                    status=502,
+                    content_type="text/plain; charset=utf-8",
+                )
+
             return self._json(MOCK_STATE)
 
         if path == "/api/feed-link":
@@ -602,6 +623,13 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def _raw(self, payload: bytes, status=200, content_type="text/plain; charset=utf-8"):
+        self.send_response(status)
+        self.send_header("content-type", content_type)
+        self.send_header("content-length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
     def _file(self, path: Path, content_type: str, headers=None):
         payload = path.read_bytes()
         self.send_response(200)
@@ -633,6 +661,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         cls.server_thread.join(timeout=2)
 
     def setUp(self):
+        self.server.manage_api_mode = "ok"
         self.server.catalog_failures_remaining = 0
         self.server.last_manage_api_path = None
         self.server.last_manage_authorization = None
@@ -655,6 +684,17 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         page.wait_for_selector(".recommendation-card")
         return page
 
+    def open_planner_without_waiting_for_app(self, width: int, height: int):
+        context = self.browser.new_context(
+            viewport={"width": width, "height": height},
+            locale="en-US",
+            timezone_id="Asia/Singapore",
+            reduced_motion="reduce",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+        return page
+
     def assert_no_horizontal_overflow(self, page):
         dimensions = page.evaluate(
             """() => ({
@@ -669,6 +709,73 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             dimensions["viewport"] + 1,
             f"Unexpected horizontal overflow: {dimensions}",
         )
+
+    def test_non_json_server_failure_has_actionable_message(self):
+        self.server.manage_api_mode = "html_503"
+        page = self.open_planner_without_waiting_for_app(1024, 800)
+
+        page.goto(
+            f"{self.base_url}/manage/browser-test-token",
+            wait_until="domcontentloaded",
+        )
+
+        page.wait_for_function(
+            """() => document.getElementById('loadStatus')?.textContent.includes('temporarily unavailable')"""
+        )
+
+        message = page.locator("#loadStatus").inner_text()
+        self.assertEqual(
+            message,
+            "The Planner service is temporarily unavailable (HTTP 503). Please try again.",
+        )
+        self.assertNotIn("Unexpected token", message)
+        self.assertNotIn("Fixture gateway failure", message)
+        self.assertTrue(
+            page.locator(".hero-status").evaluate(
+                "element => element.classList.contains('error-state')"
+            )
+        )
+
+    def test_empty_server_failure_has_actionable_message(self):
+        self.server.manage_api_mode = "empty_502"
+        page = self.open_planner_without_waiting_for_app(1024, 800)
+
+        page.goto(
+            f"{self.base_url}/manage/browser-test-token",
+            wait_until="domcontentloaded",
+        )
+
+        page.wait_for_function(
+            """() => document.getElementById('loadStatus')?.textContent.includes('HTTP 502')"""
+        )
+
+        self.assertEqual(
+            page.locator("#loadStatus").inner_text(),
+            "The Planner service is temporarily unavailable (HTTP 502). Please try again.",
+        )
+
+    def test_network_failure_has_actionable_message(self):
+        page = self.open_planner_without_waiting_for_app(1024, 800)
+        page.route(
+            "**/api/me",
+            lambda route: route.abort("failed"),
+        )
+
+        page.goto(
+            f"{self.base_url}/manage/browser-test-token",
+            wait_until="domcontentloaded",
+        )
+
+        page.wait_for_function(
+            """() => document.getElementById('loadStatus')?.textContent.includes('Check your internet connection')"""
+        )
+
+        message = page.locator("#loadStatus").inner_text()
+        self.assertEqual(
+            message,
+            "Could not reach the Planner service. Check your internet connection and try again.",
+        )
+        self.assertNotIn("Failed to fetch", message)
 
     def test_planner_runs_under_strict_script_csp(self):
         page = self.open_planner(1024, 800)
