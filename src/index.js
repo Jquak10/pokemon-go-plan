@@ -8616,13 +8616,18 @@ async function calendarEventsApi(request, env) {
 }
 
 async function feedLinkApi(request, env) {
-  const url = new URL(request.url);
-  const user = await userByManageRequest(
-    request,
-    env
-  );
+  const user =
+    await userByManageRequest(
+      request,
+      env
+    );
 
-  if (!user) return bad("Invalid management link.", 401);
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
 
   if (!env.FEED_LINK_KEY) {
     return bad(
@@ -8631,7 +8636,34 @@ async function feedLinkApi(request, env) {
     );
   }
 
-  const signature = await recoverableFeedSignature(env, user.id);
+  const credentialState =
+    await feedLinkCredentialState(
+      env,
+      user.id
+    );
+
+  if (!credentialState.enabled) {
+    return json({
+      calendar_url: null,
+      read_only: true,
+      preferred: true,
+      format: "signed",
+      revoked: true,
+      generation:
+        credentialState.generation,
+      rotation_available:
+        credentialState.migration_ready,
+      note:
+        "The preferred signed calendar URL is revoked. Regenerate it before adding a new subscription."
+    });
+  }
+
+  const signature =
+    await recoverableFeedSignature(
+      env,
+      user.id,
+      credentialState.generation
+    );
 
   const baseUrl =
     publicBaseUrl(
@@ -8641,15 +8673,229 @@ async function feedLinkApi(request, env) {
 
   return json({
     calendar_url:
-      `${baseUrl}/calendar/recover/${user.id}.${signature}.ics`,
+      `${baseUrl}${recoverableFeedPath(
+        user.id,
+        credentialState.generation,
+        signature
+      )}`,
     read_only: true,
     preferred: true,
     format: "signed",
+    revoked: false,
+    generation:
+      credentialState.generation,
+    rotation_available:
+      credentialState.migration_ready,
     note:
       "Private read-only calendar subscription URL."
   });
 }
 
+async function rotateSignedFeedApi(
+  request,
+  env
+) {
+  let body = {};
+
+  try {
+    body =
+      await request.json();
+  } catch {}
+
+  const user =
+    await userByManageRequest(
+      request,
+      env,
+      body
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  if (!env.FEED_LINK_KEY) {
+    return bad(
+      "ICS link recovery is not enabled yet. Add the FEED_LINK_KEY Worker runtime secret.",
+      503
+    );
+  }
+
+  let credentialState;
+
+  try {
+    credentialState =
+      await advanceFeedLinkCredential(
+        env,
+        user.id,
+        true
+      );
+  } catch (error) {
+    if (
+      error?.code ===
+      "feed_credentials_migration_required"
+    ) {
+      return bad(
+        error.message,
+        503
+      );
+    }
+
+    throw error;
+  }
+
+  const signature =
+    await recoverableFeedSignature(
+      env,
+      user.id,
+      credentialState.generation
+    );
+
+  const baseUrl =
+    publicBaseUrl(
+      request,
+      env
+    );
+
+  return json({
+    ok: true,
+    calendar_url:
+      `${baseUrl}${recoverableFeedPath(
+        user.id,
+        credentialState.generation,
+        signature
+      )}`,
+    read_only: true,
+    preferred: true,
+    format: "signed",
+    revoked: false,
+    generation:
+      credentialState.generation,
+    note:
+      "A new preferred signed calendar URL is active. The previous signed URL is now invalid."
+  });
+}
+
+async function revokeSignedFeedApi(
+  request,
+  env
+) {
+  let body = {};
+
+  try {
+    body =
+      await request.json();
+  } catch {}
+
+  const user =
+    await userByManageRequest(
+      request,
+      env,
+      body
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  try {
+    const credentialState =
+      await advanceFeedLinkCredential(
+        env,
+        user.id,
+        false
+      );
+
+    return json({
+      ok: true,
+      signed_feed_revoked:
+        true,
+      generation:
+        credentialState.generation,
+      note:
+        "The preferred signed calendar URL is revoked. Regenerate it when you are ready to subscribe again."
+    });
+  } catch (error) {
+    if (
+      error?.code ===
+      "feed_credentials_migration_required"
+    ) {
+      return bad(
+        error.message,
+        503
+      );
+    }
+
+    throw error;
+  }
+}
+
+async function rotateManagementLinkApi(
+  request,
+  env
+) {
+  let body = {};
+
+  try {
+    body =
+      await request.json();
+  } catch {}
+
+  const user =
+    await userByManageRequest(
+      request,
+      env,
+      body
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  const manageToken =
+    randomToken(32);
+
+  const manageHash =
+    await sha256Hex(
+      manageToken
+    );
+
+  await env.DB.prepare(`
+    UPDATE users
+    SET
+      manage_hash = ?,
+      updated_at = ?
+    WHERE id = ?
+  `).bind(
+    manageHash,
+    nowIso(),
+    user.id
+  ).run();
+
+  const baseUrl =
+    publicBaseUrl(
+      request,
+      env
+    );
+
+  return json({
+    ok: true,
+    management_url:
+      `${baseUrl}/manage/${manageToken}`,
+    manage_token:
+      manageToken,
+    note:
+      "The new management link is active. The previous management link is now invalid."
+  });
+}
 
 async function revokeLegacyFeedApi(
   request,
