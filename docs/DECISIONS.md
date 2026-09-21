@@ -858,7 +858,7 @@ The following sequence is retained as a compact repository implementation/change
 | #59 | BL-014 per-source synchronization health | Adds additive D1-backed health for event, official, and meta synchronization sources; preserves last-success/item-count across failed attempts; filters event warnings to the user's relevant sources; and keeps legacy freshness timestamps as a deployment-order fallback until migration 0006 is applied. |
 | #60 | BL-015 independent credential rotation | Rotates the management capability independently from calendar credentials and adds per-planner signed-calendar generations/revocation state while preserving generation-zero signed URLs and legacy random-token calendar compatibility until each credential is explicitly rotated or revoked. |
 | #61 | BL-016 keyboard and modal accessibility | Centralizes focus containment, Escape dispatch, opener focus restoration, background inert/aria-hidden isolation, visible keyboard focus, reduced-motion handling, and real-browser regressions across Planner modals, sheets, drawers, and the command palette. |
-| #62 (open) | BL-017 Planner script CSP hardening | Externalizes the remaining Planner integration script, removes generated inline event handlers, and applies `script-src 'self'` without `'unsafe-inline'` to the private management route while preserving compatibility policy on other HTML surfaces. |
+| #62 | BL-017 Planner script CSP hardening | Externalizes the remaining Planner integration script, removes generated inline event handlers, and applies `script-src 'self'` without `'unsafe-inline'` to the private management route while preserving compatibility policy on other HTML surfaces. |
 
 ## Supersession map
 
