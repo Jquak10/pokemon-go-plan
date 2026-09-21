@@ -1174,6 +1174,28 @@ assert.equal(
   "Custom Hundo levels only support 0.5-level steps"
 );
 
+const levelOnePointFiveCpm =
+  hundoLogic.cpMultiplierForLevel(
+    1.5
+  );
+
+assert.ok(
+  Math.abs(
+    levelOnePointFiveCpm -
+      0.13513743215803847
+  ) < 1e-12,
+  "Lv1.5 CPM must use the Pokémon GO half-level root-mean-square formula"
+);
+
+assert.equal(
+  hundoLogic.hundoCp(
+    mewtwoStats,
+    1.5
+  ),
+  122,
+  "Mewtwo Lv1.5 Hundo CP must use the canonical half-level CPM"
+);
+
 assert.equal(
   hundoLogic.cpMultiplierForLevel(
     50.5
