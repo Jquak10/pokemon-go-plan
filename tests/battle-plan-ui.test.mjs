@@ -99,7 +99,7 @@ assert.match(manage, /<script src="\/planner-overlay\.js\?v=1"><\/script>/);
 assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=2">/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
-assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=1"><\/script>/);
+assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-intel\.js\?v=1"><\/script>/);
 assert.match(manage, /PlannerBattleIntel/);
