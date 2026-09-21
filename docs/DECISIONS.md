@@ -724,6 +724,29 @@ Rules:
 
 This supersedes the Raid-oriented future-budget model while preserving current Remote-limit, target-completion, source-precedence, and conservative unknown-MP invariants.
 
+## ADR-044 — Rotate management and signed-calendar bearer credentials independently
+
+Status: Current  
+Introduced in PR #60.
+
+Management links and calendar subscription URLs are separate bearer credentials with different consumers and recovery needs. A leaked credential must therefore be recoverable without forcing unrelated credentials to change.
+
+Current decision:
+
+- management-link rotation replaces only the planner's `users.manage_hash`;
+- the already-authenticated Planner receives the new management capability once, switches its in-memory Authorization bearer immediately, and replaces the browser URL without navigating through the invalid old capability;
+- management rotation does not change the preferred signed calendar credential or the legacy random-token calendar credential;
+- the preferred signed calendar URL is versioned by a per-planner generation stored in `feed_link_credentials`;
+- generation 0 preserves the exact historical HMAC payload and URL shape, so every pre-BL-015 signed subscription remains valid until that planner explicitly rotates or revokes it;
+- regenerating the signed calendar URL advances the generation and enables it, immediately invalidating the prior signed generation for that planner only;
+- revoking the signed calendar URL advances the generation and disables it until a later regeneration;
+- the global `FEED_LINK_KEY` remains the signing secret and is not rotated merely to recover one planner's leaked URL;
+- legacy `/calendar/<random-token>.ics` URLs remain independently compatible and keep their existing explicit legacy-revoke path.
+
+Migration 0007 adds only the per-planner signed generation/revocation state. Before that migration exists, generation-0 signed URLs remain valid and signed-feed rotation is unavailable rather than failing existing subscriptions.
+
+This decision treats credential recovery as scoped invalidation: rotate only the bearer that is believed to be exposed.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
