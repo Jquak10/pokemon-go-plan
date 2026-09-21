@@ -565,7 +565,7 @@
             </button>
           </div>
 
-          <div id="targetFilterDrawer" class="target-filter-drawer">
+          <div id="targetFilterDrawer" class="target-filter-drawer" inert aria-hidden="true">
             <div class="target-filter-drawer-head">
               <div>
                 <span class="section-eyebrow">FILTERS</span>
@@ -1750,7 +1750,12 @@ function activateTab(name, scroll = true) {
         `[data-panel="${CSS.escape(name)}"]`
       )
       ?.scrollIntoView({
-        behavior: "smooth",
+        behavior:
+          window.matchMedia(
+            "(prefers-reduced-motion: reduce)"
+          ).matches
+            ? "auto"
+            : "smooth",
         block: "start"
       });
   }
@@ -3284,6 +3289,41 @@ function openMobileMoreSheet() {
     restoreFocus:
       "#mobileMoreButton"
   });
+}
+
+function syncTargetFilterDrawerRestState() {
+  const drawer =
+    document.getElementById(
+      "targetFilterDrawer"
+    );
+
+  if (
+    !drawer ||
+    PlannerOverlay.isOpen(
+      drawer
+    )
+  ) {
+    return;
+  }
+
+  const desktop =
+    window.matchMedia(
+      "(min-width: 761px)"
+    ).matches;
+
+  drawer.inert =
+    !desktop;
+
+  if (desktop) {
+    drawer.removeAttribute(
+      "aria-hidden"
+    );
+  } else {
+    drawer.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+  }
 }
 
 function mountTargetFilterDrawerForMobile() {
@@ -8727,11 +8767,15 @@ window.addEventListener(
       ).matches
     ) {
       closeTargetFilterDrawer();
+      restoreTargetFilterDrawerHome();
     }
 
+    syncTargetFilterDrawerRestState();
     scheduleDesktopQuickRailAffix();
   }
 );
+
+syncTargetFilterDrawerRestState();
 
 window.addEventListener(
   "scroll",
