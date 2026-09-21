@@ -19,7 +19,9 @@ function read(relative) {
 }
 
 const portal = read("../public/index.html");
-const manage = read("../public/manage.html");
+const manageHtml = read("../public/manage.html");
+const plannerApp = read("../public/planner-app.js");
+const manage = `${manageHtml}\n${plannerApp}`;
 const timezoneValidation = read("../public/timezone-validation.js");
 const plannerClient = read("../public/planner-client.js");
 const plannerOverlay = read("../public/planner-overlay.js");
@@ -233,14 +235,55 @@ assert.match(worker, /planning_rationale:/);
 assert.match(manage, /<strong>Planning priority:<\/strong>/);
 assert.match(manage, /item\.label \|\| "Priority"/);
 
-// Syntax-check the Planner's inline JavaScript without executing browser APIs.
-const inlineScripts = [...manage.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+// BL-017: the Planner must remain executable with script-src 'self' only.
+assert.match(
+  manageHtml,
+  /<script src="\/planner-app\.js\?v=1"><\/script>/
+);
+
+const inlineScripts = [
+  ...manageHtml.matchAll(
+    /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi
+  )
+]
   .map(match => match[1])
-  .filter(Boolean);
-assert.ok(inlineScripts.length >= 1, "Expected Planner inline JavaScript");
-for (const [index, script] of inlineScripts.entries()) {
-  new vm.Script(script, { filename: `manage-inline-${index + 1}.js` });
-}
+  .filter(script => script.trim());
+
+assert.equal(
+  inlineScripts.length,
+  0,
+  "Planner HTML must not contain executable inline script blocks"
+);
+
+assert.doesNotMatch(
+  manageHtml,
+  /\son[a-z]+\s*=\s*["']/i,
+  "Planner HTML must not contain inline event handlers"
+);
+
+assert.doesNotMatch(
+  plannerApp,
+  /\son[a-z]+\s*=\s*["']/i,
+  "Planner-generated markup must not reintroduce inline event handlers"
+);
+
+assert.match(
+  plannerApp,
+  /data-hide-on-error="true"/
+);
+
+assert.match(
+  plannerApp,
+  /document\.addEventListener\([\s\S]*"error"/
+);
+
+new vm.Script(
+  plannerApp,
+  {
+    filename:
+      "planner-app.js"
+  }
+);
 
 new vm.Script(
   plannerClient,
@@ -1690,6 +1733,61 @@ assert.match(
     "cache-control"
   ) || "",
   /no-store/
+);
+
+assert.match(
+  hardenedHtml.headers.get(
+    "content-security-policy"
+  ) || "",
+  /script-src 'self' 'unsafe-inline'/
+);
+
+const strictPlannerHtml =
+  hardenResponse(
+    new Response(
+      "<!doctype html><title>Planner</title>",
+      {
+        headers: {
+          "content-type":
+            "text/html; charset=utf-8"
+        }
+      }
+    ),
+    {
+      noStore: true,
+      allowInlineScript:
+        false
+    }
+  );
+
+const strictPlannerCsp =
+  strictPlannerHtml.headers.get(
+    "content-security-policy"
+  ) || "";
+
+assert.match(
+  strictPlannerCsp,
+  /(?:^|;\s*)script-src 'self'(?:;|$)/
+);
+
+assert.doesNotMatch(
+  strictPlannerCsp,
+  /script-src[^;]*'unsafe-inline'/
+);
+
+assert.match(
+  strictPlannerCsp,
+  /style-src 'self' 'unsafe-inline'/
+);
+
+assert.match(
+  worker,
+  /\/manage\\\/[A-Za-z0-9_-]\+\\\/?\$\/[\s\S]*allowInlineScript:\s*false/
+);
+
+assert.match(
+  httpSecurity,
+  /allowInlineScript/
 );
 
 const hardenedCalendar =
