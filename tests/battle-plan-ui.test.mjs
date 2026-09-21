@@ -1696,14 +1696,20 @@ assert.equal(
 );
 
 plannerClientContext.fetch =
-  async () => ({
-    ok: false,
-    json:
-      async () => ({
+  async () =>
+    new Response(
+      JSON.stringify({
         error:
           "Fixture request failed."
-      })
-  });
+      }),
+      {
+        status: 400,
+        headers: {
+          "content-type":
+            "application/json"
+        }
+      }
+    );
 
 await assert.rejects(
   () =>
