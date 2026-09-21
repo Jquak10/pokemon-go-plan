@@ -15,6 +15,23 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "public"
 
+PLANNER_CSP = "; ".join(
+    [
+        "default-src 'self'",
+        "base-uri 'none'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "frame-src 'none'",
+        "form-action 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https:",
+        "font-src 'self' data:",
+        "connect-src 'self'",
+        "manifest-src 'self'",
+    ]
+)
+
 ADVICE_DETAIL = (
     "The shared plan leaves lower-value pass capacity unused rather than spending to a ceiling. "
     "This guidance must remain fully readable on intermediate desktop widths instead of being clipped."
@@ -497,7 +514,13 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
             return self._json(CATALOG)
 
         if path.startswith("/manage/"):
-            return self._file(PUBLIC / "manage.html", "text/html; charset=utf-8")
+            return self._file(
+                PUBLIC / "manage.html",
+                "text/html; charset=utf-8",
+                headers={
+                    "content-security-policy": PLANNER_CSP,
+                },
+            )
 
         static_path = (PUBLIC / path.lstrip("/")).resolve()
         if PUBLIC.resolve() in static_path.parents and static_path.is_file():
@@ -579,11 +602,13 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def _file(self, path: Path, content_type: str):
+    def _file(self, path: Path, content_type: str, headers=None):
         payload = path.read_bytes()
         self.send_response(200)
         self.send_header("content-type", content_type)
         self.send_header("content-length", str(len(payload)))
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(payload)
 
@@ -644,6 +669,28 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             dimensions["viewport"] + 1,
             f"Unexpected horizontal overflow: {dimensions}",
         )
+
+    def test_planner_runs_under_strict_script_csp(self):
+        page = self.open_planner(1024, 800)
+
+        response = page.request.get(
+            f"{self.base_url}/manage/browser-test-token"
+        )
+        csp = response.headers.get("content-security-policy", "")
+
+        self.assertIn(
+            "script-src 'self'",
+            csp,
+        )
+        self.assertNotIn(
+            "script-src 'self' 'unsafe-inline'",
+            csp,
+        )
+        self.assertTrue(
+            page.locator("#app").is_visible(),
+            "Planner must boot while inline script execution is blocked",
+        )
+        self.assert_no_horizontal_overflow(page)
 
     def test_management_api_uses_header_without_query_token(self):
         page = self.open_planner(1024, 800)
