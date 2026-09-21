@@ -13,6 +13,7 @@
 
   const entries = [];
   let isolatedElements = [];
+  let pendingRestoreFocus = null;
 
   function resolveElement(value) {
     if (!value) {
@@ -277,16 +278,28 @@
         resolveElement(
           restoreFocus
         ) ||
+        pendingRestoreFocus ||
         (
           active instanceof
             HTMLElement
             ? active
             : null
         ),
-      addedTabIndex: false
+      addedTabIndex: false,
+      overlayInert:
+        Boolean(
+          element.inert
+        ),
+      overlayAriaHidden:
+        element.getAttribute(
+          "aria-hidden"
+        )
     };
 
+    pendingRestoreFocus = null;
+
     entries.push(entry);
+    element.inert = false;
     element.removeAttribute(
       "aria-hidden"
     );
@@ -346,6 +359,23 @@
       );
     }
 
+    entry.overlay.inert =
+      entry.overlayInert;
+
+    if (
+      entry.overlayAriaHidden ==
+      null
+    ) {
+      entry.overlay.removeAttribute(
+        "aria-hidden"
+      );
+    } else {
+      entry.overlay.setAttribute(
+        "aria-hidden",
+        entry.overlayAriaHidden
+      );
+    }
+
     restoreBackground();
 
     const next =
@@ -367,7 +397,17 @@
     }
 
     if (
-      restoreFocus &&
+      !restoreFocus
+    ) {
+      pendingRestoreFocus =
+        entry.restoreFocus ||
+        null;
+      return true;
+    }
+
+    pendingRestoreFocus = null;
+
+    if (
       entry.restoreFocus &&
       entry.restoreFocus.isConnected &&
       !entry.restoreFocus
