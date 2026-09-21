@@ -283,7 +283,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 
 - On wide desktop screens (1180 px and above), the planner uses fixed left-side navigation and a sticky **Quick status** rail with top priority, activity totals, **+ Log battle**, quick search, and a **Compact density** toggle. Targets also offer **Cards** and **Compact list**.
 - Intermediate desktop/tablet widths keep dense Today/Battle Resources and Calendar panels stacked, use a four-column Paid Battle Forecast, wrap primary detail names, and retain segmented navigation above the content instead of prematurely squeezing the wide-desktop layout.
-- Mobile uses a fixed bottom navigation for **Raid Plan**, **Targets**, **Hundo CP**, **Calendar**, and **More**. **Preferences** and **Data sources** are in the **More options** sheet.
+- Mobile uses a fixed bottom navigation for **Raid Plan**, **Targets**, **Hundo CP**, **Calendar**, and **More**. **Preferences** and **Data sources** are in the **More options** sheet. Opening **More** preserves the current section until an option is selected.
 - Mobile provides a floating **+ Log raid** action, presents the raid logger as a bottom sheet, and moves advanced Target filters into the **Organize targets** drawer.
 - On mobile, **More levels** expands the additional Hundo benchmarks, and Calendar day details flow beneath the month view.
 - The public landing page, Data Sources page, and Planner Admin page collapse their multi-column layouts for narrow browsers, keep long URLs/text wrapped, and use touch-friendly controls without reserving space for the Planner-only bottom navigation.
