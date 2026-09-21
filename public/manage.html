@@ -3414,6 +3414,10 @@ function restoreTargetFilterDrawerHome() {
   drawer.removeAttribute(
     "aria-modal"
   );
+
+  drawer.removeAttribute(
+    "aria-labelledby"
+  );
 }
 
 function lockPageForTargetDrawer() {
@@ -3526,6 +3530,10 @@ function closeTargetFilterDrawer() {
 
   drawer.removeAttribute(
     "aria-modal"
+  );
+
+  drawer.removeAttribute(
+    "aria-labelledby"
   );
 
   unlockPageForTargetDrawer();
@@ -3916,7 +3924,11 @@ function commandEntries() {
               )
               ?.scrollIntoView({
                 behavior:
-                  "smooth",
+                  window.matchMedia(
+                    "(prefers-reduced-motion: reduce)"
+                  ).matches
+                    ? "auto"
+                    : "smooth",
                 block:
                   "start"
               }),
@@ -8717,10 +8729,12 @@ document
         ];
 
       if (entry) {
-        closeCommandPalette(
-          false
+        closeCommandPalette();
+
+        requestAnimationFrame(
+          () =>
+            entry.action()
         );
-        entry.action();
       }
     }
   );
