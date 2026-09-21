@@ -22,6 +22,7 @@ const portal = read("../public/index.html");
 const manage = read("../public/manage.html");
 const timezoneValidation = read("../public/timezone-validation.js");
 const plannerClient = read("../public/planner-client.js");
+const plannerOverlay = read("../public/planner-overlay.js");
 const plannerTargetLogic = read("../public/planner-target-logic.js");
 const plannerCalendarLogic = read("../public/planner-calendar-logic.js");
 const plannerHundoLogic = read("../public/planner-hundo-logic.js");
@@ -92,6 +93,8 @@ assert.match(manage, /PERSONAL BATTLE STRATEGY/);
 assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
 assert.match(manage, /<script src="\/planner-client\.js\?v=2"><\/script>/);
+assert.match(manage, /<script src="\/planner-overlay\.js\?v=1"><\/script>/);
+assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=2">/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=1"><\/script>/);
@@ -1491,6 +1494,24 @@ assert.match(plannerClient, /url\.searchParams\.delete\([\s\S]*"token"/);
 assert.match(plannerClient, /delete parsed\.token/);
 assert.match(plannerClient, /globalThis\.PlannerClient/);
 assert.match(plannerClient, /function buildManagedApiRequest/);
+
+assert.match(plannerOverlay, /function focusableElements/);
+assert.match(plannerOverlay, /function isolateBackground/);
+assert.match(plannerOverlay, /event\.key ===[\s\S]*"Escape"/);
+assert.match(plannerOverlay, /event\.key !==[\s\S]*"Tab"/);
+assert.match(plannerOverlay, /stopImmediatePropagation/);
+assert.match(plannerOverlay, /element\.inert = true/);
+assert.match(manage, /PlannerOverlay\.open/);
+assert.match(manage, /PlannerOverlay\.close/);
+assert.match(manage, /role",[\s\S]*"dialog"/);
+assert.doesNotMatch(
+  manage,
+  /event\.key === "Escape" && !document\.getElementById\("targetModal"\)/
+);
+assert.match(plannerStyles, /:focus-visible/);
+assert.match(plannerStyles, /prefers-reduced-motion: reduce/);
+assert.match(plannerStyles, /transition-duration: 0\.01ms/);
+assert.match(plannerStyles, /command-palette-open/);
 assert.match(plannerClient, /function createApiClient/);
 assert.match(plannerClient, /function setToken/);
 assert.match(plannerClient, /tokenProvider/);
