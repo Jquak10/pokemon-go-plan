@@ -1,17 +1,23 @@
-const HTML_CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "base-uri 'none'",
-  "object-src 'none'",
-  "frame-ancestors 'none'",
-  "frame-src 'none'",
-  "form-action 'self'",
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "manifest-src 'self'"
-].join("; ");
+function htmlContentSecurityPolicy({
+  allowInlineScript = true
+} = {}) {
+  return [
+    "default-src 'self'",
+    "base-uri 'none'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "frame-src 'none'",
+    "form-action 'self'",
+    allowInlineScript
+      ? "script-src 'self' 'unsafe-inline'"
+      : "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "manifest-src 'self'"
+  ].join("; ");
+}
 
 export function json(
   data,
@@ -145,7 +151,8 @@ export function adminKeyFromRequest(
 export function hardenResponse(
   response,
   {
-    noStore = false
+    noStore = false,
+    allowInlineScript = true
   } = {}
 ) {
   const headers =
@@ -189,7 +196,9 @@ export function hardenResponse(
   ) {
     headers.set(
       "content-security-policy",
-      HTML_CONTENT_SECURITY_POLICY
+      htmlContentSecurityPolicy({
+        allowInlineScript
+      })
     );
 
     headers.set(
