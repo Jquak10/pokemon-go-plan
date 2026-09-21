@@ -747,6 +747,30 @@ Migration 0007 adds only the per-planner signed generation/revocation state. Bef
 
 This decision treats credential recovery as scoped invalidation: rotate only the bearer that is believed to be exposed.
 
+## ADR-045 — Centralize Planner overlay accessibility behavior
+
+Status: Current  
+Introduced in PR #61.
+
+Planner dialogs, sheets, drawers, and the command palette previously owned parts of their Escape/focus behavior independently. That made keyboard behavior inconsistent and allowed background content to remain reachable while a foreground interaction was active.
+
+The Planner now uses one shared overlay accessibility controller.
+
+Current decision:
+
+- only the top active overlay owns Escape;
+- Tab and Shift+Tab are contained within the active overlay;
+- closing restores focus to the opening control when it still exists and is visible;
+- body siblings outside the active overlay are marked `inert` and `aria-hidden`, with their previous states restored afterward;
+- hidden static overlays remain inert while closed;
+- the mobile Targets filter drawer gets `role="dialog"` and `aria-modal="true"` only while it is acting as a mobile foreground sheet;
+- Ctrl/Cmd+K cannot open the command palette over another active overlay;
+- existing overlay-specific scroll-lock code remains responsible for page/background scroll containment;
+- keyboard focus is visibly indicated by Planner-only `:focus-visible` styling;
+- reduced-motion preference removes meaningful transition/animation delays and avoids smooth programmatic scrolling.
+
+The controller owns cross-overlay keyboard/focus/isolation mechanics only. Feature-specific form state, save/cancel behavior, and scroll-lock details remain in `manage.html`.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -813,6 +837,7 @@ The following sequence is retained as a compact repository implementation/change
 | #58 | BL-013 durable official schedule discovery | Reuses stored official source URLs for still-future supplement rows beyond the newest-news discovery window, includes stale future rows for self-recovery, and limits replacement/staling to official pages that fully refreshed successfully so transient source failures preserve last-known future availability. |
 | #59 | BL-014 per-source synchronization health | Adds additive D1-backed health for event, official, and meta synchronization sources; preserves last-success/item-count across failed attempts; filters event warnings to the user's relevant sources; and keeps legacy freshness timestamps as a deployment-order fallback until migration 0006 is applied. |
 | #60 | BL-015 independent credential rotation | Rotates the management capability independently from calendar credentials and adds per-planner signed-calendar generations/revocation state while preserving generation-zero signed URLs and legacy random-token calendar compatibility until each credential is explicitly rotated or revoked. |
+| #61 (open) | BL-016 keyboard and modal accessibility | Centralizes focus containment, Escape dispatch, opener focus restoration, background inert/aria-hidden isolation, visible keyboard focus, reduced-motion handling, and real-browser regressions across Planner modals, sheets, drawers, and the command palette. |
 
 ## Supersession map
 
