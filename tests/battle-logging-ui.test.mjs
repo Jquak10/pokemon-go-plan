@@ -13,8 +13,22 @@ function element(id) {
     dataset:{}, classList:{toggle(){},add(){},remove(){}},focus(){}});
   return elements.get(id);
 }
+const openOverlays = new Set();
+const PlannerOverlay = {
+  open({overlay}) {
+    openOverlays.add(overlay);
+    return {overlay};
+  },
+  close(overlay) {
+    return openOverlays.delete(overlay);
+  },
+  isOpen(overlay) {
+    return openOverlays.has(overlay);
+  }
+};
 const context = vm.createContext({
   BattleTargets:globalThis.BattleTargets, targetTypeLabels:{candy:'Candy'},
+  PlannerOverlay,
   document:{getElementById:element,querySelector:element,querySelectorAll:()=>[]},
   localStorage:{setItem(){},getItem(){return 'remote';}}, crypto:{randomUUID(){return 'test-request-id-12345';}},
   setTimeout(){},lockPageForModal(){},unlockPageForModal(){},
