@@ -1780,9 +1780,18 @@ assert.match(
   /style-src 'self' 'unsafe-inline'/
 );
 
-assert.match(
-  worker,
-  /\/manage\\\/[A-Za-z0-9_-]\+\\\/?\$\/[\s\S]*allowInlineScript:\s*false/
+assert.ok(
+  worker.includes(
+    'if (request.method === "GET" && /^\\/manage\\/[A-Za-z0-9_-]+\\/?$/.test(path))'
+  ),
+  "Planner route must remain explicitly identified for strict CSP handling"
+);
+
+assert.ok(
+  worker.includes(
+    "allowInlineScript: false"
+  ),
+  "Planner route must disable inline script execution"
 );
 
 assert.match(
