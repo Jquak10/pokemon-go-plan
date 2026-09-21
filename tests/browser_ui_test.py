@@ -1504,6 +1504,15 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
     def test_mobile_sheets_trap_focus_restore_and_reduce_motion(self):
         page = self.open_planner(390, 844)
 
+        page.locator('.tab-button[data-tab="targets"]').click()
+        page.wait_for_function(
+            """() => document.querySelector('.tab-button[data-tab="targets"]').classList.contains('active')"""
+        )
+        self.assertEqual(
+            page.evaluate("() => sessionStorage.getItem('raid-planner-tab')"),
+            "targets",
+        )
+
         more_button = page.locator("#mobileMoreButton")
         more_button.focus()
         more_button.click()
@@ -1536,7 +1545,23 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             """() => document.activeElement?.id === 'mobileMoreButton'"""
         )
 
-        page.locator('.tab-button[data-tab="targets"]').click()
+        self.assertTrue(
+            page.locator('.tab-button[data-tab="targets"]').evaluate(
+                "element => element.classList.contains('active')"
+            ),
+            "Closing Mobile More must preserve the underlying active tab",
+        )
+        self.assertEqual(
+            page.evaluate("() => sessionStorage.getItem('raid-planner-tab')"),
+            "targets",
+            "Opening Mobile More must not overwrite the saved tab",
+        )
+        self.assertFalse(
+            page.locator('.tab-button[data-tab="plan"]').evaluate(
+                "element => element.classList.contains('active')"
+            ),
+        )
+
         filters = page.locator("#openTargetFilters")
         filters.focus()
         filters.click()

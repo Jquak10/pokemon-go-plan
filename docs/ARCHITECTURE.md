@@ -175,6 +175,7 @@ Mobile invariants:
 - Foreground sheet content may scroll.
 - No horizontal page scrolling.
 - Secondary filters are hidden until explicitly requested.
+- Opening the mobile More sheet does not change the current Planner tab; navigation changes only after the user chooses a More action.
 - Target advanced filters open in a bottom drawer.
 - Add Target and destructive actions must remain inside the viewport.
 
