@@ -233,6 +233,8 @@ The **Hundo CP** tab calculates CP for a 15/15/15 Pokémon without inventing fix
 4. Select **More levels** for wild maximum, weather-boosted wild maximum, Level 40, and Level 50 benchmarks.
 5. Under **CUSTOM LEVEL**, enter Level 1–50 in 0.5 steps.
 
+Half-level custom results use Pokémon GO's canonical half-level CP-multiplier relationship rather than linearly averaging adjacent whole levels.
+
 Search and calculations are form-specific. On raid recommendation cards, the app distinguishes the raid battle form from the catch encounter: Mega, Primal, Gigantamax, and Dynamax prefixes are removed when resolving the base-form catch encounter. Mega or Primal raid-boss stats therefore are not used as the base-form catch CP.
 
 ### Calendar
