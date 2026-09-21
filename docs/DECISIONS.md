@@ -883,6 +883,7 @@ The following sequence is retained as a compact repository implementation/change
 | #63 | BL-018 Planner API and transport failure normalization | Centralizes response parsing and transport failure handling in `planner-client.js`, preserving structured server errors while turning non-JSON, empty, and network failures into stable actionable messages with typed metadata. |
 | #64 | Fresh product audit backlog | Closed without merge; superseded by #65, which carries the verified BL-020 through BL-028 backlog forward while shipping BL-019. |
 | #65 | BL-019 half-level Hundo CP correctness | Replaces arithmetic half-level CPM interpolation with Pokémon GO's root-mean-square relationship, adds canonical low-level regressions, bumps the Hundo helper asset version, and removes BL-019 from Active. |
+| #66 | BL-020 Mobile More tab preservation | Restricts tab activation wiring to real `data-tab` controls so opening the mobile More sheet preserves the current/saved tab, with Chromium coverage from a non-Plan section and a Planner app asset-version bump. |
 
 ## Supersession map
 
