@@ -11043,32 +11043,89 @@ async function calendarFeed(request, env, feedToken) {
   return calendarFeedForUser(request, env, user);
 }
 
-async function recoverableCalendarFeed(request, env, userId, signature) {
+async function recoverableCalendarFeed(
+  request,
+  env,
+  userId,
+  generation,
+  signature
+) {
   if (!env.FEED_LINK_KEY) {
-    return new Response("Calendar not found.", { status: 404 });
+    return new Response(
+      "Calendar not found.",
+      {
+        status: 404
+      }
+    );
   }
 
-  const valid = await verifyRecoverableFeedSignature(
-    env,
-    userId,
-    signature
-  );
+  const credentialState =
+    await feedLinkCredentialState(
+      env,
+      userId
+    );
+
+  const requestedGeneration =
+    Math.max(
+      0,
+      Math.floor(
+        Number(generation) || 0
+      )
+    );
+
+  if (
+    !credentialState.enabled ||
+    credentialState.generation !==
+      requestedGeneration
+  ) {
+    return new Response(
+      "Calendar not found.",
+      {
+        status: 404
+      }
+    );
+  }
+
+  const valid =
+    await verifyRecoverableFeedSignature(
+      env,
+      userId,
+      requestedGeneration,
+      signature
+    );
 
   if (!valid) {
-    return new Response("Calendar not found.", { status: 404 });
+    return new Response(
+      "Calendar not found.",
+      {
+        status: 404
+      }
+    );
   }
 
-  const user = await env.DB.prepare(`
-    SELECT *
-    FROM users
-    WHERE id = ?
-  `).bind(userId).first();
+  const user =
+    await env.DB.prepare(`
+      SELECT *
+      FROM users
+      WHERE id = ?
+    `).bind(
+      userId
+    ).first();
 
   if (!user) {
-    return new Response("Calendar not found.", { status: 404 });
+    return new Response(
+      "Calendar not found.",
+      {
+        status: 404
+      }
+    );
   }
 
-  return calendarFeedForUser(request, env, user);
+  return calendarFeedForUser(
+    request,
+    env,
+    user
+  );
 }
 
 
@@ -11350,6 +11407,36 @@ async function handleFetch(request, env) {
       );
     }
 
+    if (
+      request.method === "POST" &&
+      path === "/api/feed-link/rotate"
+    ) {
+      return rotateSignedFeedApi(
+        request,
+        env
+      );
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/feed-link/revoke"
+    ) {
+      return revokeSignedFeedApi(
+        request,
+        env
+      );
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/manage-link/rotate"
+    ) {
+      return rotateManagementLinkApi(
+        request,
+        env
+      );
+    }
+
     if (request.method === "POST" && path === "/api/settings") {
       return updateSettings(request, env);
     }
@@ -11453,15 +11540,43 @@ async function handleFetch(request, env) {
       return adminSyncLegacy(request, env);
     }
 
-    const recoverableCalendarMatch =
-      path.match(/^\/calendar\/recover\/([0-9a-fA-F-]{36})\.([A-Za-z0-9_-]+)\.ics$/);
+    const versionedRecoverableCalendarMatch =
+      path.match(
+        /^\/calendar\/recover\/([0-9a-fA-F-]{36})\.(\d+)\.([A-Za-z0-9_-]+)\.ics$/
+      );
 
-    if (request.method === "GET" && recoverableCalendarMatch) {
+    if (
+      request.method === "GET" &&
+      versionedRecoverableCalendarMatch
+    ) {
+      return hardenResponse(
+        await recoverableCalendarFeed(
+          request,
+          env,
+          versionedRecoverableCalendarMatch[1],
+          Number(
+            versionedRecoverableCalendarMatch[2]
+          ),
+          versionedRecoverableCalendarMatch[3]
+        )
+      );
+    }
+
+    const recoverableCalendarMatch =
+      path.match(
+        /^\/calendar\/recover\/([0-9a-fA-F-]{36})\.([A-Za-z0-9_-]+)\.ics$/
+      );
+
+    if (
+      request.method === "GET" &&
+      recoverableCalendarMatch
+    ) {
       return hardenResponse(
         await recoverableCalendarFeed(
           request,
           env,
           recoverableCalendarMatch[1],
+          0,
           recoverableCalendarMatch[2]
         )
       );
