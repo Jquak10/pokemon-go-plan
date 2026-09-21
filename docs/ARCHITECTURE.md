@@ -840,6 +840,8 @@ This mechanism is for identity resolution, not permission to invent event availa
 
 The Hundo CP calculator and battle cards use the Pokémon GO CP formula with 15/15/15 IVs.
 
+Whole-level CP multipliers use the canonical stored values. Supported half levels derive their CPM as `sqrt((lowerCPM² + upperCPM²) / 2)`, matching Pokémon GO's half-level multiplier relationship; arithmetic interpolation is not valid.
+
 Common levels:
 
 - Level 15 — Research.
