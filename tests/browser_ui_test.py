@@ -1223,6 +1223,228 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
 
         self.assert_no_horizontal_overflow(page)
 
+    def test_target_modal_traps_keyboard_and_restores_focus(self):
+        page = self.open_planner(1280, 900)
+        page.locator('.tab-button[data-tab="targets"]').click()
+
+        opener = page.locator("#openAddTarget")
+        opener.focus()
+        opener.click()
+
+        modal = page.locator("#targetModal")
+        modal.wait_for(state="visible")
+
+        page.wait_for_function(
+            """() => document.activeElement?.id === 'pokemonName'"""
+        )
+
+        self.assertTrue(
+            page.evaluate(
+                "() => document.querySelector('main').inert"
+            )
+        )
+        self.assertFalse(
+            page.evaluate(
+                "() => document.getElementById('targetModal').inert"
+            )
+        )
+
+        page.locator("#saveTarget").focus()
+        page.keyboard.press("Tab")
+        self.assertEqual(
+            page.evaluate("() => document.activeElement?.id"),
+            "closeTargetModal",
+            "Tab from the last control must wrap to the first modal control",
+        )
+
+        focus_outline = page.evaluate(
+            """() => {
+                const style = getComputedStyle(document.activeElement);
+                return {
+                    style: style.outlineStyle,
+                    width: style.outlineWidth,
+                };
+            }"""
+        )
+        self.assertEqual(focus_outline["style"], "solid")
+        self.assertNotEqual(focus_outline["width"], "0px")
+
+        page.keyboard.press("Shift+Tab")
+        self.assertEqual(
+            page.evaluate("() => document.activeElement?.id"),
+            "saveTarget",
+            "Shift+Tab from the first control must wrap to the last modal control",
+        )
+
+        page.keyboard.press("Control+K")
+        self.assertTrue(
+            page.locator("#commandPaletteBackdrop").evaluate(
+                "element => element.classList.contains('hidden')"
+            ),
+            "The command palette must not open over another active modal",
+        )
+
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            """() => document.getElementById('targetModal').classList.contains('hidden')"""
+        )
+        page.wait_for_function(
+            """() => document.activeElement?.id === 'openAddTarget'"""
+        )
+
+        self.assertFalse(
+            page.evaluate(
+                "() => document.querySelector('main').inert"
+            )
+        )
+        self.assertTrue(
+            page.evaluate(
+                "() => document.getElementById('targetModal').inert"
+            )
+        )
+        self.assert_no_horizontal_overflow(page)
+
+    def test_command_palette_isolates_background_and_restores_trigger(self):
+        page = self.open_planner(1280, 900)
+
+        trigger = page.locator("#desktopCommandButton")
+        trigger.focus()
+        trigger.click()
+
+        palette = page.locator("#commandPaletteBackdrop")
+        palette.wait_for(state="visible")
+
+        page.wait_for_function(
+            """() => document.activeElement?.id === 'commandPaletteInput'"""
+        )
+
+        self.assertTrue(
+            page.evaluate(
+                "() => document.querySelector('main').inert"
+            )
+        )
+        self.assertEqual(
+            page.evaluate("() => document.body.style.position"),
+            "fixed",
+        )
+
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            """() => document.getElementById('commandPaletteBackdrop').classList.contains('hidden')"""
+        )
+        page.wait_for_function(
+            """() => document.activeElement?.id === 'desktopCommandButton'"""
+        )
+
+        self.assertFalse(
+            page.evaluate(
+                "() => document.querySelector('main').inert"
+            )
+        )
+        self.assertEqual(
+            page.evaluate("() => document.body.style.position"),
+            "",
+        )
+        self.assert_no_horizontal_overflow(page)
+
+    def test_mobile_sheets_trap_focus_restore_and_reduce_motion(self):
+        page = self.open_planner(390, 844)
+
+        more_button = page.locator("#mobileMoreButton")
+        more_button.focus()
+        more_button.click()
+
+        more = page.locator("#mobileMoreBackdrop")
+        more.wait_for(state="visible")
+
+        page.wait_for_function(
+            """() => document.activeElement?.id === 'closeMobileMore'"""
+        )
+        self.assertTrue(
+            page.evaluate(
+                "() => document.querySelector('main').inert"
+            )
+        )
+
+        page.locator("#mobileMoreSheet a.mobile-more-action").focus()
+        page.keyboard.press("Tab")
+        self.assertEqual(
+            page.evaluate("() => document.activeElement?.id"),
+            "closeMobileMore",
+            "Mobile More must wrap focus back to its first control",
+        )
+
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            """() => document.getElementById('mobileMoreBackdrop').classList.contains('hidden')"""
+        )
+        page.wait_for_function(
+            """() => document.activeElement?.id === 'mobileMoreButton'"""
+        )
+
+        page.locator('.tab-button[data-tab="targets"]').click()
+        filters = page.locator("#openTargetFilters")
+        filters.focus()
+        filters.click()
+
+        drawer = page.locator("#targetFilterDrawer")
+        page.wait_for_function(
+            """() => document.getElementById('targetFilterDrawer').classList.contains('open')"""
+        )
+        page.wait_for_function(
+            """() => document.activeElement?.id === 'closeTargetFilters'"""
+        )
+
+        self.assertEqual(
+            drawer.get_attribute("role"),
+            "dialog",
+        )
+        self.assertEqual(
+            drawer.get_attribute("aria-modal"),
+            "true",
+        )
+        self.assertTrue(
+            page.evaluate(
+                "() => document.querySelector('main').inert"
+            )
+        )
+
+        transition_ms = page.evaluate(
+            """() => {
+                const value = getComputedStyle(
+                    document.getElementById('targetFilterDrawer')
+                ).transitionDuration.split(',')[0].trim();
+                if (value.endsWith('ms')) return parseFloat(value);
+                if (value.endsWith('s')) return parseFloat(value) * 1000;
+                return 0;
+            }"""
+        )
+        self.assertLessEqual(
+            transition_ms,
+            0.02,
+            "Reduced-motion mode should collapse drawer animation duration",
+        )
+
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            """() => !document.getElementById('targetFilterDrawer').classList.contains('open')"""
+        )
+        page.wait_for_function(
+            """() => document.activeElement?.id === 'openTargetFilters'"""
+        )
+
+        self.assertTrue(
+            page.evaluate(
+                "() => document.getElementById('targetFilterDrawer').inert"
+            )
+        )
+        self.assertFalse(
+            page.evaluate(
+                "() => document.querySelector('main').inert"
+            )
+        )
+        self.assert_no_horizontal_overflow(page)
+
     def test_mobile_logger_stays_in_view_and_freezes_background(self):
         page = self.open_planner(390, 667)
         self.assert_no_horizontal_overflow(page)
@@ -1233,6 +1455,14 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
 
         body_position = page.evaluate("() => getComputedStyle(document.body).position")
         self.assertEqual(body_position, "fixed")
+        self.assertTrue(
+            page.evaluate(
+                "() => document.querySelector('main').inert"
+            )
+        )
+        page.wait_for_function(
+            """() => document.activeElement?.id === 'raidLogCount'"""
+        )
 
         confirm = page.locator("#confirmRaidLog")
         box = confirm.bounding_box()
@@ -1241,6 +1471,16 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertLessEqual(box["y"] + box["height"], 668)
 
         self.assert_no_horizontal_overflow(page)
+
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            """() => document.getElementById('raidLogModal').classList.contains('hidden')"""
+        )
+        self.assertFalse(
+            page.evaluate(
+                "() => document.querySelector('main').inert"
+            )
+        )
 
 
 if __name__ == "__main__":
