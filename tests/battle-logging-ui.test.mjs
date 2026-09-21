@@ -5,7 +5,7 @@ import '../public/battle-targets.js';
 import { inferMaxParticleCost } from '../src/resource-planning.js';
 
 const manage = readFileSync(new URL('../public/manage.html',import.meta.url),'utf8');
-const script = [...manage.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
+const script = readFileSync(new URL('../public/planner-app.js',import.meta.url),'utf8');
 new vm.Script(script);
 const elements = new Map();
 function element(id) {
