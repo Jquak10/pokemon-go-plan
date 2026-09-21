@@ -881,6 +881,7 @@ The following sequence is retained as a compact repository implementation/change
 | #61 | BL-016 keyboard and modal accessibility | Centralizes focus containment, Escape dispatch, opener focus restoration, background inert/aria-hidden isolation, visible keyboard focus, reduced-motion handling, and real-browser regressions across Planner modals, sheets, drawers, and the command palette. |
 | #62 | BL-017 Planner script CSP hardening | Externalizes the remaining Planner integration script, removes generated inline event handlers, and applies `script-src 'self'` without `'unsafe-inline'` to the private management route while preserving compatibility policy on other HTML surfaces. |
 | #63 | BL-018 Planner API and transport failure normalization | Centralizes response parsing and transport failure handling in `planner-client.js`, preserving structured server errors while turning non-JSON, empty, and network failures into stable actionable messages with typed metadata. |
+| #64 | Fresh product audit backlog | Records the post-BL-018 audit findings as BL-019 through BL-028, covering verified Hundo half-level correctness, Mobile More tab preservation, security/resilience/accessibility hardening, and production release guardrails without changing current application behavior. |
 
 ## Supersession map
 
