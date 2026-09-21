@@ -99,7 +99,7 @@ assert.match(manage, /<script src="\/planner-overlay\.js\?v=1"><\/script>/);
 assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=2">/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
-assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=1"><\/script>/);
+assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-intel\.js\?v=1"><\/script>/);
 assert.match(manage, /PlannerBattleIntel/);
@@ -1172,6 +1172,28 @@ assert.equal(
   ),
   null,
   "Custom Hundo levels only support 0.5-level steps"
+);
+
+const levelOnePointFiveCpm =
+  hundoLogic.cpMultiplierForLevel(
+    1.5
+  );
+
+assert.ok(
+  Math.abs(
+    levelOnePointFiveCpm -
+      0.13513743215803847
+  ) < 1e-12,
+  "Lv1.5 CPM must use the Pokémon GO half-level root-mean-square formula"
+);
+
+assert.equal(
+  hundoLogic.hundoCp(
+    mewtwoStats,
+    1.5
+  ),
+  122,
+  "Mewtwo Lv1.5 Hundo CP must use the canonical half-level CPM"
 );
 
 assert.equal(

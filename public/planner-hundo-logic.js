@@ -143,10 +143,16 @@
       return null;
     }
 
-    return (
-      lowerCpm +
-      upperCpm
-    ) / 2;
+    // Pokémon GO half-level CPMs are the root-mean-square of the
+    // adjacent whole-level CPMs, not their arithmetic mean.
+    return Math.sqrt(
+      (
+        lowerCpm *
+          lowerCpm +
+        upperCpm *
+          upperCpm
+      ) / 2
+    );
   }
 
   function hundoCp(
