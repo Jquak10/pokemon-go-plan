@@ -13,7 +13,6 @@
 
   const entries = [];
   let isolatedElements = [];
-  let pendingRestoreFocus = null;
 
   function resolveElement(value) {
     if (!value) {
@@ -278,7 +277,6 @@
         resolveElement(
           restoreFocus
         ) ||
-        pendingRestoreFocus ||
         (
           active instanceof
             HTMLElement
@@ -295,8 +293,6 @@
           "aria-hidden"
         )
     };
-
-    pendingRestoreFocus = null;
 
     entries.push(entry);
     element.inert = false;
@@ -397,19 +393,12 @@
     }
 
     if (
-      !restoreFocus
-    ) {
-      pendingRestoreFocus =
-        entry.restoreFocus ||
-        null;
-      return true;
-    }
-
-    pendingRestoreFocus = null;
-
-    if (
+      restoreFocus &&
       entry.restoreFocus &&
       entry.restoreFocus.isConnected &&
+      isVisible(
+        entry.restoreFocus
+      ) &&
       !entry.restoreFocus
         .hasAttribute(
           "disabled"
