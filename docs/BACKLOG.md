@@ -27,7 +27,121 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-No confirmed active backlog items remain from the 21 September 2026 product audit.
+### BL-020 — Preserve the active tab when Mobile More opens
+
+**Priority:** High · mobile UX defect
+
+The mobile **More** button has the shared `.tab-button` class but no `data-tab`. The generic tab click handler therefore calls `activateTab(undefined)`, which falls back to Plan and updates the saved tab before the More sheet opens. Opening and dismissing More from Targets, Hundo CP, or Calendar can silently move the user back to Plan.
+
+Done when:
+
+- More opens without changing the underlying active tab or saved tab;
+- choosing a real More action still navigates normally;
+- Chromium regression coverage opens More from a non-Plan tab, closes it, and confirms the original tab remains active.
+
+### BL-021 — Do not expose internal exception details in 500 responses
+
+**Priority:** High · security / failure handling
+
+The Worker-wide `handleFetch()` catch logs an unexpected exception but also returns `String(error.message || error)` to the client as `detail`. Internal D1, upstream, or implementation error text should remain in server observability rather than being exposed by a generic public 500 response.
+
+Done when:
+
+- unexpected exceptions remain fully logged server-side;
+- clients receive a stable generic error without raw internal exception text;
+- deterministic coverage verifies the public 500 contract.
+
+### BL-022 — Add abuse protection to public planner creation
+
+**Priority:** High · operational security
+
+`POST /api/create` is intentionally public and currently inserts a new planner for every valid request. The repository contains no application-level rate limit, challenge, quota, or other creation-abuse control. Before implementation, confirm whether Cloudflare already supplies an external compensating rule; do not duplicate a working control blindly.
+
+Done when:
+
+- the effective production path has a documented bounded-abuse control for planner creation;
+- ordinary first-time creation remains low-friction;
+- the design avoids retaining unnecessary personal/IP data;
+- abuse responses are explicit and testable.
+
+### BL-023 — Enforce strict script CSP on remaining credential-bearing pages
+
+**Priority:** Medium · security hardening
+
+The private Planner already runs with `script-src 'self'`, but the landing page and Admin page still contain inline application scripts and therefore use the default `'unsafe-inline'` script policy. The landing page displays newly issued bearer URLs and Admin handles the admin credential, so they should receive the same executable-script boundary where practical.
+
+Done when:
+
+- landing/Admin application JavaScript is external same-origin code;
+- those HTML surfaces no longer require `script-src 'unsafe-inline'`;
+- current no-store/referrer/frame protections remain intact;
+- regression coverage prevents accidental inline-script reintroduction.
+
+### BL-024 — Normalize landing/Admin API and transport failures
+
+**Priority:** Medium · resilience
+
+BL-018 centralized robust failure parsing for the private Planner, but the landing page and Admin page still call `response.json()` directly. Empty, HTML, malformed, or network failures can therefore surface parser/browser-specific errors rather than actionable UI messages.
+
+Done when:
+
+- create-planner and Admin requests handle structured JSON, non-JSON, empty, and network failures consistently;
+- useful server-provided errors are preserved;
+- raw HTML/parser/transport strings are not presented as the primary user message;
+- deterministic or browser coverage exercises the failure modes.
+
+### BL-025 — Surface single-target deletion failures
+
+**Priority:** Medium · UX resilience
+
+`removeTarget()` is the only normal Planner mutation found in the current audit that awaits `api()` without local failure handling. If deletion fails, the delegated click path can produce an unhandled rejected promise with no visible recovery message, even though the shared client now normalizes the error.
+
+Done when:
+
+- single-target delete shows an actionable failure state without losing the current Targets context;
+- success behavior remains unchanged;
+- regression coverage verifies a failed delete does not disappear silently.
+
+### BL-026 — Complete keyboard semantics for Planner tabs
+
+**Priority:** Medium · accessibility
+
+The Planner navigation advertises `role="tablist"` / `role="tab"`, but it currently relies on ordinary button Tab/Enter behavior and does not implement the standard roving-tabindex and Arrow/Home/End interactions expected for an ARIA tab set. The mobile More control also lives inside the tablist even though it opens a sheet rather than a tab.
+
+Done when:
+
+- desktop tab semantics and keyboard behavior follow the ARIA tabs interaction model;
+- only the active/roving tab participates in the intended tab stop pattern;
+- ArrowLeft/ArrowRight and Home/End work predictably;
+- More retains correct non-tab semantics on mobile;
+- browser regressions cover keyboard navigation and focus.
+
+### BL-027 — Enforce the production-main PR/check policy in GitHub
+
+**Priority:** Medium · release safety
+
+`main` is the production branch and repository policy requires feature branches, PR review flow, and passing deterministic/browser checks, but GitHub currently reports `main` as unprotected. The release policy is therefore convention rather than an enforced repository guardrail.
+
+Done when:
+
+- a GitHub branch protection/ruleset requires PR-based changes to `main`;
+- deterministic and browser UI checks are required;
+- the external live-contract job is not made a blocking PR gate because upstream availability is outside the branch's control;
+- force-push/deletion protection is enabled where supported;
+- the rule is documented in the developer workflow.
+
+### BL-028 — Validate dependency install and Worker packaging in CI
+
+**Priority:** Medium · release safety
+
+The deterministic CI job currently runs JavaScript syntax checks and the test suite without first installing repository dependencies, and it does not perform a Wrangler packaging/configuration validation. The tests can therefore pass even if the lockfile/dependency install or Worker bundle/configuration has become undeployable.
+
+Done when:
+
+- CI installs dependencies reproducibly from the lockfile;
+- CI performs a non-deploying Wrangler build/package/config validation appropriate to the current Worker setup;
+- protected bindings/routes/Cron/deployment configuration remain unchanged unless intentionally modified;
+- the validation is deterministic and suitable as a PR gate.
 
 ## Deferred
 
@@ -59,6 +173,8 @@ A follow-up repository audit on 18 September 2026 identified the improvement wor
 
 BL-011 was completed through the incremental Planner/Worker modularization series ending with the iCalendar parsing extraction. The resulting boundaries cover Planner client/auth, Targets, Calendar, Hundo, Battle Plan/resources, Battle Intel, Planner-only CSS, Worker HTTP security, and pure iCalendar parsing. Remaining large integration files are intentionally orchestration surfaces rather than backlog items based on size alone.
 
-A fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, BL-014 in PR #59, BL-015 in PR #60, BL-016 in PR #61, and BL-017 in PR #62. BL-018 (Planner API and transport failure normalization) is implemented by the current change and is therefore removed from Active. No confirmed active items from that audit remain.
+The first fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, BL-014 in PR #59, BL-015 in PR #60, BL-016 in PR #61, BL-017 in PR #62, and BL-018 in PR #63.
+
+A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 is implemented by the current change and is therefore removed from Active; BL-020 through BL-028 remain above. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
