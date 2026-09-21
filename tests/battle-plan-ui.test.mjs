@@ -102,7 +102,9 @@ assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-intel\.js\?v=1"><\/script>/);
+assert.match(manage, /<script src="\/planner-app\.js\?v=2"><\/script>/);
 assert.match(manage, /PlannerBattleIntel/);
+assert.match(plannerApp, /querySelectorAll\("\\.tab-button\\[data-tab\\]"\)/);
 assert.doesNotMatch(manage, /const TYPE_RELATIONS =/);
 assert.doesNotMatch(manage, /function defendingTypeMultipliers\(/);
 assert.match(manage, /PlannerBattlePlanLogic\.create/);
