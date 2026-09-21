@@ -27,9 +27,7 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-018 — Normalize Planner API and transport failures
-
-Make the Planner API client handle structured JSON errors, non-JSON 5xx responses, empty responses, and network failures with actionable user messages instead of assuming every response is valid JSON.
+No confirmed active backlog items remain from the 21 September 2026 product audit.
 
 ## Deferred
 
@@ -61,6 +59,6 @@ A follow-up repository audit on 18 September 2026 identified the improvement wor
 
 BL-011 was completed through the incremental Planner/Worker modularization series ending with the iCalendar parsing extraction. The resulting boundaries cover Planner client/auth, Targets, Calendar, Hundo, Battle Plan/resources, Battle Intel, Planner-only CSS, Worker HTTP security, and pure iCalendar parsing. Remaining large integration files are intentionally orchestration surfaces rather than backlog items based on size alone.
 
-A fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, BL-014 in PR #59, BL-015 in PR #60, and BL-016 in PR #61. BL-017 (Planner script CSP hardening) is implemented by the current change and is therefore removed from Active; BL-018 remains recorded above for future prioritization.
+A fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, BL-014 in PR #59, BL-015 in PR #60, BL-016 in PR #61, and BL-017 in PR #62. BL-018 (Planner API and transport failure normalization) is implemented by the current change and is therefore removed from Active. No confirmed active items from that audit remain.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
