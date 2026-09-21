@@ -460,6 +460,23 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
             self.server.last_manage_authorization = self.headers.get("authorization")
             return self._json(MOCK_STATE)
 
+        if path == "/api/feed-link":
+            host = self.headers.get("host")
+            return self._json(
+                {
+                    "calendar_url": (
+                        f"http://{host}/calendar/recover/"
+                        "11111111-2222-4333-8444-555555555555.initialSignature.ics"
+                    ),
+                    "read_only": True,
+                    "preferred": True,
+                    "format": "signed",
+                    "revoked": False,
+                    "generation": 0,
+                    "rotation_available": True,
+                }
+            )
+
         if path == "/api/pokemon-catalog":
             # Keep this asynchronous enough that the first render exercises the
             # loading placeholder before the catalog-driven rerender.
@@ -502,7 +519,55 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
                 )
                 + 1
             )
+            self.server.last_settings_authorization = self.headers.get(
+                "authorization"
+            )
             return self._json({"ok": True})
+
+        if path == "/api/manage-link/rotate":
+            self.server.last_manage_rotation_authorization = self.headers.get(
+                "authorization"
+            )
+            host = self.headers.get("host")
+            return self._json(
+                {
+                    "ok": True,
+                    "management_url": f"http://{host}/manage/rotated-browser-token",
+                    "manage_token": "rotated-browser-token",
+                }
+            )
+
+        if path == "/api/feed-link/rotate":
+            self.server.last_feed_rotation_authorization = self.headers.get(
+                "authorization"
+            )
+            host = self.headers.get("host")
+            return self._json(
+                {
+                    "ok": True,
+                    "calendar_url": (
+                        f"http://{host}/calendar/recover/"
+                        "11111111-2222-4333-8444-555555555555.1.rotatedSignature.ics"
+                    ),
+                    "read_only": True,
+                    "preferred": True,
+                    "format": "signed",
+                    "revoked": False,
+                    "generation": 1,
+                }
+            )
+
+        if path == "/api/feed-link/revoke":
+            self.server.last_feed_revoke_authorization = self.headers.get(
+                "authorization"
+            )
+            return self._json(
+                {
+                    "ok": True,
+                    "signed_feed_revoked": True,
+                    "generation": 2,
+                }
+            )
 
         self.send_error(404)
 
@@ -546,6 +611,10 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.server.catalog_failures_remaining = 0
         self.server.last_manage_api_path = None
         self.server.last_manage_authorization = None
+        self.server.last_settings_authorization = None
+        self.server.last_manage_rotation_authorization = None
+        self.server.last_feed_rotation_authorization = None
+        self.server.last_feed_revoke_authorization = None
 
     def open_planner(self, width: int, height: int):
         context = self.browser.new_context(
@@ -588,6 +657,101 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             "/api/me",
         )
 
+        self.assert_no_horizontal_overflow(page)
+
+    def test_management_rotation_replaces_live_browser_capability(self):
+        page = self.open_planner(1024, 800)
+        page.locator('.tab-button[data-tab="preferences"]').click()
+
+        management_link = page.locator("#managementLinkValue")
+        self.assertIn(
+            "/manage/browser-test-token",
+            management_link.input_value(),
+        )
+
+        page.once(
+            "dialog",
+            lambda dialog: dialog.accept(),
+        )
+        page.locator("#rotateManagementLink").click()
+
+        page.wait_for_url("**/manage/rotated-browser-token")
+        self.assertEqual(
+            self.server.last_manage_rotation_authorization,
+            "Bearer browser-test-token",
+        )
+        self.assertIn(
+            "/manage/rotated-browser-token",
+            management_link.input_value(),
+        )
+        self.assertIn(
+            "Previous link revoked",
+            page.locator("#managementLinkStatus").inner_text(),
+        )
+
+        page.locator("#saveSettings").click()
+        page.wait_for_timeout(100)
+
+        self.assertEqual(
+            self.server.last_settings_authorization,
+            "Bearer rotated-browser-token",
+            "Subsequent API calls must switch to the new management credential without reloading the page",
+        )
+        self.assert_no_horizontal_overflow(page)
+
+    def test_signed_calendar_link_can_rotate_and_revoke_independently(self):
+        page = self.open_planner(1024, 800)
+        page.locator('.tab-button[data-tab="calendar"]').click()
+
+        feed = page.locator("#icsFeedLink")
+        page.wait_for_function(
+            """() => document.getElementById('icsFeedLink').value.includes('initialSignature')"""
+        )
+        self.assertFalse(
+            page.locator("#rotateSignedFeed").is_disabled()
+        )
+        self.assertFalse(
+            page.locator("#revokeSignedFeed").is_disabled()
+        )
+
+        page.once(
+            "dialog",
+            lambda dialog: dialog.accept(),
+        )
+        page.locator("#rotateSignedFeed").click()
+        page.wait_for_function(
+            """() => document.getElementById('icsFeedLink').value.includes('.1.rotatedSignature.ics')"""
+        )
+        self.assertEqual(
+            self.server.last_feed_rotation_authorization,
+            "Bearer browser-test-token",
+        )
+        self.assertIn(
+            "Previous signed URL revoked",
+            page.locator("#signedFeedStatus").inner_text(),
+        )
+
+        page.once(
+            "dialog",
+            lambda dialog: dialog.accept(),
+        )
+        page.locator("#revokeSignedFeed").click()
+        page.wait_for_function(
+            """() => document.getElementById('icsFeedLink').value === 'Preferred signed URL revoked'"""
+        )
+        self.assertEqual(
+            self.server.last_feed_revoke_authorization,
+            "Bearer browser-test-token",
+        )
+        self.assertTrue(
+            page.locator("#copyFeedLink").is_disabled()
+        )
+        self.assertFalse(
+            page.locator("#rotateSignedFeed").is_disabled()
+        )
+        self.assertTrue(
+            page.locator("#revokeSignedFeed").is_disabled()
+        )
         self.assert_no_horizontal_overflow(page)
 
     def test_degraded_sync_source_is_visible_in_freshness_strip(self):
