@@ -396,9 +396,6 @@
       restoreFocus &&
       entry.restoreFocus &&
       entry.restoreFocus.isConnected &&
-      isVisible(
-        entry.restoreFocus
-      ) &&
       !entry.restoreFocus
         .hasAttribute(
           "disabled"
