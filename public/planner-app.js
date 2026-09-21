@@ -7003,7 +7003,7 @@ async function removeTarget(id) {
   await load();
 }
 
-document.querySelectorAll(".tab-button").forEach(button => {
+document.querySelectorAll(".tab-button[data-tab]").forEach(button => {
   button.addEventListener("click", () => activateTab(button.dataset.tab));
 });
 
