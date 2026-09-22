@@ -71,28 +71,20 @@ async function requestJson(path, options = {}) {
     } catch {}
   }
 
-  const response =
-    await fetch(
-      `${url.pathname}${url.search}${url.hash}`,
-      {
-        ...options,
-        headers,
-        body,
-        referrerPolicy:
-          "no-referrer"
-      }
-    );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data.error ||
-      "Request failed"
-    );
-  }
-
-  return data;
+  return JsonApiClient.fetchJson(
+    `${url.pathname}${url.search}${url.hash}`,
+    {
+      ...options,
+      headers,
+      body,
+      referrerPolicy:
+        "no-referrer"
+    },
+    {
+      serviceName:
+        "Admin service"
+    }
+  );
 }
 
 function setStage(name, state, message) {

@@ -69,25 +69,24 @@ createButton.addEventListener("click", async () => {
   status.className = "save-status";
 
   try {
-    const response = await fetch("/api/create", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({
-        timezone:
-          timezoneResult.timezone
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.error ||
-        "Could not create planner."
+    const data =
+      await JsonApiClient.fetchJson(
+        "/api/create",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            timezone:
+              timezoneResult.timezone
+          })
+        },
+        {
+          serviceName:
+            "Planner creation service"
+        }
       );
-    }
 
     manageUrl = data.management_url;
     calendarUrl = data.calendar_url;
