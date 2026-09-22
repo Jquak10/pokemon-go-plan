@@ -472,6 +472,28 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
+        if path in ("/", "/index.html"):
+            return self._file(
+                PUBLIC / "index.html",
+                "text/html; charset=utf-8",
+                headers={
+                    "content-security-policy": PLANNER_CSP,
+                },
+            )
+
+        if path == "/admin":
+            return self._file(
+                PUBLIC / "admin.html",
+                "text/html; charset=utf-8",
+                headers={
+                    "content-security-policy": PLANNER_CSP,
+                },
+            )
+
+        if path == "/api/admin/meta":
+            self.server.last_admin_key = self.headers.get("x-admin-key")
+            return self._json({"metas": []})
+
         if path == "/api/me":
             self.server.last_manage_api_path = self.path
             self.server.last_manage_authorization = self.headers.get("authorization")
@@ -553,6 +575,19 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
+        if path == "/api/create":
+            host = self.headers.get("host")
+            return self._json(
+                {
+                    "ok": True,
+                    "management_url": f"http://{host}/manage/browser-created-token",
+                    "calendar_url": f"http://{host}/calendar/browser-created-feed.ics",
+                    "subscription_format": "legacy",
+                    "manage_token": "browser-created-token",
+                    "note": "Fixture planner created.",
+                }
+            )
 
         if path == "/api/settings":
             self.server.settings_post_count = (
@@ -669,6 +704,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.server.last_manage_rotation_authorization = None
         self.server.last_feed_rotation_authorization = None
         self.server.last_feed_revoke_authorization = None
+        self.server.last_admin_key = None
 
     def open_planner(self, width: int, height: int):
         context = self.browser.new_context(
@@ -776,6 +812,77 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             "Could not reach the Planner service. Check your internet connection and try again.",
         )
         self.assertNotIn("Failed to fetch", message)
+
+    def test_landing_runs_under_strict_script_csp(self):
+        context = self.browser.new_context(
+            viewport={"width": 1024, "height": 800},
+            locale="en-US",
+            timezone_id="Asia/Singapore",
+            reduced_motion="reduce",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+
+        response = page.goto(
+            f"{self.base_url}/",
+            wait_until="domcontentloaded",
+        )
+        self.assertIsNotNone(response)
+        csp = response.headers.get("content-security-policy", "")
+
+        self.assertIn("script-src 'self'", csp)
+        self.assertNotIn(
+            "script-src 'self' 'unsafe-inline'",
+            csp,
+        )
+
+        page.locator("#create").click()
+        page.wait_for_selector("#result:not(.hidden)")
+
+        self.assertEqual(
+            page.locator("#status").inner_text(),
+            "Created successfully ✓",
+        )
+        self.assertIn(
+            "/manage/browser-created-token",
+            page.locator("#manageUrl").inner_text(),
+        )
+        self.assert_no_horizontal_overflow(page)
+
+    def test_admin_runs_under_strict_script_csp(self):
+        context = self.browser.new_context(
+            viewport={"width": 1024, "height": 800},
+            locale="en-US",
+            timezone_id="Asia/Singapore",
+            reduced_motion="reduce",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+
+        response = page.goto(
+            f"{self.base_url}/admin",
+            wait_until="domcontentloaded",
+        )
+        self.assertIsNotNone(response)
+        csp = response.headers.get("content-security-policy", "")
+
+        self.assertIn("script-src 'self'", csp)
+        self.assertNotIn(
+            "script-src 'self' 'unsafe-inline'",
+            csp,
+        )
+
+        page.locator("#key").fill("browser-admin-key")
+        page.locator("#loadMeta").click()
+        page.wait_for_function(
+            """() => document.getElementById('entries')?.textContent.includes('No automatic assessments yet')"""
+        )
+
+        self.assertEqual(
+            self.server.last_admin_key,
+            "browser-admin-key",
+        )
+        self.assert_no_horizontal_overflow(page)
 
     def test_planner_runs_under_strict_script_csp(self):
         page = self.open_planner(1024, 800)
