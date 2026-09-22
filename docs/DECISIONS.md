@@ -886,6 +886,7 @@ The following sequence is retained as a compact repository implementation/change
 | #66 | BL-020 stacked implementation | Closed without merge after #65 was squash-merged; retargeting exposed pre-squash history conflicts, so the validated BL-020 diff was replayed cleanly in #67. |
 | #67 | BL-020 Mobile More tab preservation | Restricts tab activation wiring to real `data-tab` controls so opening the mobile More sheet preserves the current/saved tab, with Chromium coverage from a non-Plan section and a Planner app asset-version bump. |
 | #68 | BL-021 generic 500 error disclosure | Keeps unexpected Worker exceptions in server-side logging while reducing the public generic 500 JSON contract to a stable error message with no raw internal detail, backed by a behavioral regression against the real Worker fetch boundary. |
+| #69 | BL-022 planner creation abuse protection | Adds repository-owned Cloudflare Workers Rate Limiting bindings before public planner creation, combining a hashed per-client threshold with a route-wide per-location ceiling, explicit 429/Retry-After responses, fail-closed limiter errors, and deterministic config/Worker regressions without storing raw IPs in D1 or logs. |
 
 ## Supersession map
 
