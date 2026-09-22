@@ -27,18 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-025 — Surface single-target deletion failures
-
-**Priority:** Medium · UX resilience
-
-`removeTarget()` is the only normal Planner mutation found in the current audit that awaits `api()` without local failure handling. If deletion fails, the delegated click path can produce an unhandled rejected promise with no visible recovery message, even though the shared client now normalizes the error.
-
-Done when:
-
-- single-target delete shows an actionable failure state without losing the current Targets context;
-- success behavior remains unchanged;
-- regression coverage verifies a failed delete does not disappear silently.
-
 ### BL-026 — Complete keyboard semantics for Planner tabs
 
 **Priority:** Medium · accessibility
@@ -112,6 +100,6 @@ BL-011 was completed through the incremental Planner/Worker modularization serie
 
 The first fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, BL-014 in PR #59, BL-015 in PR #60, BL-016 in PR #61, BL-017 in PR #62, and BL-018 in PR #63.
 
-A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65, BL-020 in PR #67, BL-021 in PR #68, BL-022 in PR #69, and BL-023 in PR #70. BL-024 is implemented by the current change and removed from Active; BL-025 through BL-028 remain above. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
+A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65, BL-020 in PR #67, BL-021 in PR #68, BL-022 in PR #69, and BL-023 in PR #70. BL-024 is implemented by the parent change and removed from Active. BL-025 is implemented by the current change and removed from Active; BL-026 through BL-028 remain above. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

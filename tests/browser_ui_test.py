@@ -7,7 +7,7 @@ import time
 import unittest
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from playwright.sync_api import sync_playwright
 
@@ -518,7 +518,20 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
                     content_type="text/plain; charset=utf-8",
                 )
 
-            return self._json(MOCK_STATE)
+            deleted_target_ids = getattr(
+                self.server,
+                "deleted_target_ids",
+                set(),
+            )
+            state = {
+                **MOCK_STATE,
+                "targets": [
+                    target
+                    for target in MOCK_STATE["targets"]
+                    if target["id"] not in deleted_target_ids
+                ],
+            }
+            return self._json(state)
 
         if path == "/api/feed-link":
             host = self.headers.get("host")
@@ -650,6 +663,45 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
 
         self.send_error(404)
 
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        if path == "/api/targets":
+            target_id = parse_qs(parsed.query).get(
+                "id",
+                [None],
+            )[0]
+            self.server.last_deleted_target_id = target_id
+
+            if getattr(
+                self.server,
+                "target_delete_mode",
+                "ok",
+            ) == "fail":
+                return self._json(
+                    {
+                        "error": (
+                            "Fixture target deletion temporarily unavailable."
+                        )
+                    },
+                    status=503,
+                )
+
+            if target_id:
+                self.server.deleted_target_ids.add(
+                    target_id
+                )
+
+            return self._json(
+                {
+                    "ok": True,
+                    "deleted": target_id,
+                }
+            )
+
+        self.send_error(404)
+
     def _json(self, value, status=200):
         payload = json.dumps(value).encode("utf-8")
         self.send_response(status)
@@ -705,6 +757,9 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.server.last_feed_rotation_authorization = None
         self.server.last_feed_revoke_authorization = None
         self.server.last_admin_key = None
+        self.server.target_delete_mode = "ok"
+        self.server.deleted_target_ids = set()
+        self.server.last_deleted_target_id = None
 
     def open_planner(self, width: int, height: int):
         context = self.browser.new_context(
@@ -977,6 +1032,107 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             "Planner must boot while inline script execution is blocked",
         )
         self.assert_no_horizontal_overflow(page)
+
+    def test_single_target_delete_failure_stays_visible_in_targets_context(self):
+        self.server.target_delete_mode = "fail"
+        page = self.open_planner(1024, 800)
+
+        page.locator('.tab-button[data-tab="targets"]').click()
+        page.locator("#targetSearch").fill("Moltres")
+        page.locator(
+            '[data-target-more="target-dynamax-moltres"]'
+        ).click()
+
+        page.once(
+            "dialog",
+            lambda dialog: dialog.accept(),
+        )
+        page.locator(
+            '[data-delete-target="target-dynamax-moltres"]'
+        ).click()
+
+        page.wait_for_function(
+            """() => document.getElementById('targetActionStatus')?.textContent.includes('Could not delete Dynamax Moltres')"""
+        )
+
+        self.assertEqual(
+            page.locator("#targetActionStatus").inner_text(),
+            (
+                "Could not delete Dynamax Moltres. "
+                "Fixture target deletion temporarily unavailable."
+            ),
+        )
+        self.assertEqual(
+            page.locator("#targetSearch").input_value(),
+            "Moltres",
+        )
+        self.assertEqual(
+            page.locator(
+                '[data-delete-target="target-dynamax-moltres"]'
+            ).count(),
+            1,
+            "Failed delete must leave the target in place",
+        )
+        self.assertTrue(
+            page.locator(
+                '.tab-button[data-tab="targets"]'
+            ).evaluate(
+                "element => element.classList.contains('active')"
+            ),
+            "Failed delete must keep the Targets tab active",
+        )
+        self.assertEqual(
+            self.server.last_deleted_target_id,
+            "target-dynamax-moltres",
+        )
+
+    def test_single_target_delete_success_still_reloads_targets(self):
+        page = self.open_planner(1024, 800)
+
+        page.locator('.tab-button[data-tab="targets"]').click()
+        page.locator("#targetSearch").fill("Moltres")
+        page.locator(
+            '[data-target-more="target-dynamax-moltres"]'
+        ).click()
+
+        page.once(
+            "dialog",
+            lambda dialog: dialog.accept(),
+        )
+        page.locator(
+            '[data-delete-target="target-dynamax-moltres"]'
+        ).click()
+
+        page.wait_for_function(
+            """() => document.getElementById('targetActionStatus')?.textContent.includes('Deleted Dynamax Moltres')"""
+        )
+
+        self.assertEqual(
+            page.locator("#targetActionStatus").inner_text(),
+            "Deleted Dynamax Moltres ✓",
+        )
+        self.assertEqual(
+            page.locator(
+                '[data-delete-target="target-dynamax-moltres"]'
+            ).count(),
+            0,
+            "Successful delete must reload state without the removed target",
+        )
+        self.assertEqual(
+            page.locator("#targetSearch").input_value(),
+            "Moltres",
+        )
+        self.assertTrue(
+            page.locator(
+                '.tab-button[data-tab="targets"]'
+            ).evaluate(
+                "element => element.classList.contains('active')"
+            ),
+        )
+        self.assertEqual(
+            self.server.last_deleted_target_id,
+            "target-dynamax-moltres",
+        )
 
     def test_management_api_uses_header_without_query_token(self):
         page = self.open_planner(1024, 800)

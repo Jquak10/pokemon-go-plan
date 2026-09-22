@@ -308,11 +308,27 @@ assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-intel\.js\?v=1"><\/script>/);
-assert.match(manage, /<script src="\/planner-app\.js\?v=2"><\/script>/);
+assert.match(manage, /<script src="\/planner-app\.js\?v=3"><\/script>/);
 assert.match(manage, /PlannerBattleIntel/);
 assert.match(
   plannerApp,
   /querySelectorAll\("\.tab-button\[data-tab\]"\)\.forEach\(button => \{\s*button\.addEventListener\("click", \(\) => activateTab\(button\.dataset\.tab\)\);/
+);
+assert.match(
+  manageHtml,
+  /id="targetActionStatus"[\s\S]*role="status"[\s\S]*aria-live="polite"/
+);
+assert.match(
+  plannerApp,
+  /async function removeTarget\(id\)[\s\S]*try \{[\s\S]*await api\([\s\S]*method:[\s\S]*"DELETE"[\s\S]*await load\(\)[\s\S]*activateTab\([\s\S]*"targets"[\s\S]*catch \(error\)[\s\S]*Could not delete/
+);
+assert.match(
+  plannerApp,
+  /document\.getElementById\("targets"\)\.addEventListener\("click", async event => \{/
+);
+assert.match(
+  plannerApp,
+  /await removeTarget\([\s\S]*remove\.dataset\.deleteTarget/
 );
 assert.doesNotMatch(manage, /const TYPE_RELATIONS =/);
 assert.doesNotMatch(manage, /function defendingTypeMultipliers\(/);
@@ -449,7 +465,7 @@ assert.match(manage, /item\.label \|\| "Priority"/);
 // BL-017: the Planner must remain executable with script-src 'self' only.
 assert.match(
   manageHtml,
-  /<script src="\/planner-app\.js\?v=2"><\/script>/
+  /<script src="\/planner-app\.js\?v=3"><\/script>/
 );
 
 const inlineScripts = [
