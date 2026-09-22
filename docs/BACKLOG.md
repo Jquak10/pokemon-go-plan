@@ -27,19 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-022 — Add abuse protection to public planner creation
-
-**Priority:** High · operational security
-
-`POST /api/create` is intentionally public and currently inserts a new planner for every valid request. The repository contains no application-level rate limit, challenge, quota, or other creation-abuse control. Before implementation, confirm whether Cloudflare already supplies an external compensating rule; do not duplicate a working control blindly.
-
-Done when:
-
-- the effective production path has a documented bounded-abuse control for planner creation;
-- ordinary first-time creation remains low-friction;
-- the design avoids retaining unnecessary personal/IP data;
-- abuse responses are explicit and testable.
-
 ### BL-023 — Enforce strict script CSP on remaining credential-bearing pages
 
 **Priority:** Medium · security hardening
@@ -151,6 +138,6 @@ BL-011 was completed through the incremental Planner/Worker modularization serie
 
 The first fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, BL-014 in PR #59, BL-015 in PR #60, BL-016 in PR #61, BL-017 in PR #62, and BL-018 in PR #63.
 
-A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65 and BL-020 shipped in PR #67. BL-021 is implemented by the current change and removed from Active; BL-022 through BL-028 remain above. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
+A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65, BL-020 in PR #67, and BL-021 in PR #68. BL-022 is implemented by the current change and removed from Active; BL-023 through BL-028 remain above. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
