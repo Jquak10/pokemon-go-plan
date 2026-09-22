@@ -11742,13 +11742,28 @@ async function handleFetch(request, env) {
       );
     }
 
+    if (
+      request.method === "GET" &&
+      (path === "/" || path === "/index.html")
+    ) {
+      return asset(
+        request,
+        env,
+        path,
+        {
+          allowInlineScript: false
+        }
+      );
+    }
+
     if (request.method === "GET" && path === "/admin") {
       return asset(
         request,
         env,
         "/admin",
         {
-          noStore: true
+          noStore: true,
+          allowInlineScript: false
         }
       );
     }
