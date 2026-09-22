@@ -20,6 +20,7 @@ function read(relative) {
 
 const portal = read("../public/index.html");
 const landingApp = read("../public/landing-app.js");
+const jsonApiClient = read("../public/json-api-client.js");
 const adminHtml = read("../public/admin.html");
 const adminApp = read("../public/admin-app.js");
 const admin = `${adminHtml}\n${adminApp}`;
@@ -67,6 +68,207 @@ assert.equal(
     .parse("Asia/Singapor")
     .valid,
   false
+);
+
+const jsonApiClientContext =
+  vm.createContext({
+    Headers,
+    Request,
+    Response
+  });
+
+jsonApiClientContext.globalThis =
+  jsonApiClientContext;
+
+vm.runInContext(
+  jsonApiClient,
+  jsonApiClientContext
+);
+
+const sharedJsonApiClient =
+  jsonApiClientContext
+    .JsonApiClient;
+
+assert.ok(
+  sharedJsonApiClient,
+  "Shared public/Admin JSON API client must initialize"
+);
+
+assert.deepEqual(
+  JSON.parse(
+    JSON.stringify(
+      await sharedJsonApiClient
+        .readJsonResponse(
+          new Response(
+            JSON.stringify({
+              ok: true
+            }),
+            {
+              status: 200,
+              headers: {
+                "content-type":
+                  "application/json"
+              }
+            }
+          ),
+          {
+            serviceName:
+              "Fixture service"
+          }
+        )
+    )
+  ),
+  {
+    ok: true
+  }
+);
+
+await assert.rejects(
+  sharedJsonApiClient
+    .readJsonResponse(
+      new Response(
+        JSON.stringify({
+          error:
+            "Specific server guidance"
+        }),
+        {
+          status: 429,
+          headers: {
+            "content-type":
+              "application/json"
+          }
+        }
+      ),
+      {
+        serviceName:
+          "Fixture service"
+      }
+    ),
+  error =>
+    error.message ===
+      "Specific server guidance" &&
+    error.kind ===
+      "http" &&
+    error.status ===
+      429 &&
+    error.retryable ===
+      true
+);
+
+await assert.rejects(
+  sharedJsonApiClient
+    .readJsonResponse(
+      new Response(
+        "<!doctype html><title>Gateway exploded</title>",
+        {
+          status: 503,
+          headers: {
+            "content-type":
+              "text/html"
+          }
+        }
+      ),
+      {
+        serviceName:
+          "Fixture service"
+      }
+    ),
+  error =>
+    error.message ===
+      "The Fixture service is temporarily unavailable (HTTP 503). Please try again." &&
+    !error.message.includes(
+      "Gateway exploded"
+    ) &&
+    !error.message.includes(
+      "Unexpected token"
+    )
+);
+
+await assert.rejects(
+  sharedJsonApiClient
+    .readJsonResponse(
+      new Response(
+        "",
+        {
+          status: 502
+        }
+      ),
+      {
+        serviceName:
+          "Fixture service"
+      }
+    ),
+  error =>
+    error.message ===
+      "The Fixture service is temporarily unavailable (HTTP 502). Please try again."
+);
+
+await assert.rejects(
+  sharedJsonApiClient
+    .readJsonResponse(
+      new Response(
+        "<html>not json</html>",
+        {
+          status: 200
+        }
+      ),
+      {
+        serviceName:
+          "Fixture service"
+      }
+    ),
+  error =>
+    error.message ===
+      "The Fixture service returned an unreadable response. Refresh the page and try again." &&
+    error.kind ===
+      "invalid-response"
+);
+
+await assert.rejects(
+  sharedJsonApiClient
+    .readJsonResponse(
+      new Response(
+        "",
+        {
+          status: 200
+        }
+      ),
+      {
+        serviceName:
+          "Fixture service"
+      }
+    ),
+  error =>
+    error.message ===
+      "The Fixture service returned an empty response. Refresh the page and try again." &&
+    error.kind ===
+      "empty-response"
+);
+
+await assert.rejects(
+  sharedJsonApiClient
+    .fetchJson(
+      "/fixture",
+      {},
+      {
+        serviceName:
+          "Fixture service",
+        fetchImpl:
+          async () => {
+            throw new TypeError(
+              "Failed to fetch"
+            );
+          }
+      }
+    ),
+  error =>
+    error.message ===
+      "Could not reach the Fixture service. Check your internet connection and try again." &&
+    !error.message.includes(
+      "Failed to fetch"
+    ) &&
+    error.kind ===
+      "network"
 );
 
 assert.match(
@@ -1835,11 +2037,19 @@ assert.doesNotMatch(manage, /\/api\/targets\?token=/);
 
 assert.match(
   portal,
-  /<script src="\/landing-app\.js\?v=1"><\/script>/
+  /<script src="\/json-api-client\.js\?v=1"><\/script>/
+);
+assert.match(
+  portal,
+  /<script src="\/landing-app\.js\?v=2"><\/script>/
 );
 assert.match(
   adminHtml,
-  /<script src="\/admin-app\.js\?v=1"><\/script>/
+  /<script src="\/json-api-client\.js\?v=1"><\/script>/
+);
+assert.match(
+  adminHtml,
+  /<script src="\/admin-app\.js\?v=2"><\/script>/
 );
 
 for (const [name, html] of [
@@ -1869,7 +2079,19 @@ for (const [name, html] of [
 
 assert.match(
   landingApp,
-  /fetch\("\/api\/create"/
+  /JsonApiClient\.fetchJson/
+);
+assert.match(
+  adminApp,
+  /JsonApiClient\.fetchJson/
+);
+assert.doesNotMatch(
+  landingApp,
+  /response\.json\(/
+);
+assert.doesNotMatch(
+  adminApp,
+  /response\.json\(/
 );
 assert.match(admin, /"x-admin-key"/);
 assert.match(admin, /delete parsed\.key/);
