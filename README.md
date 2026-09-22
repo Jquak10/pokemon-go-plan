@@ -18,6 +18,8 @@ The planner brings the decisions that normally live in several places into one d
 
 Create a planner with your timezone, save its private management link, and then tailor its Targets, recommendation weights, Remote limits, and event filters. The Battle Plan updates from those choices and from the battles you log.
 
+Planner creation is deliberately low-friction but abuse-bounded. If creation traffic exceeds the configured Cloudflare limit, the page receives an explicit temporary rate-limit error and can be retried after one minute.
+
 ## Part 4: unified Battle logging
 
 The Battle logger records ordinary Raids, Dynamax and Gigantamax separately. Recommendations prefill battle identity, participation eligibility and confidently known MP costs. Unknown or estimated costs remain blank and must be supplied for wins. Actual target progress stays editable. For Max Battles, enter attempts, wins and actual Remote Passes consumed; same-boss retries can use fewer passes than attempts. Log groups with different MP costs separately.
@@ -292,6 +294,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 
 - **Cloudflare Workers** runs the backend and serves static frontend assets.
 - **Cloudflare D1** stores planners, targets, events, meta data, Remote Raid usage, and limit overrides.
+- **Cloudflare Workers Rate Limiting** protects public planner creation without storing raw client IPs in D1 or logs: the creation endpoint enforces both a per-client hashed-key limit and a route-wide per-location ceiling before any planner row is inserted.
 - **Static frontend files** in `public/` provide the landing page, planner, administration, data-source, and responsive UI.
 - **Worker code** in `src/index.js` orchestrates APIs, private routes, scheduled synchronization, recommendations, and asset routing; focused modules such as `src/http-security.js` and `src/calendar-ics.js` keep reusable infrastructure/parsing logic out of the entry point.
 - **Cron Triggers** run separate event, official Remote Raid limit, and automatic meta synchronization jobs every six hours; the meta sync also refreshes versioned raid-ranking profiles.
