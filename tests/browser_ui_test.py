@@ -813,6 +813,43 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         )
         self.assertNotIn("Failed to fetch", message)
 
+    def test_landing_html_failure_has_actionable_message(self):
+        context = self.browser.new_context(
+            viewport={"width": 1024, "height": 800},
+            locale="en-US",
+            timezone_id="Asia/Singapore",
+            reduced_motion="reduce",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+
+        page.route(
+            "**/api/create",
+            lambda route: route.fulfill(
+                status=503,
+                content_type="text/html; charset=utf-8",
+                body="<!doctype html><title>Fixture gateway failure</title>",
+            ),
+        )
+
+        page.goto(
+            f"{self.base_url}/",
+            wait_until="domcontentloaded",
+        )
+        page.locator("#create").click()
+
+        page.wait_for_function(
+            """() => document.getElementById('status')?.textContent.includes('temporarily unavailable')"""
+        )
+
+        message = page.locator("#status").inner_text()
+        self.assertEqual(
+            message,
+            "The Planner creation service is temporarily unavailable (HTTP 503). Please try again.",
+        )
+        self.assertNotIn("Unexpected token", message)
+        self.assertNotIn("Fixture gateway failure", message)
+
     def test_landing_runs_under_strict_script_csp(self):
         context = self.browser.new_context(
             viewport={"width": 1024, "height": 800},
@@ -848,6 +885,40 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             page.locator("#manageUrl").inner_text(),
         )
         self.assert_no_horizontal_overflow(page)
+
+    def test_admin_network_failure_has_actionable_message(self):
+        context = self.browser.new_context(
+            viewport={"width": 1024, "height": 800},
+            locale="en-US",
+            timezone_id="Asia/Singapore",
+            reduced_motion="reduce",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+
+        page.route(
+            "**/api/admin/meta",
+            lambda route: route.abort("failed"),
+        )
+
+        page.goto(
+            f"{self.base_url}/admin",
+            wait_until="domcontentloaded",
+        )
+        page.locator("#key").fill("browser-admin-key")
+        page.locator('[data-admin-section="meta"]').click()
+        page.locator("#loadMeta").click()
+
+        page.wait_for_function(
+            """() => document.getElementById('entries')?.textContent.includes('Check your internet connection')"""
+        )
+
+        message = page.locator("#entries").inner_text()
+        self.assertEqual(
+            message,
+            "Could not reach the Admin service. Check your internet connection and try again.",
+        )
+        self.assertNotIn("Failed to fetch", message)
 
     def test_admin_runs_under_strict_script_csp(self):
         context = self.browser.new_context(
