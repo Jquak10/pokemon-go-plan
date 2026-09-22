@@ -123,6 +123,7 @@ Private/browser surfaces receive defense-in-depth response headers in Worker rou
 - `X-Frame-Options: DENY`, a restrictive Permissions Policy, `X-Content-Type-Options: nosniff`, and same-origin opener/resource policies protect HTML surfaces.
 - Management and Admin HTML are `private, no-store`; authenticated JSON is also no-store by default.
 - Calendar feeds keep their private ETag/revalidation behavior for calendar-client compatibility while also receiving no-referrer/nosniff protection.
+- Unexpected Worker exceptions are logged with the original error server-side, but the public 500 JSON contract exposes only a stable generic error message and never raw internal exception text.
 
 The HTML CSP is route-aware. The private Planner management route uses `script-src 'self'` with no `'unsafe-inline'` script allowance. Its executable application logic lives in same-origin external files, and generated Planner markup must not use inline `on*=...` handlers. The public creation page and Admin page still contain inline JavaScript, so their existing HTML responses retain the historical inline-script compatibility policy. `style-src 'unsafe-inline'` is unchanged across HTML surfaces because BL-017 is intentionally script-only and existing inline style usage remains. Chromium regression fixtures serve the Planner under the strict script policy so an accidental inline-script dependency fails browser CI.
 
