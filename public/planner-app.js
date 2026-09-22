@@ -6990,17 +6990,56 @@ async function saveTarget() {
 }
 
 async function removeTarget(id) {
-  const target = targetById.get(String(id));
+  const target =
+    targetById.get(
+      String(id)
+    );
+
   if (!target) return;
 
-  if (!confirm(`Delete the target for ${target.pokemon_name}?`)) return;
+  if (
+    !confirm(
+      `Delete the target for ${target.pokemon_name}?`
+    )
+  ) {
+    return;
+  }
 
-  await api(
-    `/api/targets?id=${encodeURIComponent(id)}`,
-    { method: "DELETE" }
-  );
+  const status =
+    document.getElementById(
+      "targetActionStatus"
+    );
 
-  await load();
+  status.textContent =
+    `Deleting ${target.pokemon_name}…`;
+  status.className =
+    "save-status";
+
+  try {
+    await api(
+      `/api/targets?id=${encodeURIComponent(id)}`,
+      {
+        method:
+          "DELETE"
+      }
+    );
+
+    await load();
+    activateTab(
+      "targets",
+      false
+    );
+
+    status.textContent =
+      `Deleted ${target.pokemon_name} ✓`;
+    status.className =
+      "save-status";
+  } catch (error) {
+    status.textContent =
+      `Could not delete ${target.pokemon_name}. ${error.message}`;
+    status.className =
+      "save-status error";
+  }
 }
 
 document.querySelectorAll(".tab-button[data-tab]").forEach(button => {
@@ -7594,7 +7633,7 @@ document.getElementById("targetModal").addEventListener("click", event => {
   if (event.target.id === "targetModal") closeTargetModal();
 });
 
-document.getElementById("targets").addEventListener("click", event => {
+document.getElementById("targets").addEventListener("click", async event => {
   const select = event.target.closest("[data-select-target]");
   if (select) {
     toggleTargetSelected(select.dataset.selectTarget);
@@ -7619,7 +7658,9 @@ document.getElementById("targets").addEventListener("click", event => {
 
   const remove = event.target.closest("[data-delete-target]");
   if (remove) {
-    removeTarget(remove.dataset.deleteTarget);
+    await removeTarget(
+      remove.dataset.deleteTarget
+    );
     return;
   }
 
