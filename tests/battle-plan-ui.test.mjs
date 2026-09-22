@@ -19,6 +19,10 @@ function read(relative) {
 }
 
 const portal = read("../public/index.html");
+const landingApp = read("../public/landing-app.js");
+const adminHtml = read("../public/admin.html");
+const adminApp = read("../public/admin-app.js");
+const admin = `${adminHtml}\n${adminApp}`;
 const manageHtml = read("../public/manage.html");
 const plannerApp = read("../public/planner-app.js");
 const manage = `${manageHtml}\n${plannerApp}`;
@@ -1829,7 +1833,44 @@ assert.doesNotMatch(manage, /\/api\/calendar-events\?token=/);
 assert.doesNotMatch(manage, /\/api\/feed-link\?token=/);
 assert.doesNotMatch(manage, /\/api\/targets\?token=/);
 
-const admin = read("../public/admin.html");
+assert.match(
+  portal,
+  /<script src="\/landing-app\.js\?v=1"><\/script>/
+);
+assert.match(
+  adminHtml,
+  /<script src="\/admin-app\.js\?v=1"><\/script>/
+);
+
+for (const [name, html] of [
+  ["landing", portal],
+  ["Admin", adminHtml]
+]) {
+  const inlineScripts = [
+    ...html.matchAll(
+      /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi
+    )
+  ]
+    .map(match => match[1])
+    .filter(script => script.trim());
+
+  assert.equal(
+    inlineScripts.length,
+    0,
+    `${name} HTML must not contain executable inline script blocks`
+  );
+
+  assert.doesNotMatch(
+    html,
+    /\son[a-z]+\s*=\s*["']/i,
+    `${name} HTML must not contain inline event handlers`
+  );
+}
+
+assert.match(
+  landingApp,
+  /fetch\("\/api\/create"/
+);
 assert.match(admin, /"x-admin-key"/);
 assert.match(admin, /delete parsed\.key/);
 assert.doesNotMatch(admin, /\/api\/admin\/meta\?key=/);
@@ -2126,6 +2167,109 @@ assert.match(
   /style-src 'self' 'unsafe-inline'/
 );
 
+const credentialSurfaceAssetFetches = [];
+
+const credentialSurfaceEnv = {
+  ASSETS: {
+    async fetch(request) {
+      credentialSurfaceAssetFetches.push(
+        new URL(request.url).pathname
+      );
+
+      return new Response(
+        "<!doctype html><title>Credential surface</title>",
+        {
+          headers: {
+            "content-type":
+              "text/html; charset=utf-8",
+            "cache-control":
+              "public, max-age=3600"
+          }
+        }
+      );
+    }
+  }
+};
+
+const landingResponse =
+  await workerApp.fetch(
+    new Request(
+      "https://planner.example/"
+    ),
+    credentialSurfaceEnv
+  );
+
+const landingCsp =
+  landingResponse.headers.get(
+    "content-security-policy"
+  ) || "";
+
+assert.match(
+  landingCsp,
+  /(?:^|;\s*)script-src 'self'(?:;|$)/
+);
+assert.doesNotMatch(
+  landingCsp,
+  /script-src[^;]*'unsafe-inline'/
+);
+assert.equal(
+  landingResponse.headers.get(
+    "referrer-policy"
+  ),
+  "no-referrer"
+);
+assert.equal(
+  landingResponse.headers.get(
+    "x-frame-options"
+  ),
+  "DENY"
+);
+
+const adminResponse =
+  await workerApp.fetch(
+    new Request(
+      "https://planner.example/admin"
+    ),
+    credentialSurfaceEnv
+  );
+
+const adminCsp =
+  adminResponse.headers.get(
+    "content-security-policy"
+  ) || "";
+
+assert.match(
+  adminCsp,
+  /(?:^|;\s*)script-src 'self'(?:;|$)/
+);
+assert.doesNotMatch(
+  adminCsp,
+  /script-src[^;]*'unsafe-inline'/
+);
+assert.match(
+  adminResponse.headers.get(
+    "cache-control"
+  ) || "",
+  /no-store/
+);
+assert.equal(
+  adminResponse.headers.get(
+    "referrer-policy"
+  ),
+  "no-referrer"
+);
+assert.equal(
+  adminResponse.headers.get(
+    "x-frame-options"
+  ),
+  "DENY"
+);
+assert.deepEqual(
+  credentialSurfaceAssetFetches,
+  ["/", "/admin"],
+  "Landing and Admin must preserve their existing asset paths"
+);
+
 assert.ok(
   worker.includes(
     'if (request.method === "GET" && /^\\/manage\\/[A-Za-z0-9_-]+\\/?$/.test(path))'
@@ -2134,10 +2278,12 @@ assert.ok(
 );
 
 assert.ok(
-  worker.includes(
-    "allowInlineScript: false"
-  ),
-  "Planner route must disable inline script execution"
+  (
+    worker.match(
+      /allowInlineScript:\s*false/g
+    ) || []
+  ).length >= 3,
+  "Planner, landing, and Admin routes must disable inline script execution"
 );
 
 assert.match(
