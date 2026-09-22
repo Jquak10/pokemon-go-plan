@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
-import {
+import workerApp, {
   adminKeyFromRequest,
   hardenResponse,
   manageTokenFromRequest
@@ -1893,6 +1893,86 @@ const securityBadResponse =
 assert.equal(
   securityBadResponse.status,
   418
+);
+
+const internalFailure =
+  new Error(
+    "Sensitive D1 implementation detail"
+  );
+const loggedUnexpectedErrors = [];
+const originalConsoleError =
+  console.error;
+
+let unexpectedFailureResponse;
+
+try {
+  console.error =
+    (...args) =>
+      loggedUnexpectedErrors.push(
+        args
+      );
+
+  unexpectedFailureResponse =
+    await workerApp.fetch(
+      new Request(
+        "https://planner.example/unexpected-failure"
+      ),
+      {
+        ASSETS: {
+          async fetch() {
+            throw internalFailure;
+          }
+        }
+      }
+    );
+} finally {
+  console.error =
+    originalConsoleError;
+}
+
+assert.equal(
+  unexpectedFailureResponse.status,
+  500
+);
+
+const unexpectedFailureBody =
+  await unexpectedFailureResponse.json();
+
+assert.deepEqual(
+  unexpectedFailureBody,
+  {
+    error:
+      "Unexpected server error."
+  },
+  "Generic 500 responses must expose only the stable public error message"
+);
+
+assert.equal(
+  Object.prototype.hasOwnProperty.call(
+    unexpectedFailureBody,
+    "detail"
+  ),
+  false,
+  "Unexpected 500 responses must not expose an internal detail field"
+);
+
+assert.doesNotMatch(
+  JSON.stringify(
+    unexpectedFailureBody
+  ),
+  /Sensitive D1 implementation detail/
+);
+
+assert.equal(
+  loggedUnexpectedErrors.length,
+  1,
+  "Unexpected Worker failures must still be logged server-side"
+);
+
+assert.equal(
+  loggedUnexpectedErrors[0][0],
+  internalFailure,
+  "Server logging must preserve the original exception object"
 );
 assert.deepEqual(
   await securityBadResponse.json(),

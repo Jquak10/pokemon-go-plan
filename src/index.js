@@ -11631,8 +11631,7 @@ async function handleFetch(request, env) {
     console.error(error);
     return json(
       {
-        error: "Unexpected server error.",
-        detail: String(error.message || error)
+        error: "Unexpected server error."
       },
       500
     );

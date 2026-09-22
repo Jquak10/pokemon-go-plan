@@ -27,18 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-021 — Do not expose internal exception details in 500 responses
-
-**Priority:** High · security / failure handling
-
-The Worker-wide `handleFetch()` catch logs an unexpected exception but also returns `String(error.message || error)` to the client as `detail`. Internal D1, upstream, or implementation error text should remain in server observability rather than being exposed by a generic public 500 response.
-
-Done when:
-
-- unexpected exceptions remain fully logged server-side;
-- clients receive a stable generic error without raw internal exception text;
-- deterministic coverage verifies the public 500 contract.
-
 ### BL-022 — Add abuse protection to public planner creation
 
 **Priority:** High · operational security
@@ -163,6 +151,6 @@ BL-011 was completed through the incremental Planner/Worker modularization serie
 
 The first fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, BL-014 in PR #59, BL-015 in PR #60, BL-016 in PR #61, BL-017 in PR #62, and BL-018 in PR #63.
 
-A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 is implemented by the parent change and removed from Active. BL-020 is implemented by the current change and removed from Active; BL-021 through BL-028 remain above. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
+A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65 and BL-020 shipped in PR #67. BL-021 is implemented by the current change and removed from Active; BL-022 through BL-028 remain above. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
