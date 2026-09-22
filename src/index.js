@@ -3372,6 +3372,131 @@ function publicBaseUrl(request, env) {
   return new URL(request.url).origin;
 }
 
+const PLANNER_CREATE_RATE_LIMIT_WINDOW_SECONDS = 60;
+const PLANNER_CREATE_RATE_LIMIT_ERROR =
+  "Too many planner creation attempts. Please wait a minute and try again.";
+const PLANNER_CREATE_RATE_LIMIT_UNAVAILABLE_ERROR =
+  "Planner creation is temporarily unavailable. Please try again shortly.";
+
+async function plannerCreationClientRateLimitKey(
+  request
+) {
+  const clientIp =
+    String(
+      request.headers.get(
+        "cf-connecting-ip"
+      ) || ""
+    ).trim();
+
+  if (!clientIp) {
+    return "planner-create-client:unknown";
+  }
+
+  return `planner-create-client:${await sha256Hex(clientIp)}`;
+}
+
+async function plannerCreationRateLimitResponse(
+  request,
+  env
+) {
+  const clientLimiter =
+    env.PLANNER_CREATE_CLIENT_RATE_LIMITER;
+  const routeLimiter =
+    env.PLANNER_CREATE_ROUTE_RATE_LIMITER;
+
+  if (
+    !clientLimiter?.limit ||
+    !routeLimiter?.limit
+  ) {
+    console.error(
+      "Planner creation rate limiter binding is unavailable."
+    );
+
+    return json(
+      {
+        error:
+          PLANNER_CREATE_RATE_LIMIT_UNAVAILABLE_ERROR
+      },
+      503,
+      {
+        "retry-after":
+          String(
+            PLANNER_CREATE_RATE_LIMIT_WINDOW_SECONDS
+          )
+      }
+    );
+  }
+
+  try {
+    const clientResult =
+      await clientLimiter.limit({
+        key:
+          await plannerCreationClientRateLimitKey(
+            request
+          )
+      });
+
+    if (!clientResult?.success) {
+      return json(
+        {
+          error:
+            PLANNER_CREATE_RATE_LIMIT_ERROR
+        },
+        429,
+        {
+          "retry-after":
+            String(
+              PLANNER_CREATE_RATE_LIMIT_WINDOW_SECONDS
+            )
+        }
+      );
+    }
+
+    const routeResult =
+      await routeLimiter.limit({
+        key:
+          "planner-create-route"
+      });
+
+    if (!routeResult?.success) {
+      return json(
+        {
+          error:
+            PLANNER_CREATE_RATE_LIMIT_ERROR
+        },
+        429,
+        {
+          "retry-after":
+            String(
+              PLANNER_CREATE_RATE_LIMIT_WINDOW_SECONDS
+            )
+        }
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Planner creation rate limiter failed:",
+      error
+    );
+
+    return json(
+      {
+        error:
+          PLANNER_CREATE_RATE_LIMIT_UNAVAILABLE_ERROR
+      },
+      503,
+      {
+        "retry-after":
+          String(
+            PLANNER_CREATE_RATE_LIMIT_WINDOW_SECONDS
+          )
+      }
+    );
+  }
+
+  return null;
+}
+
 async function createUser(request, env) {
   let body = {};
   try {
@@ -11374,6 +11499,16 @@ async function handleFetch(request, env) {
 
   try {
     if (request.method === "POST" && path === "/api/create") {
+      const rateLimitResponse =
+        await plannerCreationRateLimitResponse(
+          request,
+          env
+        );
+
+      if (rateLimitResponse) {
+        return rateLimitResponse;
+      }
+
       return createUser(request, env);
     }
 
