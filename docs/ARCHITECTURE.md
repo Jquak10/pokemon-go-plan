@@ -91,6 +91,7 @@ Current wrangler.jsonc defines:
 - static assets directory: public.
 - asset binding: ASSETS.
 - D1 binding: DB.
+- Rate Limiting bindings: `PLANNER_CREATE_CLIENT_RATE_LIMITER` and `PLANNER_CREATE_ROUTE_RATE_LIMITER`.
 - observability enabled.
 - recurring Cron expressions:
   - 23 */6 * * *
@@ -126,6 +127,8 @@ Private/browser surfaces receive defense-in-depth response headers in Worker rou
 - Unexpected Worker exceptions are logged with the original error server-side, but the public 500 JSON contract exposes only a stable generic error message and never raw internal exception text.
 
 The HTML CSP is route-aware. The private Planner management route uses `script-src 'self'` with no `'unsafe-inline'` script allowance. Its executable application logic lives in same-origin external files, and generated Planner markup must not use inline `on*=...` handlers. The public creation page and Admin page still contain inline JavaScript, so their existing HTML responses retain the historical inline-script compatibility policy. `style-src 'unsafe-inline'` is unchanged across HTML surfaces because BL-017 is intentionally script-only and existing inline style usage remains. Chromium regression fixtures serve the Planner under the strict script policy so an accidental inline-script dependency fails browser CI.
+
+Public planner creation is intentionally unauthenticated but is bounded before any D1 insert. The Worker uses Cloudflare Rate Limiting bindings with two one-minute controls: three creation attempts per hashed `CF-Connecting-IP` key and ten attempts for the creation route per Cloudflare location. The raw IP is never written to D1 or application logs. A client already over its own limit is rejected before consuming the route-wide budget. Rate limiting returns JSON 429 with `Retry-After: 60`; missing or failing limiter bindings fail creation closed with JSON 503 rather than inserting an unprotected planner. The limiter is a coarse abuse brake, not exact billing/accounting, because Cloudflare rate-limit counters are per location and eventually consistent.
 
 Secrets such as ADMIN_KEY, FEED_LINK_KEY, GitHub credentials, Cloudflare credentials, management tokens, and private ICS URLs must never be requested or committed.
 
