@@ -888,6 +888,7 @@ The following sequence is retained as a compact repository implementation/change
 | #68 | BL-021 generic 500 error disclosure | Keeps unexpected Worker exceptions in server-side logging while reducing the public generic 500 JSON contract to a stable error message with no raw internal detail, backed by a behavioral regression against the real Worker fetch boundary. |
 | #69 | BL-022 planner creation abuse protection | Adds repository-owned Cloudflare Workers Rate Limiting bindings before public planner creation, combining a hashed per-client threshold with a route-wide per-location ceiling, explicit 429/Retry-After responses, fail-closed limiter errors, and deterministic config/Worker regressions without storing raw IPs in D1 or logs. |
 | #70 | BL-023 strict CSP on landing and Admin | Externalizes landing and Admin application JavaScript into same-origin assets, applies `script-src 'self'` to `/`, `/index.html`, and `/admin`, preserves Admin no-store and existing response hardening, and adds deterministic plus Chromium regressions that prevent inline-script reintroduction. |
+| #71 | BL-024 landing/Admin API failure normalization | Adds a shared JSON API transport boundary for landing and Admin that preserves structured server errors, converts empty/non-JSON/malformed responses into stable status-aware messages, normalizes network failures, and keeps existing Admin credential/header behavior intact with deterministic and Chromium coverage. |
 
 ## Supersession map
 
