@@ -54,7 +54,7 @@ Matching uses the exact Pokémon/form plus battle identity across recommendation
 
 When several goals match, recommendations prioritize active targets, then personal priority, with a stable goal/ID tie-break. The logger initially selects that target, but the user can select another matching goal and edit actual progress. Completed/Skip goals retain their planning exclusions. Battle-count goals use wins, not failed attempts. The planner does not automatically mark targets complete.
 
-Battle and availability filters participate in the existing Active/Completed/All counts. Max Target cards omit ordinary Raid attacker information and never substitute a base sprite for a missing exact form. The Target editor and logger retain visible actions at narrow mobile sizes; CSS references are v34.
+Battle and availability filters participate in the existing Active/Completed/All counts. Max Target cards omit ordinary Raid attacker information and never substitute a base sprite for a missing exact form. The Target editor and logger retain visible actions at narrow mobile sizes; CSS references are v34. Single-target deletion now reports progress/failure inline in Targets: a failed delete preserves the current tab, search/filter context, and target card, while a successful delete reloads state as before.
 
 ### Part 5 migration and rollout
 
