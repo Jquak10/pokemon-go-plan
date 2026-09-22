@@ -887,6 +887,7 @@ The following sequence is retained as a compact repository implementation/change
 | #67 | BL-020 Mobile More tab preservation | Restricts tab activation wiring to real `data-tab` controls so opening the mobile More sheet preserves the current/saved tab, with Chromium coverage from a non-Plan section and a Planner app asset-version bump. |
 | #68 | BL-021 generic 500 error disclosure | Keeps unexpected Worker exceptions in server-side logging while reducing the public generic 500 JSON contract to a stable error message with no raw internal detail, backed by a behavioral regression against the real Worker fetch boundary. |
 | #69 | BL-022 planner creation abuse protection | Adds repository-owned Cloudflare Workers Rate Limiting bindings before public planner creation, combining a hashed per-client threshold with a route-wide per-location ceiling, explicit 429/Retry-After responses, fail-closed limiter errors, and deterministic config/Worker regressions without storing raw IPs in D1 or logs. |
+| #70 | BL-023 strict CSP on landing and Admin | Externalizes landing and Admin application JavaScript into same-origin assets, applies `script-src 'self'` to `/`, `/index.html`, and `/admin`, preserves Admin no-store and existing response hardening, and adds deterministic plus Chromium regressions that prevent inline-script reintroduction. |
 
 ## Supersession map
 

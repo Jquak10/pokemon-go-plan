@@ -296,6 +296,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 - **Cloudflare D1** stores planners, targets, events, meta data, Remote Raid usage, and limit overrides.
 - **Cloudflare Workers Rate Limiting** protects public planner creation without storing raw client IPs in D1 or logs: the creation endpoint enforces both a per-client hashed-key limit and a route-wide per-location ceiling before any planner row is inserted.
 - **Static frontend files** in `public/` provide the landing page, planner, administration, data-source, and responsive UI.
+- The credential-bearing landing, Admin, and private Planner HTML surfaces execute application JavaScript only from same-origin external files under `script-src 'self'`; inline executable scripts are regression-tested against reintroduction.
 - **Worker code** in `src/index.js` orchestrates APIs, private routes, scheduled synchronization, recommendations, and asset routing; focused modules such as `src/http-security.js` and `src/calendar-ics.js` keep reusable infrastructure/parsing logic out of the entry point.
 - **Cron Triggers** run separate event, official Remote Raid limit, and automatic meta synchronization jobs every six hours; the meta sync also refreshes versioned raid-ranking profiles.
 - **GitHub and Cloudflare** provide the production path: feature branch → PR → `main` → the existing Cloudflare deployment pipeline.
@@ -333,8 +334,10 @@ Manual `wrangler deploy` is available as an npm script, but it is not the normal
 │   ├── post-create.sh         # Dependencies and first-create setup
 │   └── post-start.sh          # GitHub Git setup and local author identity
 ├── public/
-│   ├── admin.html             # Administration interface
-│   ├── index.html             # Planner creation page
+│   ├── admin.html             # Administration interface markup
+│   ├── admin-app.js           # Admin same-origin application script
+│   ├── index.html             # Planner creation page markup
+│   ├── landing-app.js         # Landing/create-planner same-origin application script
 │   ├── manage.html            # Personalized planner dashboard markup shell
 │   ├── planner-app.js         # Planner DOM/state/API orchestration
 │   ├── planner-client.js      # Planner auth, API transport + normalized failures
