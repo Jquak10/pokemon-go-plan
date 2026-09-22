@@ -314,6 +314,22 @@ assert.match(
   plannerApp,
   /querySelectorAll\("\.tab-button\[data-tab\]"\)\.forEach\(button => \{\s*button\.addEventListener\("click", \(\) => activateTab\(button\.dataset\.tab\)\);/
 );
+assert.match(
+  manageHtml,
+  /id="targetActionStatus"[\s\S]*role="status"[\s\S]*aria-live="polite"/
+);
+assert.match(
+  plannerApp,
+  /async function removeTarget\(id\)[\s\S]*try \{[\s\S]*await api\([\s\S]*method:[\s\S]*"DELETE"[\s\S]*await load\(\)[\s\S]*activateTab\([\s\S]*"targets"[\s\S]*catch \(error\)[\s\S]*Could not delete/
+);
+assert.match(
+  plannerApp,
+  /document\.getElementById\("targets"\)\.addEventListener\("click", async event => \{/
+);
+assert.match(
+  plannerApp,
+  /await removeTarget\([\s\S]*remove\.dataset\.deleteTarget/
+);
 assert.doesNotMatch(manage, /const TYPE_RELATIONS =/);
 assert.doesNotMatch(manage, /function defendingTypeMultipliers\(/);
 assert.match(manage, /PlannerBattlePlanLogic\.create/);
