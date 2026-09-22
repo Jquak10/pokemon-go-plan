@@ -873,6 +873,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         )
 
         page.locator("#key").fill("browser-admin-key")
+        page.locator('[data-admin-section="meta"]').click()
         page.locator("#loadMeta").click()
         page.wait_for_function(
             """() => document.getElementById('entries')?.textContent.includes('No automatic assessments yet')"""
