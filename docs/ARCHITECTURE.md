@@ -553,7 +553,9 @@ If the current filters match two active and one completed target, counts must re
 
 The global Targets navigation badge shows Active count only.
 
-### 12.3 Bulk deletion
+### 12.3 Deletion resilience
+
+Single-target deletion reports progress and failures in an in-context `aria-live` Target action status. A failed delete must leave the target, active Targets tab, search, and filters unchanged; normalized API failures are shown without reloading or silently removing the card. A successful delete keeps the historical behavior of reloading Planner state and returning to Targets, then confirms the deleted Pokémon in the same status region.
 
 Multi-select deletion supports Select, Select all shown, Delete selected, and Cancel. Selection must respect the current filtered set.
 
