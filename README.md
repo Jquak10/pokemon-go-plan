@@ -297,6 +297,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 - **Cloudflare Workers Rate Limiting** protects public planner creation without storing raw client IPs in D1 or logs: the creation endpoint enforces both a per-client hashed-key limit and a route-wide per-location ceiling before any planner row is inserted.
 - **Static frontend files** in `public/` provide the landing page, planner, administration, data-source, and responsive UI.
 - The credential-bearing landing, Admin, and private Planner HTML surfaces execute application JavaScript only from same-origin external files under `script-src 'self'`; inline executable scripts are regression-tested against reintroduction.
+- Landing and Admin requests share one status-aware JSON/transport boundary: structured server errors are preserved, HTML/empty/malformed responses become actionable messages, and connection failures do not expose raw parser or browser error text.
 - **Worker code** in `src/index.js` orchestrates APIs, private routes, scheduled synchronization, recommendations, and asset routing; focused modules such as `src/http-security.js` and `src/calendar-ics.js` keep reusable infrastructure/parsing logic out of the entry point.
 - **Cron Triggers** run separate event, official Remote Raid limit, and automatic meta synchronization jobs every six hours; the meta sync also refreshes versioned raid-ranking profiles.
 - **GitHub and Cloudflare** provide the production path: feature branch → PR → `main` → the existing Cloudflare deployment pipeline.
@@ -338,6 +339,7 @@ Manual `wrangler deploy` is available as an npm script, but it is not the normal
 │   ├── admin-app.js           # Admin same-origin application script
 │   ├── index.html             # Planner creation page markup
 │   ├── landing-app.js         # Landing/create-planner same-origin application script
+│   ├── json-api-client.js      # Shared landing/Admin JSON + transport failure normalization
 │   ├── manage.html            # Personalized planner dashboard markup shell
 │   ├── planner-app.js         # Planner DOM/state/API orchestration
 │   ├── planner-client.js      # Planner auth, API transport + normalized failures
