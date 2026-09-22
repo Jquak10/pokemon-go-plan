@@ -21,6 +21,24 @@
       "database_id": "a164c5c3-abaf-4900-92fa-c3f2c6a95d1e"
     }
   ],
+  "ratelimits": [
+    {
+      "name": "PLANNER_CREATE_CLIENT_RATE_LIMITER",
+      "namespace_id": "2026092201",
+      "simple": {
+        "limit": 3,
+        "period": 60
+      }
+    },
+    {
+      "name": "PLANNER_CREATE_ROUTE_RATE_LIMITER",
+      "namespace_id": "2026092202",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    }
+  ],
 "triggers": {
   "crons": [
     "23 */6 * * *",
