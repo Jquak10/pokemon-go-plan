@@ -302,6 +302,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 - **Worker code** in `src/index.js` orchestrates APIs, private routes, scheduled synchronization, recommendations, and asset routing; focused modules such as `src/http-security.js` and `src/calendar-ics.js` keep reusable infrastructure/parsing logic out of the entry point.
 - **Cron Triggers** run separate event, official Remote Raid limit, and automatic meta synchronization jobs every six hours; the meta sync also refreshes versioned raid-ranking profiles.
 - **GitHub and Cloudflare** provide the production path: feature branch → PR → `main` → the existing Cloudflare deployment pipeline.
+- The production `main` branch is expected to be protected by an active GitHub branch ruleset: changes must arrive through a PR, `deterministic` and `browser-ui` must pass, `live-contract` stays non-blocking, and force pushes/deletion are blocked.
 - **VS Code Dev Containers** provide the development toolchain while source remains on Windows.
 
 ```text
