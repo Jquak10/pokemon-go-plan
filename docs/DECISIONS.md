@@ -891,6 +891,7 @@ The following sequence is retained as a compact repository implementation/change
 | #71 | BL-024 landing/Admin API failure normalization | Adds a shared JSON API transport boundary for landing and Admin that preserves structured server errors, converts empty/non-JSON/malformed responses into stable status-aware messages, normalizes network failures, and keeps existing Admin credential/header behavior intact with deterministic and Chromium coverage. |
 | #72 | BL-025 stacked implementation (superseded, unmerged) | Validated the single-target deletion failure UX while stacked on BL-024, but was closed without merge after PR #71 was squash-merged and retargeting produced a history conflict. |
 | #73 | BL-025 single-target deletion failure UX | Clean replay from post-#71 `main`; handles single-target delete failures locally in Planner Targets, reports progress/failure in an `aria-live` status region, preserves target/search/tab context on failure, retains reload-on-success behavior, and covers both outcomes in Chromium. |
+| #74 | BL-026 Planner tab keyboard semantics | Implements roving tabindex and ArrowLeft/ArrowRight/Home/End activation across true Planner tabs, adds explicit tab/panel ARIA relationships, moves Mobile More outside the tablist while preserving its mobile fifth-slot layout, and covers keyboard/focus behavior in Chromium. |
 
 ## Supersession map
 

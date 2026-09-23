@@ -226,15 +226,159 @@ async function load() {
   }
 }
 
+function plannerTabButtons() {
+  return [
+    ...document.querySelectorAll(
+      '[role="tab"][data-tab]'
+    )
+  ];
+}
+
+function visiblePlannerTabButtons() {
+  return plannerTabButtons()
+    .filter(
+      button =>
+        button.getClientRects()
+          .length > 0
+    );
+}
+
+function syncPlannerTabState(name) {
+  const tabs =
+    plannerTabButtons();
+
+  let selectedTab =
+    null;
+
+  for (const button of tabs) {
+    const active =
+      button.dataset.tab ===
+      name;
+
+    button.classList.toggle(
+      "active",
+      active
+    );
+
+    button.setAttribute(
+      "aria-selected",
+      active
+        ? "true"
+        : "false"
+    );
+
+    if (active) {
+      selectedTab =
+        button;
+    }
+  }
+
+  const visibleTabs =
+    visiblePlannerTabButtons();
+
+  const rovingTab =
+    selectedTab &&
+    visibleTabs.includes(
+      selectedTab
+    )
+      ? selectedTab
+      : visibleTabs[0] ||
+        selectedTab;
+
+  for (const button of tabs) {
+    button.tabIndex =
+      button === rovingTab
+        ? 0
+        : -1;
+  }
+}
+
+function handlePlannerTabKeydown(
+  event
+) {
+  if (
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey
+  ) {
+    return;
+  }
+
+  const tabs =
+    visiblePlannerTabButtons();
+
+  if (!tabs.length) {
+    return;
+  }
+
+  const currentIndex =
+    tabs.indexOf(
+      event.currentTarget
+    );
+
+  if (currentIndex < 0) {
+    return;
+  }
+
+  let nextIndex =
+    null;
+
+  if (
+    event.key ===
+    "ArrowRight"
+  ) {
+    nextIndex =
+      (currentIndex + 1) %
+      tabs.length;
+  } else if (
+    event.key ===
+    "ArrowLeft"
+  ) {
+    nextIndex =
+      (
+        currentIndex -
+        1 +
+        tabs.length
+      ) %
+      tabs.length;
+  } else if (
+    event.key ===
+    "Home"
+  ) {
+    nextIndex = 0;
+  } else if (
+    event.key ===
+    "End"
+  ) {
+    nextIndex =
+      tabs.length - 1;
+  } else {
+    return;
+  }
+
+  event.preventDefault();
+
+  const nextTab =
+    tabs[nextIndex];
+
+  nextTab.focus({
+    preventScroll:
+      true
+  });
+
+  activateTab(
+    nextTab.dataset.tab,
+    false
+  );
+}
+
 function activateTab(name, scroll = true) {
   const valid = ["plan", "targets", "hundo", "preferences", "calendar"];
   if (!valid.includes(name)) name = "plan";
 
-  document.querySelectorAll(".tab-button[data-tab]").forEach(button => {
-    const active = button.dataset.tab === name;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-selected", active ? "true" : "false");
-  });
+  syncPlannerTabState(
+    name
+  );
 
   document.querySelectorAll(".tab-panel").forEach(panel => {
     panel.classList.toggle("active", panel.dataset.panel === name);
@@ -7042,9 +7186,21 @@ async function removeTarget(id) {
   }
 }
 
-document.querySelectorAll(".tab-button[data-tab]").forEach(button => {
-  button.addEventListener("click", () => activateTab(button.dataset.tab));
-});
+plannerTabButtons()
+  .forEach(button => {
+    button.addEventListener(
+      "click",
+      () =>
+        activateTab(
+          button.dataset.tab
+        )
+    );
+
+    button.addEventListener(
+      "keydown",
+      handlePlannerTabKeydown
+    );
+  });
 
 document.querySelectorAll("[data-open-tab]").forEach(button => {
   button.addEventListener("click", () => activateTab(button.dataset.openTab));

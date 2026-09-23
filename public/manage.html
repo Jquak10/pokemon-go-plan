@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1f6feb">
   <title>My Pokémon GO Battle Planner</title>
   <link rel="stylesheet" href="/styles.css?v=42">
-  <link rel="stylesheet" href="/planner.css?v=2">
+  <link rel="stylesheet" href="/planner.css?v=3">
 </head>
 
 <body class="manage-page">
@@ -194,44 +194,45 @@
            TAB NAVIGATION
            ======================================================= -->
       <nav class="tab-nav" aria-label="Planner sections" role="tablist">
-        <button class="tab-button active" type="button" data-tab="plan" aria-selected="true" role="tab" aria-controls="panel-plan">
+        <button id="tab-plan" class="tab-button active" type="button" data-tab="plan" aria-selected="true" role="tab" aria-controls="panel-plan" tabindex="0">
           <span class="tab-icon" aria-hidden="true">⚔</span>
           <span class="nav-label-desktop">Battle Plan</span><span class="nav-label-mobile">Plan</span>
         </button>
 
-        <button class="tab-button" type="button" data-tab="targets" aria-selected="false" role="tab" aria-controls="panel-targets">
+        <button id="tab-targets" class="tab-button" type="button" data-tab="targets" aria-selected="false" role="tab" aria-controls="panel-targets" tabindex="-1">
           <span class="tab-icon" aria-hidden="true">◎</span>
           <span>Targets</span>
           <span id="targetTabCount" class="tab-count">0</span>
         </button>
 
-        <button class="tab-button" type="button" data-tab="hundo" aria-selected="false" role="tab" aria-controls="panel-hundo">
+        <button id="tab-hundo" class="tab-button" type="button" data-tab="hundo" aria-selected="false" role="tab" aria-controls="panel-hundo" tabindex="-1">
           <span class="tab-icon tab-icon-iv" aria-hidden="true">IV</span>
           <span>Hundo CP</span>
         </button>
 
-        <button class="tab-button" type="button" data-tab="preferences" aria-selected="false" role="tab" aria-controls="panel-preferences">
+        <button id="tab-preferences" class="tab-button" type="button" data-tab="preferences" aria-selected="false" role="tab" aria-controls="panel-preferences" tabindex="-1">
           <span class="tab-icon" aria-hidden="true">⚙</span>
           <span>Preferences</span>
         </button>
 
-        <button class="tab-button" type="button" data-tab="calendar" aria-selected="false" role="tab" aria-controls="panel-calendar">
+        <button id="tab-calendar" class="tab-button" type="button" data-tab="calendar" aria-selected="false" role="tab" aria-controls="panel-calendar" tabindex="-1">
           <span class="tab-icon" aria-hidden="true">▦</span>
           <span>Calendar</span>
           <span id="calendarTabCount" class="tab-count">0</span>
         </button>
-
-        <button
-          id="mobileMoreButton"
-          class="tab-button mobile-more-tab"
-          type="button"
-          aria-expanded="false"
-          aria-controls="mobileMoreSheet"
-        >
-          <span class="tab-icon" aria-hidden="true">•••</span>
-          <span>More</span>
-        </button>
       </nav>
+
+      <button
+        id="mobileMoreButton"
+        class="tab-button mobile-more-tab"
+        type="button"
+        aria-expanded="false"
+        aria-controls="mobileMoreSheet"
+        aria-label="More Planner sections"
+      >
+        <span class="tab-icon" aria-hidden="true">•••</span>
+        <span>More</span>
+      </button>
 
       <button
         id="mobileQuickLog"
@@ -245,7 +246,7 @@
       <!-- =======================================================
            TAB: BATTLE PLAN
            ======================================================= -->
-      <section id="panel-plan" class="tab-panel active" data-panel="plan" role="tabpanel">
+      <section id="panel-plan" class="tab-panel active" data-panel="plan" role="tabpanel" aria-labelledby="tab-plan">
 
         <div class="plan-layout">
 
@@ -512,7 +513,7 @@
       <!-- =======================================================
            TAB: TARGETS
            ======================================================= -->
-      <section id="panel-targets" class="tab-panel" data-panel="targets" role="tabpanel">
+      <section id="panel-targets" class="tab-panel" data-panel="targets" role="tabpanel" aria-labelledby="tab-targets">
         <section class="dashboard-card target-organizer-card">
           <div class="section-heading-row target-heading">
             <div>
@@ -660,7 +661,7 @@
       <!-- =======================================================
            TAB: HUNDO CP
            ======================================================= -->
-      <section id="panel-hundo" class="tab-panel" data-panel="hundo" role="tabpanel">
+      <section id="panel-hundo" class="tab-panel" data-panel="hundo" role="tabpanel" aria-labelledby="tab-hundo">
         <div class="hundo-workspace">
           <section class="dashboard-card hundo-search-card">
           <div class="section-heading-row">
@@ -766,7 +767,7 @@
       <!-- =======================================================
            TAB: PREFERENCES
            ======================================================= -->
-      <section id="panel-preferences" class="tab-panel" data-panel="preferences" role="tabpanel">
+      <section id="panel-preferences" class="tab-panel" data-panel="preferences" role="tabpanel" aria-labelledby="tab-preferences">
         <div class="settings-layout">
 
           <section class="dashboard-card">
@@ -928,7 +929,7 @@
       <!-- =======================================================
            TAB: CALENDAR
            ======================================================= -->
-      <section id="panel-calendar" class="tab-panel" data-panel="calendar" role="tabpanel">
+      <section id="panel-calendar" class="tab-panel" data-panel="calendar" role="tabpanel" aria-labelledby="tab-calendar">
 
         <section class="dashboard-card calendar-subscription-card">
           <div class="calendar-subscription-head">
@@ -1495,6 +1496,6 @@
 <script src="/planner-hundo-logic.js?v=2"></script>
 <script src="/planner-battle-plan-logic.js?v=1"></script>
 <script src="/planner-battle-intel.js?v=1"></script>
-<script src="/planner-app.js?v=3"></script>
+<script src="/planner-app.js?v=4"></script>
 </body>
 </html>

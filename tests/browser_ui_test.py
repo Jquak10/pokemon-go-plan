@@ -1033,6 +1033,87 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         )
         self.assert_no_horizontal_overflow(page)
 
+    def test_planner_tabs_support_roving_keyboard_navigation(self):
+        page = self.open_planner(1280, 900)
+
+        tabs = page.locator('[role="tab"][data-tab]')
+        self.assertEqual(
+            tabs.count(),
+            5,
+        )
+
+        self.assertEqual(
+            tabs.evaluate_all(
+                "elements => elements.map(element => element.tabIndex)"
+            ),
+            [0, -1, -1, -1, -1],
+        )
+
+        plan = page.locator("#tab-plan")
+        plan.focus()
+        page.keyboard.press("ArrowRight")
+
+        self.assertEqual(
+            page.evaluate("() => document.activeElement?.id"),
+            "tab-targets",
+        )
+        self.assertTrue(
+            page.locator("#tab-targets").evaluate(
+                "element => element.classList.contains('active')"
+            )
+        )
+        self.assertEqual(
+            tabs.evaluate_all(
+                "elements => elements.map(element => element.tabIndex)"
+            ),
+            [-1, 0, -1, -1, -1],
+        )
+        self.assertEqual(
+            page.evaluate(
+                "() => sessionStorage.getItem('raid-planner-tab')"
+            ),
+            "targets",
+        )
+
+        page.keyboard.press("End")
+        self.assertEqual(
+            page.evaluate("() => document.activeElement?.id"),
+            "tab-calendar",
+        )
+        self.assertEqual(
+            page.locator("#tab-calendar").get_attribute(
+                "aria-selected"
+            ),
+            "true",
+        )
+
+        page.keyboard.press("Home")
+        self.assertEqual(
+            page.evaluate("() => document.activeElement?.id"),
+            "tab-plan",
+        )
+
+        page.keyboard.press("ArrowLeft")
+        self.assertEqual(
+            page.evaluate("() => document.activeElement?.id"),
+            "tab-calendar",
+            "ArrowLeft from the first tab must wrap to the last visible tab",
+        )
+
+        page.keyboard.press("ArrowRight")
+        self.assertEqual(
+            page.evaluate("() => document.activeElement?.id"),
+            "tab-plan",
+            "ArrowRight from the last tab must wrap to the first visible tab",
+        )
+        self.assertEqual(
+            page.locator("#tab-plan").get_attribute(
+                "aria-selected"
+            ),
+            "true",
+        )
+        self.assert_no_horizontal_overflow(page)
+
     def test_single_target_delete_failure_stays_visible_in_targets_context(self):
         self.server.target_delete_mode = "fail"
         page = self.open_planner(1024, 800)
@@ -1849,8 +1930,21 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         )
 
         more_button = page.locator("#mobileMoreButton")
+        self.assertFalse(
+            more_button.evaluate(
+                "element => Boolean(element.closest('[role=tablist]'))"
+            ),
+            "Mobile More must sit outside the ARIA tablist",
+        )
+        self.assertIsNone(
+            more_button.get_attribute("aria-selected"),
+        )
+        self.assertIsNone(
+            more_button.get_attribute("role"),
+        )
+
         more_button.focus()
-        more_button.click()
+        page.keyboard.press("Enter")
 
         more = page.locator("#mobileMoreBackdrop")
         more.wait_for(state="visible")

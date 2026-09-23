@@ -27,20 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-026 — Complete keyboard semantics for Planner tabs
-
-**Priority:** Medium · accessibility
-
-The Planner navigation advertises `role="tablist"` / `role="tab"`, but it currently relies on ordinary button Tab/Enter behavior and does not implement the standard roving-tabindex and Arrow/Home/End interactions expected for an ARIA tab set. The mobile More control also lives inside the tablist even though it opens a sheet rather than a tab.
-
-Done when:
-
-- desktop tab semantics and keyboard behavior follow the ARIA tabs interaction model;
-- only the active/roving tab participates in the intended tab stop pattern;
-- ArrowLeft/ArrowRight and Home/End work predictably;
-- More retains correct non-tab semantics on mobile;
-- browser regressions cover keyboard navigation and focus.
-
 ### BL-027 — Enforce the production-main PR/check policy in GitHub
 
 **Priority:** Medium · release safety
@@ -100,6 +86,6 @@ BL-011 was completed through the incremental Planner/Worker modularization serie
 
 The first fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, BL-014 in PR #59, BL-015 in PR #60, BL-016 in PR #61, BL-017 in PR #62, and BL-018 in PR #63.
 
-A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65, BL-020 in PR #67, BL-021 in PR #68, BL-022 in PR #69, and BL-023 in PR #70. BL-024 is implemented by the parent change and removed from Active. BL-025 is implemented by the current change and removed from Active; BL-026 through BL-028 remain above. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
+A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65, BL-020 in PR #67, BL-021 in PR #68, BL-022 in PR #69, BL-023 in PR #70, BL-024 in PR #71, and BL-025 in PR #73. BL-026 is implemented by the current change and removed from Active; BL-027 through BL-028 remain above. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

@@ -494,6 +494,24 @@
     display: flex;
   }
 
+  #mobileMoreButton {
+    position: fixed;
+    z-index: 91;
+    right: 13px;
+    bottom:
+      calc(
+        13px +
+        env(safe-area-inset-bottom)
+      );
+    width:
+      calc(
+        (100vw - 38px) / 5
+      );
+    min-height: 54px;
+    margin: 0;
+    justify-content: center;
+  }
+
   .tab-count {
     position: absolute;
     top: 3px;
