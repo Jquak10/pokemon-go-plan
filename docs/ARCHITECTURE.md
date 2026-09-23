@@ -222,6 +222,22 @@ Width behavior:
 
 Sticky elements must begin at their natural section position and must not cover content that precedes them. No desktop or intermediate layout may introduce horizontal page scrolling.
 
+### 5.4 Production branch enforcement
+
+GitHub enforces the production `main` branch with the repository ruleset **Production main**. The ruleset targets the default branch only and has no bypass actors.
+
+Current invariants:
+
+- changes to `main` require a pull request;
+- required PR checks are exactly `deterministic` and `browser-ui`;
+- `live-contract` remains non-blocking because it depends on external Pokémon/event availability and intentionally does not run on pull requests;
+- strict "branch must be up to date" mode is disabled, so PRs are not forced into redundant rebuilds solely because `main` moved;
+- deletion of `main` is blocked;
+- non-fast-forward updates/force pushes to `main` are blocked;
+- there are no routine owner/admin bypass actors.
+
+The public branch endpoint must report `protected: true`. The ruleset is repository-owned operational configuration, while `AGENTS.md` records the matching development workflow.
+
 ### 5.4 CSS cache discipline
 
 Whenever public/styles.css changes, every page that references it must have its CSS cache/version reference bumped. This prevents stale production styling after deployment.
