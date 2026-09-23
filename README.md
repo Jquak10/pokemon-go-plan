@@ -303,6 +303,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 - **Cron Triggers** run separate event, official Remote Raid limit, and automatic meta synchronization jobs every six hours; the meta sync also refreshes versioned raid-ranking profiles.
 - **GitHub and Cloudflare** provide the production path: feature branch → PR → `main` → the existing Cloudflare deployment pipeline.
 - The production `main` branch is protected by the active **Production main** GitHub ruleset: changes must arrive through a PR, `deterministic` and `browser-ui` must pass, `live-contract` stays non-blocking, and force pushes/deletion are blocked. The ruleset has no routine bypass actors.
+- The required `deterministic` gate installs dependencies reproducibly with `npm ci` and runs `npm run check:worker`, which packages the Worker with Wrangler `deploy --dry-run` without uploading it. This validates the lockfile plus Worker bundle/configuration before merge.
 - **VS Code Dev Containers** provide the development toolchain while source remains on Windows.
 
 ```text
