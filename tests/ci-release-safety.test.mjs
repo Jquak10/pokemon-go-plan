@@ -1,0 +1,132 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const read = relative =>
+  readFileSync(
+    new URL(
+      `../${relative}`,
+      import.meta.url
+    ),
+    "utf8"
+  );
+
+const packageJson =
+  JSON.parse(
+    read("package.json")
+  );
+
+const packageLock =
+  JSON.parse(
+    read("package-lock.json")
+  );
+
+const workflow =
+  read(
+    ".github/workflows/raid-ranking-regression.yml"
+  );
+
+const gitignore =
+  read(".gitignore");
+
+const workerCheck =
+  packageJson.scripts?.[
+    "check:worker"
+  ] || "";
+
+assert.match(
+  workerCheck,
+  /\bwrangler deploy\b/
+);
+assert.match(
+  workerCheck,
+  /--dry-run\b/,
+  "Worker packaging validation must never perform a live deploy"
+);
+assert.match(
+  workerCheck,
+  /--outdir\s+\.wrangler\/ci-dry-run\b/,
+  "Worker dry-run output must stay in the ignored .wrangler directory"
+);
+assert.match(
+  gitignore,
+  /^\.wrangler\/$/m,
+  "Wrangler CI output must remain gitignored"
+);
+
+const deterministic =
+  workflow.match(
+    /^  deterministic:\n([\s\S]*?)(?=^  browser-ui:)/m
+  )?.[1] || "";
+
+assert.ok(
+  deterministic,
+  "CI must contain the deterministic PR gate"
+);
+
+const installIndex =
+  deterministic.indexOf(
+    "run: npm ci"
+  );
+const testIndex =
+  deterministic.indexOf(
+    "run: npm test"
+  );
+const packageIndex =
+  deterministic.indexOf(
+    "run: npm run check:worker"
+  );
+
+assert.ok(
+  installIndex >= 0,
+  "Deterministic CI must install dependencies with npm ci"
+);
+assert.ok(
+  testIndex > installIndex,
+  "npm ci must run before the test suite"
+);
+assert.ok(
+  packageIndex > testIndex,
+  "Worker packaging validation must run after the test suite"
+);
+assert.match(
+  deterministic,
+  /actions\/setup-node@v4[\s\S]*cache:\s*npm/,
+  "Deterministic CI should reuse npm's lockfile-aware cache"
+);
+
+assert.equal(
+  packageLock.lockfileVersion,
+  3,
+  "Repository dependency installation must remain lockfile-backed"
+);
+assert.equal(
+  packageLock.packages?.[""]
+    ?.devDependencies
+    ?.wrangler,
+  packageJson.devDependencies
+    ?.wrangler,
+  "package.json and package-lock.json must agree on the Wrangler dependency range"
+);
+
+const installedWrangler =
+  packageLock.packages?.[
+    "node_modules/wrangler"
+  ]?.version;
+
+assert.match(
+  String(
+    installedWrangler || ""
+  ),
+  /^\d+\.\d+\.\d+$/,
+  "package-lock.json must pin an installed Wrangler version"
+);
+
+assert.match(
+  workflow,
+  /^  live-contract:\n\s+if: github\.event_name != 'pull_request'/m,
+  "The external live-contract job must remain non-blocking on pull requests"
+);
+
+console.log(
+  "CI dependency-install and Worker packaging checks passed."
+);

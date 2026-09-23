@@ -27,18 +27,7 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-028 — Validate dependency install and Worker packaging in CI
-
-**Priority:** Medium · release safety
-
-The deterministic CI job currently runs JavaScript syntax checks and the test suite without first installing repository dependencies, and it does not perform a Wrangler packaging/configuration validation. The tests can therefore pass even if the lockfile/dependency install or Worker bundle/configuration has become undeployable.
-
-Done when:
-
-- CI installs dependencies reproducibly from the lockfile;
-- CI performs a non-deploying Wrangler build/package/config validation appropriate to the current Worker setup;
-- protected bindings/routes/Cron/deployment configuration remain unchanged unless intentionally modified;
-- the validation is deterministic and suitable as a PR gate.
+No confirmed active backlog items.
 
 ## Deferred
 
@@ -72,6 +61,6 @@ BL-011 was completed through the incremental Planner/Worker modularization serie
 
 The first fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, BL-014 in PR #59, BL-015 in PR #60, BL-016 in PR #61, BL-017 in PR #62, and BL-018 in PR #63.
 
-A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65, BL-020 in PR #67, BL-021 in PR #68, BL-022 in PR #69, BL-023 in PR #70, BL-024 in PR #71, BL-025 in PR #73, and BL-026 in PR #74. BL-027 is completed by the active Production main GitHub ruleset plus PR #75 repository documentation; BL-028 remains above. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
+A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65, BL-020 in PR #67, BL-021 in PR #68, BL-022 in PR #69, BL-023 in PR #70, BL-024 in PR #71, BL-025 in PR #73, BL-026 in PR #74, and BL-027 in PR #75. BL-028 is implemented by the current change, leaving no active items from that audit. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

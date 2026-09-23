@@ -111,10 +111,11 @@ After editing:
 4. Run appropriate syntax checks for every changed JavaScript file.
 5. Run relevant existing automated tests/checks.
 6. Run targeted behavioral checks appropriate to the change.
-7. For UI/responsive changes, require the PR's automated Chromium `browser-ui` job to pass. Treat deterministic/unit/browser checks as PR gates; do not make an external live-contract check a required PR gate because upstream availability can fail independently of the branch. The browser regression test starts/stops its own fixture server; never ask the user to manually start Wrangler or another server just to satisfy this test. Keep browser fixtures deterministic and independent of the live Pokémon/event rotation; update them only when the product contract they encode intentionally changes.
-8. Use `npm run dev` / local Worker testing when the change affects runtime behavior and a separate local smoke test is useful.
-9. Confirm no unrelated files changed.
-10. Confirm protected Cloudflare/D1/deployment files did not change unless explicitly required.
+7. The required `deterministic` PR gate must install repository dependencies with `npm ci` from `package-lock.json`, then run syntax/tests and `npm run check:worker`. The Worker check must remain a non-deploying Wrangler dry run that validates the current Worker bundle/configuration; never replace it with a live deploy in CI.
+8. For UI/responsive changes, require the PR's automated Chromium `browser-ui` job to pass. Treat deterministic/unit/browser checks as PR gates; do not make an external live-contract check a required PR gate because upstream availability can fail independently of the branch. The browser regression test starts/stops its own fixture server; never ask the user to manually start Wrangler or another server just to satisfy this test. Keep browser fixtures deterministic and independent of the live Pokémon/event rotation; update them only when the product contract they encode intentionally changes.
+9. Use `npm run dev` / local Worker testing when the change affects runtime behavior and a separate local smoke test is useful.
+10. Confirm no unrelated files changed.
+11. Confirm protected Cloudflare/D1/deployment files did not change unless explicitly required.
 
 If validation fails, diagnose and fix it before continuing.
 
