@@ -33,6 +33,8 @@ It is intentionally different from the other repository references:
 
 `main` is the production branch and repository policy requires feature branches, PR review flow, and passing deterministic/browser checks, but GitHub currently reports `main` as unprotected. The release policy is therefore convention rather than an enforced repository guardrail.
 
+**Current implementation status (23 September 2026):** repository verification still reports `main.protected = false` and no repository rulesets. The exact target policy is now documented in the BL-027 branch, but the GitHub administration setting must still be activated before this item can be removed from Active.
+
 Done when:
 
 - a GitHub branch protection/ruleset requires PR-based changes to `main`;
