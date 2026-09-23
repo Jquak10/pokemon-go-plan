@@ -893,6 +893,7 @@ The following sequence is retained as a compact repository implementation/change
 | #73 | BL-025 single-target deletion failure UX | Clean replay from post-#71 `main`; handles single-target delete failures locally in Planner Targets, reports progress/failure in an `aria-live` status region, preserves target/search/tab context on failure, retains reload-on-success behavior, and covers both outcomes in Chromium. |
 | #74 | BL-026 Planner tab keyboard semantics | Implements roving tabindex and ArrowLeft/ArrowRight/Home/End activation across true Planner tabs, adds explicit tab/panel ARIA relationships, moves Mobile More outside the tablist while preserving its mobile fifth-slot layout, and covers keyboard/focus behavior in Chromium. |
 | #75 | BL-027 production-main enforcement | Records the active `Production main` GitHub ruleset after verification that `main` reports `protected: true`; the ruleset requires PRs plus `deterministic` and `browser-ui`, leaves `live-contract` non-blocking and strict up-to-date mode off, blocks deletion/force pushes, and has no bypass actors. |
+| #76 | BL-028 dependency install and Worker packaging CI gate | Makes the required `deterministic` PR job run lockfile-backed `npm ci` and a non-deploying Wrangler `deploy --dry-run` package/config check, with a regression that preserves the install/package gate and keeps `live-contract` non-blocking. |
 
 ## Supersession map
 
