@@ -134,6 +134,31 @@ Once validation succeeds:
 4. Create a concise conventional commit message.
 5. Confirm the worktree is clean after the commit.
 
+## Production `main` enforcement
+
+The GitHub repository must enforce the production branch policy with an **active branch ruleset** targeting the default branch (`main`).
+
+Required rules:
+
+- Require a pull request before merging. This repository may use 0 required approving reviews because it is maintained as a single-owner project; the PR boundary itself is mandatory.
+- Require status checks to pass before merging:
+  - `deterministic`
+  - `browser-ui`
+- Do **not** require `live-contract` on pull requests. It intentionally does not run for `pull_request` events because external Pokémon/event availability can fail independently of a branch.
+- Do not require branches to be up to date before merging unless the repository policy is deliberately changed later. The required deterministic/browser checks must still pass on the PR head used for merge.
+- Restrict deletion of `main`.
+- Block force pushes to `main`.
+- Do not add a routine administrator/owner bypass. Emergency bypass should require an explicit temporary ruleset change with the reason documented.
+
+If a required job name changes, update the GitHub ruleset in the same maintenance change. A green workflow run is not sufficient if GitHub is no longer enforcing these checks.
+
+Verification:
+
+- the public branch endpoint for `main` must report `protected: true`;
+- a ruleset/branch-protection view in GitHub Settings must show PR enforcement plus required `deterministic` and `browser-ui` checks;
+- `live-contract` must remain non-required;
+- force pushes and deletion must remain blocked.
+
 ## GitHub workflow
 
 After a successful commit:
