@@ -201,6 +201,9 @@ Current invariants:
 - the mobile Targets filter drawer gains modal dialog semantics only while it is mounted/open as a mobile sheet and is removed from the keyboard flow while closed;
 - overlay-specific page scroll locks remain responsible for preventing background scrolling while foreground content can scroll;
 - Planner keyboard focus uses a visible `:focus-visible` ring;
+- Planner section tabs use the ARIA tabs interaction model: exactly one visible tab participates in the roving tab stop, ArrowLeft/ArrowRight move and activate with wraparound, and Home/End jump to the first/last visible tab without forcing content scroll;
+- each `role="tab"` has a stable ID/`aria-controls` relationship to its `role="tabpanel"`/`aria-labelledby` peer;
+- the mobile More disclosure is not part of the tablist and retains ordinary button semantics while occupying the fifth visual bottom-nav slot;
 - `prefers-reduced-motion: reduce` collapses Planner animation/transition durations and disables smooth tab scrolling.
 
 `planner-app.js` remains responsible for overlay-specific open/close business state and scroll-lock mechanics; `planner-overlay.js` owns the cross-overlay keyboard/focus/isolation contract.
@@ -223,9 +226,9 @@ Sticky elements must begin at their natural section position and must not cover 
 
 Whenever public/styles.css changes, every page that references it must have its CSS cache/version reference bumped. This prevents stale production styling after deployment.
 
-The current shared CSS cache generation is v42 after the BL-011G Planner stylesheet split. Future `styles.css` changes must continue the version bump. Planner-only overrides are loaded separately from `planner.css`; BL-016 advances the Planner-only stylesheet reference to v2 for focus-visible and reduced-motion rules without changing shared `styles.css`.
+The current shared CSS cache generation is v42 after the BL-011G Planner stylesheet split. Future `styles.css` changes must continue the version bump. Planner-only overrides are loaded separately from `planner.css`; BL-026 advances the Planner-only stylesheet reference to v3 for the Mobile More fifth-slot positioning needed after moving that control outside the ARIA tablist, without changing shared `styles.css`.
 
-JavaScript assets use explicit query-version bumps when their browser contract changes. BL-018 advances the `planner-client.js` reference from v2 to v3 so cached clients cannot retain the old unconditional-`response.json()` behavior after deployment.
+JavaScript assets use explicit query-version bumps when their browser contract changes. BL-018 advances the `planner-client.js` reference from v2 to v3 so cached clients cannot retain the old unconditional-`response.json()` behavior after deployment. BL-026 advances `planner-app.js` from v3 to v4 for the roving-tabindex and keyboard-navigation contract.
 
 ## 6. Server modules
 
