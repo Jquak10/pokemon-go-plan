@@ -302,17 +302,81 @@ assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
 assert.match(manage, /<script src="\/planner-client\.js\?v=3"><\/script>/);
 assert.match(manage, /<script src="\/planner-overlay\.js\?v=1"><\/script>/);
-assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=2">/);
+assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=3">/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-intel\.js\?v=1"><\/script>/);
-assert.match(manage, /<script src="\/planner-app\.js\?v=3"><\/script>/);
+assert.match(manage, /<script src="\/planner-app\.js\?v=4"><\/script>/);
 assert.match(manage, /PlannerBattleIntel/);
+const plannerTablistMarkup =
+  manageHtml.match(
+    /<nav[^>]*role="tablist"[^>]*>[\s\S]*?<\/nav>/
+  )?.[0] || "";
+
+assert.ok(
+  plannerTablistMarkup,
+  "Planner must expose a tablist"
+);
+assert.doesNotMatch(
+  plannerTablistMarkup,
+  /mobileMoreButton/,
+  "Mobile More must not live inside the ARIA tablist"
+);
+assert.match(
+  manageHtml,
+  /<\/nav>\s*<button\s+id="mobileMoreButton"[\s\S]*aria-expanded="false"[\s\S]*aria-controls="mobileMoreSheet"/
+);
+assert.doesNotMatch(
+  manageHtml.match(
+    /<button\s+id="mobileMoreButton"[\s\S]*?<\/button>/
+  )?.[0] || "",
+  /role="tab"|aria-selected|data-tab=/,
+  "Mobile More must remain a non-tab disclosure button"
+);
+
+for (const [name, expectedTabIndex] of [
+  ["plan", "0"],
+  ["targets", "-1"],
+  ["hundo", "-1"],
+  ["preferences", "-1"],
+  ["calendar", "-1"]
+]) {
+  assert.match(
+    plannerTablistMarkup,
+    new RegExp(
+      `id="tab-${name}"[\\s\\S]*role="tab"[\\s\\S]*aria-controls="panel-${name}"[\\s\\S]*tabindex="${expectedTabIndex}"`
+    )
+  );
+
+  assert.match(
+    manageHtml,
+    new RegExp(
+      `id="panel-${name}"[\\s\\S]*role="tabpanel"[\\s\\S]*aria-labelledby="tab-${name}"`
+    )
+  );
+}
+
 assert.match(
   plannerApp,
-  /querySelectorAll\("\.tab-button\[data-tab\]"\)\.forEach\(button => \{\s*button\.addEventListener\("click", \(\) => activateTab\(button\.dataset\.tab\)\);/
+  /function syncPlannerTabState\(name\)[\s\S]*button\.tabIndex[\s\S]*rovingTab/
+);
+assert.match(
+  plannerApp,
+  /function handlePlannerTabKeydown[\s\S]*"ArrowRight"[\s\S]*"ArrowLeft"[\s\S]*"Home"[\s\S]*"End"/
+);
+assert.match(
+  plannerApp,
+  /nextTab\.focus\([\s\S]*preventScroll:[\s\S]*true[\s\S]*activateTab\([\s\S]*nextTab\.dataset\.tab[\s\S]*false/
+);
+assert.match(
+  plannerApp,
+  /plannerTabButtons\(\)[\s\S]*addEventListener\([\s\S]*"click"[\s\S]*addEventListener\([\s\S]*"keydown"[\s\S]*handlePlannerTabKeydown/
+);
+assert.match(
+  plannerStyles,
+  /#mobileMoreButton[\s\S]*position:\s*fixed[\s\S]*width:[\s\S]*100vw[\s\S]*\/ 5/
 );
 assert.match(
   manageHtml,
@@ -435,7 +499,7 @@ for (const page of [
 
 assert.match(
   manage,
-  /<link rel="stylesheet" href="\/planner\.css\?v=2">/
+  /<link rel="stylesheet" href="\/planner\.css\?v=3">/
 );
 for (const page of [
   "../public/index.html",
@@ -465,7 +529,7 @@ assert.match(manage, /item\.label \|\| "Priority"/);
 // BL-017: the Planner must remain executable with script-src 'self' only.
 assert.match(
   manageHtml,
-  /<script src="\/planner-app\.js\?v=3"><\/script>/
+  /<script src="\/planner-app\.js\?v=4"><\/script>/
 );
 
 const inlineScripts = [
