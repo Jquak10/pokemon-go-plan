@@ -20,11 +20,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      - name: Install repository dependencies
+        run: npm ci
       - name: Check JavaScript syntax
         run: |
           find src public tests -type f \( -name '*.js' -o -name '*.mjs' \) -print0 \
             | xargs -0 -n1 node --check
       - run: npm test
+      - name: Validate Worker package
+        run: npm run check:worker
       - run: git diff --check
 
   browser-ui:
