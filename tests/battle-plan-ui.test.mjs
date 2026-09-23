@@ -2664,7 +2664,8 @@ assert.doesNotMatch(manage, /separate Raid-only rule/i);
 
 // Part 8 mobile actions remain 44px+ and only real tabs receive tab state.
 assert.match(plannerStyles, /recommendation-footer-row \.log-raid-button,[\s\S]*min-height:\s*44px/);
-assert.match(manage, /querySelectorAll\("\.tab-button\[data-tab\]"\)/);
+assert.match(plannerApp, /plannerTabButtons\(\)/);
+assert.match(manageHtml, /role="tablist"/);
 
 
 assert.match(plannerStyles, /Desktop text visibility \+ Max battle-intel hardening · v37/);
