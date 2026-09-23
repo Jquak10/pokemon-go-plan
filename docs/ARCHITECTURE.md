@@ -238,7 +238,15 @@ Current invariants:
 
 The public branch endpoint must report `protected: true`. The ruleset is repository-owned operational configuration, while `AGENTS.md` records the matching development workflow.
 
-### 5.4 CSS cache discipline
+### 5.5 Required PR packaging validation
+
+The required `deterministic` GitHub Actions job is also the release-packaging gate. It uses Node 22, restores npm's lockfile-aware cache, runs `npm ci` against `package-lock.json`, then executes JavaScript syntax checks, the deterministic test suite, and `npm run check:worker`.
+
+`npm run check:worker` runs `wrangler deploy --dry-run --outdir .wrangler/ci-dry-run`. This invokes the same Wrangler bundling/configuration path used for deployment but does not upload or deploy the Worker. The output directory is already ignored by Git. This catches broken dependency/lockfile state and Worker packaging/config errors before a PR can merge without changing D1 bindings, routes, Cron triggers, secrets, or other production configuration.
+
+The external `live-contract` job remains separate and non-blocking on pull requests.
+
+### 5.6 CSS cache discipline
 
 Whenever public/styles.css changes, every page that references it must have its CSS cache/version reference bumped. This prevents stale production styling after deployment.
 
