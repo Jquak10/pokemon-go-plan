@@ -7,11 +7,15 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
     "run_worker_first": [
       "/api/*",
       "/calendar/*",
-      "/manage/*",
-      "/admin"
+      "/",
+      "/sources",
+      "/admin",
+      "/manage",
+      "/manage/*"
     ]
   },
   "d1_databases": [

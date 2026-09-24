@@ -77,6 +77,79 @@ function assertContentType(
   );
 }
 
+function assertHardenedHtmlHeaders(
+  response,
+  label,
+  {
+    noStore = false
+  } = {}
+) {
+  const csp =
+    response.headers.get(
+      "content-security-policy"
+    ) || "";
+
+  assert.match(
+    csp,
+    /(?:^|;\s*)script-src 'self'(?:;|$)/,
+    `${label} must use the strict same-origin script CSP`
+  );
+  assert.doesNotMatch(
+    csp,
+    /script-src[^;]*'unsafe-inline'/,
+    `${label} must not allow inline executable script`
+  );
+
+  for (const [
+    header,
+    expected
+  ] of [
+    ["referrer-policy", "no-referrer"],
+    ["x-content-type-options", "nosniff"],
+    ["x-frame-options", "DENY"],
+    ["cross-origin-opener-policy", "same-origin"],
+    ["cross-origin-resource-policy", "same-origin"]
+  ]) {
+    assert.equal(
+      response.headers.get(
+        header
+      ),
+      expected,
+      `${label} is missing hardened ${header}`
+    );
+  }
+
+  const permissions =
+    response.headers.get(
+      "permissions-policy"
+    ) || "";
+
+  for (const directive of [
+    "camera=()",
+    "microphone=()",
+    "geolocation=()",
+    "payment=()",
+    "usb=()"
+  ]) {
+    assert.ok(
+      permissions.includes(
+        directive
+      ),
+      `${label} permissions policy is missing ${directive}`
+    );
+  }
+
+  if (noStore) {
+    assert.match(
+      response.headers.get(
+        "cache-control"
+      ) || "",
+      /no-store/i,
+      `${label} must remain no-store`
+    );
+  }
+}
+
 function versionedLocalAssets(
   html
 ) {
@@ -308,6 +381,10 @@ async function runSmokeAttempt({
     landingResponse,
     /text\/html/i
   );
+  assertHardenedHtmlHeaders(
+    landingResponse,
+    "Landing page"
+  );
 
   const landingHtml =
     await landingResponse.text();
@@ -386,6 +463,10 @@ async function runSmokeAttempt({
     sourcesResponse,
     /text\/html/i
   );
+  assertHardenedHtmlHeaders(
+    sourcesResponse,
+    "Data Sources page"
+  );
 
   const sourcesHtml =
     await sourcesResponse.text();
@@ -395,6 +476,114 @@ async function runSmokeAttempt({
     /<h1>Data Sources &amp; Precedence<\/h1>|<h1>Data Sources & Precedence<\/h1>/,
     "Data Sources page heading is missing"
   );
+
+  for (const {
+    path,
+    label
+  } of [
+    {
+      path: "/admin",
+      label: "Admin page"
+    },
+    {
+      path: "/manage",
+      label: "Direct Planner shell"
+    }
+  ]) {
+    const response =
+      await fetchWithTimeout(
+        new URL(
+          path,
+          baseUrl
+        ),
+        {
+          headers: {
+            accept: "text/html"
+          }
+        },
+        timeoutMs
+      );
+
+    assert.equal(
+      response.status,
+      200,
+      `${label} returned HTTP ${response.status}`
+    );
+    assertContentType(
+      response,
+      /text\/html/i
+    );
+    assertHardenedHtmlHeaders(
+      response,
+      label,
+      {
+        noStore: true
+      }
+    );
+    await response.text();
+  }
+
+  for (const {
+    path,
+    canonicalPath,
+    label
+  } of [
+    {
+      path: "/index.html",
+      canonicalPath: "/",
+      label: "Direct landing HTML"
+    },
+    {
+      path: "/sources.html",
+      canonicalPath: "/sources",
+      label: "Direct Data Sources HTML"
+    },
+    {
+      path: "/admin.html",
+      canonicalPath: "/admin",
+      label: "Direct Admin HTML"
+    },
+    {
+      path: "/manage.html",
+      canonicalPath: "/manage",
+      label: "Direct Planner HTML"
+    }
+  ]) {
+    const response =
+      await fetchWithTimeout(
+        new URL(
+          path,
+          baseUrl
+        ),
+        {
+          redirect: "manual",
+          headers: {
+            accept: "text/html"
+          }
+        },
+        timeoutMs
+      );
+
+    assert.equal(
+      response.status,
+      307,
+      `${label} must preserve Cloudflare's canonical HTML redirect`
+    );
+
+    const location =
+      response.headers.get(
+        "location"
+      ) || "";
+
+    assert.equal(
+      new URL(
+        location,
+        baseUrl
+      ).pathname,
+      canonicalPath,
+      `${label} must redirect to ${canonicalPath}`
+    );
+  }
 
   const plannerResponse =
     await fetchWithTimeout(
@@ -419,12 +608,12 @@ async function runSmokeAttempt({
     plannerResponse,
     /text\/html/i
   );
-  assert.match(
-    plannerResponse.headers.get(
-      "cache-control"
-    ) || "",
-    /no-store/i,
-    "Private Planner shell responses must remain no-store"
+  assertHardenedHtmlHeaders(
+    plannerResponse,
+    "Synthetic Planner shell",
+    {
+      noStore: true
+    }
   );
 
   const plannerHtml =
