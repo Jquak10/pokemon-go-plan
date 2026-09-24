@@ -1,5 +1,10 @@
 import { targetMatchesBattle, matchingBattleTargets } from './battle-targets.js';
 import { maxBattleVariantFromText } from './battle-opportunities.js';
+import {
+  PLANNER_STORAGE_LIMITS,
+  battleLogDailyLimitMessage,
+  battleLogTotalLimitMessage
+} from './planner-storage-limits.js';
 
 export class BattleLogError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -81,12 +86,76 @@ export function battleStorageError(error) {
 export async function createBattleLog(db, userId, localDate, timestamp, id, input) {
   const fields = Object.keys(input);
   try {
-    // ON CONFLICT targets only the id: other constraint failures must not be ignored.
+    // The conditional SELECT keeps the storage bounds race-safe without a
+    // schema migration. An idempotent retry for an existing request ID is
+    // always allowed through to ON CONFLICT so it can return the original row.
     await db.prepare(`INSERT INTO battle_log (id, user_id, local_date, created_at, ${fields.join(',')})
-      VALUES (?, ?, ?, ?, ${fields.map(() => '?').join(',')}) ON CONFLICT(id) DO NOTHING`)
-      .bind(id, userId, localDate, timestamp, ...Object.values(input)).run();
-    const row = await db.prepare('SELECT * FROM battle_log WHERE id = ? AND user_id = ?').bind(id, userId).first();
-    if (!row || fields.some(field => row[field] !== input[field])) {
+      SELECT ?, ?, ?, ?, ${fields.map(() => '?').join(',')}
+      WHERE EXISTS (
+        SELECT 1 FROM battle_log
+        WHERE id = ? AND user_id = ?
+      )
+      OR (
+        (SELECT COUNT(*) FROM battle_log WHERE user_id = ?) < ?
+        AND
+        (SELECT COUNT(*) FROM battle_log WHERE user_id = ? AND local_date = ?) < ?
+      )
+      ON CONFLICT(id) DO NOTHING`)
+      .bind(
+        id,
+        userId,
+        localDate,
+        timestamp,
+        ...Object.values(input),
+        id,
+        userId,
+        userId,
+        PLANNER_STORAGE_LIMITS.battle_logs_total,
+        userId,
+        localDate,
+        PLANNER_STORAGE_LIMITS.battle_logs_per_local_day
+      ).run();
+
+    const row = await db.prepare(
+      'SELECT * FROM battle_log WHERE id = ? AND user_id = ?'
+    ).bind(id, userId).first();
+
+    if (!row) {
+      const counts = await db.prepare(`
+        SELECT
+          COUNT(*) AS total_count,
+          SUM(CASE WHEN local_date = ? THEN 1 ELSE 0 END) AS daily_count
+        FROM battle_log
+        WHERE user_id = ?
+      `).bind(localDate, userId).first();
+
+      if (
+        Number(counts?.total_count || 0) >=
+        PLANNER_STORAGE_LIMITS.battle_logs_total
+      ) {
+        throw new BattleLogError(
+          battleLogTotalLimitMessage(),
+          409
+        );
+      }
+
+      if (
+        Number(counts?.daily_count || 0) >=
+        PLANNER_STORAGE_LIMITS.battle_logs_per_local_day
+      ) {
+        throw new BattleLogError(
+          battleLogDailyLimitMessage(),
+          409
+        );
+      }
+
+      throw new BattleLogError(
+        'This request ID was already used for a different log. Close the logger and start again.',
+        409
+      );
+    }
+
+    if (fields.some(field => row[field] !== input[field])) {
       throw new BattleLogError('This request ID was already used for a different log. Close the logger and start again.', 409);
     }
     if (row.undone_at) throw new BattleLogError('This log was already undone. Close the logger to start a new log.', 409);
