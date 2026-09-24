@@ -2735,17 +2735,42 @@ assert.equal(
   ),
   "DENY"
 );
+const sourcesResponse =
+  await workerApp.fetch(
+    new Request(
+      "https://planner.example/sources"
+    ),
+    credentialSurfaceEnv
+  );
+
+const sourcesCsp =
+  sourcesResponse.headers.get(
+    "content-security-policy"
+  ) || "";
+
+assert.match(
+  sourcesCsp,
+  /(?:^|;\s*)script-src 'self'(?:;|$)/
+);
+assert.doesNotMatch(
+  sourcesCsp,
+  /script-src[^;]*'unsafe-inline'/
+);
+
 assert.deepEqual(
   credentialSurfaceAssetFetches,
-  ["/", "/admin"],
-  "Landing and Admin must preserve their existing asset paths"
+  ["/", "/admin", "/sources"],
+  "Landing, Admin, and Data Sources must preserve their canonical asset paths"
 );
 
 assert.ok(
   worker.includes(
-    'if (request.method === "GET" && /^\\/manage\\/[A-Za-z0-9_-]+\\/?$/.test(path))'
+    'path === "/manage"'
+  ) &&
+  worker.includes(
+    '/^\\/manage\\/[A-Za-z0-9_-]+\\/?$/.test(path)'
   ),
-  "Planner route must remain explicitly identified for strict CSP handling"
+  "Planner shell and private management routes must remain explicitly identified for strict CSP handling"
 );
 
 assert.ok(
@@ -2753,8 +2778,8 @@ assert.ok(
     worker.match(
       /allowInlineScript:\s*false/g
     ) || []
-  ).length >= 3,
-  "Planner, landing, and Admin routes must disable inline script execution"
+  ).length >= 4,
+  "Planner, landing, Admin, and Data Sources routes must disable inline script execution"
 );
 
 assert.match(
