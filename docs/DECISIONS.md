@@ -812,6 +812,26 @@ Current decision:
 
 This keeps feature UI simple: it can display `error.message` while the shared client preserves enough structured metadata for future recovery UX without duplicating parsing logic.
 
+## ADR-048 — Permanent planner deletion uses authenticated parent-row cascade
+
+Status: Current  
+Introduced in PR #77.
+
+A public planner can accumulate Targets, notes, Battle logs, resource history, preference state, per-planner overrides, and private calendar credentials. Capability rotation reduces exposure risk but is not a substitute for letting the holder of the management capability permanently remove that planner.
+
+Current decision:
+
+- permanent deletion is available only from an authenticated management session;
+- the Preferences danger zone keeps the destructive control disabled until the user types the exact phrase `DELETE`;
+- `DELETE /api/planner` independently requires the same exact confirmation in the request body, so bypassing the UI does not remove the confirmation boundary;
+- after authentication and confirmation, the Worker performs one `DELETE FROM users WHERE id = ?` operation for the authenticated planner rather than manually deleting child tables one-by-one;
+- planner-owned tables already use `FOREIGN KEY ... REFERENCES users(id) ON DELETE CASCADE`, so Targets, Remote usage/budget overrides, Max cost overrides, Battle resource state/history, legacy/new Battle logs, and signed-feed credential state are removed atomically with the parent;
+- removing the parent row immediately invalidates the management token plus signed and legacy calendar links because all authorization/feed lookup paths require the owning user row;
+- no BL-029 migration or deployment-binding change is required;
+- after successful deletion, the browser clears Planner-specific session navigation state and replaces the private management page with the public landing page, which confirms completion without retaining the deleted capability URL.
+
+Deletion is intentionally separate from ordinary preference saving and from credential rotation. Rotation remains the recovery action when a capability is exposed; deletion is irreversible data removal.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -894,6 +914,7 @@ The following sequence is retained as a compact repository implementation/change
 | #74 | BL-026 Planner tab keyboard semantics | Implements roving tabindex and ArrowLeft/ArrowRight/Home/End activation across true Planner tabs, adds explicit tab/panel ARIA relationships, moves Mobile More outside the tablist while preserving its mobile fifth-slot layout, and covers keyboard/focus behavior in Chromium. |
 | #75 | BL-027 production-main enforcement | Records the active `Production main` GitHub ruleset after verification that `main` reports `protected: true`; the ruleset requires PRs plus `deterministic` and `browser-ui`, leaves `live-contract` non-blocking and strict up-to-date mode off, blocks deletion/force pushes, and has no bypass actors. |
 | #76 | BL-028 dependency install and Worker packaging CI gate | Makes the required `deterministic` PR job run lockfile-backed `npm ci` and a non-deploying Wrangler `deploy --dry-run` package/config check, with a regression that preserves the install/package gate and keeps `live-contract` non-blocking. |
+| #77 | BL-029 permanent self-service planner deletion | Adds exact typed/server confirmation plus authenticated `DELETE /api/planner`; deleting the parent planner row uses existing D1 cascades to remove planner-owned data and immediately invalidate management/calendar capabilities, with deterministic SQLite and Chromium regressions and no migration. |
 
 ## Supersession map
 

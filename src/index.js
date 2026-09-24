@@ -9080,6 +9080,69 @@ async function revokeLegacyFeedApi(
 }
 
 
+async function deletePlannerApi(
+  request,
+  env
+) {
+  let body = {};
+
+  try {
+    body =
+      await request.json();
+  } catch {}
+
+  const user =
+    await userByManageRequest(
+      request,
+      env,
+      body
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  if (
+    String(
+      body.confirmation || ""
+    ).trim() !== "DELETE"
+  ) {
+    return bad(
+      "Type DELETE to confirm permanent planner deletion."
+    );
+  }
+
+  const result =
+    await env.DB.prepare(`
+      DELETE FROM users
+      WHERE id = ?
+    `).bind(
+      user.id
+    ).run();
+
+  if (
+    !Number(
+      result?.meta?.changes || 0
+    )
+  ) {
+    return bad(
+      "Planner not found.",
+      404
+    );
+  }
+
+  return json({
+    ok: true,
+    deleted: true,
+    note:
+      "Planner deleted permanently. Its management and calendar links are no longer valid."
+  });
+}
+
+
 async function updateRemoteRaidBudgetOverride(
   request,
   env
@@ -11569,6 +11632,16 @@ async function handleFetch(request, env) {
       path === "/api/manage-link/rotate"
     ) {
       return rotateManagementLinkApi(
+        request,
+        env
+      );
+    }
+
+    if (
+      request.method === "DELETE" &&
+      path === "/api/planner"
+    ) {
+      return deletePlannerApi(
         request,
         env
       );

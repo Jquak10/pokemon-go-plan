@@ -13,6 +13,28 @@ TimezoneValidation.attachSuggestions(
   )
 );
 
+const landingParams =
+  new URLSearchParams(
+    globalThis.location?.search || ""
+  );
+
+if (
+  landingParams.get(
+    "planner_deleted"
+  ) === "1"
+) {
+  status.textContent =
+    "Planner deleted permanently ✓";
+  status.className =
+    "save-status";
+
+  history.replaceState(
+    null,
+    "",
+    globalThis.location?.pathname || "/"
+  );
+}
+
 timezoneInput.addEventListener("keydown", event => {
   if (event.key !== "Enter") return;
 
