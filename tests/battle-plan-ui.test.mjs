@@ -20,6 +20,7 @@ function read(relative) {
 
 const portal = read("../public/index.html");
 const landingApp = read("../public/landing-app.js");
+const themeApp = read("../public/theme.js");
 const jsonApiClient = read("../public/json-api-client.js");
 const adminHtml = read("../public/admin.html");
 const adminApp = read("../public/admin-app.js");
@@ -303,7 +304,7 @@ assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
 assert.match(manage, /<script src="\/planner-client\.js\?v=3"><\/script>/);
 assert.match(manage, /<script src="\/planner-overlay\.js\?v=1"><\/script>/);
-assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=4">/);
+assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=5">/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
@@ -495,13 +496,21 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=42/);
+  const html = read(page);
+  assert.match(html, /styles\.css\?v=43/);
+  assert.match(html, /<script src="\/theme\.js\?v=1"><\/script>/);
+  assert.match(html, /data-theme-select/);
+  assert.ok(
+    html.indexOf("/theme.js?v=1") <
+      html.indexOf("/styles.css?v=43"),
+    page + " must initialize appearance before shared CSS to avoid a light flash"
+  );
 }
 
 assert.match(
   manage,
-  /<link rel="stylesheet" href="\/planner\.css\?v=4">/
-);
+  /<link rel="stylesheet" href="\/planner\.css\?v=5">/
+);\nassert.match(themeApp, /pogo-theme/);\nassert.match(themeApp, /prefers-color-scheme: dark/);\nassert.match(themeApp, /data-theme-select/);\nassert.match(themeApp, /pogo-theme-change/);\nassert.match(themeApp, /#0b1220/);\nassert.match(themeApp, /#1f6feb/);\n\nfor (const token of [\n  "--page-bg",\n  "--surface",\n  "--surface-soft",\n  "--surface-raised",\n  "--surface-glass",\n  "--ink",\n  "--muted",\n  "--line",\n  "--input-bg",\n  "--overlay-bg",\n  "--success-soft",\n  "--danger-soft",\n  "--info-soft",\n  "--violet-soft"\n]) {\n  assert.ok(\n    styles.includes(token + ":"),\n    "Missing semantic theme token " + token\n  );\n}\n\nassert.match(\n  styles,\n  /html\[data-theme="dark"\][\s\S]*--page-bg:\s*#0b1220/\n);\nassert.match(\n  styles,\n  /BL-035 — SEMANTIC APPEARANCE \+ SHARED THEME SURFACES · v43/\n);\nassert.match(\n  plannerStyles,\n  /BL-035 — PLANNER-ONLY SEMANTIC THEME SURFACES · v5/\n);\nassert.match(\n  styles,\n  /\.theme-control[\s\S]*background:\s*var\(--surface-glass\)/\n);\n
 for (const page of [
   "../public/index.html",
   "../public/admin.html",
