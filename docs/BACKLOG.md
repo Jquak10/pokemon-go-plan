@@ -1,6 +1,6 @@
 # Pokémon GO Battle Planner — Backlog
 
-Last reviewed: 24 September 2026
+Last reviewed: 25 September 2026
 
 This file is the durable home for **confirmed but unshipped work** and explicitly deferred/rejected ideas that would otherwise exist only in project chats.
 
@@ -27,7 +27,91 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-No confirmed active backlog items are currently recorded.
+### BL-042 — Complete accessibility semantics across interactive controls and status feedback
+
+Priority: High
+
+Close the remaining screen-reader semantics gaps without changing the established visual interaction model.
+
+Required outcome:
+
+- ensure every interactive form control has a programmatic accessible name, including search/filter inputs that currently rely only on placeholder text;
+- audit Landing, Planner, Data Sources, and Admin controls for missing or ambiguous labels;
+- make dynamically updated user-action feedback consistently discoverable to assistive technology with appropriate `role="status"`, `aria-live`, or equivalent semantics;
+- include the currently identified gaps such as Target search and status regions for Landing, Planner settings, Calendar, Raid/Battle logging, and Targets;
+- preserve existing focus management, keyboard navigation, modal/drawer semantics, reduced-motion behavior, and theme contrast guarantees;
+- add deterministic and real-browser regressions that fail if covered controls lose their accessible name or covered feedback regions lose their announcement semantics.
+
+No D1 migration should be introduced solely for this work.
+
+### BL-043 — Add production data-freshness monitoring
+
+Priority: High
+
+Extend production monitoring beyond page/API availability so stale Pokémon/event/meta data is detected proactively rather than only when a user opens a Planner.
+
+Required outcome:
+
+- add a secret-free, read-only production freshness signal using the existing synchronization/source-health model where practical;
+- detect materially stale event, official-source, and/or Pokémon meta synchronization state that could make recommendations or Calendar output misleading;
+- avoid alerting on a single transient sync failure when current last-known-good data is still acceptably fresh;
+- keep the monitor non-mutating and independent of private management/calendar credentials;
+- preserve the separation between deterministic PR gates and external production monitoring;
+- add deterministic fixture coverage for healthy, transiently degraded, and meaningfully stale states before enabling the live monitor.
+
+Do not invent a new data-health model if the existing source-health records can support the requirement. Inspect current production/schema state before deciding whether any migration is necessary.
+
+### BL-044 — Add a public data-handling and support surface
+
+Priority: Recommended
+
+Add a concise public trust/help surface for users who need to understand what the Planner stores or how to report a problem.
+
+Required outcome:
+
+- provide a public, easily discoverable Data Handling / Privacy / Help surface or equivalent section linked from the public product experience;
+- explain in plain language what planner data is stored, what is not stored, and that management/calendar URLs are bearer capabilities that must remain private;
+- explain Planner Backup, management-link recovery limits, calendar credential handling, and permanent planner deletion;
+- distinguish browser-local appearance preferences from planner/D1 data;
+- provide a clear route for reporting incorrect Pokémon/event data, application defects, or other support issues without asking users to expose private management/calendar URLs;
+- keep the wording accurate to the no-account/capability-link architecture and avoid implying recovery is possible without a management link or prior backup;
+- add focused browser/content regressions for discoverability and the critical privacy/recovery statements.
+
+No new account, email, identity, or analytics layer is implied by this item.
+
+### BL-045 — Update GitHub Actions for Node 24-era runner compatibility
+
+Priority: Recommended maintenance
+
+Remove the current GitHub Actions runtime deprecation warnings and keep CI on supported first-party action runtimes without weakening the required gates.
+
+Required outcome:
+
+- update first-party GitHub Actions used by Planner regression and Production smoke to current Node-24-compatible releases;
+- preserve the existing `deterministic`, `browser-ui`, `live-contract`, and Production smoke behavior/cadence;
+- keep `deterministic` and `browser-ui` as the required PR checks and keep `live-contract` non-blocking on PRs;
+- preserve lockfile-backed `npm ci`, Worker dry-run packaging, Chromium + focused WebKit coverage, and secret-free read-only production smoke;
+- reassess the repository's repeated `MODULE_TYPELESS_PACKAGE_JSON` warnings and add `"type": "module"` only if the full Node/test/Worker toolchain remains compatible;
+- update deterministic workflow-safety assertions so a future downgrade to deprecated action runtimes is caught where practical.
+
+This is CI/developer maintenance; it must not change production Pokémon GO behavior.
+
+### BL-046 — Separate current README guidance from historical rollout instructions
+
+Priority: Recommended maintenance
+
+Reduce operator confusion by keeping the README focused on the current product and moving historical one-time rollout material into a durable historical/runbook location.
+
+Required outcome:
+
+- keep the main README focused on current product usage, architecture links, current setup, current deployment/operation, and current migration state;
+- move shipped historical Part-by-Part rollout/migration instructions that are no longer meant to be executed into an appropriate durable history/runbook document rather than deleting their context;
+- clearly distinguish fresh-environment setup from historical production migrations;
+- ensure non-repeatable historical SQL instructions cannot be mistaken for current steps;
+- preserve links to architecture, decisions/supersession history, backlog, and any migration/runbook reference;
+- update documentation tests/checks if any current automation relies on README wording.
+
+This is documentation/operational-safety work only unless the implementation audit identifies a separate real deployment defect.
 
 ## Deferred
 
@@ -76,5 +160,7 @@ BL-036 shipped in PR #86 on 24 September 2026: Production smoke now checks a syn
 BL-040 shipped in PR #87 on 24 September 2026: semantic Light/Dark tokens receive deterministic WCAG contrast checks, Chromium verifies representative computed component/calendar/source contrast plus focus/disabled states, and theme changes during active overlays preserve keyboard focus, dialog/tab/live-region semantics, inert background isolation, and reduced-motion behavior. The audit also tightened the few Light-theme tokens that fell just below the new thresholds. BL-039 shipped in PR #89: **Pokémon GO Battle Planner** with **Personal Battle Strategy** is the canonical user-facing branding across Landing, Planner, Data Sources, Admin, README, architecture guidance, and production-smoke title assertions; the supporting copy explicitly covers Raids plus Dynamax/Gigantamax Max Battles without implying roster/storage management. BL-038 shipped in PR #90 with explicit management-link/backup guidance before and after planner creation, an exact new-empty-planner restore flow, and a mobile More description that surfaces access plus backup/recovery. BL-037 is implemented by PR #91 by extending the existing required `browser-ui` gate with a focused deterministic Playwright WebKit smoke suite for landing/theme, Planner shell, mobile fixed navigation and safe-area spacing, More/Preferences/backup controls, Calendar, representative overflow, and desktop sticky behavior. No active backlog items remain.
 
 A fresh post-PR-#91 product audit identified BL-041 as a verified production-routing security mismatch. PR #92 added selective Worker-first public HTML routing and stronger production smoke, but the post-merge smoke correctly proved that the live release path still served the Landing asset without the Worker CSP. PR #93 fixes the live path by using Cloudflare Static Assets `public/_headers` for public/static HTML while retaining Worker hardening on dynamic/private routes, so the deployed security policy no longer depends on public HTML being Worker-first. No D1 migration is required.
+
+The same 25 September 2026 fresh product audit identified five additional concrete follow-ups. The user explicitly promoted all of them into the durable backlog: BL-042 completes remaining accessibility semantics, BL-043 adds production data-freshness monitoring, BL-044 adds a public data-handling/support surface, BL-045 updates GitHub Actions for Node-24-era runtime compatibility, and BL-046 separates current README guidance from historical rollout instructions. These are now confirmed Active work rather than optional audit notes.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
