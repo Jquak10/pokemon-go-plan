@@ -26,6 +26,9 @@ const wranglerConfig =
     read("wrangler.jsonc")
   );
 
+const staticHeaders =
+  read("public/_headers");
+
 const workflow =
   read(
     ".github/workflows/raid-ranking-regression.yml"
@@ -156,6 +159,60 @@ assert.equal(
 );
 
 for (const path of [
+  "/api/*",
+  "/calendar/*",
+  "/admin",
+  "/manage/*"
+]) {
+  assert.ok(
+    workerFirstRoutes.includes(
+      path
+    ),
+    `Worker-first routing must preserve dynamic/private route ${path}`
+  );
+}
+
+for (const path of [
+  "/",
+  "/sources",
+  "/manage"
+]) {
+  assert.equal(
+    workerFirstRoutes.includes(
+      path
+    ),
+    false,
+    `Asset-first public HTML path ${path} must rely on public/_headers instead of billable Worker-first routing`
+  );
+}
+
+const requiredStaticHtmlHeaderBlocks = [
+  {
+    route: "/",
+    noStore: false
+  },
+  {
+    route: "/sources",
+    noStore: false
+  },
+  {
+    route: "/admin",
+    noStore: true
+  },
+  {
+    route: "/manage",
+    noStore: true
+  }
+];
+
+for (const {
+  route,
+  noStore
+} of requiredStaticHtmlHeaderBlocks) {
+  const escapedRoute =
+    route.replace(
+      /[.*+?^$\{\}()|[\]\\]/g,
+      "\\for (const path of [
   "/",
   "/sources",
   "/admin",
@@ -168,6 +225,57 @@ for (const path of [
     ),
     `Worker-first routing must cover hardened HTML entry path ${path}`
   );
+}
+"
+    );
+  const nextRoute =
+    "(?=\\n\\/|$)";
+  const block =
+    staticHeaders.match(
+      new RegExp(
+        `^${escapedRoute}\\n([\\s\\S]*?)${nextRoute}`,
+        "m"
+      )
+    )?.[1] || "";
+
+  assert.ok(
+    block,
+    `public/_headers must define ${route}`
+  );
+  assert.match(
+    block,
+    /Content-Security-Policy: .*script-src 'self'/,
+    `${route} must enforce the strict script CSP through Static Assets`
+  );
+  assert.doesNotMatch(
+    block,
+    /Content-Security-Policy: .*script-src[^\n]*'unsafe-inline'/,
+    `${route} must not allow inline executable script`
+  );
+
+  for (const expected of [
+    "Referrer-Policy: no-referrer",
+    "X-Content-Type-Options: nosniff",
+    "X-Frame-Options: DENY",
+    "Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "Cross-Origin-Opener-Policy: same-origin",
+    "Cross-Origin-Resource-Policy: same-origin"
+  ]) {
+    assert.ok(
+      block.includes(
+        expected
+      ),
+      `${route} static headers must include ${expected}`
+    );
+  }
+
+  if (noStore) {
+    assert.match(
+      block,
+      /Cache-Control: private, no-store, max-age=0/,
+      `${route} static HTML must remain no-store`
+    );
+  }
 }
 
 assert.match(
