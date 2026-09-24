@@ -547,7 +547,7 @@ assert.match(
 );
 assert.match(
   styles,
-  /BL-040 — ACCESSIBLE SEMANTIC APPEARANCE \\+ SHARED THEME SURFACES · v44/
+  /BL-040 — ACCESSIBLE SEMANTIC APPEARANCE \+ SHARED THEME SURFACES · v44/
 );
 assert.match(
   plannerStyles,
