@@ -3190,7 +3190,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             "true",
         )
 
-        planner = self.open_planner(1024, 800)
+        planner = self.open_planner(1280, 900)
         self.assertEqual(planner.locator("#loadStatus").get_attribute("role"), "status")
         for selector in (
             "#settingsStatus",
