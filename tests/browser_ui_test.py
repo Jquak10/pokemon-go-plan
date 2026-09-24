@@ -1113,7 +1113,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
 
             const parse = value => {
                 const match = value.match(
-                    /rgba?\\(\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)(?:\\s*,\\s*([\\d.]+))?\\s*\\)/i
+                    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/i
                 );
                 if (!match) {
                     throw new Error('Unsupported computed color: ' + value);
