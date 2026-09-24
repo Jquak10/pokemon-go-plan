@@ -542,6 +542,18 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
             }
             return self._json(state)
 
+        if path == "/api/calendar-events":
+            month = parse_qs(parsed.query).get(
+                "month",
+                ["2026-09"],
+            )[0]
+            return self._json(
+                {
+                    "month": month,
+                    "events": [],
+                }
+            )
+
         if path == "/api/planner/backup":
             self.server.last_backup_authorization = self.headers.get("authorization")
             return self._json(
