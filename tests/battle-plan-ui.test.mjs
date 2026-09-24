@@ -510,7 +510,54 @@ for (const page of [
 assert.match(
   manage,
   /<link rel="stylesheet" href="\/planner\.css\?v=5">/
-);\nassert.match(themeApp, /pogo-theme/);\nassert.match(themeApp, /prefers-color-scheme: dark/);\nassert.match(themeApp, /data-theme-select/);\nassert.match(themeApp, /pogo-theme-change/);\nassert.match(themeApp, /#0b1220/);\nassert.match(themeApp, /#1f6feb/);\n\nfor (const token of [\n  "--page-bg",\n  "--surface",\n  "--surface-soft",\n  "--surface-raised",\n  "--surface-glass",\n  "--ink",\n  "--muted",\n  "--line",\n  "--input-bg",\n  "--overlay-bg",\n  "--success-soft",\n  "--danger-soft",\n  "--info-soft",\n  "--violet-soft"\n]) {\n  assert.ok(\n    styles.includes(token + ":"),\n    "Missing semantic theme token " + token\n  );\n}\n\nassert.match(\n  styles,\n  /html\[data-theme="dark"\][\s\S]*--page-bg:\s*#0b1220/\n);\nassert.match(\n  styles,\n  /BL-035 — SEMANTIC APPEARANCE \+ SHARED THEME SURFACES · v43/\n);\nassert.match(\n  plannerStyles,\n  /BL-035 — PLANNER-ONLY SEMANTIC THEME SURFACES · v5/\n);\nassert.match(\n  styles,\n  /\.theme-control[\s\S]*background:\s*var\(--surface-glass\)/\n);\n
+);
+
+assert.match(themeApp, /pogo-theme/);
+assert.match(themeApp, /prefers-color-scheme: dark/);
+assert.match(themeApp, /data-theme-select/);
+assert.match(themeApp, /pogo-theme-change/);
+assert.match(themeApp, /#0b1220/);
+assert.match(themeApp, /#1f6feb/);
+
+for (const token of [
+  "--page-bg",
+  "--surface",
+  "--surface-soft",
+  "--surface-raised",
+  "--surface-glass",
+  "--ink",
+  "--muted",
+  "--line",
+  "--input-bg",
+  "--overlay-bg",
+  "--success-soft",
+  "--danger-soft",
+  "--info-soft",
+  "--violet-soft"
+]) {
+  assert.ok(
+    styles.includes(token + ":"),
+    "Missing semantic theme token " + token
+  );
+}
+
+assert.match(
+  styles,
+  /html\[data-theme="dark"\][\s\S]*--page-bg:\s*#0b1220/
+);
+assert.match(
+  styles,
+  /BL-035 — SEMANTIC APPEARANCE \+ SHARED THEME SURFACES · v43/
+);
+assert.match(
+  plannerStyles,
+  /BL-035 — PLANNER-ONLY SEMANTIC THEME SURFACES · v5/
+);
+assert.match(
+  styles,
+  /\.theme-control[\s\S]*background:\s*var\(--surface-glass\)/
+);
+
 for (const page of [
   "../public/index.html",
   "../public/admin.html",
