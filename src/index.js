@@ -60,6 +60,12 @@ import {
   SYNC_HEALTH_GROUPS,
   summarizeSyncHealth
 } from "./sync-health.js";
+import {
+  PLANNER_STORAGE_LIMITS,
+  maxBattleOverrideLimitMessage,
+  targetNotesLimitMessage,
+  targetStorageLimitMessage
+} from "./planner-storage-limits.js";
 
 export {
   adminKeyFromRequest,
@@ -7599,42 +7605,124 @@ export async function updateMaxBattleCostOverrideApi(
       );
     }
 
+    const localDate =
+      localDateForTimezone(
+        user.timezone
+      );
+
+    if (endDate < localDate) {
+      return bad(
+        "This Max Battle opportunity has already ended. Refresh the Planner before saving a tier."
+      );
+    }
+
+    // Expired manual overrides are not consulted by any current/future plan.
+    // Prune them before applying the bounded active/future override set.
+    await env.DB.prepare(`
+      DELETE FROM max_battle_cost_overrides
+      WHERE user_id = ?
+        AND end_date < ?
+    `).bind(
+      user.id,
+      localDate
+    ).run();
+
+    const capacity =
+      await env.DB.prepare(`
+        SELECT
+          EXISTS(
+            SELECT 1
+            FROM max_battle_cost_overrides
+            WHERE user_id = ?
+              AND opportunity_key = ?
+          ) AS existing,
+          COUNT(*) AS stored
+        FROM max_battle_cost_overrides
+        WHERE user_id = ?
+      `).bind(
+        user.id,
+        opportunityKey,
+        user.id
+      ).first();
+
+    if (
+      !Number(
+        capacity?.existing || 0
+      ) &&
+      Number(
+        capacity?.stored || 0
+      ) >=
+        PLANNER_STORAGE_LIMITS.max_battle_cost_overrides
+    ) {
+      return bad(
+        maxBattleOverrideLimitMessage(),
+        409
+      );
+    }
+
     const timestamp =
       nowIso();
 
-    await env.DB.prepare(`
-      INSERT INTO max_battle_cost_overrides (
-        user_id,
-        opportunity_key,
-        pokemon_name,
-        battle_variant,
-        start_date,
-        end_date,
-        max_battle_tier,
-        max_particle_cost,
-        updated_at
+    const saved =
+      await env.DB.prepare(`
+        INSERT INTO max_battle_cost_overrides (
+          user_id,
+          opportunity_key,
+          pokemon_name,
+          battle_variant,
+          start_date,
+          end_date,
+          max_battle_tier,
+          max_particle_cost,
+          updated_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS(
+          SELECT 1
+          FROM max_battle_cost_overrides
+          WHERE user_id = ?
+            AND opportunity_key = ?
+        )
+        OR (
+          SELECT COUNT(*)
+          FROM max_battle_cost_overrides
+          WHERE user_id = ?
+        ) < ?
+        ON CONFLICT(user_id, opportunity_key)
+        DO UPDATE SET
+          pokemon_name = excluded.pokemon_name,
+          battle_variant = excluded.battle_variant,
+          start_date = excluded.start_date,
+          end_date = excluded.end_date,
+          max_battle_tier = excluded.max_battle_tier,
+          max_particle_cost = excluded.max_particle_cost,
+          updated_at = excluded.updated_at
+      `).bind(
+        user.id,
+        opportunityKey,
+        pokemonName,
+        battleVariant,
+        startDate,
+        endDate,
+        tier,
+        cost,
+        timestamp,
+        user.id,
+        opportunityKey,
+        user.id,
+        PLANNER_STORAGE_LIMITS.max_battle_cost_overrides
+      ).run();
+
+    if (
+      !Number(
+        saved?.meta?.changes || 0
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(user_id, opportunity_key)
-      DO UPDATE SET
-        pokemon_name = excluded.pokemon_name,
-        battle_variant = excluded.battle_variant,
-        start_date = excluded.start_date,
-        end_date = excluded.end_date,
-        max_battle_tier = excluded.max_battle_tier,
-        max_particle_cost = excluded.max_particle_cost,
-        updated_at = excluded.updated_at
-    `).bind(
-      user.id,
-      opportunityKey,
-      pokemonName,
-      battleVariant,
-      startDate,
-      endDate,
-      tier,
-      cost,
-      timestamp
-    ).run();
+    ) {
+      return bad(
+        maxBattleOverrideLimitMessage(),
+        409
+      );
+    }
 
     return json({
       ok: true,
@@ -9143,7 +9231,7 @@ async function deletePlannerApi(
 }
 
 
-async function updateRemoteRaidBudgetOverride(
+export async function updateRemoteRaidBudgetOverride(
   request,
   env
 ) {
@@ -9183,6 +9271,15 @@ async function updateRemoteRaidBudgetOverride(
     );
   }
 
+  if (
+    requestedDate !==
+    localDate
+  ) {
+    return bad(
+      "Daily budget overrides can only be changed for the planner's current local date."
+    );
+  }
+
   const value =
     body.budget_override;
 
@@ -9190,13 +9287,13 @@ async function updateRemoteRaidBudgetOverride(
     value === "" ||
     value == null
   ) {
+    // Only today's override is part of the product contract. Clearing it also
+    // removes obsolete dated rows left by older/direct API callers.
     await env.DB.prepare(`
       DELETE FROM remote_raid_daily_budget_overrides
       WHERE user_id = ?
-        AND local_date = ?
     `).bind(
-      user.id,
-      requestedDate
+      user.id
     ).run();
 
     return json({
@@ -9224,26 +9321,36 @@ async function updateRemoteRaidBudgetOverride(
   const budgetOverride =
     Math.floor(number);
 
-  await env.DB.prepare(`
-    INSERT INTO remote_raid_daily_budget_overrides (
-      user_id,
-      local_date,
-      budget_override,
-      updated_at
+  await env.DB.batch([
+    env.DB.prepare(`
+      DELETE FROM remote_raid_daily_budget_overrides
+      WHERE user_id = ?
+        AND local_date <> ?
+    `).bind(
+      user.id,
+      requestedDate
+    ),
+    env.DB.prepare(`
+      INSERT INTO remote_raid_daily_budget_overrides (
+        user_id,
+        local_date,
+        budget_override,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id, local_date)
+      DO UPDATE SET
+        budget_override =
+          excluded.budget_override,
+        updated_at =
+          excluded.updated_at
+    `).bind(
+      user.id,
+      requestedDate,
+      budgetOverride,
+      nowIso()
     )
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(user_id, local_date)
-    DO UPDATE SET
-      budget_override =
-        excluded.budget_override,
-      updated_at =
-        excluded.updated_at
-  `).bind(
-    user.id,
-    requestedDate,
-    budgetOverride,
-    nowIso()
-  ).run();
+  ]);
 
   return json({
     ok: true,
@@ -10565,6 +10672,15 @@ export async function upsertTarget(request, env) {
   const targetValue = body.target_value === "" || body.target_value == null ? null : Number(body.target_value);
   const currentValue = body.current_value === "" || body.current_value == null ? 0 : Number(body.current_value);
   const expected = body.expected_progress_per_raid === "" || body.expected_progress_per_raid == null ? null : Number(body.expected_progress_per_raid);
+  const notes = String(body.notes || "");
+  if (
+    notes.length >
+    PLANNER_STORAGE_LIMITS.target_notes_characters
+  ) {
+    return bad(
+      targetNotesLimitMessage()
+    );
+  }
   if ((targetValue != null && (!Number.isFinite(targetValue) || targetValue < 0)) || !Number.isFinite(currentValue) || currentValue < 0) return bad("Progress and desired target must be non-negative numbers.");
   if (expected != null && (!Number.isFinite(expected) || expected <= 0)) return bad("Expected progress per battle must be blank or greater than 0.");
   const priority = ["high","medium","low","skip"].includes(body.priority) ? body.priority : "medium";
@@ -10574,6 +10690,17 @@ export async function upsertTarget(request, env) {
   const existing = body.id ? targets.find(t => t.id === String(body.id))
     : matchingBattleTargets(targets,identity).find(t => t.target_type === targetType);
   if (body.id && !existing) return bad("Target not found.",404);
+
+  if (
+    !existing &&
+    targets.length >=
+      PLANNER_STORAGE_LIMITS.targets
+  ) {
+    return bad(
+      targetStorageLimitMessage(),
+      409
+    );
+  }
 
   if (
     !body.id &&
@@ -10611,16 +10738,54 @@ export async function upsertTarget(request, env) {
     const saved = await env.DB.prepare(`
       INSERT INTO targets (id,user_id,pokemon_name,target_type,battle_kind,target_value,
         current_value,expected_progress_per_raid,priority,completed,notes,created_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?
+      WHERE ? = 1
+        OR (
+          SELECT COUNT(*)
+          FROM targets
+          WHERE user_id = ?
+        ) < ?
       ON CONFLICT(id) DO UPDATE SET pokemon_name=excluded.pokemon_name,target_type=excluded.target_type,
         target_value=excluded.target_value,current_value=excluded.current_value,battle_kind=excluded.battle_kind,
         expected_progress_per_raid=excluded.expected_progress_per_raid,priority=excluded.priority,
         completed=excluded.completed,notes=excluded.notes,updated_at=excluded.updated_at
         WHERE targets.user_id=excluded.user_id AND ?
-    `).bind(id,user.id,pokemonName,targetType,kind,targetValue,currentValue,expected,priority,
+    `).bind(
+      id,user.id,pokemonName,targetType,kind,targetValue,currentValue,expected,priority,
       body.completed === true || body.completed === 1 || body.completed === "1" ? 1 : 0,
-      String(body.notes || "").slice(0,2000),existing?.created_at || timestamp,timestamp,existing ? 1 : 0).run();
-    if (!saved.meta?.changes) return bad("This target already exists. Use Edit to change it.",409);
+      notes,existing?.created_at || timestamp,timestamp,
+      existing ? 1 : 0,
+      user.id,
+      PLANNER_STORAGE_LIMITS.targets,
+      existing ? 1 : 0
+    ).run();
+
+    if (!saved.meta?.changes) {
+      if (!existing) {
+        const count =
+          await env.DB.prepare(`
+            SELECT COUNT(*) AS stored
+            FROM targets
+            WHERE user_id = ?
+          `).bind(
+            user.id
+          ).first();
+
+        if (
+          Number(
+            count?.stored || 0
+          ) >=
+            PLANNER_STORAGE_LIMITS.targets
+        ) {
+          return bad(
+            targetStorageLimitMessage(),
+            409
+          );
+        }
+      }
+
+      return bad("This target already exists. Use Edit to change it.",409);
+    }
   } catch (error) {
     if (/no column named battle_kind|no such column:.*battle_kind/i.test(String(error.message))) return bad("Targets need migrations/0003_target_battle_kind.sql. No changes were saved.",503);
     if (/UNIQUE constraint failed: targets\.user_id, targets\.pokemon_name, targets\.target_type/i.test(String(error.message))) {
