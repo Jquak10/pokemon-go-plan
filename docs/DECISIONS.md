@@ -963,6 +963,25 @@ Current decision:
 
 This is a naming and scope-communication decision only. It requires no D1 migration, Worker/API behavior change, CSS/cache bump, Cloudflare binding, route, secret, Service Binding, Cron, or deployment configuration change.
 
+## ADR-055 — Required browser-ui gate combines full Chromium regressions with focused WebKit smoke
+
+Status: Current  
+Introduced in PR #91.
+
+Chromium remains the primary browser regression engine because it carries the broadest deterministic UI coverage. Safari/WebKit-specific layout, native-input, theme, fixed-position, sticky-position, and safe-area behavior still needs automated protection, but duplicating the entire Chromium suite in WebKit would materially increase CI runtime and flakiness without equivalent value.
+
+Current decision:
+
+- the existing required `browser-ui` status check remains the single protected-branch browser gate;
+- that job installs both Chromium and WebKit through the pinned Playwright version;
+- Chromium continues to run the full responsive/browser regression suite;
+- WebKit runs a deliberately smaller deterministic smoke suite against the same repository-owned local fixture;
+- WebKit coverage includes the Landing surface and theme persistence, primary Planner shell, mobile fixed navigation and safe-area spacing, the More foreground sheet, Preferences and native backup-file controls, Calendar layout, representative mobile/desktop horizontal overflow, and desktop sticky navigation/Quick Status/Calendar behavior;
+- WebKit smoke remains independent of live Pokémon/event rotations and must not require a manually started server, private planner capability, or production dependency;
+- keeping the `browser-ui` check name unchanged preserves the existing GitHub `main` ruleset; no additional required status-check rule is introduced.
+
+This is a CI/testing-governance change only. It requires no D1 migration, Worker/API behavior change, CSS/cache bump, Cloudflare binding, route, secret, Service Binding, Cron, or deployment configuration change.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -1058,6 +1077,7 @@ The following sequence is retained as a compact repository implementation/change
 | #87 | BL-040 theme accessibility regression gates | Adds deterministic WCAG token contrast checks plus Chromium computed component/theme-switch accessibility coverage, raises the few Light-theme values below threshold, bumps shared CSS to v44, and preserves existing focus/live-region/reduced-motion semantics without changing planner data or Worker behavior. |
 | #89 | BL-039 canonical Battle Planner branding | Standardizes **Pokémon GO Battle Planner** / **Personal Battle Strategy** across Landing, Planner, Data Sources, Admin, README, architecture guidance, and production-smoke title assertions; supporting copy explicitly covers Raids plus Dynamax/Gigantamax Max Battles without implying roster/storage management. |
 | #90 | BL-038 backup/recovery discoverability | Surfaces management-link and Planner Backup guidance before/after creation, documents the exact new-empty-planner restore flow, states that recovery requires the management link or a previously saved backup, updates mobile More/Preferences wording, and adds Chromium discoverability regressions without changing backup/auth/storage semantics. |
+| #91 | BL-037 focused WebKit smoke coverage | Extends the existing required `browser-ui` gate with a small deterministic Playwright WebKit suite for landing/theme, Planner shell, mobile fixed/safe-area navigation, More/Preferences/backup controls, Calendar, overflow, and desktop sticky behavior while retaining the full Chromium suite and existing protected-check name. |
 
 ## Supersession map
 
