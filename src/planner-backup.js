@@ -233,16 +233,50 @@ function timestamp(
   );
 }
 
+function safeId(
+  value,
+  label,
+  {
+    allowNull = false
+  } = {}
+) {
+  const clean =
+    text(
+      value,
+      label,
+      {
+        allowNull,
+        min: allowNull ? 0 : 1,
+        max: 300
+      }
+    );
+
+  if (clean == null) {
+    return null;
+  }
+
+  if (
+    !/^[a-zA-Z0-9:_-]+$/.test(
+      clean
+    )
+  ) {
+    backupError(
+      `${label} contains unsupported characters.`
+    );
+  }
+
+  return clean;
+}
+
 function nullableTargetId(
   value,
   label
 ) {
-  return text(
+  return safeId(
     value,
     label,
     {
-      allowNull: true,
-      max: 300
+      allowNull: true
     }
   );
 }
@@ -429,13 +463,9 @@ function normalizeTarget(
 
   return {
     id:
-      text(
+      safeId(
         row.id,
-        `Backup target ${index + 1} id`,
-        {
-          min: 1,
-          max: 300
-        }
+        `Backup target ${index + 1} id`
       ),
     pokemon_name:
       text(
@@ -790,13 +820,9 @@ function normalizeLegacyLog(
 
   return {
     id:
-      text(
+      safeId(
         row.id,
-        `Backup legacy Raid log ${index + 1} id`,
-        {
-          min: 1,
-          max: 300
-        }
+        `Backup legacy Raid log ${index + 1} id`
       ),
     pokemon_name:
       text(
@@ -1009,21 +1035,16 @@ function normalizeBattleLog(
 
   return {
     id:
-      text(
+      safeId(
         row.id,
-        `Backup Battle log ${index + 1} id`,
-        {
-          min: 1,
-          max: 300
-        }
+        `Backup Battle log ${index + 1} id`
       ),
     legacy_log_id:
-      text(
+      safeId(
         row.legacy_log_id,
         `Backup Battle log ${index + 1} legacy id`,
         {
-          allowNull: true,
-          max: 300
+          allowNull: true
         }
       ),
     pokemon_name:
