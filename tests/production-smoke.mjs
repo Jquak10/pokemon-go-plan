@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 const DEFAULT_PRODUCTION_URL =
   "https://pogo-plan.jquak-10.workers.dev";
 const SYNTHETIC_MANAGEMENT_TOKEN =
-  "bl-031-production-smoke-invalid";
+  "bl-036-production-smoke-invalid";
+const SYNTHETIC_MANAGE_PATH =
+  `/manage/${SYNTHETIC_MANAGEMENT_TOKEN}`;
 
 const sleep = milliseconds =>
   new Promise(resolve =>
@@ -75,18 +77,157 @@ function assertContentType(
   );
 }
 
+function versionedLocalAssets(
+  html
+) {
+  const assets = [];
+
+  for (
+    const match of html.matchAll(
+      /<(?:script|link)\b[^>]*(?:src|href)="(\/[^"]+\?v=\d+)"[^>]*>/gi
+    )
+  ) {
+    if (
+      !assets.includes(
+        match[1]
+      )
+    ) {
+      assets.push(
+        match[1]
+      );
+    }
+  }
+
+  return assets;
+}
+
+function requiredAssetReference(
+  html,
+  pattern,
+  label
+) {
+  const reference =
+    html.match(
+      pattern
+    )?.[1];
+
+  assert.ok(
+    reference,
+    `Repository Planner shell must reference a versioned ${label}`
+  );
+
+  return reference;
+}
+
+function assetContentTypePattern(
+  reference
+) {
+  const path =
+    new URL(
+      reference,
+      "https://smoke.invalid"
+    ).pathname;
+
+  if (
+    path.endsWith(
+      ".css"
+    )
+  ) {
+    return /text\/css/i;
+  }
+
+  if (
+    path.endsWith(
+      ".js"
+    )
+  ) {
+    return /(?:javascript|text\/plain)/i;
+  }
+
+  throw new Error(
+    `Unsupported production-smoke asset type: ${reference}`
+  );
+}
+
+function assertCriticalPlannerAsset(
+  reference,
+  body,
+  {
+    themeAsset,
+    sharedStylesAsset,
+    plannerStylesAsset,
+    plannerAppAsset
+  }
+) {
+  if (
+    reference ===
+      themeAsset
+  ) {
+    assert.match(
+      body,
+      /pogo-theme/,
+      "Theme initializer is missing its browser-local preference contract"
+    );
+  }
+
+  if (
+    reference ===
+      sharedStylesAsset
+  ) {
+    assert.match(
+      body,
+      /--page-bg\s*:/,
+      "Shared stylesheet is missing the semantic theme token contract"
+    );
+  }
+
+  if (
+    reference ===
+      plannerStylesAsset
+  ) {
+    assert.match(
+      body,
+      /RESPONSIVE APP SHELL/,
+      "Planner stylesheet is missing the responsive shell contract"
+    );
+  }
+
+  if (
+    reference ===
+      plannerAppAsset
+  ) {
+    assert.match(
+      body,
+      /PlannerClient/,
+      "Planner JavaScript is missing the Planner client contract"
+    );
+  }
+}
+
 async function runSmokeAttempt({
   baseUrl,
   timeoutMs
 }) {
-  const expectedLandingHtml =
-    await readFile(
-      new URL(
-        "../public/index.html",
-        import.meta.url
+  const [
+    expectedLandingHtml,
+    expectedPlannerHtml
+  ] =
+    await Promise.all([
+      readFile(
+        new URL(
+          "../public/index.html",
+          import.meta.url
+        ),
+        "utf8"
       ),
-      "utf8"
-    );
+      readFile(
+        new URL(
+          "../public/manage.html",
+          import.meta.url
+        ),
+        "utf8"
+      )
+    ]);
 
   const expectedLandingAsset =
     expectedLandingHtml.match(
@@ -97,6 +238,52 @@ async function runSmokeAttempt({
     expectedLandingAsset,
     "Repository landing page must reference a versioned landing-app.js asset"
   );
+
+  const plannerAssets =
+    versionedLocalAssets(
+      expectedPlannerHtml
+    );
+
+  const criticalPlannerAssets = {
+    themeAsset:
+      requiredAssetReference(
+        expectedPlannerHtml,
+        /<script src="(\/theme\.js\?v=\d+)"><\/script>/,
+        "theme.js initializer"
+      ),
+    sharedStylesAsset:
+      requiredAssetReference(
+        expectedPlannerHtml,
+        /<link rel="stylesheet" href="(\/styles\.css\?v=\d+)">/,
+        "shared styles.css asset"
+      ),
+    plannerStylesAsset:
+      requiredAssetReference(
+        expectedPlannerHtml,
+        /<link rel="stylesheet" href="(\/planner\.css\?v=\d+)">/,
+        "Planner-specific planner.css asset"
+      ),
+    plannerAppAsset:
+      requiredAssetReference(
+        expectedPlannerHtml,
+        /<script src="(\/planner-app\.js\?v=\d+)"><\/script>/,
+        "planner-app.js asset"
+      )
+  };
+
+  for (
+    const reference of
+      Object.values(
+        criticalPlannerAssets
+      )
+  ) {
+    assert.ok(
+      plannerAssets.includes(
+        reference
+      ),
+      `Critical Planner asset ${reference} must be part of the versioned Planner shell`
+    );
+  }
 
   const landingResponse =
     await fetchWithTimeout(
@@ -208,6 +395,108 @@ async function runSmokeAttempt({
     /<h1>Data Sources &amp; Precedence<\/h1>|<h1>Data Sources & Precedence<\/h1>/,
     "Data Sources page heading is missing"
   );
+
+  const plannerResponse =
+    await fetchWithTimeout(
+      new URL(
+        SYNTHETIC_MANAGE_PATH,
+        baseUrl
+      ),
+      {
+        headers: {
+          accept: "text/html"
+        }
+      },
+      timeoutMs
+    );
+
+  assert.equal(
+    plannerResponse.status,
+    200,
+    `Synthetic Planner shell returned HTTP ${plannerResponse.status}`
+  );
+  assertContentType(
+    plannerResponse,
+    /text\/html/i
+  );
+  assert.match(
+    plannerResponse.headers.get(
+      "cache-control"
+    ) || "",
+    /no-store/i,
+    "Private Planner shell responses must remain no-store"
+  );
+
+  const plannerHtml =
+    await plannerResponse.text();
+
+  assert.match(
+    plannerHtml,
+    /<title>My Pokémon GO Battle Planner<\/title>/,
+    "Planner shell title is missing"
+  );
+  assert.match(
+    plannerHtml,
+    /<section id="app" class="hidden">/,
+    "Planner shell is missing the authenticated app container"
+  );
+
+  for (
+    const reference of
+      plannerAssets
+  ) {
+    assert.ok(
+      plannerHtml.includes(
+        `"${reference}"`
+      ),
+      `Production Planner shell is not serving the repository's expected asset reference ${reference}`
+    );
+
+    const response =
+      await fetchWithTimeout(
+        new URL(
+          reference,
+          baseUrl
+        ),
+        {
+          headers: {
+            accept:
+              reference.includes(
+                ".css?"
+              )
+                ? "text/css"
+                : "text/javascript, application/javascript"
+          }
+        },
+        timeoutMs
+      );
+
+    assert.equal(
+      response.status,
+      200,
+      `Planner asset ${reference} returned HTTP ${response.status}`
+    );
+    assertContentType(
+      response,
+      assetContentTypePattern(
+        reference
+      )
+    );
+
+    const body =
+      await response.text();
+
+    assert.ok(
+      body.length > 0,
+      `Planner asset ${reference} returned an empty body`
+    );
+
+    assertCriticalPlannerAsset(
+      reference,
+      body,
+      criticalPlannerAssets
+    );
+  }
 
   const apiResponse =
     await fetchWithTimeout(
