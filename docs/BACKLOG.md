@@ -1,6 +1,6 @@
 # Pokémon GO Planner — Backlog
 
-Last reviewed: 21 September 2026
+Last reviewed: 24 September 2026
 
 This file is the durable home for **confirmed but unshipped work** and explicitly deferred/rejected ideas that would otherwise exist only in project chats.
 
@@ -28,6 +28,8 @@ It is intentionally different from the other repository references:
 ## Active
 
 No confirmed active backlog items.
+
+BL-029 — Permanent self-service planner deletion — is implemented by the current change and is removed from Active in the same change, consistent with the backlog rules. No D1 migration is required because planner-owned tables already cascade from `users`.
 
 ## Deferred
 
@@ -62,5 +64,7 @@ BL-011 was completed through the incremental Planner/Worker modularization serie
 The first fresh product audit on 21 September 2026 identified BL-012 through BL-018. BL-012 shipped in PR #57, BL-013 in PR #58, BL-014 in PR #59, BL-015 in PR #60, BL-016 in PR #61, BL-017 in PR #62, and BL-018 in PR #63.
 
 A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65, BL-020 in PR #67, BL-021 in PR #68, BL-022 in PR #69, BL-023 in PR #70, BL-024 in PR #71, BL-025 in PR #73, BL-026 in PR #74, and BL-027 in PR #75. BL-028 is implemented by the current change, leaving no active items from that audit. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
+
+A fresh public-readiness audit on 23 September 2026 identified the lack of whole-planner self-service deletion as a concrete public-launch gap. The user explicitly selected that item as BL-029 on 24 September 2026. BL-029 adds a management-authenticated, exact-confirmation permanent deletion flow backed by the existing `ON DELETE CASCADE` schema, immediately invalidating all planner capabilities without adding a migration. Other launch-hardening ideas from that audit remain suggestions only and are not promoted into the durable Active backlog unless the user explicitly selects them.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
