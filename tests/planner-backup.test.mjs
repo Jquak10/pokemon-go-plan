@@ -777,7 +777,7 @@ assert.equal(
 
 assert.equal(
   sqlite.prepare(
-    "SELECT raids_used FROM remote_raid_usage WHERE user_id = ? AND local_date = '${today}'"
+    `SELECT raids_used FROM remote_raid_usage WHERE user_id = ? AND local_date = '${today}'`
   ).get(
     destinationUser
   ).raids_used,
@@ -889,7 +889,7 @@ assert.equal(
 
 assert.equal(
   sqlite.prepare(
-    "SELECT raids_used FROM remote_raid_usage WHERE user_id = ? AND local_date = '${today}'"
+    `SELECT raids_used FROM remote_raid_usage WHERE user_id = ? AND local_date = '${today}'`
   ).get(
     destinationUser
   ).raids_used,
