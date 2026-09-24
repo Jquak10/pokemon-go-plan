@@ -826,13 +826,17 @@ const seedBattleRows = (
       WHERE user_id = 'budget-user'
     `).all();
 
-  assert.deepEqual(
-    rows,
-    [{
-      local_date:
-        today,
-      budget_override: 6
-    }]
+  assert.equal(
+    rows.length,
+    1
+  );
+  assert.equal(
+    rows[0].local_date,
+    today
+  );
+  assert.equal(
+    rows[0].budget_override,
+    6
   );
 
   const cleared =
