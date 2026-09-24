@@ -7,17 +7,14 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
     "run_worker_first": [
       "/api/*",
       "/calendar/*",
       "/",
-      "/index.html",
       "/sources",
-      "/sources.html",
       "/admin",
-      "/admin.html",
       "/manage",
-      "/manage.html",
       "/manage/*"
     ]
   },
