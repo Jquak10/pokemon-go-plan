@@ -8,9 +8,6 @@
     "Segoe UI",
     sans-serif;
 
-  color: #172033;
-  background: #f4f7fb;
-
   --go-blue: #2474e5;
   --go-blue-deep: #173c70;
   --go-sky: #58bbf5;
@@ -20,12 +17,125 @@
   --go-orange: #ef7b37;
   --go-red: #e5484d;
 
+  /* Semantic theme tokens. Light is the resilient no-JavaScript fallback. */
+  --page-bg: #f4f7fb;
+  --page-bg-soft: #f7faff;
   --ink: #172033;
+  --ink-soft: #3c4c61;
   --muted: #67758a;
+  --text-subtle: #8090a5;
   --line: #dbe5f0;
+  --line-strong: #cfd9e6;
+  --border: var(--line);
   --surface: #ffffff;
   --surface-soft: #f7faff;
+  --surface-muted: #edf2f7;
+  --surface-raised: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.90);
+  --surface-glass-strong: rgba(255, 255, 255, 0.94);
+  --surface-hover: #edf5ff;
+  --input-bg: #ffffff;
+  --input-placeholder: #7a899b;
+  --control-soft-bg: #eaf1f9;
+  --control-soft-ink: #29445f;
+  --overlay-bg: rgba(16, 33, 54, 0.54);
+  --focus-ring: rgba(36, 116, 229, 0.18);
   --shadow: 0 18px 55px rgba(27, 67, 117, 0.12);
+  --shadow-soft: 0 10px 30px rgba(31, 67, 107, 0.10);
+
+  --success-ink: #166534;
+  --success-soft: #eaf8ef;
+  --success-line: #cce8d6;
+  --warning-ink: #92400e;
+  --warning-soft: #fff7e9;
+  --warning-line: #f0d4ad;
+  --danger-ink: #991b1b;
+  --danger-soft: #fff1f2;
+  --danger-line: #f1cccc;
+  --info-ink: #245f9e;
+  --info-soft: #edf6ff;
+  --info-line: #cfe1f5;
+  --violet-ink: #6245a9;
+  --violet-soft: #f4efff;
+  --violet-line: #ded5f5;
+
+  --map-sky-start: #aee2ff;
+  --map-sky-mid: #d9f2ff;
+  --map-field-start: #e7f5ee;
+  --map-field-end: #d8edcf;
+  --map-road: rgba(255, 255, 255, 0.80);
+  --map-route: rgba(44, 126, 93, 0.16);
+  --map-grid-blue: rgba(36, 116, 229, 0.08);
+  --map-grid-blue-soft: rgba(36, 116, 229, 0.06);
+  --map-hill-one: #8fd078;
+  --map-hill-two: #78c46a;
+  --map-hill-three: #95d47c;
+  --map-hill-four: #72be63;
+
+  color: var(--ink);
+  background: var(--page-bg);
+  color-scheme: light;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  --page-bg: #0b1220;
+  --page-bg-soft: #0f1a2b;
+  --ink: #e8eef8;
+  --ink-soft: #c5d0df;
+  --muted: #a8b5c7;
+  --text-subtle: #8fa0b6;
+  --line: #2b3b52;
+  --line-strong: #3a4b63;
+  --surface: #111c2d;
+  --surface-soft: #162338;
+  --surface-muted: #1b2a40;
+  --surface-raised: #18263c;
+  --surface-glass: rgba(17, 28, 45, 0.91);
+  --surface-glass-strong: rgba(17, 28, 45, 0.96);
+  --surface-hover: #1b3150;
+  --input-bg: #0f1a2b;
+  --input-placeholder: #8393a8;
+  --control-soft-bg: #20324a;
+  --control-soft-ink: #dce9fa;
+  --overlay-bg: rgba(3, 8, 16, 0.72);
+  --focus-ring: rgba(88, 187, 245, 0.28);
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.38);
+  --shadow-soft: 0 12px 34px rgba(0, 0, 0, 0.30);
+
+  --success-ink: #86efac;
+  --success-soft: rgba(34, 197, 94, 0.14);
+  --success-line: rgba(74, 222, 128, 0.30);
+  --warning-ink: #fbbf24;
+  --warning-soft: rgba(245, 158, 11, 0.14);
+  --warning-line: rgba(251, 191, 36, 0.30);
+  --danger-ink: #fca5a5;
+  --danger-soft: rgba(239, 68, 68, 0.14);
+  --danger-line: rgba(248, 113, 113, 0.30);
+  --info-ink: #93c5fd;
+  --info-soft: rgba(59, 130, 246, 0.16);
+  --info-line: rgba(96, 165, 250, 0.30);
+  --violet-ink: #c4b5fd;
+  --violet-soft: rgba(139, 92, 246, 0.16);
+  --violet-line: rgba(167, 139, 250, 0.30);
+
+  --map-sky-start: #10243a;
+  --map-sky-mid: #122b3e;
+  --map-field-start: #132d30;
+  --map-field-end: #10251f;
+  --map-road: rgba(192, 213, 235, 0.08);
+  --map-route: rgba(91, 168, 135, 0.10);
+  --map-grid-blue: rgba(88, 187, 245, 0.06);
+  --map-grid-blue-soft: rgba(88, 187, 245, 0.04);
+  --map-hill-one: #173c31;
+  --map-hill-two: #14372c;
+  --map-hill-three: #1a4234;
+  --map-hill-four: #123228;
+
+  color-scheme: dark;
 }
 
 * {
@@ -5334,4 +5444,639 @@ details[open] > summary .details-chevron {
   .recent-log-summary span {
     white-space: normal;
   }
+}
+
+
+/* ============================================================
+   BL-035 — SEMANTIC APPEARANCE + SHARED THEME SURFACES · v43
+   Dark mode changes semantic tokens above; component rules below consume
+   those tokens so the product does not require a parallel dark-only cascade.
+   ============================================================ */
+
+body {
+  color: var(--ink);
+  background: var(--page-bg);
+}
+
+input,
+select,
+textarea {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: var(--input-bg);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--input-placeholder);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow: 0 0 0 4px var(--focus-ring);
+}
+
+button.secondary,
+.button.secondary {
+  color: var(--control-soft-ink);
+  background: var(--control-soft-bg);
+}
+
+button.ghost-danger {
+  color: var(--danger-ink);
+  background: var(--danger-soft);
+}
+
+.good {
+  color: var(--success-ink);
+}
+
+.warn {
+  color: var(--warning-ink);
+}
+
+.error {
+  color: var(--danger-ink);
+}
+
+.theme-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 10px;
+}
+
+.theme-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 7px 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface-glass);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px);
+  font-size: .72rem;
+  font-weight: 850;
+}
+
+.theme-control select {
+  width: auto;
+  min-width: 94px;
+  min-height: 36px;
+  padding: 6px 28px 6px 10px;
+  border-radius: 999px;
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+body.manage-page {
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--surface-raised) 92%, transparent) 0 4%, transparent 18%),
+    radial-gradient(circle at 85% 7%, color-mix(in srgb, var(--surface-raised) 65%, transparent) 0 5%, transparent 22%),
+    linear-gradient(
+      180deg,
+      var(--map-sky-start) 0%,
+      var(--map-sky-mid) 31%,
+      var(--map-field-start) 64%,
+      var(--map-field-end) 100%
+    );
+}
+
+body.manage-page::before {
+  background:
+    linear-gradient(30deg, transparent 0 47%, var(--map-road) 48% 50%, transparent 51% 100%),
+    linear-gradient(120deg, transparent 0 46%, var(--map-route) 47% 49%, transparent 50% 100%),
+    repeating-linear-gradient(
+      90deg,
+      var(--map-grid-blue) 0 1px,
+      transparent 1px 70px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      var(--map-grid-blue-soft) 0 1px,
+      transparent 1px 70px
+    );
+}
+
+body.manage-page::after {
+  background:
+    radial-gradient(ellipse at 8% 70%, var(--map-hill-one) 0 22%, transparent 23%),
+    radial-gradient(ellipse at 32% 70%, var(--map-hill-two) 0 27%, transparent 28%),
+    radial-gradient(ellipse at 60% 70%, var(--map-hill-three) 0 30%, transparent 31%),
+    radial-gradient(ellipse at 88% 70%, var(--map-hill-four) 0 28%, transparent 29%);
+}
+
+.hero-metric,
+.portal-feature,
+.tab-nav,
+.dashboard-card,
+.admin-section-nav {
+  border-color: var(--line);
+  background: var(--surface-glass);
+  box-shadow: var(--shadow-soft);
+}
+
+.dashboard-card {
+  background: var(--surface-glass-strong);
+  box-shadow: var(--shadow);
+}
+
+.tab-button,
+.admin-section-nav button {
+  color: var(--muted);
+}
+
+.tab-button:hover,
+.admin-section-nav button:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.tab-count,
+.tab-icon {
+  background: color-mix(in srgb, var(--go-blue) 10%, transparent);
+}
+
+.hero-metric small,
+.allocation-kicker,
+.freshness-item small {
+  color: var(--text-subtle);
+}
+
+.status-badge {
+  color: var(--ink-soft);
+  background: var(--surface-muted);
+}
+
+.badge-blue,
+.status-badge.tone-good,
+.source-confidence-badge.source-calendar {
+  color: var(--info-ink);
+  background: var(--info-soft);
+  border-color: var(--info-line);
+}
+
+.badge-green,
+.source-confidence-badge.source-official {
+  color: var(--success-ink);
+  background: var(--success-soft);
+  border-color: var(--success-line);
+}
+
+.source-confidence-badge.source-meta {
+  color: var(--violet-ink);
+  background: var(--violet-soft);
+  border-color: var(--violet-line);
+}
+
+.badge-red,
+.status-badge.tone-bad {
+  color: var(--danger-ink);
+  background: var(--danger-soft);
+  border-color: var(--danger-line);
+}
+
+.recommendation-card,
+.target-card,
+.card,
+.preference-guide,
+.portal-link-card,
+.sync-stage,
+.precedence-step {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.target-card.target-complete {
+  background: var(--success-soft);
+}
+
+.target-progress-row,
+.compact-details summary,
+.info-details summary,
+.compact-details ul,
+.source-info-card > strong,
+.portal-url,
+.portal-security-note,
+.admin-log {
+  color: var(--ink-soft);
+}
+
+.target-progress-track,
+.icon-button,
+.admin-log {
+  background: var(--surface-muted);
+}
+
+.score-pill,
+.score-ring {
+  color: var(--info-ink);
+  background: var(--info-soft);
+}
+
+.modal-backdrop {
+  background: var(--overlay-bg);
+}
+
+.target-modal {
+  border-color: var(--line);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.modal-header,
+.modal-footer {
+  border-color: var(--line);
+}
+
+.modal-footer {
+  background: var(--surface-soft);
+}
+
+.icon-button {
+  color: var(--muted);
+}
+
+.portal-link-card,
+.precedence-step,
+.sync-stage {
+  background: var(--surface-soft);
+}
+
+.portal-url {
+  border-color: var(--line);
+  background: var(--input-bg);
+}
+
+.portal-security-note {
+  border-color: var(--info-line);
+  background: var(--info-soft);
+}
+
+.portal-footer,
+.dashboard-footer {
+  color: var(--muted);
+}
+
+.sync-stage > span {
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.sync-stage.running {
+  border-color: var(--info-line);
+  background: var(--info-soft);
+}
+
+.sync-stage.running > span {
+  color: var(--info-ink);
+  background: color-mix(in srgb, var(--info-soft) 76%, var(--surface));
+}
+
+.sync-stage.complete {
+  border-color: var(--success-line);
+  background: var(--success-soft);
+}
+
+.sync-stage.complete > span {
+  color: var(--success-ink);
+  background: color-mix(in srgb, var(--success-soft) 76%, var(--surface));
+}
+
+.sync-stage.failed {
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+}
+
+.sync-stage.failed > span {
+  color: var(--danger-ink);
+  background: color-mix(in srgb, var(--danger-soft) 76%, var(--surface));
+}
+
+.source-confidence-badge {
+  border-color: var(--line);
+  color: var(--muted);
+  background: var(--surface-soft);
+}
+
+html[data-theme="dark"] .dashboard-hero {
+  border-color: rgba(147, 197, 253, .20);
+  background:
+    radial-gradient(circle at 90% 15%, rgba(88, 187, 245, .25), transparent 28%),
+    linear-gradient(135deg, #102b4d, #174f8b 55%, #1c6788);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .36);
+}
+
+html[data-theme="dark"] .ambient-orb-one {
+  background: rgba(88, 187, 245, .10);
+}
+
+html[data-theme="dark"] .ambient-orb-two {
+  background: rgba(54, 183, 108, .09);
+}
+
+html[data-theme="dark"] .metric-blue .metric-icon,
+html[data-theme="dark"] .metric-icon-blue {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, .16);
+}
+
+html[data-theme="dark"] .metric-violet .metric-icon {
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, .16);
+}
+
+html[data-theme="dark"] .metric-green .metric-icon,
+html[data-theme="dark"] .metric-icon-green {
+  color: #86efac;
+  background: rgba(34, 197, 94, .14);
+}
+
+html[data-theme="dark"] .metric-gold .metric-icon,
+html[data-theme="dark"] .metric-icon-gold {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, .15);
+}
+
+@media (max-width: 700px) {
+  .theme-toolbar {
+    margin-bottom: 8px;
+  }
+
+  .theme-control {
+    width: 100%;
+    justify-content: space-between;
+    min-height: 44px;
+  }
+
+  .theme-control select {
+    min-height: 40px;
+  }
+}
+
+
+/* Planner feature surfaces that still originate in the shared stylesheet. */
+.remote-summary-item,
+.raid-capacity-wrap,
+.zero-raid-row,
+.empty-state,
+.slider-setting,
+.event-chip span,
+.calendar-help,
+.feed-input-wrap input,
+.feed-security-note,
+.calendar-weekdays,
+.calendar-day-cell,
+.admin-data-card,
+.purchase-advice-card,
+.budget-forecast-wrap,
+.daily-budget-override,
+.today-command-card,
+.today-spend-signal,
+.preferred-feed-panel,
+.calendar-app-button,
+.calendar-app-guide,
+.legacy-feed-migration,
+.legacy-revoke-box,
+.raid-activity-summary article,
+.recent-raid-row,
+.raid-type-toggle,
+.raid-update-target-row,
+.raid-log-preview,
+.target-status-tabs,
+.target-search-wrap,
+.target-compact-meta > span,
+.pokemon-search-input-wrap,
+.pokemon-search-results,
+.pokemon-search-result,
+.form-badge,
+.hundo-recent-chip,
+.type-pill,
+.hundo-benchmark-grid article,
+.hundo-custom-level,
+.hundo-custom-result,
+.raid-intel,
+.battle-catch-note,
+.compact-log-details,
+.planner-controls-details,
+.more-recommendations,
+.allocation-reason-inline,
+.max-tier-source-badge {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--surface-soft);
+}
+
+.remote-summary-item,
+.raid-capacity-wrap,
+.slider-setting,
+.calendar-help,
+.feed-security-note,
+.budget-forecast-wrap,
+.daily-budget-override,
+.today-spend-signal,
+.preferred-feed-panel,
+.calendar-app-guide,
+.raid-activity-summary article,
+.raid-update-target-row,
+.raid-log-preview,
+.hundo-custom-level,
+.raid-intel,
+.battle-catch-note,
+.allocation-reason-inline {
+  color: var(--ink-soft);
+}
+
+.empty-state,
+.feed-input-wrap input,
+.calendar-app-button,
+.recent-raid-row,
+.target-search-wrap,
+.pokemon-search-input-wrap,
+.pokemon-search-results,
+.pokemon-search-result,
+.hundo-recent-chip,
+.hundo-custom-result {
+  background: var(--surface);
+}
+
+.pokemon-search-result {
+  color: var(--ink-soft);
+  border-bottom-color: var(--line);
+}
+
+.pokemon-search-result:hover,
+.calendar-app-button:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.calendar-weekdays {
+  border-color: var(--line);
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.calendar-day-cell {
+  border-color: var(--line);
+  color: var(--ink-soft);
+  background: var(--surface-glass);
+}
+
+.calendar-day-cell:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.calendar-day-cell.outside-month {
+  color: var(--text-subtle);
+  background: var(--surface-soft);
+}
+
+.calendar-day-cell.today {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--info-soft) 82%, var(--surface)),
+      var(--surface)
+    );
+}
+
+.event-banner,
+.remote-summary-item.highlight,
+.purchase-advice-card.advice-selective,
+.hundo-benchmark-grid article.featured,
+.raid-log-preview {
+  border-color: var(--info-line);
+  background: var(--info-soft);
+}
+
+.remote-summary-item.highlight,
+.purchase-advice-card.advice-save,
+.today-spend-signal.signal-save,
+.max-tier-source-badge {
+  border-color: var(--success-line);
+  color: var(--success-ink);
+  background: var(--success-soft);
+}
+
+.purchase-advice-card.advice-max,
+.purchase-advice-card.advice-heavy,
+.today-spend-signal.signal-max,
+.today-spend-signal.signal-heavy,
+.raid-log-adjustment-note,
+.co-leader-badge {
+  border-color: var(--warning-line);
+  color: var(--warning-ink);
+  background: var(--warning-soft);
+}
+
+.legacy-revoke-box,
+button.danger-soft,
+button.danger-soft:hover:not(:disabled) {
+  border-color: var(--danger-line);
+  color: var(--danger-ink);
+  background: var(--danger-soft);
+}
+
+.today-command-card {
+  border-color: var(--line);
+  background:
+    linear-gradient(
+      135deg,
+      var(--surface-glass-strong),
+      color-mix(in srgb, var(--surface-soft) 90%, transparent)
+    );
+  box-shadow: var(--shadow-soft);
+}
+
+.raid-type-toggle button,
+.target-status-tabs button {
+  color: var(--muted);
+  background: transparent;
+}
+
+.raid-type-toggle button.active,
+.target-status-tabs button.active {
+  border-color: var(--info-line);
+  color: var(--info-ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.form-badge,
+.target-compact-meta > span,
+.type-pill {
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.type-pill.extra-weak {
+  border-color: var(--danger-line);
+  color: var(--danger-ink);
+  background: var(--danger-soft);
+}
+
+.allocation-inline-badge.has-allocation {
+  border-color: var(--success-line);
+  color: var(--success-ink);
+  background: var(--success-soft);
+}
+
+.allocation-inline-badge.no-allocation {
+  border-color: var(--line);
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.allocation-reason-max {
+  border-color: var(--violet-line);
+  background: var(--violet-soft);
+}
+
+.allocation-reason-max span {
+  color: var(--violet-ink);
+}
+
+.recommendation-footer-row {
+  border-top-color: var(--line);
+}
+
+html[data-theme="dark"] .calendar-source-raid_battles,
+html[data-theme="dark"] .calendar-source-raid_hour,
+html[data-theme="dark"] .calendar-source-raid_day {
+  border-left-color: #fb7185 !important;
+  color: #fecdd3 !important;
+  background: rgba(244, 63, 94, .14) !important;
+}
+
+html[data-theme="dark"] .calendar-source-community_day {
+  border-left-color: #facc15 !important;
+  color: #fef08a !important;
+  background: rgba(234, 179, 8, .14) !important;
+}
+
+html[data-theme="dark"] .calendar-source-pokemon_spotlight_hour {
+  border-left-color: #a78bfa !important;
+  color: #ddd6fe !important;
+  background: rgba(139, 92, 246, .15) !important;
+}
+
+html[data-theme="dark"] .calendar-source-max_battles,
+html[data-theme="dark"] .calendar-source-max_mondays {
+  border-left-color: #d8b4fe !important;
+  color: #e9d5ff !important;
+  background: rgba(168, 85, 247, .14) !important;
+}
+
+html[data-theme="dark"] .recommendation-sprite {
+  background:
+    radial-gradient(
+      circle at 50% 60%,
+      rgba(88, 187, 245, .14),
+      rgba(17, 28, 45, 0) 68%
+    );
 }

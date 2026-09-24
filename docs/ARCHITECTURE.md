@@ -167,6 +167,7 @@ Legacy management API credential forms and legacy calendar subscription URLs mus
 The main public files are:
 
 - public/index.html — landing/create-planner experience.
+- public/theme.js — shared appearance initializer/controller. It runs synchronously in each HTML `<head>` before the stylesheets so a stored/System dark theme is resolved before first paint, then wires every `data-theme-select` control after DOMContentLoaded.
 - public/landing-app.js — landing/create-planner behavior, externalized so the credential-bearing creation surface can run under `script-src 'self'`.
 - public/json-api-client.js — shared landing/Admin JSON response and transport normalization. It preserves structured server errors, converts empty/non-JSON HTTP failures into status-aware messages, treats malformed successful responses as recoverable API failures, and normalizes fetch/connection errors without surfacing parser/browser text.
 - public/manage.html — primary authenticated Planner markup shell and same-origin script/style references.
@@ -181,13 +182,21 @@ The main public files are:
 - public/admin.html — administration/synchronization controls.
 - public/admin-app.js — Admin credential/API orchestration, externalized so the Admin surface can run under `script-src 'self'`. Admin requests keep their `X-Admin-Key`/no-referrer credential boundary while delegating response/transport normalization to `json-api-client.js`.
 - public/sources.html — data-source explanation.
-- public/styles.css — shared base styling used by the public, admin, sources, and Planner surfaces.
-- public/planner.css — Planner-only responsive shell, feature styling, and regression-hardening overrides. It is loaded after styles.css only by manage.html, preserving the original cascade order while keeping unrelated pages out of Planner-specific CSS.
+- public/styles.css — shared base styling used by the public, admin, sources, and Planner surfaces. BL-035 defines the semantic appearance tokens here (page/surface/text/border/input/status/overlay/shadow plus map-background roles) so Light/Dark differences flow through variables instead of a duplicate dark stylesheet.
+- public/planner.css — Planner-only responsive shell, feature styling, and regression-hardening overrides. It is loaded after styles.css only by manage.html, preserving the original cascade order while keeping unrelated pages out of Planner-specific CSS; Planner-specific theme surfaces consume the shared semantic tokens.
 - public/battle-targets.js — shared client-side target identity helpers.
 
 The application intentionally uses a relatively compact static-client architecture rather than a framework-heavy SPA. The completed BL-011 modularization established explicit boundaries around reusable Planner logic. BL-017 moved the remaining integration script out of `manage.html` into `planner-app.js` solely so the Planner can run under a strict external-script CSP; this is not a new file-size-driven modularization requirement. The Planner client module owns both the PR #47 management-auth transport contract and BL-018 response/failure normalization, so feature code calls its `api` helper rather than reimplementing token/query/body handling or assuming every response is valid JSON. Structured JSON `error`/`message` fields are preserved on failed HTTP responses; non-JSON or empty failures use status-aware recovery messages; empty/non-JSON successful responses are treated as malformed API responses; and fetch/connection failures become a stable connectivity message. Normalized `PlannerApiError` instances also expose `kind`, HTTP `status` when available, and a `retryable` flag while existing feature UI continues to display `error.message`. The landing and Admin surfaces follow the same failure principles through `json-api-client.js` rather than calling `response.json()` directly: useful structured JSON errors remain visible, HTML/empty/malformed responses become stable actionable messages, and network failures never expose raw browser strings such as `Failed to fetch`. Their UI layers continue to display only the normalized `error.message`. Target list business logic is likewise kept in the pure Planner Target Logic module; `planner-app.js` owns Target DOM rendering, selection state, modal interactions, and API mutations. Planner-specific CSS follows the same boundary: shared base rules stay in `styles.css`, while Planner-only responsive/feature overrides live in `planner.css` and load after the base stylesheet.
 
-### 5.1 Mobile information architecture
+### 5.1 Appearance and theme boundary
+
+Appearance is intentionally browser/device state, not planner-owned state. The only persisted theme value is the localStorage key `pogo-theme` with one of `system`, `light`, or `dark`; missing/invalid storage resolves to `system`. No D1 column, management API field, backup field, or calendar behavior depends on appearance.
+
+Every HTML surface that uses the shared visual system—Landing, authenticated Planner, Data Sources, and Admin—loads the same versioned `theme.js` before `styles.css`. That external same-origin script is compatible with the strict `script-src 'self'` policy and applies `data-theme` / `data-theme-preference` on the root element before CSS is parsed, avoiding a light-first flash when the resolved theme is Dark. System mode listens for `prefers-color-scheme` changes; explicit Light/Dark choices ignore later OS changes until System is selected again.
+
+The resolved mode also sets native `color-scheme` and updates the existing `theme-color` meta tag. Major structural surfaces consume semantic tokens from `styles.css`; Pokémon/source/status identity accents keep their distinct meaning while theme-specific variants provide suitable dark backgrounds/text. BL-040 owns dedicated automated contrast/WCAG regression coverage and therefore remains separate from the BL-035 functional theme implementation.
+
+### 5.2 Mobile information architecture
 
 Mobile is treated as a dedicated experience, not a squeezed desktop layout.
 
@@ -214,7 +223,7 @@ Mobile invariants:
 - Target advanced filters open in a bottom drawer.
 - Add Target and destructive actions must remain inside the viewport.
 
-### 5.2 Overlay and keyboard accessibility
+### 5.3 Overlay and keyboard accessibility
 
 Foreground Planner overlays use one shared accessibility controller instead of independent Escape/focus implementations.
 

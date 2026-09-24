@@ -27,21 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-035 — Add semantic theming and System / Light / Dark mode
-
-Introduce a maintainable theme architecture rather than layering ad-hoc dark overrides onto the current literal colors.
-
-Required outcome:
-
-- provide **System**, **Light**, and **Dark** appearance choices, with System as the default;
-- keep appearance as a browser/device preference rather than planner-owned D1 data unless a later requirement changes that decision;
-- introduce semantic color tokens for page/surface/text/border/input/status/overlay/shadow roles and migrate the major product surfaces away from hard-coded light-only values;
-- apply theming consistently to the landing page, Planner, Data Sources, and Admin;
-- initialize the selected/system theme early enough to avoid a light flash before dark rendering;
-- set native `color-scheme` and update browser theme-color behavior appropriately;
-- preserve Pokémon/source/status identity while ensuring readable light and dark variants;
-- keep desktop/mobile behavior and existing accessibility/navigation invariants intact.
-
 ### BL-036 — Extend production smoke coverage to the Planner shell and assets
 
 Expand BL-031 monitoring beyond the public landing shell so production can detect a broken Planner deployment without creating real planner state.
@@ -136,6 +121,8 @@ A fresh public-readiness audit on 23 September 2026 identified whole-planner sel
 
 A fresh product audit on 24 September 2026 reviewed the post-BL-033 production state, responsive coverage, security/recovery boundaries, monitoring, cross-browser coverage, accessibility, branding, and readiness for dark mode. The user explicitly asked to promote all identified audit items into the durable backlog. BL-034 through BL-040 therefore track restore request hardening, semantic dark-mode theming, Planner-aware production smoke coverage, WebKit/Safari smoke coverage, backup/recovery discoverability, unified product branding, and automated contrast/theme accessibility checks.
 
-BL-034 was then selected on 24 September 2026 and is implemented by the current change: restore capabilities presented outside the body are authenticated before body parsing, every restore request is bounded to 25 MB server-side even without a trustworthy `Content-Length`, and focused deterministic coverage preserves the valid BL-033 restore/Undo contract. BL-035 through BL-040 remain active.
+BL-034 shipped in PR #84 on 24 September 2026: restore capabilities presented outside the body are authenticated before body parsing, every restore request is bounded to 25 MB server-side even without a trustworthy `Content-Length`, and focused deterministic coverage preserves the valid BL-033 restore/Undo contract.
+
+BL-035 was then selected on 24 September 2026 and is implemented by the current change with browser-local System/Light/Dark appearance, early pre-CSS theme initialization, semantic shared/Planner theme tokens, all-surface controls, native `color-scheme`/theme-color integration, and Chromium persistence/responsive coverage. BL-036 through BL-040 remain active.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

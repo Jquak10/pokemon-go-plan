@@ -20,6 +20,7 @@ function read(relative) {
 
 const portal = read("../public/index.html");
 const landingApp = read("../public/landing-app.js");
+const themeApp = read("../public/theme.js");
 const jsonApiClient = read("../public/json-api-client.js");
 const adminHtml = read("../public/admin.html");
 const adminApp = read("../public/admin-app.js");
@@ -303,7 +304,7 @@ assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
 assert.match(manage, /<script src="\/planner-client\.js\?v=3"><\/script>/);
 assert.match(manage, /<script src="\/planner-overlay\.js\?v=1"><\/script>/);
-assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=4">/);
+assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=5">/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
@@ -495,13 +496,68 @@ for (const page of [
   "../public/admin.html",
   "../public/sources.html"
 ]) {
-  assert.match(read(page), /styles\.css\?v=42/);
+  const html = read(page);
+  assert.match(html, /styles\.css\?v=43/);
+  assert.match(html, /<script src="\/theme\.js\?v=1"><\/script>/);
+  assert.match(html, /data-theme-select/);
+  assert.ok(
+    html.indexOf("/theme.js?v=1") <
+      html.indexOf("/styles.css?v=43"),
+    page + " must initialize appearance before shared CSS to avoid a light flash"
+  );
 }
 
 assert.match(
   manage,
-  /<link rel="stylesheet" href="\/planner\.css\?v=4">/
+  /<link rel="stylesheet" href="\/planner\.css\?v=5">/
 );
+
+assert.match(themeApp, /pogo-theme/);
+assert.match(themeApp, /prefers-color-scheme: dark/);
+assert.match(themeApp, /data-theme-select/);
+assert.match(themeApp, /pogo-theme-change/);
+assert.match(themeApp, /#0b1220/);
+assert.match(themeApp, /#1f6feb/);
+
+for (const token of [
+  "--page-bg",
+  "--surface",
+  "--surface-soft",
+  "--surface-raised",
+  "--surface-glass",
+  "--ink",
+  "--muted",
+  "--line",
+  "--input-bg",
+  "--overlay-bg",
+  "--success-soft",
+  "--danger-soft",
+  "--info-soft",
+  "--violet-soft"
+]) {
+  assert.ok(
+    styles.includes(token + ":"),
+    "Missing semantic theme token " + token
+  );
+}
+
+assert.match(
+  styles,
+  /html\[data-theme="dark"\][\s\S]*--page-bg:\s*#0b1220/
+);
+assert.match(
+  styles,
+  /BL-035 — SEMANTIC APPEARANCE \+ SHARED THEME SURFACES · v43/
+);
+assert.match(
+  plannerStyles,
+  /BL-035 — PLANNER-ONLY SEMANTIC THEME SURFACES · v5/
+);
+assert.match(
+  styles,
+  /\.theme-control[\s\S]*background:\s*var\(--surface-glass\)/
+);
+
 for (const page of [
   "../public/index.html",
   "../public/admin.html",
