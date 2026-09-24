@@ -1026,6 +1026,37 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             )
             self.assert_no_horizontal_overflow(page)
 
+        page.locator("[data-theme-select]").select_option("dark")
+        page.wait_for_function(
+            "() => document.documentElement.dataset.theme === 'dark'"
+        )
+
+        for path in ("/", "/admin", "/sources", "/manage/browser-test-token"):
+            page.goto(f"{self.base_url}{path}", wait_until="domcontentloaded")
+            page.wait_for_selector("[data-theme-select]")
+            if path.startswith("/manage/"):
+                page.wait_for_selector("#app:not(.hidden)")
+            self.assertEqual(
+                page.locator("html").get_attribute("data-theme"),
+                "dark",
+                f"Dark appearance should render on {path}",
+            )
+            surface_color = page.evaluate(
+                """() => {
+                    const surface = document.querySelector(
+                        '.dashboard-card, .portal-feature'
+                    );
+                    return surface ? getComputedStyle(surface).backgroundColor : null;
+                }"""
+            )
+            self.assertIsNotNone(surface_color)
+            self.assertNotIn(
+                surface_color,
+                ("rgb(255, 255, 255)", "rgba(255, 255, 255, 1)"),
+                f"{path} should consume dark semantic surface tokens",
+            )
+            self.assert_no_horizontal_overflow(page)
+
         page.locator("[data-theme-select]").select_option("system")
         page.wait_for_function(
             "() => document.documentElement.dataset.themePreference === 'system'"
