@@ -924,6 +924,89 @@
           </section>
 
           <section class="dashboard-card">
+            <span class="section-eyebrow">BACKUP &amp; RECOVERY</span>
+            <h2>Planner Backup</h2>
+            <p class="section-subtitle">
+              Download a portable JSON backup of this planner's preferences, Targets,
+              battle history, and resource state. The backup does not contain your
+              management link, calendar links, or credential hashes, but it can contain
+              private notes and gameplay history, so store it somewhere you trust.
+            </p>
+
+            <div class="legacy-revoke-box">
+              <div>
+                <strong>Download a current backup</strong>
+                <p>
+                  Create a fresh backup after important Target, resource, or battle-log changes.
+                  You can restore it into a newly created empty planner if this management link
+                  is ever lost.
+                </p>
+              </div>
+
+              <button
+                id="downloadPlannerBackup"
+                type="button"
+                class="secondary"
+              >
+                Download backup
+              </button>
+            </div>
+
+            <span
+              id="plannerBackupStatus"
+              class="save-status"
+              role="status"
+              aria-live="polite"
+            ></span>
+
+            <div class="legacy-revoke-box">
+              <div>
+                <strong>Restore into this empty planner</strong>
+                <p id="restorePlannerHelp">
+                  Restore never changes this destination planner's management or calendar
+                  credentials. The destination must not already contain Targets, battle logs,
+                  usage/resource history, or saved Max tier overrides. Choose a backup, then
+                  type <code>RESTORE</code> exactly.
+                </p>
+
+                <label for="plannerBackupFile">Backup file</label>
+                <input
+                  id="plannerBackupFile"
+                  type="file"
+                  accept=".json,application/json"
+                  aria-describedby="restorePlannerHelp"
+                >
+
+                <label for="restorePlannerConfirmation">Confirmation</label>
+                <input
+                  id="restorePlannerConfirmation"
+                  type="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  aria-describedby="restorePlannerHelp"
+                  placeholder="RESTORE"
+                >
+              </div>
+
+              <button
+                id="restorePlannerBackup"
+                type="button"
+                class="secondary"
+                disabled
+              >
+                Restore backup
+              </button>
+            </div>
+
+            <span
+              id="plannerRestoreStatus"
+              class="save-status"
+              role="status"
+              aria-live="polite"
+            ></span>
+          </section>
+
+          <section class="dashboard-card">
             <span class="section-eyebrow">DANGER ZONE</span>
             <h2>Delete Planner</h2>
             <p class="section-subtitle">
@@ -1546,6 +1629,6 @@
 <script src="/planner-hundo-logic.js?v=2"></script>
 <script src="/planner-battle-plan-logic.js?v=1"></script>
 <script src="/planner-battle-intel.js?v=1"></script>
-<script src="/planner-app.js?v=5"></script>
+<script src="/planner-app.js?v=6"></script>
 </body>
 </html>

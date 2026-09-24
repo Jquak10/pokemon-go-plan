@@ -874,6 +874,29 @@ Current decision:
 
 These bounds are deliberately well above normal Planner use and are storage-safety controls, not gameplay limits or recommended targets.
 
+## ADR-051 — Planner-loss resilience uses credential-free portable backups
+
+Status: Current  
+Introduced in PR #81.
+
+The Planner intentionally has no account/email identity layer, so a lost management capability cannot be safely reconstructed from server-side identity claims. Recovery must preserve that capability-security model rather than introducing a weaker secondary authentication path.
+
+Current decision:
+
+- a user with a valid management capability can download a versioned JSON backup of planner-owned settings, Targets, Remote usage, Battle resource state/history, Max tier overrides, legacy Raid history, and unified Battle history;
+- the backup excludes management/calendar URLs, tokens and hashes, signed-calendar generation/enabled state, and global synchronized event/meta data;
+- backups remain private user data because they may contain notes and gameplay history even though they contain no authorization capability;
+- restore requires a valid destination management capability, exact `RESTORE` confirmation, and an otherwise empty destination planner; the intended lost-link flow is therefore create a new planner, keep its newly issued credentials, then restore the saved backup;
+- restore never replaces the destination management hash, legacy calendar hash, or signed-calendar credential state;
+- source Target/log IDs are remapped into a destination-planner namespace so source and restored planners can coexist without global primary-key collisions;
+- missing/deleted Target references and legacy-log relationships are preserved under the namespace so existing Undo-conflict and unified-history semantics remain faithful to the source state;
+- Battle logs are inserted with non-null unique restore markers so historical effects are not replayed by `battle_log_apply`; current target/resource/Remote ledgers are restored separately, while later Undo continues through the normal `battle_log_undo` trigger;
+- obsolete dated Remote-ceiling overrides and expired Max overrides are not resurrected during restore;
+- large arrays are inserted through chunked D1 JSON expansion inside one transactional `batch()`, with a statement-count ceiling chosen to leave headroom for authentication and validation under the Free-plan per-invocation query limit;
+- no new D1 migration, account system, recovery secret, Cloudflare binding, or scheduled job is introduced.
+
+A backup is therefore a portable reconstruction artifact, not a bearer credential and not an account-recovery token.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -960,6 +983,7 @@ The following sequence is retained as a compact repository implementation/change
 | #78 | BL-030 automatic new-planner timezone detection | Replaces the fixed Singapore onboarding value with validated browser timezone detection, preserves manual overrides, leaves the field empty when detection is unavailable instead of silently assuming another region, and adds deterministic plus Chromium coverage. |
 | #79 | BL-031 production smoke monitoring | Adds a separate read-only production smoke workflow on `main` pushes, manual dispatch, and a three-hour schedule; checks public assets plus a synthetic-invalid Worker/D1 lookup without secrets or state mutation, with deterministic fixture and release-safety coverage. |
 | #80 | BL-032 planner storage growth bounds | Bounds per-planner Targets, Target-note length, daily/total battle-log rows, and active/future Max tier overrides; restricts the one-day Remote ceiling override to the current planner-local date and prunes obsolete override rows, with race-safe SQL predicates and focused SQLite coverage. |
+| #81 | BL-033 portable planner backup and restore | Adds management-authenticated credential-free JSON backup plus empty-planner atomic restore, preserves destination capabilities and history/Undo semantics through namespaced ID remapping, and adds deterministic plus Chromium recovery coverage without a migration. |
 
 ## Supersession map
 

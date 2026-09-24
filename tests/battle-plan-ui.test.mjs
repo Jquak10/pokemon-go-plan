@@ -40,6 +40,7 @@ const styles = read("../public/styles.css");
 const plannerStyles = read("../public/planner.css");
 const worker = read("../src/index.js");
 const httpSecurity = read("../src/http-security.js");
+const plannerBackup = read("../src/planner-backup.js");
 
 const timezoneValidationContext =
   vm.createContext({
@@ -308,7 +309,7 @@ assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-intel\.js\?v=1"><\/script>/);
-assert.match(manage, /<script src="\/planner-app\.js\?v=5"><\/script>/);
+assert.match(manage, /<script src="\/planner-app\.js\?v=6"><\/script>/);
 assert.match(manage, /PlannerBattleIntel/);
 const plannerTablistMarkup =
   manageHtml.match(
@@ -529,7 +530,7 @@ assert.match(manage, /item\.label \|\| "Priority"/);
 // BL-017: the Planner must remain executable with script-src 'self' only.
 assert.match(
   manageHtml,
-  /<script src="\/planner-app\.js\?v=5"><\/script>/
+  /<script src="\/planner-app\.js\?v=6"><\/script>/
 );
 
 const inlineScripts = [
@@ -2113,6 +2114,59 @@ assert.match(plannerStyles, /:focus-visible/);
 assert.match(plannerStyles, /prefers-reduced-motion: reduce/);
 assert.match(plannerStyles, /transition-duration: 0\.01ms/);
 assert.match(plannerStyles, /command-palette-open/);
+assert.match(
+  manageHtml,
+  /id="downloadPlannerBackup"/
+);
+assert.match(
+  manageHtml,
+  /id="plannerBackupFile"[\s\S]*accept="\.json,application\/json"/
+);
+assert.match(
+  manageHtml,
+  /id="restorePlannerConfirmation"[\s\S]*placeholder="RESTORE"/
+);
+assert.match(
+  manageHtml,
+  /<script src="\/planner-app\.js\?v=6"><\/script>/
+);
+assert.match(
+  plannerApp,
+  /"\/api\/planner\/backup"/
+);
+assert.match(
+  plannerApp,
+  /"\/api\/planner\/restore"/
+);
+assert.match(
+  plannerApp,
+  /new Blob/
+);
+assert.match(
+  plannerApp,
+  /await file\.text\(\)/
+);
+assert.match(
+  plannerApp,
+  /confirmation !==[\s\S]*"RESTORE"/
+);
+assert.match(
+  worker,
+  /path === "\/api\/planner\/backup"/
+);
+assert.match(
+  worker,
+  /path === "\/api\/planner\/restore"/
+);
+assert.match(
+  plannerBackup,
+  /pokemon-go-planner-backup/
+);
+assert.match(
+  plannerBackup,
+  /PLANNER_BACKUP_VERSION\s*=\s*1/
+);
+
 assert.match(plannerClient, /function createApiClient/);
 assert.match(plannerClient, /function setToken/);
 assert.match(plannerClient, /tokenProvider/);

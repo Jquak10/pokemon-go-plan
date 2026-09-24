@@ -10,7 +10,7 @@ The engineering references above are the durable source for current architecture
 
 **Change logging policy:** every product improvement and bug fix is recorded in the PR lineage in [docs/DECISIONS.md](docs/DECISIONS.md). Changes to current system behavior or invariants also update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); confirmed unshipped work and technical debt update [docs/BACKLOG.md](docs/BACKLOG.md); user/developer-facing behavior updates this README; development automation/policy updates [AGENTS.md](AGENTS.md). Documentation is maintained in the same PR as the change rather than reconstructed from chat history later.
 
-Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner. The Planner includes recovery controls for rotating an exposed management link and regenerating or revoking the preferred signed calendar URL without changing the other credential. The Preferences danger zone also supports permanent self-service planner deletion; deleting the planner invalidates every management/calendar capability and removes planner-owned data through the existing D1 cascade relationships.
+Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner. The Planner includes recovery controls for rotating an exposed management link and regenerating or revoking the preferred signed calendar URL without changing the other credential. Preferences also provides a portable JSON planner backup: it contains planner settings, Targets, history, and resource state but excludes management/calendar credentials and hashes. A backup can be restored into a newly created empty planner if the original management link is lost. The Preferences danger zone separately supports permanent self-service planner deletion; deleting the planner invalidates every management/calendar capability and removes planner-owned data through the existing D1 cascade relationships.
 
 ## What the app does
 
@@ -283,6 +283,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 6. Use **+ Log raid** for completed Remote or Local raids and enter the actual progress gained.
 7. Review updated target progress and recommendations.
 8. Check **Calendar** for upcoming opportunities and subscribe with the private read-only link if desired.
+9. Periodically use **Preferences → Planner Backup** to download a fresh backup, especially after meaningful Target/resource/history changes. Keep the file private because it can contain notes and gameplay history. If the management link is lost, create a new planner, open Preferences, and restore the backup into that empty planner; the new planner keeps its own new management/calendar credentials.
 
 ### Mobile and desktop experience
 
@@ -299,6 +300,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 - **Cloudflare D1** stores planners, targets, events, meta data, Remote Raid usage, and limit overrides.
 - **Cloudflare Workers Rate Limiting** protects public planner creation without storing raw client IPs in D1 or logs: the creation endpoint enforces both a per-client hashed-key limit and a route-wide per-location ceiling before any planner row is inserted.
 - **Planner storage growth bounds** protect D1 after creation without changing ordinary gameplay limits: each planner can hold up to 250 Targets, target notes are capped at 2,000 characters, battle history is capped at 200 log entries per planner-local day and 20,000 entries total, and at most 250 active/future manual Max tier overrides are retained. Battle entries can still represent up to 99 battles each. Today's Remote ceiling override is stored only for the current planner-local date; obsolete dated override rows are removed automatically.
+- **Portable planner backups** are management-authenticated JSON exports containing only planner-owned settings/data, never capability credentials. Restore is allowed only into an empty planner, remaps internal IDs so the source and restored planner can coexist, preserves Undo semantics, and retains the destination planner's management/calendar links.
 - **Static frontend files** in `public/` provide the landing page, planner, administration, data-source, and responsive UI.
 - The credential-bearing landing, Admin, and private Planner HTML surfaces execute application JavaScript only from same-origin external files under `script-src 'self'`; inline executable scripts are regression-tested against reintroduction.
 - Landing and Admin requests share one status-aware JSON/transport boundary: structured server errors are preserved, HTML/empty/malformed responses become actionable messages, and connection failures do not expose raw parser or browser error text.
