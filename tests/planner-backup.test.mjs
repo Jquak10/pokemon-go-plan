@@ -5,8 +5,12 @@ import { DatabaseSync } from "node:sqlite";
 import workerApp from "../src/index.js";
 import {
   PLANNER_BACKUP_FORMAT,
+  PLANNER_BACKUP_MAX_RESTORE_BYTES,
+  PLANNER_BACKUP_TOO_LARGE_MESSAGE,
   PLANNER_BACKUP_VERSION,
-  normalizePlannerBackup
+  PlannerBackupError,
+  normalizePlannerBackup,
+  readPlannerRestoreJson
 } from "../src/planner-backup.js";
 
 class D1Statement {
@@ -499,6 +503,138 @@ function managedRequest(
     }
   );
 }
+
+let unauthenticatedBodyRead =
+  false;
+
+const unauthenticatedResponse =
+  await workerApp.fetch(
+    {
+      method: "POST",
+      url:
+        "https://planner.example/api/planner/restore",
+      headers:
+        new Headers({
+          authorization:
+            "Bearer invalid-restore-token",
+          "content-type":
+            "application/json"
+        }),
+      get body() {
+        unauthenticatedBodyRead =
+          true;
+        throw new Error(
+          "Unauthenticated restore body must not be read."
+        );
+      }
+    },
+    env
+  );
+
+assert.equal(
+  unauthenticatedResponse.status,
+  401
+);
+assert.equal(
+  unauthenticatedBodyRead,
+  false,
+  "Bearer-authenticated restore requests must be rejected before their body is parsed when the capability is invalid"
+);
+
+const oversizedResponse =
+  await workerApp.fetch(
+    {
+      method: "POST",
+      url:
+        "https://planner.example/api/planner/restore",
+      headers:
+        new Headers({
+          authorization:
+            `Bearer ${destinationToken}`,
+          "content-type":
+            "application/json",
+          "content-length":
+            String(
+              PLANNER_BACKUP_MAX_RESTORE_BYTES +
+                1
+            )
+        }),
+      body:
+        new Response(
+          JSON.stringify({
+            confirmation:
+              "RESTORE"
+          })
+        ).body
+    },
+    env
+  );
+
+assert.equal(
+  oversizedResponse.status,
+  413
+);
+assert.deepEqual(
+  await oversizedResponse.json(),
+  {
+    error:
+      PLANNER_BACKUP_TOO_LARGE_MESSAGE
+  }
+);
+
+const malformedResponse =
+  await workerApp.fetch(
+    new Request(
+      "https://planner.example/api/planner/restore",
+      {
+        method: "POST",
+        headers: {
+          authorization:
+            `Bearer ${destinationToken}`,
+          "content-type":
+            "application/json"
+        },
+        body:
+          "{not-valid-json"
+      }
+    ),
+    env
+  );
+
+assert.equal(
+  malformedResponse.status,
+  400
+);
+assert.match(
+  (await malformedResponse.json()).error,
+  /valid Planner backup JSON/i
+);
+
+await assert.rejects(
+  () =>
+    readPlannerRestoreJson(
+      new Request(
+        "https://planner.example/api/planner/restore",
+        {
+          method: "POST",
+          headers: {
+            "content-type":
+              "application/json"
+          },
+          body:
+            "123456789"
+        }
+      ),
+      8
+    ),
+  error =>
+    error instanceof
+      PlannerBackupError &&
+    error.status === 413 &&
+    error.message ===
+      PLANNER_BACKUP_TOO_LARGE_MESSAGE,
+  "Streaming restore reads must enforce the byte ceiling even without a Content-Length header"
+);
 
 const exportedResponse =
   await workerApp.fetch(

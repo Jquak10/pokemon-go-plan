@@ -27,20 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-034 — Harden planner backup restore request handling
-
-Enforce the restore upload boundary on the Worker, not only in the browser.
-
-Required outcome:
-
-- authenticate the destination management capability before parsing the restore payload wherever the existing request contract safely permits it;
-- enforce the same maximum restore-body size server-side as the browser's current 25 MB file guard;
-- return a clear `413 Payload Too Large` response for oversized restore requests;
-- preserve the existing credential-free backup format, empty-planner restore rule, atomic D1 restore behavior, and post-restore Undo semantics;
-- add deterministic coverage for unauthenticated, oversized, malformed, and valid restore requests.
-
-This is a resource-abuse hardening item identified by the 24 September 2026 fresh product audit.
-
 ### BL-035 — Add semantic theming and System / Light / Dark mode
 
 Introduce a maintainable theme architecture rather than layering ad-hoc dark overrides onto the current literal colors.
@@ -149,5 +135,7 @@ A second fresh audit after PR #63 verified the current `main` behavior, determin
 A fresh public-readiness audit on 23 September 2026 identified whole-planner self-service deletion, fixed Singapore timezone onboarding, repository-owned production smoke monitoring, unbounded planner-owned storage growth, and loss of the private management capability without a portable recovery path as concrete public-launch gaps. BL-029 shipped in PR #77 with management-authenticated permanent deletion, BL-030 in PR #78 with validated browser timezone detection, BL-031 in PR #79 with scheduled/post-`main` read-only production smoke monitoring, BL-032 in PR #80 with planner-owned storage growth bounds, and BL-033 in PR #81 with credential-free portable backups plus empty-planner atomic restore. PR #82 then fixed the responsive Preferences regression introduced around the expanded backup/recovery surface.
 
 A fresh product audit on 24 September 2026 reviewed the post-BL-033 production state, responsive coverage, security/recovery boundaries, monitoring, cross-browser coverage, accessibility, branding, and readiness for dark mode. The user explicitly asked to promote all identified audit items into the durable backlog. BL-034 through BL-040 therefore track restore request hardening, semantic dark-mode theming, Planner-aware production smoke coverage, WebKit/Safari smoke coverage, backup/recovery discoverability, unified product branding, and automated contrast/theme accessibility checks.
+
+BL-034 was then selected on 24 September 2026 and is implemented by the current change: restore capabilities presented outside the body are authenticated before body parsing, every restore request is bounded to 25 MB server-side even without a trustworthy `Content-Length`, and focused deterministic coverage preserves the valid BL-033 restore/Undo contract. BL-035 through BL-040 remain active.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

@@ -72,7 +72,8 @@ import {
   PLANNER_BACKUP_MAX_BATCH_STATEMENTS,
   PlannerBackupError,
   chunkJsonRows,
-  normalizePlannerBackup
+  normalizePlannerBackup,
+  readPlannerRestoreJson
 } from "./planner-backup.js";
 
 export {
@@ -9460,23 +9461,58 @@ async function restorePlannerBackupApi(
   request,
   env
 ) {
+  const tokenWithoutBody =
+    manageTokenFromRequest(
+      request
+    );
+
+  let user =
+    tokenWithoutBody
+      ? await userByManageToken(
+          env,
+          tokenWithoutBody
+        )
+      : null;
+
+  if (
+    tokenWithoutBody &&
+    !user
+  ) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
   let body;
 
   try {
     body =
-      await request.json();
-  } catch {
-    return bad(
-      "Choose a valid Planner backup JSON file."
-    );
+      await readPlannerRestoreJson(
+        request
+      );
+  } catch (error) {
+    if (
+      error instanceof
+        PlannerBackupError
+    ) {
+      return bad(
+        error.message,
+        error.status
+      );
+    }
+
+    throw error;
   }
 
-  const user =
-    await userByManageRequest(
-      request,
-      env,
-      body
-    );
+  if (!user) {
+    user =
+      await userByManageRequest(
+        request,
+        env,
+        body
+      );
+  }
 
   if (!user) {
     return bad(
