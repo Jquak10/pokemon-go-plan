@@ -27,16 +27,7 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-037 — Add lightweight WebKit / Safari smoke coverage
-
-Add a small cross-browser gate for behavior most likely to differ from Chromium without duplicating the entire browser regression suite.
-
-Required outcome:
-
-- run a focused Playwright WebKit smoke suite in CI;
-- cover the landing page, primary Planner shell, mobile navigation, Preferences, backup file controls, at least one modal/drawer, Calendar, and theme behavior after BL-035;
-- check for horizontal overflow and broken fixed/sticky/safe-area behavior at representative phone and desktop sizes;
-- keep the suite intentionally smaller than the Chromium regression job so CI remains stable and reasonably fast.
+No confirmed active backlog items are currently recorded.
 
 ## Deferred
 
@@ -82,6 +73,6 @@ BL-035 shipped in PR #85 on 24 September 2026 with browser-local System/Light/Da
 
 BL-036 shipped in PR #86 on 24 September 2026: Production smoke now checks a synthetic no-store Planner shell, requires its current versioned asset references, fetches every referenced Planner script/stylesheet read-only, explicitly validates theme/shared CSS/Planner CSS/main Planner JavaScript contracts, and has a deterministic missing-asset failure regression.
 
-BL-040 shipped in PR #87 on 24 September 2026: semantic Light/Dark tokens receive deterministic WCAG contrast checks, Chromium verifies representative computed component/calendar/source contrast plus focus/disabled states, and theme changes during active overlays preserve keyboard focus, dialog/tab/live-region semantics, inert background isolation, and reduced-motion behavior. The audit also tightened the few Light-theme tokens that fell just below the new thresholds. BL-039 shipped in PR #89: **Pokémon GO Battle Planner** with **Personal Battle Strategy** is the canonical user-facing branding across Landing, Planner, Data Sources, Admin, README, architecture guidance, and production-smoke title assertions; the supporting copy explicitly covers Raids plus Dynamax/Gigantamax Max Battles without implying roster/storage management. BL-038 is implemented by PR #90 with explicit management-link/backup guidance before and after planner creation, an exact new-empty-planner restore flow, and a mobile More description that surfaces access plus backup/recovery. BL-037 remains active.
+BL-040 shipped in PR #87 on 24 September 2026: semantic Light/Dark tokens receive deterministic WCAG contrast checks, Chromium verifies representative computed component/calendar/source contrast plus focus/disabled states, and theme changes during active overlays preserve keyboard focus, dialog/tab/live-region semantics, inert background isolation, and reduced-motion behavior. The audit also tightened the few Light-theme tokens that fell just below the new thresholds. BL-039 shipped in PR #89: **Pokémon GO Battle Planner** with **Personal Battle Strategy** is the canonical user-facing branding across Landing, Planner, Data Sources, Admin, README, architecture guidance, and production-smoke title assertions; the supporting copy explicitly covers Raids plus Dynamax/Gigantamax Max Battles without implying roster/storage management. BL-038 shipped in PR #90 with explicit management-link/backup guidance before and after planner creation, an exact new-empty-planner restore flow, and a mobile More description that surfaces access plus backup/recovery. BL-037 is implemented by PR #91 by extending the existing required `browser-ui` gate with a focused deterministic Playwright WebKit smoke suite for landing/theme, Planner shell, mobile fixed navigation and safe-area spacing, More/Preferences/backup controls, Calendar, representative overflow, and desktop sticky behavior. No active backlog items remain.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
