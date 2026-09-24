@@ -115,6 +115,8 @@ The management capability remains in the private `/manage/<token>` URL so existi
 
 Management-link rotation replaces only `users.manage_hash`. The authenticated Planner immediately swaps its in-memory API credential and uses `history.replaceState` to replace the capability URL without navigating through the now-invalid old link. Calendar credentials are unchanged.
 
+Permanent planner deletion is management-authenticated and deliberately separate from normal settings updates. The UI requires the exact typed confirmation `DELETE`, and `DELETE /api/planner` independently requires the same confirmation in the request body before it deletes the authenticated parent row from `users`. Planner-owned tables reference `users(id)` with `ON DELETE CASCADE`, so Targets, Remote usage/budget overrides, Max cost overrides, battle resource state/history, legacy/new Battle logs, and signed-feed credential state are removed in the same database operation. The parent-row deletion immediately invalidates the management token and both signed and legacy calendar credentials because no owning user row remains. No BL-029 D1 migration is required; this behavior uses the existing schema relationships.
+
 The preferred signed calendar link is generation-scoped per planner. Generation 0 deliberately uses the exact pre-BL-015 HMAC payload and URL shape, so existing signed subscriptions remain valid without migration or user action. Migration 0007 adds `feed_link_credentials`; once present, regenerate/revoke advances only that planner's signed generation. A calendar request must match both the currently enabled generation and its HMAC signature. Revocation disables the current generation; regeneration advances again and re-enables it. The historical random-token `/calendar/<token>.ics` credential remains independent and is invalidated only by the existing legacy-feed revoke action.
 
 Private/browser surfaces receive defense-in-depth response headers in Worker routing:
@@ -142,7 +144,7 @@ The main public files are:
 - public/landing-app.js — landing/create-planner behavior, externalized so the credential-bearing creation surface can run under `script-src 'self'`.
 - public/json-api-client.js — shared landing/Admin JSON response and transport normalization. It preserves structured server errors, converts empty/non-JSON HTTP failures into status-aware messages, treats malformed successful responses as recoverable API failures, and normalizes fetch/connection errors without surfacing parser/browser text.
 - public/manage.html — primary authenticated Planner markup shell and same-origin script/style references.
-- public/planner-app.js — Planner DOM/state/API orchestration that previously lived in the final inline `manage.html` application script. It remains one integration surface by design; BL-017 externalizes it for CSP correctness rather than reopening modularization based on file size.
+- public/planner-app.js — Planner DOM/state/API orchestration that previously lived in the final inline `manage.html` application script. It remains one integration surface by design; BL-017 externalizes it for CSP correctness rather than reopening modularization based on file size. It also owns the typed-confirmation deletion flow in Preferences: the destructive control remains disabled until `DELETE` is entered, then calls the authenticated planner-deletion endpoint and replaces the page with the public landing surface after success.
 - public/planner-client.js — shared Planner capability-token parsing, authenticated API request preparation, response parsing/failure normalization, HTML escaping, and numeric formatting. All Planner feature calls use this boundary rather than calling `response.json()` directly.
 - public/planner-overlay.js — centralized modal/sheet/drawer keyboard containment, Escape dispatch, opener focus restoration, and background inert/aria-hidden isolation.
 - public/planner-target-logic.js — pure Target progress, availability, non-status/status filtering, sorting, counts, and grouping/view-model logic. It accepts BattleTargets and normalization/formatting helpers as dependencies and contains no DOM or API mutation code.
@@ -958,6 +960,7 @@ package.json runs a deterministic regression suite covering the major domains, i
 - Unified battle logging.
 - Battle logging UI.
 - Battle-aware Targets.
+- Permanent planner deletion, including server-side confirmation, D1 cascade cleanup, and immediate management-credential invalidation.
 - Fresh-database schema and idempotent operational-table migration completeness.
 
 There is also a live upstream contract test for Pokémon GO API/GameMaster-related assumptions.
