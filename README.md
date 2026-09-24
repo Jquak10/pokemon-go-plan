@@ -12,6 +12,8 @@ The engineering references above are the durable source for current architecture
 
 Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner. The Planner includes recovery controls for rotating an exposed management link and regenerating or revoking the preferred signed calendar URL without changing the other credential. Preferences also provides a portable JSON planner backup: it contains planner settings, Targets, history, and resource state but excludes management/calendar credentials and hashes. A backup can be restored into a newly created empty planner if the original management link is lost. The Preferences danger zone separately supports permanent self-service planner deletion; deleting the planner invalidates every management/calendar capability and removes planner-owned data through the existing D1 cascade relationships.
 
+Appearance is device/browser-local rather than planner data. The **Appearance** control is available on the Landing, Planner, Data Sources, and Admin surfaces with **System**, **Light**, and **Dark** choices. System is the default and follows the browser/OS color preference; choosing Light or Dark is remembered in that browser. Appearance is not stored in D1, included in Planner Backup, or synchronized through the private management link.
+
 ## What the app does
 
 The planner brings the decisions that normally live in several places into one dashboard: what is currently available, how valuable each raid is, which Pokémon matter to you, how much progress remains, and whether another paid Remote Raid is worthwhile. It also provides a personal event calendar and a private calendar subscription.
