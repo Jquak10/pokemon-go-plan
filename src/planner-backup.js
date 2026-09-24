@@ -1333,31 +1333,6 @@ export function normalizePlannerBackup(
     battleLogs
   );
 
-  const targetIds =
-    new Set(
-      targets.map(
-        row => row.id
-      )
-    );
-
-  for (
-    const row of [
-      ...legacyLogs,
-      ...battleLogs
-    ]
-  ) {
-    if (
-      row.target_id != null &&
-      !targetIds.has(
-        row.target_id
-      )
-    ) {
-      backupError(
-        "Backup history references a Target that is not present in the backup."
-      );
-    }
-  }
-
   return {
     format:
       PLANNER_BACKUP_FORMAT,
