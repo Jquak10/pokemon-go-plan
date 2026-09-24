@@ -490,6 +490,15 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
                 },
             )
 
+        if path == "/sources":
+            return self._file(
+                PUBLIC / "sources.html",
+                "text/html; charset=utf-8",
+                headers={
+                    "content-security-policy": PLANNER_CSP,
+                },
+            )
+
         if path == "/api/admin/meta":
             self.server.last_admin_key = self.headers.get("x-admin-key")
             return self._json({"metas": []})
