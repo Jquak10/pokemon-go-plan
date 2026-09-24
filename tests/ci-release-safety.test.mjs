@@ -26,6 +26,9 @@ const wranglerConfig =
     read("wrangler.jsonc")
   );
 
+const staticHeaders =
+  read("public/_headers");
+
 const workflow =
   read(
     ".github/workflows/raid-ranking-regression.yml"
@@ -156,18 +159,132 @@ assert.equal(
 );
 
 for (const path of [
-  "/",
-  "/sources",
+  "/api/*",
+  "/calendar/*",
   "/admin",
-  "/manage",
   "/manage/*"
 ]) {
   assert.ok(
     workerFirstRoutes.includes(
       path
     ),
-    `Worker-first routing must cover hardened HTML entry path ${path}`
+    `Worker-first routing must preserve dynamic/private route ${path}`
   );
+}
+
+for (const path of [
+  "/",
+  "/sources",
+  "/manage"
+]) {
+  assert.equal(
+    workerFirstRoutes.includes(
+      path
+    ),
+    false,
+    `Asset-first public HTML path ${path} must rely on public/_headers instead of billable Worker-first routing`
+  );
+}
+
+const requiredStaticHtmlHeaderBlocks = [
+  {
+    route: "/",
+    noStore: false
+  },
+  {
+    route: "/sources",
+    noStore: false
+  },
+  {
+    route: "/admin",
+    noStore: true
+  },
+  {
+    route: "/manage",
+    noStore: true
+  }
+];
+
+for (const {
+  route,
+  noStore
+} of requiredStaticHtmlHeaderBlocks) {
+  const marker =
+    `${route}\n`;
+  const startIndex =
+    staticHeaders.indexOf(
+      marker
+    );
+
+  assert.ok(
+    startIndex >= 0,
+    `public/_headers must define ${route}`
+  );
+
+  const remainder =
+    staticHeaders.slice(
+      startIndex +
+        marker.length
+    );
+  const nextRouteIndex =
+    remainder.search(
+      /\n\/[A-Za-z0-9_-]*\n/
+    );
+  const block =
+    nextRouteIndex >= 0
+      ? remainder.slice(
+          0,
+          nextRouteIndex
+        )
+      : remainder;
+
+  const csp =
+    block.match(
+      /Content-Security-Policy:\s*([^\n]+)/
+    )?.[1] || "";
+  const scriptDirective =
+    csp
+      .split(";")
+      .map(
+        directive =>
+          directive.trim()
+      )
+      .find(
+        directive =>
+          directive.startsWith(
+            "script-src"
+          )
+      ) || "";
+
+  assert.equal(
+    scriptDirective,
+    "script-src 'self'",
+    `${route} must enforce the strict external-script CSP through Static Assets`
+  );
+
+  for (const expected of [
+    "Referrer-Policy: no-referrer",
+    "X-Content-Type-Options: nosniff",
+    "X-Frame-Options: DENY",
+    "Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "Cross-Origin-Opener-Policy: same-origin",
+    "Cross-Origin-Resource-Policy: same-origin"
+  ]) {
+    assert.ok(
+      block.includes(
+        expected
+      ),
+      `${route} static headers must include ${expected}`
+    );
+  }
+
+  if (noStore) {
+    assert.match(
+      block,
+      /Cache-Control: private, no-store, max-age=0/,
+      `${route} static HTML must remain no-store`
+    );
+  }
 }
 
 assert.match(

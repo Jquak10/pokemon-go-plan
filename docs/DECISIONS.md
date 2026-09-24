@@ -982,24 +982,27 @@ Current decision:
 
 This is a CI/testing-governance change only. It requires no D1 migration, Worker/API behavior change, CSS/cache bump, Cloudflare binding, route, secret, Service Binding, Cron, or deployment configuration change.
 
-## ADR-056 — Canonical HTML pages run through Worker response hardening
+## ADR-056 — Canonical HTML pages keep one security-header contract across Static Assets and Worker responses
 
 Status: Current  
-Introduced in PR #92.
+Introduced in PR #92; corrected by PR #93 after production verification.
 
-Cloudflare Workers Static Assets serve matching assets before Worker code unless a path is selected by `assets.run_worker_first`. The application already defined response hardening in `src/index.js` / `src/http-security.js`, but the public Landing and Data Sources canonical paths were not selected for Worker-first routing, so production asset routing could bypass those headers even though local browser fixtures exercised them.
+Cloudflare Workers Static Assets serve matching assets before Worker code unless a path is selected by `assets.run_worker_first`. PR #92 attempted to close the public-HTML hardening gap by making the canonical HTML pages selectively Worker-first. Deterministic and browser checks passed, but the strengthened post-merge production smoke repeatedly proved that the live Landing response still lacked the Worker CSP. The durable design therefore must not depend on public static HTML being routed through Worker code solely to attach headers.
 
 Current decision:
 
-- ordinary versioned JS, CSS, images, and other static assets remain asset-first for performance and lower Worker invocation cost;
-- `assets.run_worker_first` selectively covers the canonical HTML entry paths: Landing `/`, Data Sources `/sources`, Admin `/admin`, the direct Planner shell `/manage`, and private `/manage/*` links, in addition to the existing API/calendar routes;
-- every canonical product HTML page is served through the shared hardening boundary with `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, restrictive Permissions Policy, same-origin opener/resource policies, and a strict `script-src 'self'` policy with no inline executable script allowance;
-- Admin and Planner HTML remain `private, no-store`; Landing and Data Sources retain normal public caching semantics after Worker hardening;
-- `assets.html_handling` is explicitly `auto-trailing-slash`, preserving Cloudflare's canonical 307 redirects from `/index.html`, `/sources.html`, `/admin.html`, and `/manage.html` to their extensionless routes instead of introducing duplicate HTML pages;
-- deterministic release-safety tests assert both the Wrangler routing contract and the actual Worker response headers;
-- the read-only production smoke checks the deployed HTML security headers on canonical routes and verifies the direct `.html` redirects so a future configuration change cannot silently restore asset-first HTML serving.
+- ordinary public Static Asset HTML remains asset-first for performance and lower Worker invocation cost;
+- `public/_headers` applies the browser security contract directly to Landing `/`, Data Sources `/sources`, the direct Planner shell `/manage`, and provides an Admin static fallback;
+- Admin `/admin` and private `/manage/<token>` routes remain Worker-first and receive the same contract through `src/http-security.js`;
+- the shared contract includes `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, restrictive Permissions Policy, same-origin opener/resource policies, and a strict `script-src 'self'` policy with no inline executable script allowance;
+- Admin and Planner HTML remain `private, no-store`; Landing and Data Sources retain public caching semantics;
+- `assets.html_handling` remains explicitly `auto-trailing-slash`, preserving Cloudflare's canonical 307 redirects from `/index.html`, `/sources.html`, `/admin.html`, and `/manage.html` to their extensionless routes;
+- deterministic release-safety tests assert both the Static Asset `_headers` policy and Worker hardening behavior;
+- the read-only production smoke is the final authority for the live result and verifies deployed HTML security headers plus canonical `.html` redirects.
 
-This is a routing/security fix. It changes `wrangler.jsonc` static-asset routing but does not change D1 schema/data, bindings, secrets, Cron schedules, Service Bindings, CSS/cache generations, or the protected GitHub status-check policy.
+PR #92 remains part of the history because its stronger production smoke exposed the deployment mismatch; PR #93 supersedes only the public-header delivery mechanism, not the security contract itself.
+
+This is a routing/security fix only. It changes Static Asset configuration but does not change D1 schema/data, bindings, secrets, Cron schedules, Service Bindings, CSS/cache generations, or the protected GitHub status-check policy.
 
 ## PR lineage
 
@@ -1098,6 +1101,7 @@ The following sequence is retained as a compact repository implementation/change
 | #90 | BL-038 backup/recovery discoverability | Surfaces management-link and Planner Backup guidance before/after creation, documents the exact new-empty-planner restore flow, states that recovery requires the management link or a previously saved backup, updates mobile More/Preferences wording, and adds Chromium discoverability regressions without changing backup/auth/storage semantics. |
 | #91 | BL-037 focused WebKit smoke coverage | Extends the existing required `browser-ui` gate with a small deterministic Playwright WebKit suite for landing/theme, Planner shell, mobile fixed/safe-area navigation, More/Preferences/backup controls, Calendar, overflow, and desktop sticky behavior while retaining the full Chromium suite and existing protected-check name. |
 | #92 | BL-041 public HTML Worker hardening | Selectively routes canonical HTML pages through Worker response hardening, preserves canonical `.html` redirects, extends the strict external-script CSP to Data Sources, and adds deterministic plus production-smoke coverage for deployed security headers without making all static assets Worker-first. |
+| #93 | BL-041 Static Asset header correction | Fixes forward after PR #92 production smoke proved Landing still bypassed the Worker CSP: public/static HTML now receives the same security contract through `public/_headers`, dynamic/private routes remain Worker-hardened, and the production smoke remains the live source of truth. |
 
 ## Supersession map
 
