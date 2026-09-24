@@ -969,6 +969,8 @@ A real-browser regression suite runs in Chromium for UI behavior that source ins
 
 GitHub Actions runs deterministic regression checks and the browser suite automatically for every pull request and every push to `main`; no manual development server is required for the browser job. The upstream live-contract check does not gate pull requests because it depends on external availability and schema drift; it still runs on `main` pushes, schedules, and manual workflow runs. This keeps PR regression status deterministic while preserving early warning for upstream changes.
 
+Production availability is monitored by a separate `.github/workflows/production-smoke.yml` workflow so uptime checks do not increase the cadence of upstream Pokémon-data contract tests. It runs after pushes to `main`, on manual dispatch, and every three hours. The probe is read-only and uses no repository secrets: it checks the landing HTML, the versioned `landing-app.js` asset referenced by the current checkout, the public Data Sources page, and `GET /api/me` with a fixed synthetic invalid management token. The expected `401` JSON response proves that the deployed Worker route and D1 management-token lookup path are reachable without creating or mutating planner data or using a real capability. The probe retries transient failures/deployment overlap before failing the workflow. Its logic is exercised against a local deterministic HTTP fixture in the normal `npm test` suite, while the real production workflow remains intentionally outside the required PR checks.
+
 Tests are deliberately used to freeze previously discovered regressions such as:
 
 - Wrong form-family rankings.
