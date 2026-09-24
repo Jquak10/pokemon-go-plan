@@ -148,15 +148,18 @@ assert.ok(
   "Static-asset routing must keep selective Worker-first patterns instead of invoking the Worker for every asset"
 );
 
+assert.equal(
+  wranglerConfig.assets
+    ?.html_handling,
+  "auto-trailing-slash",
+  "Static HTML aliases must preserve Cloudflare's canonical extensionless redirects"
+);
+
 for (const path of [
   "/",
-  "/index.html",
   "/sources",
-  "/sources.html",
   "/admin",
-  "/admin.html",
   "/manage",
-  "/manage.html",
   "/manage/*"
 ]) {
   assert.ok(
@@ -285,17 +288,7 @@ for (const {
     noStore: false
   },
   {
-    requestPath: "/index.html",
-    expectedAssetPath: "/index.html",
-    noStore: false
-  },
-  {
     requestPath: "/sources",
-    expectedAssetPath: "/sources",
-    noStore: false
-  },
-  {
-    requestPath: "/sources.html",
     expectedAssetPath: "/sources",
     noStore: false
   },
@@ -305,17 +298,7 @@ for (const {
     noStore: true
   },
   {
-    requestPath: "/admin.html",
-    expectedAssetPath: "/admin",
-    noStore: true
-  },
-  {
     requestPath: "/manage",
-    expectedAssetPath: "/manage",
-    noStore: true
-  },
-  {
-    requestPath: "/manage.html",
     expectedAssetPath: "/manage",
     noStore: true
   },
