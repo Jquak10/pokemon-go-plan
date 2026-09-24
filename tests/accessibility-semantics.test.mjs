@@ -115,7 +115,7 @@ for (const [html, marker, expected] of initialPressed) {
 const plannerApp = read("public/planner-app.js");
 const adminApp = read("public/admin-app.js");
 
-for (const token of ["data.raidType", "data.targetView", "data.targetStatus"]) {
+for (const token of ["dataset.raidType", "dataset.targetView", "dataset.targetStatus"]) {
   const index = plannerApp.indexOf(token);
   assert.ok(index >= 0, `Missing runtime state handler for ${token}`);
   assert.match(
