@@ -667,6 +667,40 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
+        if path == "/api/planner":
+            self.server.last_planner_delete_authorization = self.headers.get(
+                "authorization"
+            )
+            content_length = int(
+                self.headers.get(
+                    "content-length",
+                    "0",
+                )
+            )
+            payload = (
+                json.loads(
+                    self.rfile.read(
+                        content_length
+                    )
+                    or b"{}"
+                )
+                if content_length
+                else {}
+            )
+            self.server.last_planner_delete_confirmation = payload.get(
+                "confirmation"
+            )
+            return self._json(
+                {
+                    "ok": True,
+                    "deleted": True,
+                    "note": (
+                        "Planner deleted permanently. Its management and calendar links "
+                        "are no longer valid."
+                    ),
+                }
+            )
+
         if path == "/api/targets":
             target_id = parse_qs(parsed.query).get(
                 "id",
@@ -754,6 +788,8 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.server.last_manage_authorization = None
         self.server.last_settings_authorization = None
         self.server.last_manage_rotation_authorization = None
+        self.server.last_planner_delete_authorization = None
+        self.server.last_planner_delete_confirmation = None
         self.server.last_feed_rotation_authorization = None
         self.server.last_feed_revoke_authorization = None
         self.server.last_admin_key = None
@@ -1266,6 +1302,69 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             self.server.last_settings_authorization,
             "Bearer rotated-browser-token",
             "Subsequent API calls must switch to the new management credential without reloading the page",
+        )
+        self.assert_no_horizontal_overflow(page)
+
+    def test_planner_deletion_requires_typed_confirmation_and_redirects(self):
+        page = self.open_planner(1024, 800)
+        page.locator('.tab-button[data-tab="preferences"]').click()
+
+        confirmation = page.locator("#deletePlannerConfirmation")
+        delete_button = page.locator("#deletePlanner")
+
+        self.assertTrue(
+            delete_button.is_disabled(),
+            "Permanent deletion must start disabled",
+        )
+
+        confirmation.fill("delete")
+        self.assertTrue(
+            delete_button.is_disabled(),
+            "Deletion must require the exact uppercase confirmation phrase",
+        )
+
+        confirmation.fill("DELETE")
+        self.assertFalse(
+            delete_button.is_disabled()
+        )
+
+        page.evaluate(
+            """() => {
+                sessionStorage.setItem('raid-planner-tab', 'preferences');
+                sessionStorage.setItem('battle-plan-filter', 'max');
+            }"""
+        )
+
+        delete_button.click()
+
+        page.wait_for_url(
+            f"{self.base_url}/"
+        )
+        page.wait_for_function(
+            """() => document.getElementById('status')?.textContent.includes('Planner deleted permanently')"""
+        )
+
+        self.assertEqual(
+            self.server.last_planner_delete_authorization,
+            "Bearer browser-test-token",
+        )
+        self.assertEqual(
+            self.server.last_planner_delete_confirmation,
+            "DELETE",
+        )
+        self.assertEqual(
+            page.locator("#status").inner_text(),
+            "Planner deleted permanently ✓",
+        )
+        self.assertIsNone(
+            page.evaluate(
+                "() => sessionStorage.getItem('raid-planner-tab')"
+            )
+        )
+        self.assertIsNone(
+            page.evaluate(
+                "() => sessionStorage.getItem('battle-plan-filter')"
+            )
         )
         self.assert_no_horizontal_overflow(page)
 
