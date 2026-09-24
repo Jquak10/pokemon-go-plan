@@ -915,6 +915,7 @@ The following sequence is retained as a compact repository implementation/change
 | #75 | BL-027 production-main enforcement | Records the active `Production main` GitHub ruleset after verification that `main` reports `protected: true`; the ruleset requires PRs plus `deterministic` and `browser-ui`, leaves `live-contract` non-blocking and strict up-to-date mode off, blocks deletion/force pushes, and has no bypass actors. |
 | #76 | BL-028 dependency install and Worker packaging CI gate | Makes the required `deterministic` PR job run lockfile-backed `npm ci` and a non-deploying Wrangler `deploy --dry-run` package/config check, with a regression that preserves the install/package gate and keeps `live-contract` non-blocking. |
 | #77 | BL-029 permanent self-service planner deletion | Adds exact typed/server confirmation plus authenticated `DELETE /api/planner`; deleting the parent planner row uses existing D1 cascades to remove planner-owned data and immediately invalidate management/calendar capabilities, with deterministic SQLite and Chromium regressions and no migration. |
+| #78 | BL-030 automatic new-planner timezone detection | Replaces the fixed Singapore onboarding value with validated browser timezone detection, preserves manual overrides, leaves the field empty when detection is unavailable instead of silently assuming another region, and adds deterministic plus Chromium coverage. |
 
 ## Supersession map
 

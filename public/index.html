@@ -95,7 +95,7 @@
         <div class="portal-form-row">
           <input
             id="timezone"
-            value="Asia/Singapore"
+            placeholder="e.g. Asia/Singapore"
             autocomplete="off"
             list="timezoneOptions"
             spellcheck="false"
@@ -108,8 +108,9 @@
           </button>
         </div>
         <p id="timezoneHelp" class="field-help">
-          Choose a valid IANA timezone such as Asia/Singapore. It controls local event dates,
-          daily Remote Raid usage, and temporary event limits.
+          We detect your browser timezone automatically when possible. Confirm or change it
+          before creating the planner. It controls local event dates, daily Remote Raid usage,
+          and temporary event limits.
         </p>
         <p class="field-help">
           You can permanently delete the planner later from Preferences. Deletion removes
@@ -176,6 +177,6 @@
 
 <script src="/timezone-validation.js?v=1"></script>
 <script src="/json-api-client.js?v=1"></script>
-<script src="/landing-app.js?v=3"></script>
+<script src="/landing-app.js?v=4"></script>
 </body>
 </html>

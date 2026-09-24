@@ -67,7 +67,7 @@ Logging that changes target progress, Remote usage, or Max Particle state must b
 
 ### 2.7 Timezone correctness is explicit
 
-Planner timezones are IANA timezone identifiers such as `Asia/Singapore`. Creation and Preferences validate them in the browser for immediate feedback and independently in the Worker before persistence. The Worker canonicalizes valid identifiers through `Intl.DateTimeFormat`; invalid timezone input is rejected rather than stored.
+Planner timezones are IANA timezone identifiers such as `Asia/Singapore`. New-planner creation initializes the empty timezone field from `Intl.DateTimeFormat().resolvedOptions().timeZone` when the browser reports a valid identifier, then lets the user keep or replace it before submission. Detection is only an initial convenience: it never overwrites a manual choice, and if detection is unavailable or invalid the field remains empty so creation cannot silently fall back to another region. Creation and Preferences validate timezones in the browser for immediate feedback and independently in the Worker before persistence. The Worker canonicalizes valid identifiers through `Intl.DateTimeFormat`; invalid timezone input is rejected rather than stored.
 
 The Planner API exposes whether an already-stored timezone is valid so a legacy malformed value can be surfaced for correction. Core date calculations retain a UTC fallback only as a defensive compatibility path for pre-validation legacy rows, and that fallback is logged rather than treated as normal behavior. Unrelated settings updates do not become blocked solely because a historical row contains an invalid timezone.
 
