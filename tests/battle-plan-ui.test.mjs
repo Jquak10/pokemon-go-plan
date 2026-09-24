@@ -2096,6 +2096,12 @@ assert.match(plannerOverlay, /event\.key ===[\s\S]*"Escape"/);
 assert.match(plannerOverlay, /event\.key !==[\s\S]*"Tab"/);
 assert.match(plannerOverlay, /stopImmediatePropagation/);
 assert.match(plannerOverlay, /element\.inert = true/);
+assert.match(
+  manageHtml,
+  /<textarea[\s\S]*id="notes"[\s\S]*maxlength="2000"/,
+  "Target notes must expose the server storage bound in the browser"
+);
+
 assert.match(manage, /PlannerOverlay\.open/);
 assert.match(manage, /PlannerOverlay\.close/);
 assert.match(manage, /role",[\s\S]*"dialog"/);

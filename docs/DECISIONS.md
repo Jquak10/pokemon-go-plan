@@ -852,6 +852,28 @@ Current decision:
 
 This provides repository-owned production coverage without introducing a new public health endpoint, persistent monitoring state, or additional credentials.
 
+## ADR-050 — Bound planner-owned persistent growth at mutation boundaries
+
+Status: Current  
+Introduced in PR #80.
+
+Public creation rate limits constrain how quickly new planners can be created, but they do not by themselves bound persistent D1 growth once a valid management capability exists. The storage contract therefore also needs per-planner limits on user-controlled rows while preserving ordinary long-term gameplay history and Undo semantics.
+
+Current decision:
+
+- a planner may store at most 250 Targets;
+- Target notes are rejected above 2,000 characters rather than silently truncated;
+- battle logging may create at most 200 log rows for one planner-local date and at most 20,000 unified battle-log rows for one planner;
+- the limits apply to log rows, not battles: one log row can still represent up to 99 battles;
+- existing Target edits and idempotent retries for an existing battle request ID remain allowed when the planner is at capacity;
+- Target and battle-log insert predicates are evaluated inside the same SQL write as the insertion so concurrent requests cannot race past the storage bound;
+- a planner may retain at most 250 active/future manual Max tier/cost overrides, with expired overrides pruned before capacity evaluation and the conditional capacity predicate included in the insert;
+- the one-day Remote Raid budget override may be written only for the planner's current local date, matching the only date consumed by the product, and valid save/clear operations remove obsolete dated rows left by prior/direct API callers;
+- historical Remote usage, Battle resource daily rows, and battle history are not opportunistically pruned because historical Undo depends on the original dated ledgers;
+- the change requires no new D1 schema migration or Cloudflare rate-limit binding.
+
+These bounds are deliberately well above normal Planner use and are storage-safety controls, not gameplay limits or recommended targets.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -937,6 +959,7 @@ The following sequence is retained as a compact repository implementation/change
 | #77 | BL-029 permanent self-service planner deletion | Adds exact typed/server confirmation plus authenticated `DELETE /api/planner`; deleting the parent planner row uses existing D1 cascades to remove planner-owned data and immediately invalidate management/calendar capabilities, with deterministic SQLite and Chromium regressions and no migration. |
 | #78 | BL-030 automatic new-planner timezone detection | Replaces the fixed Singapore onboarding value with validated browser timezone detection, preserves manual overrides, leaves the field empty when detection is unavailable instead of silently assuming another region, and adds deterministic plus Chromium coverage. |
 | #79 | BL-031 production smoke monitoring | Adds a separate read-only production smoke workflow on `main` pushes, manual dispatch, and a three-hour schedule; checks public assets plus a synthetic-invalid Worker/D1 lookup without secrets or state mutation, with deterministic fixture and release-safety coverage. |
+| #80 | BL-032 planner storage growth bounds | Bounds per-planner Targets, Target-note length, daily/total battle-log rows, and active/future Max tier overrides; restricts the one-day Remote ceiling override to the current planner-local date and prunes obsolete override rows, with race-safe SQL predicates and focused SQLite coverage. |
 
 ## Supersession map
 

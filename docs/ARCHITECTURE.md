@@ -71,6 +71,22 @@ Planner timezones are IANA timezone identifiers such as `Asia/Singapore`. New-pl
 
 The Planner API exposes whether an already-stored timezone is valid so a legacy malformed value can be surfaced for correction. Core date calculations retain a UTC fallback only as a defensive compatibility path for pre-validation legacy rows, and that fallback is logged rather than treated as normal behavior. Unrelated settings updates do not become blocked solely because a historical row contains an invalid timezone.
 
+### 2.8 Planner-owned persistent growth is bounded
+
+Public planner creation already has Cloudflare rate limiting, but a valid management capability must not permit unbounded D1 row growth. The Worker therefore enforces generous per-planner persistence bounds at the write boundary:
+
+- no more than 250 Target rows per planner;
+- target notes are rejected above 2,000 characters instead of being silently truncated;
+- no more than 200 unified battle-log rows may be created for one planner-local date;
+- no more than 20,000 unified battle-log rows may be stored for one planner;
+- no more than 250 active/future manual Max tier/cost override rows may be stored for one planner.
+
+These are storage-row bounds, not gameplay ceilings. One battle-log row may represent up to 99 battles, so logging multiple raids at once remains supported. Existing rows may still be edited or retried idempotently at capacity. Target and Max-override insert statements include their capacity predicate in the same SQL write so concurrent requests cannot race past the bound. Battle-log creation likewise performs the total/daily capacity predicate inside the insert while allowing idempotent retries for an existing request ID.
+
+Expired Max tier overrides are deleted before capacity is evaluated because past overrides are not consulted by current/future planning. The one-day Remote Raid budget override is valid only for the planner's current local date, matching the only date read by the product; saving or clearing it removes obsolete dated rows. Historical Remote usage, Battle resource daily rows, and Battle logs are not pruned opportunistically because historical Undo depends on those original dated ledgers.
+
+No BL-032 schema migration or new Cloudflare binding is required; these bounds are enforced in application SQL against the existing schema.
+
 ## 3. Production topology
 
 Repository: Jquak10/pokemon-go-plan  
