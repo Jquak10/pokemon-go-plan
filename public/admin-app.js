@@ -136,9 +136,18 @@ function showAdminSection(name) {
   document
     .querySelectorAll("[data-admin-section]")
     .forEach(button => {
+      const active =
+        button.dataset.adminSection === name;
+
       button.classList.toggle(
         "active",
-        button.dataset.adminSection === name
+        active
+      );
+      button.setAttribute(
+        "aria-pressed",
+        active
+          ? "true"
+          : "false"
       );
     });
 }

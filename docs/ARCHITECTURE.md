@@ -244,9 +244,12 @@ Current invariants:
 - Planner section tabs use the ARIA tabs interaction model: exactly one visible tab participates in the roving tab stop, ArrowLeft/ArrowRight move and activate with wraparound, and Home/End jump to the first/last visible tab without forcing content scroll;
 - each `role="tab"` has a stable ID/`aria-controls` relationship to its `role="tabpanel"`/`aria-labelledby` peer;
 - the mobile More disclosure is not part of the tablist and retains ordinary button semantics while occupying the fifth visual bottom-nav slot;
-- `prefers-reduced-motion: reduce` collapses Planner animation/transition durations and disables smooth tab scrolling.
+- `prefers-reduced-motion: reduce` collapses Planner animation/transition durations and disables smooth tab scrolling;
+- every form control on Landing, Planner, Data Sources, and Admin has a programmatic accessible name; placeholder text is never the only name;
+- button groups that visually expose a selected mode (for example Target view/status, Battle participation, Admin sections, and Battle Plan filters) expose the same selected state through `aria-pressed`;
+- short asynchronous action feedback uses `role="status"` with polite, atomic live-region semantics so save/copy/rotate/log/error outcomes are announced without moving keyboard focus; large result collections are not made live regions merely because their content refreshes.
 
-`planner-app.js` remains responsible for overlay-specific open/close business state and scroll-lock mechanics; `planner-overlay.js` owns the cross-overlay keyboard/focus/isolation contract.
+`planner-app.js` remains responsible for overlay-specific open/close business state and scroll-lock mechanics; `planner-overlay.js` owns the cross-overlay keyboard/focus/isolation contract. `tests/accessibility-semantics.test.mjs` protects control naming, live-feedback, and selected-state contracts, with Chromium covering the corresponding runtime state changes.
 
 ### 5.3 Desktop information architecture
 

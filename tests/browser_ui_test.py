@@ -3152,5 +3152,101 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         )
 
 
+    def test_accessibility_names_live_feedback_and_toggle_state(self):
+        context = self.browser.new_context(
+            viewport={"width": 1024, "height": 800},
+            locale="en-US",
+            timezone_id="Asia/Singapore",
+            reduced_motion="reduce",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+
+        page.goto(
+            f"{self.base_url}/",
+            wait_until="domcontentloaded",
+        )
+        self.assertEqual(page.locator("#status").get_attribute("role"), "status")
+        self.assertEqual(page.locator("#status").get_attribute("aria-live"), "polite")
+
+        page.goto(
+            f"{self.base_url}/admin",
+            wait_until="domcontentloaded",
+        )
+        page.locator("#key").fill("browser-admin-key")
+        self.assertEqual(page.locator("#adminAuthBadge").inner_text().lower(), "key entered")
+        self.assertEqual(page.locator("#adminAuthBadge").get_attribute("role"), "status")
+        self.assertEqual(
+            page.locator('[data-admin-section="official"]').get_attribute("aria-pressed"),
+            "true",
+        )
+        page.locator('[data-admin-section="meta"]').click()
+        self.assertEqual(
+            page.locator('[data-admin-section="official"]').get_attribute("aria-pressed"),
+            "false",
+        )
+        self.assertEqual(
+            page.locator('[data-admin-section="meta"]').get_attribute("aria-pressed"),
+            "true",
+        )
+
+        planner = self.open_planner(1280, 900)
+        self.assertEqual(planner.locator("#loadStatus").get_attribute("role"), "status")
+        for selector in (
+            "#settingsStatus",
+            "#calendarStatus",
+            "#raidLogStatus",
+            "#targetStatus",
+        ):
+            self.assertEqual(
+                planner.locator(selector).get_attribute("aria-live"),
+                "polite",
+                f"{selector} should announce user-action feedback",
+            )
+
+        planner.locator('.tab-button[data-tab="targets"]').click()
+        self.assertEqual(
+            planner.locator("#targetSearch").get_attribute("aria-label"),
+            "Search targets by Pokémon",
+        )
+        self.assertEqual(
+            planner.locator('[data-target-view="cards"]').get_attribute("aria-pressed"),
+            "true",
+        )
+        planner.locator('[data-target-view="list"]').click()
+        self.assertEqual(
+            planner.locator('[data-target-view="cards"]').get_attribute("aria-pressed"),
+            "false",
+        )
+        self.assertEqual(
+            planner.locator('[data-target-view="list"]').get_attribute("aria-pressed"),
+            "true",
+        )
+        planner.locator('[data-target-status="completed"]').click()
+        self.assertEqual(
+            planner.locator('[data-target-status="active"]').get_attribute("aria-pressed"),
+            "false",
+        )
+        self.assertEqual(
+            planner.locator('[data-target-status="completed"]').get_attribute("aria-pressed"),
+            "true",
+        )
+
+        planner.evaluate("setRaidLogType('local')")
+        self.assertEqual(
+            planner.locator('[data-raid-type="remote"]').get_attribute("aria-pressed"),
+            "false",
+        )
+        self.assertEqual(
+            planner.locator('[data-raid-type="local"]').get_attribute("aria-pressed"),
+            "true",
+        )
+
+        max_status = planner.locator(".max-tier-override-status").first
+        self.assertEqual(max_status.get_attribute("role"), "status")
+        self.assertEqual(max_status.get_attribute("aria-live"), "polite")
+        self.assert_no_horizontal_overflow(planner)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

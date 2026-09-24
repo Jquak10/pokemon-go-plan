@@ -97,7 +97,7 @@
             remains within the Free-plan per-invocation limits.
           </p>
         </div>
-        <span id="adminAuthBadge" class="status-badge badge-neutral">Key required</span>
+        <span id="adminAuthBadge" class="status-badge badge-neutral" role="status" aria-live="polite" aria-atomic="true">Key required</span>
       </div>
 
       <div class="admin-key-row">
@@ -116,7 +116,7 @@
           <span>1</span>
           <div>
             <strong>Event feeds</strong>
-            <small>Waiting</small>
+            <small role="status" aria-live="polite" aria-atomic="true">Waiting</small>
           </div>
         </article>
 
@@ -124,7 +124,7 @@
           <span>2</span>
           <div>
             <strong>Official schedules</strong>
-            <small>Waiting</small>
+            <small role="status" aria-live="polite" aria-atomic="true">Waiting</small>
           </div>
         </article>
 
@@ -132,7 +132,7 @@
           <span>3</span>
           <div>
             <strong>Meta & raid rankings</strong>
-            <small>Waiting</small>
+            <small role="status" aria-live="polite" aria-atomic="true">Waiting</small>
           </div>
         </article>
       </div>
@@ -144,10 +144,10 @@
     </section>
 
     <nav class="admin-section-nav admin-section-nav-four">
-      <button type="button" data-admin-section="official">Official raids</button>
-      <button type="button" data-admin-section="overrides">Overrides</button>
-      <button type="button" data-admin-section="limits">Remote limits</button>
-      <button type="button" data-admin-section="meta">Meta & rankings</button>
+      <button type="button" data-admin-section="official" aria-pressed="true">Official raids</button>
+      <button type="button" data-admin-section="overrides" aria-pressed="false">Overrides</button>
+      <button type="button" data-admin-section="limits" aria-pressed="false">Remote limits</button>
+      <button type="button" data-admin-section="meta" aria-pressed="false">Meta & rankings</button>
     </nav>
 
     <section id="adminOfficial" class="dashboard-card admin-data-section">
@@ -235,6 +235,6 @@
   </main>
 
 <script src="/json-api-client.js?v=1"></script>
-<script src="/admin-app.js?v=2"></script>
+<script src="/admin-app.js?v=3"></script>
 </body>
 </html>

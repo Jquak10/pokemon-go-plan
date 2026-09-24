@@ -310,7 +310,7 @@ assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-intel\.js\?v=1"><\/script>/);
-assert.match(manage, /<script src="\/planner-app\.js\?v=6"><\/script>/);
+assert.match(manage, /<script src="\/planner-app\.js\?v=7"><\/script>/);
 assert.match(manage, /PlannerBattleIntel/);
 const plannerTablistMarkup =
   manageHtml.match(
@@ -586,7 +586,7 @@ assert.match(manage, /item\.label \|\| "Priority"/);
 // BL-017: the Planner must remain executable with script-src 'self' only.
 assert.match(
   manageHtml,
-  /<script src="\/planner-app\.js\?v=6"><\/script>/
+  /<script src="\/planner-app\.js\?v=7"><\/script>/
 );
 
 const inlineScripts = [
@@ -2217,7 +2217,7 @@ assert.match(
 );
 assert.match(
   manageHtml,
-  /<script src="\/planner-app\.js\?v=6"><\/script>/
+  /<script src="\/planner-app\.js\?v=7"><\/script>/
 );
 assert.match(
   plannerApp,
@@ -2278,7 +2278,7 @@ assert.match(
 );
 assert.match(
   adminHtml,
-  /<script src="\/admin-app\.js\?v=2"><\/script>/
+  /<script src="\/admin-app\.js\?v=3"><\/script>/
 );
 
 for (const [name, html] of [
