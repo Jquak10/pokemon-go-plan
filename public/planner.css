@@ -17,6 +17,74 @@
   display: none;
 }
 
+
+/* ============================================================
+   PREFERENCES LAYOUT HARDENING · BL-033 FOLLOW-UP
+   ============================================================ */
+
+/*
+  The shared .dashboard-card + .dashboard-card rule is useful for stacked
+  cards, but Preferences is already a CSS grid. Reset that inherited margin so
+  the grid gap is the only spacing source and paired cards remain top-aligned.
+*/
+.settings-layout > .dashboard-card {
+  margin-top: 0;
+}
+
+/*
+  Keep action labels intact. The text column is the flexible side of these
+  rows; controls should not collapse into one-word-per-line buttons.
+*/
+.legacy-revoke-box > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.legacy-revoke-box > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.settings-card-backup input[type="file"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/*
+  On two-column Preferences layouts, pair the compact credential/danger cards
+  and let the more complex Backup & Recovery surface use the full row.
+  DOM order is unchanged, so tablet/mobile continue to read naturally:
+  weights → pass rules → management → backup → delete.
+*/
+@media (min-width: 981px) {
+  .settings-layout {
+    grid-template-areas:
+      "weights pass"
+      "access danger"
+      "backup backup";
+  }
+
+  .settings-card-weights {
+    grid-area: weights;
+  }
+
+  .settings-card-pass-rules {
+    grid-area: pass;
+  }
+
+  .settings-card-access {
+    grid-area: access;
+  }
+
+  .settings-card-backup {
+    grid-area: backup;
+  }
+
+  .settings-card-danger {
+    grid-area: danger;
+  }
+}
+
 /* ---------- Desktop: left navigation + larger working canvas ---------- */
 
 @media (min-width: 1180px) {

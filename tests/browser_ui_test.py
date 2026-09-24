@@ -929,6 +929,166 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             f"Unexpected horizontal overflow: {dimensions}",
         )
 
+    def open_preferences(self, page, width: int):
+        if width <= 760:
+            page.locator("#mobileMoreButton").click()
+            page.locator('[data-mobile-more-tab="preferences"]').click()
+        else:
+            page.locator('.tab-button[data-tab="preferences"]').click()
+
+        page.wait_for_function(
+            """() => document.getElementById('panel-preferences')?.classList.contains('active')"""
+        )
+
+    def test_primary_planner_sections_fit_core_desktop_and_mobile_breakpoints(self):
+        for width, height in (
+            (390, 844),
+            (760, 900),
+            (981, 900),
+            (1180, 900),
+            (1600, 1000),
+        ):
+            with self.subTest(width=width):
+                page = self.open_planner(width, height)
+
+                for tab in ("plan", "targets", "hundo", "calendar"):
+                    page.locator(f'.tab-button[data-tab="{tab}"]').click()
+                    page.wait_for_function(
+                        """name => document.querySelector('.tab-button[data-tab="' + name + '"]')?.classList.contains('active')""",
+                        arg=tab,
+                    )
+                    self.assert_no_horizontal_overflow(page)
+
+                self.open_preferences(page, width)
+                self.assert_no_horizontal_overflow(page)
+
+    def test_preferences_cards_and_backup_controls_stay_clean_across_breakpoints(self):
+        for width, height in (
+            (390, 844),
+            (640, 900),
+            (760, 900),
+            (980, 900),
+            (981, 900),
+            (1024, 900),
+            (1180, 900),
+            (1600, 1000),
+        ):
+            with self.subTest(width=width):
+                page = self.open_planner(width, height)
+                self.open_preferences(page, width)
+                self.assert_no_horizontal_overflow(page)
+
+                geometry = page.evaluate(
+                    """() => {
+                        const box = selector => {
+                            const element = document.querySelector(selector);
+                            const rect = element.getBoundingClientRect();
+                            return {
+                                x: rect.x,
+                                y: rect.y,
+                                width: rect.width,
+                                height: rect.height,
+                                right: rect.right,
+                                bottom: rect.bottom,
+                                marginTop: getComputedStyle(element).marginTop
+                            };
+                        };
+                        return {
+                            layout: box('.settings-layout'),
+                            weights: box('.settings-card-weights'),
+                            pass: box('.settings-card-pass-rules'),
+                            access: box('.settings-card-access'),
+                            backup: box('.settings-card-backup'),
+                            danger: box('.settings-card-danger')
+                        };
+                    }"""
+                )
+
+                for key in ("weights", "pass", "access", "backup", "danger"):
+                    self.assertEqual(
+                        geometry[key]["marginTop"],
+                        "0px",
+                        f"{key} card must not inherit stacked-card margin inside Preferences grid",
+                    )
+
+                if width >= 981:
+                    self.assertAlmostEqual(
+                        geometry["backup"]["x"],
+                        geometry["layout"]["x"],
+                        delta=1.5,
+                    )
+                    self.assertAlmostEqual(
+                        geometry["backup"]["width"],
+                        geometry["layout"]["width"],
+                        delta=2,
+                        msg="Backup & Recovery should span the full two-column Preferences grid",
+                    )
+                    self.assertAlmostEqual(
+                        geometry["access"]["y"],
+                        geometry["danger"]["y"],
+                        delta=1.5,
+                        msg="Management Link and Delete Planner should form one aligned row",
+                    )
+                    self.assertGreaterEqual(
+                        geometry["backup"]["y"],
+                        max(
+                            geometry["access"]["bottom"],
+                            geometry["danger"]["bottom"],
+                        )
+                        + 12,
+                        "Backup card should start after the aligned credential/danger row",
+                    )
+                else:
+                    ordered = [
+                        geometry["weights"],
+                        geometry["pass"],
+                        geometry["access"],
+                        geometry["backup"],
+                        geometry["danger"],
+                    ]
+                    for previous, current in zip(ordered, ordered[1:]):
+                        self.assertGreaterEqual(
+                            current["y"],
+                            previous["bottom"] + 12,
+                            "Single-column Preferences cards must stack without overlap",
+                        )
+
+                for selector in (
+                    "#rotateManagementLink",
+                    "#downloadPlannerBackup",
+                    "#restorePlannerBackup",
+                    "#deletePlanner",
+                ):
+                    button = page.locator(selector)
+                    box = button.bounding_box()
+                    self.assertIsNotNone(box)
+                    self.assertGreaterEqual(
+                        box["width"],
+                        112,
+                        f"{selector} should never collapse into a narrow multi-line control",
+                    )
+                    self.assertEqual(
+                        button.evaluate(
+                            "element => getComputedStyle(element).whiteSpace"
+                        ),
+                        "nowrap",
+                    )
+
+                file_input = page.locator("#plannerBackupFile")
+                file_box = file_input.bounding_box()
+                backup_box = page.locator(".settings-card-backup").bounding_box()
+                self.assertIsNotNone(file_box)
+                self.assertIsNotNone(backup_box)
+                self.assertGreaterEqual(
+                    file_box["x"],
+                    backup_box["x"],
+                )
+                self.assertLessEqual(
+                    file_box["x"] + file_box["width"],
+                    backup_box["x"] + backup_box["width"] + 1,
+                    "Backup file control must stay inside its card",
+                )
+
     def test_planner_backup_download_and_restore_use_management_auth(self):
         page = self.open_planner(1024, 900)
         page.locator('.tab-button[data-tab="preferences"]').click()
