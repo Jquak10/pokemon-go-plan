@@ -918,9 +918,31 @@ Current decision:
 - shared semantic CSS variables own page, surface, text, border, input, status, overlay, shadow, and map-background roles; Planner-specific surfaces consume those same tokens rather than maintaining an independent dark stylesheet;
 - Pokémon/source/status accents retain their semantic identity with theme-appropriate backgrounds/text instead of being flattened into neutral colors;
 - `styles.css` moves to cache generation v43, `planner.css` to v5, and the theme controller begins at `theme.js?v=1`;
-- BL-040 remains responsible for dedicated automated contrast/theme-accessibility assertions, rather than making screenshot diffs the primary BL-035 correctness gate.
+- automated theme-accessibility assertions are implemented by PR #87 and remain token/computed-style based rather than screenshot-diff based.
 
 No D1 migration, Worker API field, Cloudflare binding, secret, route, or Cron change is required.
+
+## ADR-053 — Theme accessibility is enforced by deterministic contrast and browser-state regressions
+
+Status: Current  
+Introduced in PR #87.
+
+BL-035 established semantic Light/Dark tokens, but a theme system is only maintainable if accessibility requirements fail automatically when a token or component changes.
+
+Current decision:
+
+- the repository computes WCAG contrast from the actual semantic token declarations rather than duplicating a separate hand-maintained color table;
+- representative normal-text pairs in both Light and Dark must remain at least 4.5:1, including core/secondary text, placeholders, primary/secondary controls, and success/warning/danger/info/violet status/source surfaces;
+- input boundaries and the keyboard focus indicator must remain at least 3:1 against their adjacent surfaces;
+- selected navigation must keep readable white text across both endpoints of its blue gradient;
+- Chromium supplements token-level checks with computed-style coverage for representative product text, inputs, buttons, status/source badges, calendar indicators, modal surfaces, focus treatment, and disabled semantics in both themes;
+- appearance changes during an active dialog must not steal focus or alter focus trapping/restoration, tab/dialog/live-region semantics, inert background isolation, or the reduced-motion override;
+- whole-page screenshot diffs are not the primary accessibility gate because they are noisy and do not express the contrast/focus invariants directly;
+- when the new gate exposes an actual threshold miss, the semantic token should be corrected rather than weakening the assertion unless the product requirement itself changes.
+
+PR #87 also raises the few Light-theme values that were below these thresholds: primary blue, muted/subtle text, placeholder text, and the strong input border. Because `styles.css` changes, its cache generation advances from v43 to v44; `planner.css` remains v5.
+
+No D1 migration, Worker/API change, dependency, Cloudflare binding, route, secret, Service Binding, or Cron change is required.
 
 ## PR lineage
 
@@ -1014,6 +1036,7 @@ The following sequence is retained as a compact repository implementation/change
 | #84 | BL-034 restore request hardening | Enforces the 25 MB restore boundary in the Worker, authenticates non-body management capabilities before reading restore JSON, preserves bounded legacy body-token compatibility, returns stable 413/400 failures, and adds focused deterministic coverage without changing the backup format or D1 restore semantics. |
 | #85 | BL-035 System / Light / Dark appearance | Adds browser-local System/Light/Dark theming with a pre-CSS same-origin initializer, semantic shared/Planner tokens, native color-scheme/theme-color integration, all-surface controls, cache bumps, and Chromium persistence/responsive regressions without adding planner/D1 state. |
 | #86 | BL-036 Planner-aware production smoke | Extends the existing secret-free GET-only production monitor to a synthetic no-store Planner shell plus every current versioned Planner asset, explicitly checks theme/shared CSS/Planner CSS/main Planner JS contracts, and adds deterministic success/missing-asset regressions without changing the workflow cadence or production app runtime. |
+| #87 | BL-040 theme accessibility regression gates | Adds deterministic WCAG token contrast checks plus Chromium computed component/theme-switch accessibility coverage, raises the few Light-theme values below threshold, bumps shared CSS to v44, and preserves existing focus/live-region/reduced-motion semantics without changing planner data or Worker behavior. |
 
 ## Supersession map
 
