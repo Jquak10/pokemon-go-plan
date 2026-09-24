@@ -11,8 +11,15 @@ export const PLANNER_BACKUP_FORMAT =
 export const PLANNER_BACKUP_VERSION =
   1;
 
-export const PLANNER_BACKUP_MAX_BROWSER_BYTES =
+export const PLANNER_BACKUP_MAX_RESTORE_BYTES =
   25 * 1024 * 1024;
+
+// Retained as the browser-facing name used by the BL-033 UX contract.
+export const PLANNER_BACKUP_MAX_BROWSER_BYTES =
+  PLANNER_BACKUP_MAX_RESTORE_BYTES;
+
+export const PLANNER_BACKUP_TOO_LARGE_MESSAGE =
+  "Planner backup restore requests cannot exceed 25 MB.";
 
 export const PLANNER_BACKUP_JSON_CHUNK_BYTES =
   900000;
@@ -37,6 +44,128 @@ function backupError(message) {
   throw new PlannerBackupError(
     message
   );
+}
+
+
+export async function readPlannerRestoreJson(
+  request,
+  maxBytes =
+    PLANNER_BACKUP_MAX_RESTORE_BYTES
+) {
+  const contentLength =
+    request.headers?.get?.(
+      "content-length"
+    );
+
+  if (
+    contentLength &&
+    /^\d+$/.test(
+      contentLength.trim()
+    ) &&
+    Number(
+      contentLength
+    ) > maxBytes
+  ) {
+    throw new PlannerBackupError(
+      PLANNER_BACKUP_TOO_LARGE_MESSAGE,
+      413
+    );
+  }
+
+  const body =
+    request.body;
+
+  if (
+    !body ||
+    typeof body.getReader !==
+      "function"
+  ) {
+    throw new PlannerBackupError(
+      "Choose a valid Planner backup JSON file."
+    );
+  }
+
+  const reader =
+    body.getReader();
+  const decoder =
+    new TextDecoder();
+
+  let totalBytes = 0;
+  let serialized = "";
+
+  try {
+    while (true) {
+      const {
+        done,
+        value
+      } =
+        await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      const bytes =
+        value instanceof
+          Uint8Array
+          ? value
+          : new Uint8Array(
+              value
+            );
+
+      totalBytes +=
+        bytes.byteLength;
+
+      if (
+        totalBytes >
+        maxBytes
+      ) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The request has already crossed the accepted boundary. A failed
+          // cancellation must not turn the stable 413 into an internal error.
+        }
+
+        throw new PlannerBackupError(
+          PLANNER_BACKUP_TOO_LARGE_MESSAGE,
+          413
+        );
+      }
+
+      serialized +=
+        decoder.decode(
+          bytes,
+          {
+            stream: true
+          }
+        );
+    }
+
+    serialized +=
+      decoder.decode();
+  } catch (error) {
+    if (
+      error instanceof
+        PlannerBackupError
+    ) {
+      throw error;
+    }
+
+    throw new PlannerBackupError(
+      "Choose a valid Planner backup JSON file."
+    );
+  }
+
+  try {
+    return JSON.parse(
+      serialized
+    );
+  } catch {
+    throw new PlannerBackupError(
+      "Choose a valid Planner backup JSON file."
+    );
+  }
 }
 
 function object(value, label) {
