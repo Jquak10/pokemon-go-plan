@@ -533,6 +533,35 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
             }
             return self._json(state)
 
+        if path == "/api/planner/backup":
+            self.server.last_backup_authorization = self.headers.get("authorization")
+            return self._json(
+                {
+                    "format": "pokemon-go-planner-backup",
+                    "version": 1,
+                    "exported_at": "2026-09-24T00:00:00.000Z",
+                    "planner": {
+                        "timezone": "Asia/Singapore",
+                        "included_sources": [],
+                        "pve_weight": 1,
+                        "pvp_weight": 1,
+                        "collector_weight": 1,
+                        "remote_raid_budget": None,
+                        "remote_raid_min_score": 60,
+                    },
+                    "data": {
+                        "targets": [],
+                        "remote_raid_usage": [],
+                        "remote_raid_daily_budget_overrides": [],
+                        "max_battle_cost_overrides": [],
+                        "battle_resource_state": None,
+                        "battle_resource_daily": [],
+                        "raid_log": [],
+                        "battle_log": [],
+                    },
+                }
+            )
+
         if path == "/api/feed-link":
             host = self.headers.get("host")
             return self._json(
@@ -635,6 +664,44 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
                 "authorization"
             )
             return self._json({"ok": True})
+
+        if path == "/api/planner/restore":
+            self.server.last_restore_authorization = self.headers.get("authorization")
+            content_length = int(
+                self.headers.get(
+                    "content-length",
+                    "0",
+                )
+            )
+            payload = (
+                json.loads(
+                    self.rfile.read(
+                        content_length
+                    )
+                    or b"{}"
+                )
+                if content_length
+                else {}
+            )
+            self.server.last_restore_confirmation = payload.get(
+                "confirmation"
+            )
+            self.server.last_restore_backup = payload.get(
+                "backup"
+            )
+            return self._json(
+                {
+                    "ok": True,
+                    "restored": True,
+                    "target_count": 0,
+                    "battle_log_count": 0,
+                    "legacy_raid_log_count": 0,
+                    "note": (
+                        "Planner backup restored. This destination planner keeps "
+                        "its current management and calendar credentials."
+                    ),
+                }
+            )
 
         if path == "/api/manage-link/rotate":
             self.server.last_manage_rotation_authorization = self.headers.get(
@@ -810,6 +877,10 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.server.last_manage_rotation_authorization = None
         self.server.last_planner_delete_authorization = None
         self.server.last_planner_delete_confirmation = None
+        self.server.last_backup_authorization = None
+        self.server.last_restore_authorization = None
+        self.server.last_restore_confirmation = None
+        self.server.last_restore_backup = None
         self.server.last_feed_rotation_authorization = None
         self.server.last_feed_revoke_authorization = None
         self.server.last_admin_key = None
@@ -857,6 +928,91 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             dimensions["viewport"] + 1,
             f"Unexpected horizontal overflow: {dimensions}",
         )
+
+    def test_planner_backup_download_and_restore_use_management_auth(self):
+        page = self.open_planner(1024, 900)
+        page.locator('.tab-button[data-tab="preferences"]').click()
+
+        with page.expect_download() as download_info:
+            page.locator("#downloadPlannerBackup").click()
+
+        download = download_info.value
+        self.assertEqual(
+            download.suggested_filename,
+            "pokemon-go-planner-backup-2026-09-24.json",
+        )
+        self.assertEqual(
+            self.server.last_backup_authorization,
+            "Bearer browser-test-token",
+        )
+        page.wait_for_function(
+            """() => document.getElementById('plannerBackupStatus')?.textContent.includes('Backup downloaded')"""
+        )
+
+        backup_payload = {
+            "format": "pokemon-go-planner-backup",
+            "version": 1,
+            "exported_at": "2026-09-24T00:00:00.000Z",
+            "planner": {
+                "timezone": "Asia/Singapore",
+                "included_sources": [],
+                "pve_weight": 1,
+                "pvp_weight": 1,
+                "collector_weight": 1,
+                "remote_raid_budget": None,
+                "remote_raid_min_score": 60,
+            },
+            "data": {
+                "targets": [],
+                "remote_raid_usage": [],
+                "remote_raid_daily_budget_overrides": [],
+                "max_battle_cost_overrides": [],
+                "battle_resource_state": None,
+                "battle_resource_daily": [],
+                "raid_log": [],
+                "battle_log": [],
+            },
+        }
+
+        page.locator("#plannerBackupFile").set_input_files(
+            files=[
+                {
+                    "name": "planner-backup.json",
+                    "mimeType": "application/json",
+                    "buffer": json.dumps(backup_payload).encode("utf-8"),
+                }
+            ]
+        )
+        restore_button = page.locator("#restorePlannerBackup")
+        self.assertTrue(
+            restore_button.is_disabled(),
+            "Selecting a file alone must not enable restore",
+        )
+
+        page.locator("#restorePlannerConfirmation").fill("RESTORE")
+        self.assertFalse(
+            restore_button.is_disabled(),
+            "Exact RESTORE confirmation plus a file should enable restore",
+        )
+
+        restore_button.click()
+        page.wait_for_function(
+            """() => document.getElementById('plannerRestoreStatus')?.textContent.includes('Backup restored')"""
+        )
+
+        self.assertEqual(
+            self.server.last_restore_authorization,
+            "Bearer browser-test-token",
+        )
+        self.assertEqual(
+            self.server.last_restore_confirmation,
+            "RESTORE",
+        )
+        self.assertEqual(
+            self.server.last_restore_backup["format"],
+            "pokemon-go-planner-backup",
+        )
+        self.assert_no_horizontal_overflow(page)
 
     def test_non_json_server_failure_has_actionable_message(self):
         self.server.manage_api_mode = "html_503"
