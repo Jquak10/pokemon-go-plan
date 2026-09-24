@@ -29,6 +29,14 @@ const sourcesHtml =
     ),
     "utf8"
   );
+const adminHtml =
+  await readFile(
+    new URL(
+      "../public/admin.html",
+      import.meta.url
+    ),
+    "utf8"
+  );
 
 const expectedLandingAsset =
   indexHtml.match(
@@ -149,6 +157,37 @@ function contentTypeFor(
     : "text/javascript; charset=utf-8";
 }
 
+function hardenedHtmlHeaders({
+  noStore = false
+} = {}) {
+  return {
+    "content-type":
+      "text/html; charset=utf-8",
+    "content-security-policy":
+      "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; manifest-src 'self'",
+    "referrer-policy":
+      "no-referrer",
+    "x-content-type-options":
+      "nosniff",
+    "x-frame-options":
+      "DENY",
+    "permissions-policy":
+      "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "cross-origin-opener-policy":
+      "same-origin",
+    "cross-origin-resource-policy":
+      "same-origin",
+    ...(
+      noStore
+        ? {
+            "cache-control":
+              "private, no-store, max-age=0"
+          }
+        : {}
+    )
+  };
+}
+
 const requests = [];
 let unavailableAsset = null;
 
@@ -168,14 +207,14 @@ const server =
 
       if (
         request.method === "GET" &&
-        request.url === "/"
+        (
+          request.url === "/" ||
+          request.url === "/index.html"
+        )
       ) {
         response.writeHead(
           200,
-          {
-            "content-type":
-              "text/html; charset=utf-8"
-          }
+          hardenedHtmlHeaders()
         );
         response.end(
           indexHtml
@@ -185,14 +224,14 @@ const server =
 
       if (
         request.method === "GET" &&
-        request.url === "/sources"
+        (
+          request.url === "/sources" ||
+          request.url === "/sources.html"
+        )
       ) {
         response.writeHead(
           200,
-          {
-            "content-type":
-              "text/html; charset=utf-8"
-          }
+          hardenedHtmlHeaders()
         );
         response.end(
           sourcesHtml
@@ -202,17 +241,37 @@ const server =
 
       if (
         request.method === "GET" &&
-        request.url ===
-          "/manage/bl-036-production-smoke-invalid"
+        (
+          request.url === "/admin" ||
+          request.url === "/admin.html"
+        )
       ) {
         response.writeHead(
           200,
-          {
-            "content-type":
-              "text/html; charset=utf-8",
-            "cache-control":
-              "private, no-store"
-          }
+          hardenedHtmlHeaders({
+            noStore: true
+          })
+        );
+        response.end(
+          adminHtml
+        );
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        (
+          request.url === "/manage" ||
+          request.url === "/manage.html" ||
+          request.url ===
+            "/manage/bl-036-production-smoke-invalid"
+        )
+      ) {
+        response.writeHead(
+          200,
+          hardenedHtmlHeaders({
+            noStore: true
+          })
         );
         response.end(
           manageHtml
@@ -332,6 +391,12 @@ try {
       "/",
       expectedLandingAsset,
       "/sources",
+      "/index.html",
+      "/sources.html",
+      "/admin",
+      "/admin.html",
+      "/manage",
+      "/manage.html",
       "/manage/bl-036-production-smoke-invalid",
       ...expectedPlannerAssets,
       "/api/me"

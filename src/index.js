@@ -12811,7 +12811,14 @@ async function handleFetch(request, env) {
       );
     }
 
-    if (request.method === "GET" && /^\/manage\/[A-Za-z0-9_-]+\/?$/.test(path)) {
+    if (
+      request.method === "GET" &&
+      (
+        path === "/manage" ||
+        path === "/manage.html" ||
+        /^\/manage\/[A-Za-z0-9_-]+\/?$/.test(path)
+      )
+    ) {
       return asset(
         request,
         env,
@@ -12837,7 +12844,13 @@ async function handleFetch(request, env) {
       );
     }
 
-    if (request.method === "GET" && path === "/admin") {
+    if (
+      request.method === "GET" &&
+      (
+        path === "/admin" ||
+        path === "/admin.html"
+      )
+    ) {
       return asset(
         request,
         env,
@@ -12849,8 +12862,21 @@ async function handleFetch(request, env) {
       );
     }
 
-    if (request.method === "GET" && path === "/sources") {
-      return asset(request, env, "/sources");
+    if (
+      request.method === "GET" &&
+      (
+        path === "/sources" ||
+        path === "/sources.html"
+      )
+    ) {
+      return asset(
+        request,
+        env,
+        "/sources",
+        {
+          allowInlineScript: false
+        }
+      );
     }
 
     return hardenResponse(

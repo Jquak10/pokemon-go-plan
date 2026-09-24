@@ -10,8 +10,15 @@
     "run_worker_first": [
       "/api/*",
       "/calendar/*",
-      "/manage/*",
-      "/admin"
+      "/",
+      "/index.html",
+      "/sources",
+      "/sources.html",
+      "/admin",
+      "/admin.html",
+      "/manage",
+      "/manage.html",
+      "/manage/*"
     ]
   },
   "d1_databases": [

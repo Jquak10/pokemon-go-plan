@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import workerApp from "../src/index.js";
 
 const read = relative =>
   readFileSync(
@@ -18,6 +19,11 @@ const packageJson =
 const packageLock =
   JSON.parse(
     read("package-lock.json")
+  );
+
+const wranglerConfig =
+  JSON.parse(
+    read("wrangler.jsonc")
   );
 
 const workflow =
@@ -131,6 +137,36 @@ assert.match(
   "package-lock.json must pin an installed Wrangler version"
 );
 
+const workerFirstRoutes =
+  wranglerConfig.assets
+    ?.run_worker_first;
+
+assert.ok(
+  Array.isArray(
+    workerFirstRoutes
+  ),
+  "Static-asset routing must keep selective Worker-first patterns instead of invoking the Worker for every asset"
+);
+
+for (const path of [
+  "/",
+  "/index.html",
+  "/sources",
+  "/sources.html",
+  "/admin",
+  "/admin.html",
+  "/manage",
+  "/manage.html",
+  "/manage/*"
+]) {
+  assert.ok(
+    workerFirstRoutes.includes(
+      path
+    ),
+    `Worker-first routing must cover hardened HTML entry path ${path}`
+  );
+}
+
 assert.match(
   workflow,
   /^  live-contract:\n\s+if: github\.event_name != 'pull_request'/m,
@@ -212,6 +248,174 @@ assert.match(
   /planner-app\\.js\\\?v=/,
   "Production smoke must keep the main Planner JavaScript in the critical asset contract"
 );
+
+const assetFetches = [];
+
+const securityEnv = {
+  ASSETS: {
+    async fetch(request) {
+      assetFetches.push(
+        new URL(
+          request.url
+        ).pathname
+      );
+
+      return new Response(
+        "<!doctype html><title>Fixture</title>",
+        {
+          status: 200,
+          headers: {
+            "content-type":
+              "text/html; charset=utf-8"
+          }
+        }
+      );
+    }
+  }
+};
+
+for (const {
+  requestPath,
+  expectedAssetPath,
+  noStore
+} of [
+  {
+    requestPath: "/",
+    expectedAssetPath: "/",
+    noStore: false
+  },
+  {
+    requestPath: "/index.html",
+    expectedAssetPath: "/index.html",
+    noStore: false
+  },
+  {
+    requestPath: "/sources",
+    expectedAssetPath: "/sources",
+    noStore: false
+  },
+  {
+    requestPath: "/sources.html",
+    expectedAssetPath: "/sources",
+    noStore: false
+  },
+  {
+    requestPath: "/admin",
+    expectedAssetPath: "/admin",
+    noStore: true
+  },
+  {
+    requestPath: "/admin.html",
+    expectedAssetPath: "/admin",
+    noStore: true
+  },
+  {
+    requestPath: "/manage",
+    expectedAssetPath: "/manage",
+    noStore: true
+  },
+  {
+    requestPath: "/manage.html",
+    expectedAssetPath: "/manage",
+    noStore: true
+  },
+  {
+    requestPath: "/manage/bl-041-fixture-token",
+    expectedAssetPath: "/manage",
+    noStore: true
+  }
+]) {
+  assetFetches.length = 0;
+
+  const response =
+    await workerApp.fetch(
+      new Request(
+        `https://planner.example${requestPath}`,
+        {
+          headers: {
+            accept:
+              "text/html"
+          }
+        }
+      ),
+      securityEnv
+    );
+
+  assert.equal(
+    response.status,
+    200,
+    `${requestPath} must be served through the Worker HTML hardening path`
+  );
+  assert.deepEqual(
+    assetFetches,
+    [
+      expectedAssetPath
+    ],
+    `${requestPath} must resolve to the expected static HTML asset`
+  );
+
+  const csp =
+    response.headers.get(
+      "content-security-policy"
+    ) || "";
+
+  assert.match(
+    csp,
+    /(?:^|;\s*)script-src 'self'(?:;|$)/,
+    `${requestPath} must use the strict same-origin script CSP`
+  );
+  assert.doesNotMatch(
+    csp,
+    /script-src[^;]*'unsafe-inline'/,
+    `${requestPath} must not permit inline executable script`
+  );
+  assert.equal(
+    response.headers.get(
+      "referrer-policy"
+    ),
+    "no-referrer"
+  );
+  assert.equal(
+    response.headers.get(
+      "x-content-type-options"
+    ),
+    "nosniff"
+  );
+  assert.equal(
+    response.headers.get(
+      "x-frame-options"
+    ),
+    "DENY"
+  );
+  assert.equal(
+    response.headers.get(
+      "cross-origin-opener-policy"
+    ),
+    "same-origin"
+  );
+  assert.equal(
+    response.headers.get(
+      "cross-origin-resource-policy"
+    ),
+    "same-origin"
+  );
+  assert.match(
+    response.headers.get(
+      "permissions-policy"
+    ) || "",
+    /camera=\(\).*microphone=\(\).*geolocation=\(\).*payment=\(\).*usb=\(\)/
+  );
+
+  if (noStore) {
+    assert.match(
+      response.headers.get(
+        "cache-control"
+      ) || "",
+      /no-store/i,
+      `${requestPath} must remain no-store`
+    );
+  }
+}
 
 console.log(
   "CI dependency-install, Worker packaging, and production smoke checks passed."
