@@ -207,10 +207,7 @@ const server =
 
       if (
         request.method === "GET" &&
-        (
-          request.url === "/" ||
-          request.url === "/index.html"
-        )
+        request.url === "/"
       ) {
         response.writeHead(
           200,
@@ -224,10 +221,7 @@ const server =
 
       if (
         request.method === "GET" &&
-        (
-          request.url === "/sources" ||
-          request.url === "/sources.html"
-        )
+        request.url === "/sources"
       ) {
         response.writeHead(
           200,
@@ -241,10 +235,7 @@ const server =
 
       if (
         request.method === "GET" &&
-        (
-          request.url === "/admin" ||
-          request.url === "/admin.html"
-        )
+        request.url === "/admin"
       ) {
         response.writeHead(
           200,
@@ -262,7 +253,6 @@ const server =
         request.method === "GET" &&
         (
           request.url === "/manage" ||
-          request.url === "/manage.html" ||
           request.url ===
             "/manage/bl-036-production-smoke-invalid"
         )
@@ -276,6 +266,35 @@ const server =
         response.end(
           manageHtml
         );
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        [
+          "/index.html",
+          "/sources.html",
+          "/admin.html",
+          "/manage.html"
+        ].includes(
+          request.url
+        )
+      ) {
+        const canonical = {
+          "/index.html": "/",
+          "/sources.html": "/sources",
+          "/admin.html": "/admin",
+          "/manage.html": "/manage"
+        }[request.url];
+
+        response.writeHead(
+          307,
+          {
+            location:
+              canonical
+          }
+        );
+        response.end();
         return;
       }
 
@@ -391,11 +410,11 @@ try {
       "/",
       expectedLandingAsset,
       "/sources",
+      "/admin",
+      "/manage",
       "/index.html",
       "/sources.html",
-      "/admin",
       "/admin.html",
-      "/manage",
       "/manage.html",
       "/manage/bl-036-production-smoke-invalid",
       ...expectedPlannerAssets,
