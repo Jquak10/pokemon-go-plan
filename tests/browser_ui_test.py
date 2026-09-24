@@ -1155,6 +1155,286 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
                 self.open_preferences(page, width)
                 self.assert_no_horizontal_overflow(page)
 
+    def test_theme_contrast_covers_representative_product_states(self):
+        page = self.open_planner(1280, 900)
+
+        page.evaluate(
+            """() => {
+                const probe = document.createElement('section');
+                probe.id = 'themeAccessibilityProbe';
+                probe.className = 'dashboard-card';
+                probe.setAttribute('aria-label', 'Theme accessibility probe');
+                probe.innerHTML = `
+                    <p id="a11yCoreText">Core text</p>
+                    <p id="a11ySecondaryText" class="muted">Secondary text</p>
+                    <input id="a11yInput" placeholder="Input placeholder">
+                    <button id="a11yPrimary" type="button">Primary action</button>
+                    <button id="a11ySecondary" type="button" class="secondary">Secondary action</button>
+                    <button id="a11yDisabled" type="button" disabled>Disabled action</button>
+                    <span id="a11ySuccess" class="source-confidence-badge source-official">Official</span>
+                    <span id="a11yWarning" class="status-badge tone-high">Warning</span>
+                    <span id="a11yDanger" class="status-badge tone-bad">Danger</span>
+                    <span id="a11yInfo" class="source-confidence-badge source-calendar">Calendar</span>
+                    <span id="a11yViolet" class="source-confidence-badge source-meta">Meta</span>
+                    <span id="a11yCalendarRaid" class="calendar-event-pill calendar-source-raid_battles">Raid event</span>
+                    <span id="a11yCalendarCommunity" class="calendar-event-pill calendar-source-community_day">Community Day</span>
+                    <span id="a11yCalendarMax" class="calendar-event-pill calendar-source-max_battles">Max Battle</span>
+                    <section id="a11yModalSurface" class="target-modal"><p>Modal surface text</p></section>
+                `;
+                document.body.appendChild(probe);
+            }"""
+        )
+
+        def contrast(selector, pseudo=None):
+            return page.evaluate(
+                """({ selector, pseudo }) => {
+                    const element = document.querySelector(selector);
+                    if (!element) throw new Error('Missing contrast element ' + selector);
+
+                    const parse = value => {
+                        const match = String(value).match(
+                            /rgba?\\(\\s*([\\d.]+)[, ]+\\s*([\\d.]+)[, ]+\\s*([\\d.]+)(?:\\s*[,/]\\s*([\\d.]+))?\\s*\\)/
+                        );
+                        if (!match) throw new Error('Unsupported computed color ' + value);
+                        return [
+                            Number(match[1]),
+                            Number(match[2]),
+                            Number(match[3]),
+                            match[4] === undefined ? 1 : Number(match[4])
+                        ];
+                    };
+
+                    const over = (front, back) => {
+                        const alpha = front[3] + back[3] * (1 - front[3]);
+                        if (alpha === 0) return [0, 0, 0, 0];
+                        return [
+                            (front[0] * front[3] + back[0] * back[3] * (1 - front[3])) / alpha,
+                            (front[1] * front[3] + back[1] * back[3] * (1 - front[3])) / alpha,
+                            (front[2] * front[3] + back[2] * back[3] * (1 - front[3])) / alpha,
+                            alpha
+                        ];
+                    };
+
+                    const ancestors = [];
+                    for (let node = element; node; node = node.parentElement) {
+                        ancestors.push(node);
+                    }
+
+                    let background = [255, 255, 255, 1];
+                    for (const node of ancestors.reverse()) {
+                        background = over(
+                            parse(getComputedStyle(node).backgroundColor),
+                            background
+                        );
+                    }
+
+                    const foreground = parse(
+                        getComputedStyle(element, pseudo || null).color
+                    );
+                    const visibleForeground = over(foreground, background);
+
+                    const linear = channel => {
+                        const value = channel / 255;
+                        return value <= 0.04045
+                            ? value / 12.92
+                            : Math.pow((value + 0.055) / 1.055, 2.4);
+                    };
+                    const luminance = color =>
+                        0.2126 * linear(color[0]) +
+                        0.7152 * linear(color[1]) +
+                        0.0722 * linear(color[2]);
+                    const a = luminance(visibleForeground);
+                    const b = luminance(background);
+                    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+                }""",
+                {"selector": selector, "pseudo": pseudo},
+            )
+
+        for theme in ("light", "dark"):
+            with self.subTest(theme=theme):
+                page.evaluate(
+                    "(theme) => window.PogoTheme.setPreference(theme)",
+                    theme,
+                )
+                page.wait_for_function(
+                    "(theme) => document.documentElement.dataset.theme === theme",
+                    arg=theme,
+                )
+
+                for selector in (
+                    "#a11yCoreText",
+                    "#a11ySecondaryText",
+                    "#a11yInput",
+                    "#a11yPrimary",
+                    "#a11ySecondary",
+                    "#a11ySuccess",
+                    "#a11yWarning",
+                    "#a11yDanger",
+                    "#a11yInfo",
+                    "#a11yViolet",
+                    "#a11yCalendarRaid",
+                    "#a11yCalendarCommunity",
+                    "#a11yCalendarMax",
+                    "#a11yModalSurface p",
+                ):
+                    ratio = contrast(selector)
+                    self.assertGreaterEqual(
+                        ratio,
+                        4.5,
+                        f"{theme} {selector} contrast {ratio:.2f}:1 must meet WCAG AA normal-text contrast",
+                    )
+
+                placeholder_ratio = contrast("#a11yInput", "::placeholder")
+                self.assertGreaterEqual(
+                    placeholder_ratio,
+                    4.5,
+                    f"{theme} input placeholder contrast {placeholder_ratio:.2f}:1 must meet WCAG AA",
+                )
+
+                active_tab = page.locator(".tab-button.active").first
+                self.assertEqual(
+                    active_tab.evaluate("element => getComputedStyle(element).color"),
+                    "rgb(255, 255, 255)",
+                )
+
+                page.locator("#a11yPrimary").focus()
+                focus = page.evaluate(
+                    """() => {
+                        const style = getComputedStyle(document.activeElement);
+                        return {
+                            style: style.outlineStyle,
+                            width: parseFloat(style.outlineWidth),
+                            color: style.outlineColor
+                        };
+                    }"""
+                )
+                self.assertEqual(focus["style"], "solid")
+                self.assertGreaterEqual(focus["width"], 3)
+                self.assertNotEqual(
+                    focus["color"],
+                    "rgba(0, 0, 0, 0)",
+                )
+
+                disabled = page.locator("#a11yDisabled")
+                self.assertTrue(disabled.is_disabled())
+                self.assertAlmostEqual(
+                    float(disabled.evaluate("element => getComputedStyle(element).opacity")),
+                    0.55,
+                    places=2,
+                    msg="Disabled controls should retain the explicit visual state while native disabled semantics remain intact",
+                )
+
+    def test_theme_switch_preserves_keyboard_focus_live_regions_and_reduced_motion(self):
+        page = self.open_planner(1280, 900)
+        page.locator('.tab-button[data-tab="targets"]').click()
+
+        live_regions_before = page.evaluate(
+            """() => [...document.querySelectorAll('[aria-live], [role="status"]')]
+                .map(element => ({
+                    id: element.id,
+                    ariaLive: element.getAttribute('aria-live'),
+                    role: element.getAttribute('role')
+                }))"""
+        )
+        self.assertGreater(
+            len(live_regions_before),
+            0,
+            "Planner must expose live/status regions before theme switching",
+        )
+
+        opener = page.locator("#openAddTarget")
+        opener.focus()
+        opener.click()
+        page.locator("#targetModal").wait_for(state="visible")
+        page.wait_for_function(
+            "() => document.activeElement?.id === 'pokemonName'"
+        )
+
+        for theme in ("dark", "light"):
+            with self.subTest(theme=theme):
+                page.evaluate(
+                    "(theme) => window.PogoTheme.setPreference(theme)",
+                    theme,
+                )
+                page.wait_for_function(
+                    "(theme) => document.documentElement.dataset.theme === theme",
+                    arg=theme,
+                )
+
+                self.assertEqual(
+                    page.evaluate("() => document.activeElement?.id"),
+                    "pokemonName",
+                    "Theme changes must not steal keyboard focus from the active dialog",
+                )
+                self.assertTrue(
+                    page.evaluate("() => document.querySelector('main').inert"),
+                    "Theme changes must preserve modal background isolation",
+                )
+                self.assertEqual(
+                    page.locator("#targetModal").get_attribute("role"),
+                    "dialog",
+                )
+                self.assertEqual(
+                    page.locator("#targetModal").get_attribute("aria-modal"),
+                    "true",
+                )
+
+                transition_ms = page.evaluate(
+                    """() => {
+                        const value = getComputedStyle(
+                            document.getElementById('targetModal')
+                        ).transitionDuration.split(',')[0].trim();
+                        if (value.endsWith('ms')) return parseFloat(value);
+                        if (value.endsWith('s')) return parseFloat(value) * 1000;
+                        return 0;
+                    }"""
+                )
+                self.assertLessEqual(
+                    transition_ms,
+                    0.02,
+                    "Theme changes must preserve the reduced-motion override",
+                )
+
+                live_regions_after = page.evaluate(
+                    """() => [...document.querySelectorAll('[aria-live], [role="status"]')]
+                        .map(element => ({
+                            id: element.id,
+                            ariaLive: element.getAttribute('aria-live'),
+                            role: element.getAttribute('role')
+                        }))"""
+                )
+                self.assertEqual(
+                    live_regions_after,
+                    live_regions_before,
+                    "Theme changes must not alter live-region semantics",
+                )
+
+                tabs = page.locator('[role="tab"][data-tab]')
+                self.assertEqual(tabs.count(), 5)
+                self.assertEqual(
+                    page.locator("#tab-targets").get_attribute("aria-selected"),
+                    "true",
+                )
+
+        page.locator("#saveTarget").focus()
+        page.keyboard.press("Tab")
+        self.assertEqual(
+            page.evaluate("() => document.activeElement?.id"),
+            "closeTargetModal",
+            "Focus trapping must remain active after theme changes",
+        )
+
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => document.getElementById('targetModal').classList.contains('hidden')"
+        )
+        page.wait_for_function(
+            "() => document.activeElement?.id === 'openAddTarget'"
+        )
+        self.assertFalse(
+            page.evaluate("() => document.querySelector('main').inert")
+        )
+
     def test_primary_planner_sections_fit_core_desktop_and_mobile_breakpoints(self):
         for width, height in (
             (390, 844),
