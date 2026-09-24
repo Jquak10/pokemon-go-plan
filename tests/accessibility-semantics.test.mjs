@@ -135,9 +135,20 @@ assert.match(
   /max-tier-override-status" role="status" aria-live="polite" aria-atomic="true"/,
   "Max tier save feedback must be a live status"
 );
+const adminSectionIndex =
+  adminApp.indexOf(
+    "button.dataset.adminSection"
+  );
+assert.ok(
+  adminSectionIndex >= 0,
+  "Missing Admin section state handler"
+);
 assert.match(
-  adminApp,
-  /data\.adminSection[\s\S]{0,900}setAttribute\([\s\S]*?"aria-pressed"/,
+  adminApp.slice(
+    adminSectionIndex,
+    adminSectionIndex + 900
+  ),
+  /setAttribute\([\s\S]*?"aria-pressed"/,
   "Admin section selection must synchronize aria-pressed"
 );
 
