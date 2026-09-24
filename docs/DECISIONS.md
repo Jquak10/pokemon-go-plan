@@ -1,4 +1,4 @@
-# Pokémon GO Planner — Architecture Decision Record
+# Pokémon GO Battle Planner — Architecture Decision Record
 
 Last consolidated: 18 September 2026  
 Decision/change history covered: project inception through PR #33
@@ -944,6 +944,25 @@ PR #87 also raises the few Light-theme values that were below these thresholds: 
 
 No D1 migration, Worker/API change, dependency, Cloudflare binding, route, secret, Service Binding, or Cron change is required.
 
+## ADR-054 — Canonical product branding is Pokémon GO Battle Planner
+
+Status: Current  
+Introduced in PR #89.
+
+The product now spans ordinary Raids plus Dynamax and Gigantamax Max Battles, so the historical public-facing **Raid Planner** name is narrower than the product itself. At the same time, the application remains a planning tool rather than a general Pokémon storage, roster, or PvP manager.
+
+Current decision:
+
+- **Pokémon GO Battle Planner** is the canonical user-facing product name;
+- **Personal Battle Strategy** is the canonical primary brand kicker;
+- supporting product copy should explicitly identify Raids and Max Battles where “battle” alone could be ambiguous, including Dynamax/Gigantamax on onboarding surfaces;
+- feature-specific Pokémon GO terms such as Remote Raid, Raid ranking, Max Battle, and Max Particle remain unchanged when they describe the mechanic rather than the product brand;
+- Landing and private Planner page titles use the canonical product name directly, while supporting surfaces may prefix/suffix their role, such as Data Sources or Admin;
+- production smoke coverage asserts the canonical Landing and Planner titles so a future branding split fails automatically;
+- the product description must not imply a full Pokémon storage/roster manager.
+
+This is a naming and scope-communication decision only. It requires no D1 migration, Worker/API behavior change, CSS/cache bump, Cloudflare binding, route, secret, Service Binding, Cron, or deployment configuration change.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -1037,6 +1056,7 @@ The following sequence is retained as a compact repository implementation/change
 | #85 | BL-035 System / Light / Dark appearance | Adds browser-local System/Light/Dark theming with a pre-CSS same-origin initializer, semantic shared/Planner tokens, native color-scheme/theme-color integration, all-surface controls, cache bumps, and Chromium persistence/responsive regressions without adding planner/D1 state. |
 | #86 | BL-036 Planner-aware production smoke | Extends the existing secret-free GET-only production monitor to a synthetic no-store Planner shell plus every current versioned Planner asset, explicitly checks theme/shared CSS/Planner CSS/main Planner JS contracts, and adds deterministic success/missing-asset regressions without changing the workflow cadence or production app runtime. |
 | #87 | BL-040 theme accessibility regression gates | Adds deterministic WCAG token contrast checks plus Chromium computed component/theme-switch accessibility coverage, raises the few Light-theme values below threshold, bumps shared CSS to v44, and preserves existing focus/live-region/reduced-motion semantics without changing planner data or Worker behavior. |
+| #89 | BL-039 canonical Battle Planner branding | Standardizes **Pokémon GO Battle Planner** / **Personal Battle Strategy** across Landing, Planner, Data Sources, Admin, README, architecture guidance, and production-smoke title assertions; supporting copy explicitly covers Raids plus Dynamax/Gigantamax Max Battles without implying roster/storage management. |
 
 ## Supersession map
 

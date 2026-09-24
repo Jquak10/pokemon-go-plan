@@ -1,4 +1,4 @@
-# Pokémon GO Planner — Backlog
+# Pokémon GO Battle Planner — Backlog
 
 Last reviewed: 24 September 2026
 
@@ -49,16 +49,6 @@ Required outcome:
 - update the mobile More/Preferences description so it reflects access, backup, and recovery—not only recommendation weights/timezone/budget;
 - avoid implying that a planner can be recovered without either its management link or a previously saved backup.
 
-### BL-039 — Unify product branding across public and Planner surfaces
-
-Remove the current mismatch between the public **Pokémon GO Raid Planner / Personal Raid Strategy** branding and the dashboard's broader **Pokémon GO Battle Planner / Personal Battle Strategy** scope.
-
-Required outcome:
-
-- choose one canonical user-facing product name and terminology;
-- apply it consistently to page titles, primary headings, landing copy, Planner shell, Data Sources/Admin references where appropriate, README, and production-smoke title assertions;
-- ensure the wording accurately includes ordinary Raids plus Dynamax/Gigantamax and shared battle-planning features without suggesting the app is a full Pokémon storage manager.
-
 ## Deferred
 
 No confirmed deferred feature commitments are currently recorded.
@@ -103,6 +93,6 @@ BL-035 shipped in PR #85 on 24 September 2026 with browser-local System/Light/Da
 
 BL-036 shipped in PR #86 on 24 September 2026: Production smoke now checks a synthetic no-store Planner shell, requires its current versioned asset references, fetches every referenced Planner script/stylesheet read-only, explicitly validates theme/shared CSS/Planner CSS/main Planner JavaScript contracts, and has a deterministic missing-asset failure regression.
 
-BL-040 was selected next on 24 September 2026 and is implemented by the current change: semantic Light/Dark tokens receive deterministic WCAG contrast checks, Chromium verifies representative computed component/calendar/source contrast plus focus/disabled states, and theme changes during active overlays must preserve keyboard focus, dialog/tab/live-region semantics, inert background isolation, and reduced-motion behavior. The audit also tightened the few Light-theme tokens that fell just below the new thresholds. BL-037 through BL-039 remain active.
+BL-040 shipped in PR #87 on 24 September 2026: semantic Light/Dark tokens receive deterministic WCAG contrast checks, Chromium verifies representative computed component/calendar/source contrast plus focus/disabled states, and theme changes during active overlays preserve keyboard focus, dialog/tab/live-region semantics, inert background isolation, and reduced-motion behavior. The audit also tightened the few Light-theme tokens that fell just below the new thresholds. BL-039 is implemented by PR #89: **Pokémon GO Battle Planner** with **Personal Battle Strategy** is the canonical user-facing branding across Landing, Planner, Data Sources, Admin, README, architecture guidance, and production-smoke title assertions; the supporting copy explicitly covers Raids plus Dynamax/Gigantamax Max Battles without implying roster/storage management. BL-037 and BL-038 remain active.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

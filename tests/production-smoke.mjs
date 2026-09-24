@@ -314,7 +314,7 @@ async function runSmokeAttempt({
 
   assert.match(
     landingHtml,
-    /<title>Pokémon GO Raid Planner<\/title>/,
+    /<title>Pokémon GO Battle Planner<\/title>/,
     "Landing page title is missing"
   );
   assert.ok(
@@ -432,7 +432,7 @@ async function runSmokeAttempt({
 
   assert.match(
     plannerHtml,
-    /<title>My Pokémon GO Battle Planner<\/title>/,
+    /<title>Pokémon GO Battle Planner<\/title>/,
     "Planner shell title is missing"
   );
   assert.match(

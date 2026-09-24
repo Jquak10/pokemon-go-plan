@@ -1,6 +1,6 @@
-# Pokémon GO Planner
+# Pokémon GO Battle Planner
 
-Pokémon GO Planner is a private, personalized raid-planning and calendar application. It combines current event schedules, raid and meta data, personal targets, and Remote Raid preferences to help each user decide what is worth raiding.
+Pokémon GO Battle Planner is a private, personalized battle-planning and calendar application for Pokémon GO. It combines current event schedules, Raid and Max Battle intelligence, personal targets, resource state, and Remote participation preferences to help each user decide which Raids, Dynamax battles, and Gigantamax battles are worth doing.
 
 **Production app:** [https://pogo-plan.jquak-10.workers.dev](https://pogo-plan.jquak-10.workers.dev)
 
@@ -16,7 +16,7 @@ Appearance is device/browser-local rather than planner data. The **Appearance** 
 
 ## What the app does
 
-The planner brings the decisions that normally live in several places into one dashboard: what is currently available, how valuable each raid is, which Pokémon matter to you, how much progress remains, and whether another paid Remote Raid is worthwhile. It also provides a personal event calendar and a private calendar subscription.
+The Battle Planner brings the decisions that normally live in several places into one dashboard: what is currently available, how valuable each Raid or Max Battle is, which Pokémon matter to you, how much progress remains, and whether another paid Remote battle is worthwhile. It also provides a personal event calendar and a private calendar subscription.
 
 Create a planner with your timezone, save its private management link, and then tailor its Targets, recommendation weights, Remote limits, and event filters. The Battle Plan updates from those choices and from the battles you log.
 
@@ -271,7 +271,7 @@ Select **Save preferences** after making ordinary preference changes. These sett
 
 The management dashboard is accessed through each planner's private capability link. It controls that planner's Battle Plan, targets, logs, preferences, and calendar; it is not a public account profile. Keep the management URL private. The current UI sends its capability to management APIs in an authorization header rather than repeating it in request URLs or JSON bodies; the Worker still accepts the older token forms so existing integrations are not broken. Private Planner/Admin HTML is served no-store with no-referrer, frame protection, CSP/content restrictions, and related defense-in-depth headers.
 
-The separate **Planner Admin** interface is for authorized maintainers. It can run and inspect event, official-schedule, Remote-limit, suppression, meta-assessment, and raid-ranking synchronization. Its browser requests send the configured admin credential in a request header; older query/body-key API calls remain compatible. Never share that credential or include it in a URL, README, issue, log, commit, or chat.
+The separate **Battle Planner Admin** interface is for authorized maintainers. It can run and inspect event, official-schedule, Remote-limit, suppression, meta-assessment, and raid-ranking synchronization. Its browser requests send the configured admin credential in a request header; older query/body-key API calls remain compatible. Never share that credential or include it in a URL, README, issue, log, commit, or chat.
 
 The public **Data Sources & Precedence** page explains why explicit official schedules take priority over suppression/replacement notices and general GO Calendar data, and identifies the analytical inputs and versioned computation used for raid value and attacker rankings.
 
@@ -294,7 +294,7 @@ The public **Data Sources & Precedence** page explains why explicit official sch
 - Mobile uses a fixed bottom navigation for **Raid Plan**, **Targets**, **Hundo CP**, **Calendar**, and **More**. **Preferences** and **Data sources** are in the **More options** sheet. Opening **More** preserves the current section until an option is selected.
 - Mobile provides a floating **+ Log raid** action, presents the raid logger as a bottom sheet, and moves advanced Target filters into the **Organize targets** drawer.
 - On mobile, **More levels** expands the additional Hundo benchmarks, and Calendar day details flow beneath the month view.
-- The public landing page, Data Sources page, and Planner Admin page collapse their multi-column layouts for narrow browsers, keep long URLs/text wrapped, and use touch-friendly controls without reserving space for the Planner-only bottom navigation.
+- The public landing page, Data Sources page, and Battle Planner Admin page collapse their multi-column layouts for narrow browsers, keep long URLs/text wrapped, and use touch-friendly controls without reserving space for the Planner-only bottom navigation.
 
 ## Technology and architecture
 
