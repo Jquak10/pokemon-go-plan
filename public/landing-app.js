@@ -13,6 +13,34 @@ TimezoneValidation.attachSuggestions(
   )
 );
 
+function detectBrowserTimezone() {
+  try {
+    const detected =
+      Intl.DateTimeFormat()
+        .resolvedOptions()
+        .timeZone;
+
+    const result =
+      TimezoneValidation.parse(
+        detected
+      );
+
+    return result.valid
+      ? result.timezone
+      : "";
+  } catch {
+    return "";
+  }
+}
+
+if (
+  !timezoneInput.value.trim()
+) {
+  timezoneInput.value =
+    detectBrowserTimezone();
+}
+
+
 const landingParams =
   new URLSearchParams(
     globalThis.location?.search || ""
