@@ -303,7 +303,7 @@ assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
 assert.match(manage, /<script src="\/planner-client\.js\?v=3"><\/script>/);
 assert.match(manage, /<script src="\/planner-overlay\.js\?v=1"><\/script>/);
-assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=3">/);
+assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=4">/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
@@ -500,7 +500,7 @@ for (const page of [
 
 assert.match(
   manage,
-  /<link rel="stylesheet" href="\/planner\.css\?v=3">/
+  /<link rel="stylesheet" href="\/planner\.css\?v=4">/
 );
 for (const page of [
   "../public/index.html",
@@ -2114,6 +2114,39 @@ assert.match(plannerStyles, /:focus-visible/);
 assert.match(plannerStyles, /prefers-reduced-motion: reduce/);
 assert.match(plannerStyles, /transition-duration: 0\.01ms/);
 assert.match(plannerStyles, /command-palette-open/);
+assert.match(
+  manageHtml,
+  /class="dashboard-card settings-card-weights"/
+);
+assert.match(
+  manageHtml,
+  /class="dashboard-card settings-card-pass-rules"/
+);
+assert.match(
+  manageHtml,
+  /class="dashboard-card settings-card-access"/
+);
+assert.match(
+  manageHtml,
+  /class="dashboard-card settings-card-backup"/
+);
+assert.match(
+  manageHtml,
+  /class="dashboard-card settings-card-danger"/
+);
+assert.match(
+  plannerStyles,
+  /\.settings-layout > \.dashboard-card\s*\{[\s\S]*margin-top:\s*0/
+);
+assert.match(
+  plannerStyles,
+  /@media \(min-width: 981px\)[\s\S]*grid-template-areas:[\s\S]*"weights pass"[\s\S]*"access danger"[\s\S]*"backup backup"/
+);
+assert.match(
+  plannerStyles,
+  /\.legacy-revoke-box > button\s*\{[\s\S]*white-space:\s*nowrap/
+);
+
 assert.match(
   manageHtml,
   /id="downloadPlannerBackup"/
