@@ -238,15 +238,28 @@ for (const {
         )
       : remainder;
 
-  assert.match(
-    block,
-    /Content-Security-Policy: .*script-src 'self'/,
-    `${route} must enforce the strict script CSP through Static Assets`
-  );
-  assert.doesNotMatch(
-    block,
-    /Content-Security-Policy: .*script-src[^\n]*'unsafe-inline'/,
-    `${route} must not allow inline executable script`
+  const csp =
+    block.match(
+      /Content-Security-Policy:\s*([^\n]+)/
+    )?.[1] || "";
+  const scriptDirective =
+    csp
+      .split(";")
+      .map(
+        directive =>
+          directive.trim()
+      )
+      .find(
+        directive =>
+          directive.startsWith(
+            "script-src"
+          )
+      ) || "";
+
+  assert.equal(
+    scriptDirective,
+    "script-src 'self'",
+    `${route} must enforce the strict external-script CSP through Static Assets`
   );
 
   for (const expected of [
