@@ -887,6 +887,7 @@ Current decision:
 - the backup excludes management/calendar URLs, tokens and hashes, signed-calendar generation/enabled state, and global synchronized event/meta data;
 - backups remain private user data because they may contain notes and gameplay history even though they contain no authorization capability;
 - restore requires a valid destination management capability, exact `RESTORE` confirmation, and an otherwise empty destination planner; the intended lost-link flow is therefore create a new planner, keep its newly issued credentials, then restore the saved backup;
+- restore request bodies are bounded to 25 MB in the Worker as well as the browser: Bearer/header/query capabilities are authenticated before body parsing, oversized declared or streamed bodies return JSON 413, malformed bounded JSON returns the stable restore-file 400, and the historical body-token compatibility form is accepted only through that bounded parser;
 - restore never replaces the destination management hash, legacy calendar hash, or signed-calendar credential state;
 - source Target/log IDs are remapped into a destination-planner namespace so source and restored planners can coexist without global primary-key collisions;
 - missing/deleted Target references and legacy-log relationships are preserved under the namespace so existing Undo-conflict and unified-history semantics remain faithful to the source state;
@@ -986,6 +987,7 @@ The following sequence is retained as a compact repository implementation/change
 | #81 | BL-033 portable planner backup and restore | Adds management-authenticated credential-free JSON backup plus empty-planner atomic restore, preserves destination capabilities and history/Undo semantics through namespaced ID remapping, and adds deterministic plus Chromium recovery coverage without a migration. |
 | #82 | BL-033 responsive Preferences layout follow-up | Fixes the Backup & Recovery desktop regression by resetting grid card margins, pairing Management/Delete cards, giving backup controls a full-width row, preventing action-button collapse, bumping Planner CSS to v4, and adding cross-breakpoint primary-tab/Preferences layout regressions. |
 | #83 | Latest product audit backlog capture | Promotes the user-confirmed 24 September 2026 audit findings into Active BL-034 through BL-040: restore request hardening, semantic dark-mode theming, Planner-aware production smoke, WebKit/Safari smoke, backup/recovery discoverability, unified branding, and automated contrast/theme accessibility coverage. |
+| #84 | BL-034 restore request hardening | Enforces the 25 MB restore boundary in the Worker, authenticates non-body management capabilities before reading restore JSON, preserves bounded legacy body-token compatibility, returns stable 413/400 failures, and adds focused deterministic coverage without changing the backup format or D1 restore semantics. |
 
 ## Supersession map
 
