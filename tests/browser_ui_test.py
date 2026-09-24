@@ -940,6 +940,181 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             """() => document.getElementById('panel-preferences')?.classList.contains('active')"""
         )
 
+    def test_theme_system_light_dark_and_cross_surface_persistence(self):
+        context = self.browser.new_context(
+            viewport={"width": 1180, "height": 900},
+            locale="en-US",
+            timezone_id="Asia/Singapore",
+            reduced_motion="reduce",
+            color_scheme="dark",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+
+        page.goto(f"{self.base_url}/", wait_until="domcontentloaded")
+        page.wait_for_selector("[data-theme-select]")
+
+        self.assertEqual(
+            page.locator("html").get_attribute("data-theme-preference"),
+            "system",
+        )
+        self.assertEqual(
+            page.locator("html").get_attribute("data-theme"),
+            "dark",
+        )
+        self.assertEqual(
+            page.locator("[data-theme-select]").input_value(),
+            "system",
+        )
+        self.assertEqual(
+            page.locator('meta[name="theme-color"]').get_attribute("content"),
+            "#0b1220",
+        )
+        self.assertEqual(
+            page.evaluate(
+                "() => getComputedStyle(document.documentElement).colorScheme"
+            ),
+            "dark",
+        )
+
+        page.locator("[data-theme-select]").select_option("light")
+        page.wait_for_function(
+            "() => document.documentElement.dataset.theme === 'light'"
+        )
+        self.assertEqual(
+            page.evaluate("() => localStorage.getItem('pogo-theme')"),
+            "light",
+        )
+        self.assertEqual(
+            page.locator('meta[name="theme-color"]').get_attribute("content"),
+            "#1f6feb",
+        )
+
+        page.reload(wait_until="domcontentloaded")
+        self.assertEqual(
+            page.locator("html").get_attribute("data-theme"),
+            "light",
+            "Explicit appearance must survive reloads even when the OS prefers dark",
+        )
+        self.assertEqual(
+            page.locator("[data-theme-select]").input_value(),
+            "light",
+        )
+
+        for path in ("/admin", "/sources", "/manage/browser-test-token"):
+            page.goto(f"{self.base_url}{path}", wait_until="domcontentloaded")
+            page.wait_for_selector("[data-theme-select]")
+            if path.startswith("/manage/"):
+                page.wait_for_selector("#app:not(.hidden)")
+            self.assertEqual(
+                page.locator("html").get_attribute("data-theme"),
+                "light",
+                f"Appearance preference should persist on {path}",
+            )
+            self.assertEqual(
+                page.locator("[data-theme-select]").input_value(),
+                "light",
+            )
+            self.assert_no_horizontal_overflow(page)
+
+        page.locator("[data-theme-select]").select_option("system")
+        page.wait_for_function(
+            "() => document.documentElement.dataset.themePreference === 'system'"
+        )
+        page.emulate_media(color_scheme="dark")
+        page.wait_for_function(
+            "() => document.documentElement.dataset.theme === 'dark'"
+        )
+        page.emulate_media(color_scheme="light")
+        page.wait_for_function(
+            "() => document.documentElement.dataset.theme === 'light'"
+        )
+        self.assertEqual(
+            page.evaluate("() => localStorage.getItem('pogo-theme')"),
+            "system",
+        )
+
+    def test_dark_theme_planner_surfaces_remain_responsive(self):
+        for width, height in (
+            (390, 844),
+            (760, 900),
+            (1180, 900),
+            (1600, 1000),
+        ):
+            with self.subTest(width=width):
+                context = self.browser.new_context(
+                    viewport={"width": width, "height": height},
+                    locale="en-US",
+                    timezone_id="Asia/Singapore",
+                    reduced_motion="reduce",
+                    color_scheme="light",
+                )
+                self.addCleanup(context.close)
+                page = context.new_page()
+                page.add_init_script(
+                    "localStorage.setItem('pogo-theme', 'dark')"
+                )
+                page.goto(
+                    f"{self.base_url}/manage/browser-test-token",
+                    wait_until="domcontentloaded",
+                )
+                page.wait_for_selector("#app:not(.hidden)")
+                page.wait_for_selector(".recommendation-card")
+
+                self.assertEqual(
+                    page.locator("html").get_attribute("data-theme"),
+                    "dark",
+                )
+                self.assertEqual(
+                    page.locator("[data-theme-select]").input_value(),
+                    "dark",
+                )
+                self.assertEqual(
+                    page.evaluate(
+                        "() => getComputedStyle(document.documentElement)"
+                        ".getPropertyValue('--page-bg').trim()"
+                    ),
+                    "#0b1220",
+                )
+                self.assertEqual(
+                    page.evaluate(
+                        "() => getComputedStyle(document.documentElement)"
+                        ".getPropertyValue('--surface').trim()"
+                    ),
+                    "#111c2d",
+                )
+
+                colors = page.evaluate(
+                    """() => ({
+                        card: getComputedStyle(document.querySelector('.dashboard-card')).backgroundColor,
+                        input: getComputedStyle(document.querySelector('input')).backgroundColor,
+                        text: getComputedStyle(document.body).color
+                    })"""
+                )
+                self.assertNotIn(
+                    colors["card"],
+                    ("rgb(255, 255, 255)", "rgba(255, 255, 255, 1)"),
+                )
+                self.assertNotEqual(
+                    colors["input"],
+                    "rgb(255, 255, 255)",
+                )
+                self.assertNotEqual(
+                    colors["text"],
+                    "rgb(23, 32, 51)",
+                )
+
+                for tab in ("plan", "targets", "hundo", "calendar"):
+                    page.locator(f'.tab-button[data-tab="{tab}"]').click()
+                    page.wait_for_function(
+                        """name => document.querySelector('.tab-button[data-tab="' + name + '"]')?.classList.contains('active')""",
+                        arg=tab,
+                    )
+                    self.assert_no_horizontal_overflow(page)
+
+                self.open_preferences(page, width)
+                self.assert_no_horizontal_overflow(page)
+
     def test_primary_planner_sections_fit_core_desktop_and_mobile_breakpoints(self):
         for width, height in (
             (390, 844),
