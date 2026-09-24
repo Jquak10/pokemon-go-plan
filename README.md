@@ -1,6 +1,6 @@
-# Pokémon GO Planner
+# Pokémon GO Battle Planner
 
-Pokémon GO Planner is a private, personalized raid-planning and calendar application. It combines current event schedules, raid and meta data, personal targets, and Remote Raid preferences to help each user decide what is worth raiding.
+Pokémon GO Battle Planner is a private, personalized battle-planning and calendar application for Pokémon GO. It combines current event schedules, Raid and Max Battle intelligence, personal targets, resource state, and Remote participation preferences to help each user decide which Raids, Dynamax battles, and Gigantamax battles are worth doing.
 
 **Production app:** [https://pogo-plan.jquak-10.workers.dev](https://pogo-plan.jquak-10.workers.dev)
 
@@ -16,7 +16,7 @@ Appearance is device/browser-local rather than planner data. The **Appearance** 
 
 ## What the app does
 
-The planner brings the decisions that normally live in several places into one dashboard: what is currently available, how valuable each raid is, which Pokémon matter to you, how much progress remains, and whether another paid Remote Raid is worthwhile. It also provides a personal event calendar and a private calendar subscription.
+The Battle Planner brings the decisions that normally live in several places into one dashboard: what is currently available, how valuable each Raid or Max Battle is, which Pokémon matter to you, how much progress remains, and whether another paid Remote battle is worthwhile. It also provides a personal event calendar and a private calendar subscription.
 
 Create a planner with your timezone, save its private management link, and then tailor its Targets, recommendation weights, Remote limits, and event filters. The Battle Plan updates from those choices and from the battles you log.
 

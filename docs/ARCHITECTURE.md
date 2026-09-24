@@ -1,9 +1,9 @@
-# Pokémon GO Planner — Architecture
+# Pokémon GO Battle Planner — Architecture
 
 Last consolidated: 18 September 2026  
 Architecture baseline: newest merged repository state; detailed change history is maintained in docs/DECISIONS.md
 
-This document is the durable technical reference for the current Pokémon GO Planner. It exists so future work can start from the repository rather than from old chat history.
+This document is the durable technical reference for the current Pokémon GO Battle Planner. It exists so future work can start from the repository rather than from old chat history.
 
 ## How to use this document
 
@@ -22,7 +22,7 @@ The reference order for future work is:
 
 ## 1. Product purpose
 
-Pokémon GO Planner is a private, personalized planning application for Pokémon GO. It combines current and upcoming availability, battle-specific meta intelligence, user goals, scarce resources, Remote participation limits, activity history, Hundo CP information, and a private calendar into one planner.
+Pokémon GO Battle Planner is a private, personalized battle-planning application for Pokémon GO. It combines current and upcoming Raid and Max Battle availability, battle-specific meta intelligence, user goals, scarce resources, Remote participation limits, activity history, Hundo CP information, and a private calendar into one planner. It is a battle-planning tool, not a full Pokémon storage or roster manager.
 
 The product is not intended to maximize spend or fill every available Raid slot. It helps the user decide what is worth doing and when saving resources is better.
 
