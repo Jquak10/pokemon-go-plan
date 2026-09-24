@@ -27,9 +27,90 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-No confirmed active backlog items.
+### BL-034 — Harden planner backup restore request handling
 
-BL-033 — Planner-loss resilience through portable backup/restore — is implemented by the current change and removed from Active in the same change, consistent with the backlog rules. Management-authenticated backups exclude capability credentials and can be restored atomically into a newly created empty planner while preserving the destination credentials, historical relationships, and Undo semantics.
+Enforce the restore upload boundary on the Worker, not only in the browser.
+
+Required outcome:
+
+- authenticate the destination management capability before parsing the restore payload wherever the existing request contract safely permits it;
+- enforce the same maximum restore-body size server-side as the browser's current 25 MB file guard;
+- return a clear `413 Payload Too Large` response for oversized restore requests;
+- preserve the existing credential-free backup format, empty-planner restore rule, atomic D1 restore behavior, and post-restore Undo semantics;
+- add deterministic coverage for unauthenticated, oversized, malformed, and valid restore requests.
+
+This is a resource-abuse hardening item identified by the 24 September 2026 fresh product audit.
+
+### BL-035 — Add semantic theming and System / Light / Dark mode
+
+Introduce a maintainable theme architecture rather than layering ad-hoc dark overrides onto the current literal colors.
+
+Required outcome:
+
+- provide **System**, **Light**, and **Dark** appearance choices, with System as the default;
+- keep appearance as a browser/device preference rather than planner-owned D1 data unless a later requirement changes that decision;
+- introduce semantic color tokens for page/surface/text/border/input/status/overlay/shadow roles and migrate the major product surfaces away from hard-coded light-only values;
+- apply theming consistently to the landing page, Planner, Data Sources, and Admin;
+- initialize the selected/system theme early enough to avoid a light flash before dark rendering;
+- set native `color-scheme` and update browser theme-color behavior appropriately;
+- preserve Pokémon/source/status identity while ensuring readable light and dark variants;
+- keep desktop/mobile behavior and existing accessibility/navigation invariants intact.
+
+### BL-036 — Extend production smoke coverage to the Planner shell and assets
+
+Expand BL-031 monitoring beyond the public landing shell so production can detect a broken Planner deployment without creating real planner state.
+
+Required outcome:
+
+- keep the workflow GET-only and free of real private credentials or state mutation;
+- verify a synthetic `/manage/<token>` request serves the expected Planner shell;
+- verify the versioned core Planner assets referenced by current `main`, including Planner JavaScript and Planner-specific CSS;
+- include any future theme initializer or equivalent critical shell asset in the smoke contract;
+- preserve bounded retries and deterministic local fixture coverage.
+
+### BL-037 — Add lightweight WebKit / Safari smoke coverage
+
+Add a small cross-browser gate for behavior most likely to differ from Chromium without duplicating the entire browser regression suite.
+
+Required outcome:
+
+- run a focused Playwright WebKit smoke suite in CI;
+- cover the landing page, primary Planner shell, mobile navigation, Preferences, backup file controls, at least one modal/drawer, Calendar, and theme behavior after BL-035;
+- check for horizontal overflow and broken fixed/sticky/safe-area behavior at representative phone and desktop sizes;
+- keep the suite intentionally smaller than the Chromium regression job so CI remains stable and reasonably fast.
+
+### BL-038 — Improve backup and recovery discoverability
+
+Make BL-033 easier for ordinary users to discover before and after they lose a management link.
+
+Required outcome:
+
+- explain on the public landing/onboarding surface that users should keep their management link and periodically download a Planner Backup;
+- provide clear guidance for the recovery flow: create a new planner, then restore the backup into that empty planner;
+- update the mobile More/Preferences description so it reflects access, backup, and recovery—not only recommendation weights/timezone/budget;
+- avoid implying that a planner can be recovered without either its management link or a previously saved backup.
+
+### BL-039 — Unify product branding across public and Planner surfaces
+
+Remove the current mismatch between the public **Pokémon GO Raid Planner / Personal Raid Strategy** branding and the dashboard's broader **Pokémon GO Battle Planner / Personal Battle Strategy** scope.
+
+Required outcome:
+
+- choose one canonical user-facing product name and terminology;
+- apply it consistently to page titles, primary headings, landing copy, Planner shell, Data Sources/Admin references where appropriate, README, and production-smoke title assertions;
+- ensure the wording accurately includes ordinary Raids plus Dynamax/Gigantamax and shared battle-planning features without suggesting the app is a full Pokémon storage manager.
+
+### BL-040 — Add automated contrast and theme accessibility checks
+
+Turn color accessibility into an explicit regression invariant, especially once BL-035 introduces multiple themes.
+
+Required outcome:
+
+- add deterministic or browser-based checks for representative foreground/background contrast pairs in Light and Dark modes;
+- cover core text, secondary text, inputs, buttons, focus states, danger/warning/success surfaces, selected navigation, overlays/sheets, calendar/source indicators, and disabled states where practical;
+- verify theme switching does not regress keyboard semantics, reduced-motion behavior, live regions, or existing focus management;
+- avoid brittle whole-page screenshot diffs as the primary gate;
+- coordinate implementation with BL-035 so the theme token system is testable rather than relying on hundreds of isolated literal colors.
 
 ## Deferred
 
@@ -65,6 +146,8 @@ The first fresh product audit on 21 September 2026 identified BL-012 through BL-
 
 A second fresh audit after PR #63 verified the current `main` behavior, deterministic/browser/live-contract CI, public/Admin surfaces, security boundaries, accessibility wiring, and release controls. That audit identified BL-019 through BL-028. BL-019 shipped in PR #65, BL-020 in PR #67, BL-021 in PR #68, BL-022 in PR #69, BL-023 in PR #70, BL-024 in PR #71, BL-025 in PR #73, BL-026 in PR #74, and BL-027 in PR #75. BL-028 shipped in PR #76, leaving no active items from that audit. These entries are limited to demonstrated defects or concrete repository/operational gaps; no item was added merely because a large integration file exists or because a speculative feature might be useful.
 
-A fresh public-readiness audit on 23 September 2026 identified whole-planner self-service deletion, fixed Singapore timezone onboarding, repository-owned production smoke monitoring, unbounded planner-owned storage growth, and loss of the private management capability without a portable recovery path as concrete public-launch gaps. BL-029 shipped in PR #77 with management-authenticated permanent deletion, BL-030 in PR #78 with validated browser timezone detection, BL-031 in PR #79 with scheduled/post-`main` read-only production smoke monitoring, and BL-032 in PR #80 with planner-owned storage growth bounds. The user explicitly selected BL-033 on 24 September 2026; the current change adds credential-free portable backups plus empty-planner atomic restore while preserving destination credentials and history/Undo semantics. Other launch-hardening ideas from that audit remain suggestions only and are not promoted into the durable Active backlog unless the user explicitly selects them.
+A fresh public-readiness audit on 23 September 2026 identified whole-planner self-service deletion, fixed Singapore timezone onboarding, repository-owned production smoke monitoring, unbounded planner-owned storage growth, and loss of the private management capability without a portable recovery path as concrete public-launch gaps. BL-029 shipped in PR #77 with management-authenticated permanent deletion, BL-030 in PR #78 with validated browser timezone detection, BL-031 in PR #79 with scheduled/post-`main` read-only production smoke monitoring, BL-032 in PR #80 with planner-owned storage growth bounds, and BL-033 in PR #81 with credential-free portable backups plus empty-planner atomic restore. PR #82 then fixed the responsive Preferences regression introduced around the expanded backup/recovery surface.
+
+A fresh product audit on 24 September 2026 reviewed the post-BL-033 production state, responsive coverage, security/recovery boundaries, monitoring, cross-browser coverage, accessibility, branding, and readiness for dark mode. The user explicitly asked to promote all identified audit items into the durable backlog. BL-034 through BL-040 therefore track restore request hardening, semantic dark-mode theming, Planner-aware production smoke coverage, WebKit/Safari smoke coverage, backup/recovery discoverability, unified product branding, and automated contrast/theme accessibility checks.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
