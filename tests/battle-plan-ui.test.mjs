@@ -502,7 +502,7 @@ for (const page of [
   assert.match(html, /data-theme-select/);
   assert.ok(
     html.indexOf("/theme.js?v=1") <
-      html.indexOf("/styles.css?v=43"),
+      html.indexOf("/styles.css?v=44"),
     page + " must initialize appearance before shared CSS to avoid a light flash"
   );
 }
