@@ -44,7 +44,7 @@
 
       <div class="hero-status">
         <span class="live-dot" aria-hidden="true"></span>
-        <span id="loadStatus">Loading your plan…</span>
+        <span id="loadStatus" role="status" aria-live="polite" aria-atomic="true">Loading your plan…</span>
       </div>
     </header>
 
@@ -194,7 +194,7 @@
 
           <div class="save-row battle-resource-save-row">
             <button id="saveBattleResources" type="button">Save resources</button>
-            <span id="battleResourceStatus" class="save-status"></span>
+            <span id="battleResourceStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
           </div>
         </details>
       </section>
@@ -362,7 +362,7 @@
                   </button>
                 </div>
 
-                <span id="dailyBudgetOverrideStatus" class="save-status"></span>
+                <span id="dailyBudgetOverrideStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
               </div>
 
               <div class="usage-inline">
@@ -378,7 +378,7 @@
                   <button id="saveRaidUsage" type="button">Save correction</button>
                 </div>
 
-                <span id="raidUsageStatus" class="save-status"></span>
+                <span id="raidUsageStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
               </div>
 
               <div id="remoteRuleSource" class="source-note"></div>
@@ -537,8 +537,8 @@
 
             <div class="target-heading-actions">
               <div class="target-view-toggle" role="group" aria-label="Target view">
-                <button type="button" class="active" data-target-view="cards">Cards</button>
-                <button type="button" data-target-view="list">Compact list</button>
+                <button type="button" class="active" data-target-view="cards" aria-pressed="true">Cards</button>
+                <button type="button" data-target-view="list" aria-pressed="false">Compact list</button>
               </div>
 
               <button id="toggleTargetSelection" type="button" class="secondary">Select</button>
@@ -551,9 +551,9 @@
 
           <div class="target-overview-row">
             <div id="targetStatusTabs" class="target-status-tabs" role="group" aria-label="Target status">
-              <button type="button" class="active" data-target-status="active">Active <span id="targetActiveCount">0</span></button>
-              <button type="button" data-target-status="completed">Completed <span id="targetCompletedCount">0</span></button>
-              <button type="button" data-target-status="all">All <span id="targetAllCount">0</span></button>
+              <button type="button" class="active" data-target-status="active" aria-pressed="true">Active <span id="targetActiveCount">0</span></button>
+              <button type="button" data-target-status="completed" aria-pressed="false">Completed <span id="targetCompletedCount">0</span></button>
+              <button type="button" data-target-status="all" aria-pressed="false">All <span id="targetAllCount">0</span></button>
             </div>
 
             <div class="target-search-wrap">
@@ -563,6 +563,7 @@
                 type="search"
                 placeholder="Search Pokémon…"
                 autocomplete="off"
+                aria-label="Search targets by Pokémon"
               >
             </div>
 
@@ -659,7 +660,7 @@
           </div>
 
           <div id="targetFilterSummary" class="target-filter-summary"></div>
-          <p id="targetActionStatus" class="save-status" role="status" aria-live="polite"></p>
+          <p id="targetActionStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></p>
           <div id="bulkTargetActions" class="target-heading-actions hidden" aria-live="polite">
             <button id="selectAllVisibleTargets" type="button" class="secondary">Select all shown</button>
             <button id="deleteSelectedTargets" type="button" class="ghost-danger" disabled>Delete selected</button>
@@ -884,7 +885,7 @@
 
             <div class="save-row">
               <button id="saveSettings" type="button">Save preferences</button>
-              <span id="settingsStatus" class="save-status"></span>
+              <span id="settingsStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
             </div>
           </section>
 
@@ -932,7 +933,7 @@
               </button>
             </div>
 
-            <span id="managementLinkStatus" class="save-status"></span>
+            <span id="managementLinkStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
           </section>
 
           <section class="dashboard-card settings-card-backup">
@@ -1112,7 +1113,7 @@
               </button>
             </div>
 
-            <div id="feedLinkStatus" class="feed-security-note">
+            <div id="feedLinkStatus" class="feed-security-note" role="status" aria-live="polite" aria-atomic="true">
               <span aria-hidden="true">🔒</span>
               <span>
                 Keep this link private. Anyone who has it can read this calendar.
@@ -1138,7 +1139,7 @@
                 Revoke signed URL
               </button>
 
-              <span id="signedFeedStatus" class="save-status"></span>
+              <span id="signedFeedStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
             </div>
           </div>
 
@@ -1245,7 +1246,7 @@
                 </button>
               </div>
 
-              <span id="legacyFeedStatus" class="save-status"></span>
+              <span id="legacyFeedStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
             </div>
           </details>
         </section>
@@ -1322,7 +1323,7 @@
 
             <div class="save-row">
               <button id="saveCalendar" type="button">Save calendar filters</button>
-              <span id="calendarStatus" class="save-status"></span>
+              <span id="calendarStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
             </div>
           </div>
         </details>
@@ -1428,10 +1429,10 @@
           <div>
             <label>Participation</label>
             <div class="raid-type-toggle" role="group" aria-label="Participation">
-              <button type="button" data-raid-type="remote" class="active">
+              <button type="button" data-raid-type="remote" class="active" aria-pressed="true">
                 Remote
               </button>
-              <button type="button" data-raid-type="local">
+              <button type="button" data-raid-type="local" aria-pressed="false">
                 Local
               </button>
             </div>
@@ -1508,7 +1509,7 @@
       </div>
 
       <div class="modal-footer">
-        <span id="raidLogStatus" class="save-status"></span>
+        <span id="raidLogStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
         <button id="cancelRaidLog" type="button" class="secondary">Cancel</button>
         <button id="confirmRaidLog" type="button">Confirm battle log</button>
       </div>
@@ -1626,7 +1627,7 @@
       </div>
 
       <div class="modal-footer">
-        <span id="targetStatus" class="save-status"></span>
+        <span id="targetStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
         <button id="cancelTarget" type="button" class="secondary">Cancel</button>
         <button id="saveTarget" type="button">Save target</button>
       </div>
@@ -1642,6 +1643,6 @@
 <script src="/planner-hundo-logic.js?v=2"></script>
 <script src="/planner-battle-plan-logic.js?v=1"></script>
 <script src="/planner-battle-intel.js?v=1"></script>
-<script src="/planner-app.js?v=6"></script>
+<script src="/planner-app.js?v=7"></script>
 </body>
 </html>
