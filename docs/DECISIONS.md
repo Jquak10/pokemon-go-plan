@@ -835,7 +835,7 @@ Deletion is intentionally separate from ordinary preference saving and from cred
 ## ADR-049 — Monitor production with a separate read-only smoke workflow
 
 Status: Current  
-Introduced in PR #79.
+Introduced in PR #79; extended in PR #86.
 
 The deterministic regression suite and upstream Pokémon-data live-contract checks answer different questions from whether the deployed production application is currently reachable and serving its core public/Worker paths. Increasing the existing scheduled regression workflow cadence would also increase unrelated upstream traffic and would make production availability dependent on third-party data availability.
 
@@ -844,13 +844,16 @@ Current decision:
 - production availability is checked by a dedicated GitHub Actions workflow rather than by increasing the existing regression/live-contract schedule;
 - the workflow runs after pushes to `main`, on manual dispatch, and every three hours;
 - the smoke probe is read-only and requires no repository secret, planner creation, real management capability, calendar URL, or admin credential;
-- it verifies the landing HTML, the versioned `landing-app.js` asset expected by the checked-out repository, and the public Data Sources page;
-- it also calls `GET /api/me` with a fixed synthetic invalid management token and requires the normal `401` JSON/no-store response, exercising the deployed Worker authentication path and a D1 management-token lookup without mutating state;
-- short bounded retries absorb transient network failures and deployment overlap before the workflow is marked failed;
-- the production workflow is operational monitoring, not a required pull-request gate; its probe logic and safety invariants are covered by deterministic local fixture/release-safety tests in `npm test`;
+- it verifies the landing HTML, the versioned `landing-app.js` expected by the checked-out repository, and the public Data Sources page;
+- it also requests a fixed synthetic invalid `/manage/<token>` URL and requires the private Planner shell to return HTML with `no-store`;
+- the probe derives every versioned same-origin script/stylesheet reference from the checked-out `manage.html`, requires production to expose those exact current references, and GETs every referenced Planner asset so stale shells, partial static deployments, and missing versioned assets fail monitoring;
+- critical Planner asset checks explicitly preserve the theme initializer, shared semantic stylesheet, Planner-specific responsive stylesheet, and main Planner application script contracts while automatically following other future versioned Planner assets;
+- `GET /api/me` uses the same fixed synthetic invalid management token and requires the normal `401` JSON/no-store response, exercising the deployed Worker authentication path and a D1 management-token lookup without mutating state;
+- short bounded retries absorb transient network failures and normal deployment overlap before the workflow is marked failed;
+- the production workflow is operational monitoring, not a required pull-request gate; its probe logic and safety invariants are covered by deterministic local fixture/release-safety tests in `npm test`, including a missing-Planner-asset failure case;
 - upstream `live-contract` remains separate so a Pokémon-data provider outage or schema drift cannot be confused with application uptime.
 
-This provides repository-owned production coverage without introducing a new public health endpoint, persistent monitoring state, or additional credentials.
+This provides repository-owned production coverage without introducing a new public health endpoint, persistent monitoring state, additional credentials, or state-changing probe traffic.
 
 ## ADR-050 — Bound planner-owned persistent growth at mutation boundaries
 
@@ -1010,6 +1013,7 @@ The following sequence is retained as a compact repository implementation/change
 | #83 | Latest product audit backlog capture | Promotes the user-confirmed 24 September 2026 audit findings into Active BL-034 through BL-040: restore request hardening, semantic dark-mode theming, Planner-aware production smoke, WebKit/Safari smoke, backup/recovery discoverability, unified branding, and automated contrast/theme accessibility coverage. |
 | #84 | BL-034 restore request hardening | Enforces the 25 MB restore boundary in the Worker, authenticates non-body management capabilities before reading restore JSON, preserves bounded legacy body-token compatibility, returns stable 413/400 failures, and adds focused deterministic coverage without changing the backup format or D1 restore semantics. |
 | #85 | BL-035 System / Light / Dark appearance | Adds browser-local System/Light/Dark theming with a pre-CSS same-origin initializer, semantic shared/Planner tokens, native color-scheme/theme-color integration, all-surface controls, cache bumps, and Chromium persistence/responsive regressions without adding planner/D1 state. |
+| #86 | BL-036 Planner-aware production smoke | Extends the existing secret-free GET-only production monitor to a synthetic no-store Planner shell plus every current versioned Planner asset, explicitly checks theme/shared CSS/Planner CSS/main Planner JS contracts, and adds deterministic success/missing-asset regressions without changing the workflow cadence or production app runtime. |
 
 ## Supersession map
 
