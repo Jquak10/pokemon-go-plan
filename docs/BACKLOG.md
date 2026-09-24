@@ -27,18 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-036 — Extend production smoke coverage to the Planner shell and assets
-
-Expand BL-031 monitoring beyond the public landing shell so production can detect a broken Planner deployment without creating real planner state.
-
-Required outcome:
-
-- keep the workflow GET-only and free of real private credentials or state mutation;
-- verify a synthetic `/manage/<token>` request serves the expected Planner shell;
-- verify the versioned core Planner assets referenced by current `main`, including Planner JavaScript and Planner-specific CSS;
-- include any future theme initializer or equivalent critical shell asset in the smoke contract;
-- preserve bounded retries and deterministic local fixture coverage.
-
 ### BL-037 — Add lightweight WebKit / Safari smoke coverage
 
 Add a small cross-browser gate for behavior most likely to differ from Chromium without duplicating the entire browser regression suite.
@@ -123,6 +111,8 @@ A fresh product audit on 24 September 2026 reviewed the post-BL-033 production s
 
 BL-034 shipped in PR #84 on 24 September 2026: restore capabilities presented outside the body are authenticated before body parsing, every restore request is bounded to 25 MB server-side even without a trustworthy `Content-Length`, and focused deterministic coverage preserves the valid BL-033 restore/Undo contract.
 
-BL-035 was then selected on 24 September 2026 and is implemented by the current change with browser-local System/Light/Dark appearance, early pre-CSS theme initialization, semantic shared/Planner theme tokens, all-surface controls, native `color-scheme`/theme-color integration, and Chromium persistence/responsive coverage. BL-036 through BL-040 remain active.
+BL-035 shipped in PR #85 on 24 September 2026 with browser-local System/Light/Dark appearance, early pre-CSS theme initialization, semantic shared/Planner theme tokens, all-surface controls, native `color-scheme`/theme-color integration, and Chromium persistence/responsive coverage.
+
+BL-036 was then selected on 24 September 2026 and is implemented by the current change: Production smoke now checks a synthetic no-store Planner shell, requires its current versioned asset references, fetches every referenced Planner script/stylesheet read-only, explicitly validates theme/shared CSS/Planner CSS/main Planner JavaScript contracts, and has a deterministic missing-asset failure regression. BL-037 through BL-040 remain active.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
