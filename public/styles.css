@@ -5816,3 +5816,267 @@ html[data-theme="dark"] .metric-icon-gold {
     min-height: 40px;
   }
 }
+
+
+/* Planner feature surfaces that still originate in the shared stylesheet. */
+.remote-summary-item,
+.raid-capacity-wrap,
+.zero-raid-row,
+.empty-state,
+.slider-setting,
+.event-chip span,
+.calendar-help,
+.feed-input-wrap input,
+.feed-security-note,
+.calendar-weekdays,
+.calendar-day-cell,
+.admin-data-card,
+.purchase-advice-card,
+.budget-forecast-wrap,
+.daily-budget-override,
+.today-command-card,
+.today-spend-signal,
+.preferred-feed-panel,
+.calendar-app-button,
+.calendar-app-guide,
+.legacy-feed-migration,
+.legacy-revoke-box,
+.raid-activity-summary article,
+.recent-raid-row,
+.raid-type-toggle,
+.raid-update-target-row,
+.raid-log-preview,
+.target-status-tabs,
+.target-search-wrap,
+.target-compact-meta > span,
+.pokemon-search-input-wrap,
+.pokemon-search-results,
+.pokemon-search-result,
+.form-badge,
+.hundo-recent-chip,
+.type-pill,
+.hundo-benchmark-grid article,
+.hundo-custom-level,
+.hundo-custom-result,
+.raid-intel,
+.battle-catch-note,
+.compact-log-details,
+.planner-controls-details,
+.more-recommendations,
+.allocation-reason-inline,
+.max-tier-source-badge {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--surface-soft);
+}
+
+.remote-summary-item,
+.raid-capacity-wrap,
+.slider-setting,
+.calendar-help,
+.feed-security-note,
+.budget-forecast-wrap,
+.daily-budget-override,
+.today-spend-signal,
+.preferred-feed-panel,
+.calendar-app-guide,
+.raid-activity-summary article,
+.raid-update-target-row,
+.raid-log-preview,
+.hundo-custom-level,
+.raid-intel,
+.battle-catch-note,
+.allocation-reason-inline {
+  color: var(--ink-soft);
+}
+
+.empty-state,
+.feed-input-wrap input,
+.calendar-app-button,
+.recent-raid-row,
+.target-search-wrap,
+.pokemon-search-input-wrap,
+.pokemon-search-results,
+.pokemon-search-result,
+.hundo-recent-chip,
+.hundo-custom-result {
+  background: var(--surface);
+}
+
+.pokemon-search-result {
+  color: var(--ink-soft);
+  border-bottom-color: var(--line);
+}
+
+.pokemon-search-result:hover,
+.calendar-app-button:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.calendar-weekdays {
+  border-color: var(--line);
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.calendar-day-cell {
+  border-color: var(--line);
+  color: var(--ink-soft);
+  background: var(--surface-glass);
+}
+
+.calendar-day-cell:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.calendar-day-cell.outside-month {
+  color: var(--text-subtle);
+  background: var(--surface-soft);
+}
+
+.calendar-day-cell.today {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--info-soft) 82%, var(--surface)),
+      var(--surface)
+    );
+}
+
+.event-banner,
+.remote-summary-item.highlight,
+.purchase-advice-card.advice-selective,
+.hundo-benchmark-grid article.featured,
+.raid-log-preview {
+  border-color: var(--info-line);
+  background: var(--info-soft);
+}
+
+.remote-summary-item.highlight,
+.purchase-advice-card.advice-save,
+.today-spend-signal.signal-save,
+.max-tier-source-badge {
+  border-color: var(--success-line);
+  color: var(--success-ink);
+  background: var(--success-soft);
+}
+
+.purchase-advice-card.advice-max,
+.purchase-advice-card.advice-heavy,
+.today-spend-signal.signal-max,
+.today-spend-signal.signal-heavy,
+.raid-log-adjustment-note,
+.co-leader-badge {
+  border-color: var(--warning-line);
+  color: var(--warning-ink);
+  background: var(--warning-soft);
+}
+
+.legacy-revoke-box,
+button.danger-soft,
+button.danger-soft:hover:not(:disabled) {
+  border-color: var(--danger-line);
+  color: var(--danger-ink);
+  background: var(--danger-soft);
+}
+
+.today-command-card {
+  border-color: var(--line);
+  background:
+    linear-gradient(
+      135deg,
+      var(--surface-glass-strong),
+      color-mix(in srgb, var(--surface-soft) 90%, transparent)
+    );
+  box-shadow: var(--shadow-soft);
+}
+
+.raid-type-toggle button,
+.target-status-tabs button {
+  color: var(--muted);
+  background: transparent;
+}
+
+.raid-type-toggle button.active,
+.target-status-tabs button.active {
+  border-color: var(--info-line);
+  color: var(--info-ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.form-badge,
+.target-compact-meta > span,
+.type-pill {
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.type-pill.extra-weak {
+  border-color: var(--danger-line);
+  color: var(--danger-ink);
+  background: var(--danger-soft);
+}
+
+.allocation-inline-badge.has-allocation {
+  border-color: var(--success-line);
+  color: var(--success-ink);
+  background: var(--success-soft);
+}
+
+.allocation-inline-badge.no-allocation {
+  border-color: var(--line);
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.allocation-reason-max {
+  border-color: var(--violet-line);
+  background: var(--violet-soft);
+}
+
+.allocation-reason-max span {
+  color: var(--violet-ink);
+}
+
+.recommendation-footer-row {
+  border-top-color: var(--line);
+}
+
+html[data-theme="dark"] .calendar-source-raid_battles,
+html[data-theme="dark"] .calendar-source-raid_hour,
+html[data-theme="dark"] .calendar-source-raid_day {
+  border-left-color: #fb7185 !important;
+  color: #fecdd3 !important;
+  background: rgba(244, 63, 94, .14) !important;
+}
+
+html[data-theme="dark"] .calendar-source-community_day {
+  border-left-color: #facc15 !important;
+  color: #fef08a !important;
+  background: rgba(234, 179, 8, .14) !important;
+}
+
+html[data-theme="dark"] .calendar-source-pokemon_spotlight_hour {
+  border-left-color: #a78bfa !important;
+  color: #ddd6fe !important;
+  background: rgba(139, 92, 246, .15) !important;
+}
+
+html[data-theme="dark"] .calendar-source-max_battles,
+html[data-theme="dark"] .calendar-source-max_mondays {
+  border-left-color: #d8b4fe !important;
+  color: #e9d5ff !important;
+  background: rgba(168, 85, 247, .14) !important;
+}
+
+html[data-theme="dark"] .recommendation-sprite {
+  background:
+    radial-gradient(
+      circle at 50% 60%,
+      rgba(88, 187, 245, .14),
+      rgba(17, 28, 45, 0) 68%
+    );
+}
