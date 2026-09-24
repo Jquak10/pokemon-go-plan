@@ -479,38 +479,15 @@ async function runSmokeAttempt({
 
   for (const {
     path,
-    label,
-    noStore
+    label
   } of [
     {
-      path: "/index.html",
-      label: "Direct landing HTML",
-      noStore: false
-    },
-    {
-      path: "/sources.html",
-      label: "Direct Data Sources HTML",
-      noStore: false
-    },
-    {
       path: "/admin",
-      label: "Admin page",
-      noStore: true
-    },
-    {
-      path: "/admin.html",
-      label: "Direct Admin HTML",
-      noStore: true
+      label: "Admin page"
     },
     {
       path: "/manage",
-      label: "Direct Planner shell",
-      noStore: true
-    },
-    {
-      path: "/manage.html",
-      label: "Direct Planner HTML asset",
-      noStore: true
+      label: "Direct Planner shell"
     }
   ]) {
     const response =
@@ -540,10 +517,72 @@ async function runSmokeAttempt({
       response,
       label,
       {
-        noStore
+        noStore: true
       }
     );
     await response.text();
+  }
+
+  for (const {
+    path,
+    canonicalPath,
+    label
+  } of [
+    {
+      path: "/index.html",
+      canonicalPath: "/",
+      label: "Direct landing HTML"
+    },
+    {
+      path: "/sources.html",
+      canonicalPath: "/sources",
+      label: "Direct Data Sources HTML"
+    },
+    {
+      path: "/admin.html",
+      canonicalPath: "/admin",
+      label: "Direct Admin HTML"
+    },
+    {
+      path: "/manage.html",
+      canonicalPath: "/manage",
+      label: "Direct Planner HTML"
+    }
+  ]) {
+    const response =
+      await fetchWithTimeout(
+        new URL(
+          path,
+          baseUrl
+        ),
+        {
+          redirect: "manual",
+          headers: {
+            accept: "text/html"
+          }
+        },
+        timeoutMs
+      );
+
+    assert.equal(
+      response.status,
+      307,
+      `${label} must preserve Cloudflare's canonical HTML redirect`
+    );
+
+    const location =
+      response.headers.get(
+        "location"
+      ) || "";
+
+    assert.equal(
+      new URL(
+        location,
+        baseUrl
+      ).pathname,
+      canonicalPath,
+      `${label} must redirect to ${canonicalPath}`
+    );
   }
 
   const plannerResponse =
