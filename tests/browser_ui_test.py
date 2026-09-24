@@ -590,6 +590,26 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
         path = parsed.path
 
         if path == "/api/create":
+            content_length = int(
+                self.headers.get(
+                    "content-length",
+                    "0",
+                )
+            )
+            payload = (
+                json.loads(
+                    self.rfile.read(
+                        content_length
+                    )
+                    or b"{}"
+                )
+                if content_length
+                else {}
+            )
+            self.server.last_create_timezone = payload.get(
+                "timezone"
+            )
+
             host = self.headers.get("host")
             return self._json(
                 {
@@ -793,6 +813,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.server.last_feed_rotation_authorization = None
         self.server.last_feed_revoke_authorization = None
         self.server.last_admin_key = None
+        self.server.last_create_timezone = None
         self.server.target_delete_mode = "ok"
         self.server.deleted_target_ids = set()
         self.server.last_deleted_target_id = None
@@ -903,6 +924,69 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             "Could not reach the Planner service. Check your internet connection and try again.",
         )
         self.assertNotIn("Failed to fetch", message)
+
+    def test_landing_detects_browser_timezone_and_uses_it_for_creation(self):
+        context = self.browser.new_context(
+            viewport={"width": 1024, "height": 800},
+            locale="en-US",
+            timezone_id="America/New_York",
+            reduced_motion="reduce",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+
+        page.goto(
+            f"{self.base_url}/",
+            wait_until="domcontentloaded",
+        )
+
+        self.assertEqual(
+            page.locator("#timezone").input_value(),
+            "America/New_York",
+            "New-planner timezone must initialize from the browser rather than a fixed Singapore default",
+        )
+
+        page.locator("#create").click()
+        page.wait_for_selector("#result:not(.hidden)")
+
+        self.assertEqual(
+            self.server.last_create_timezone,
+            "America/New_York",
+            "Planner creation must persist the detected browser timezone",
+        )
+        self.assert_no_horizontal_overflow(page)
+
+    def test_landing_timezone_detection_does_not_override_manual_choice(self):
+        context = self.browser.new_context(
+            viewport={"width": 1024, "height": 800},
+            locale="en-US",
+            timezone_id="America/New_York",
+            reduced_motion="reduce",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+
+        page.goto(
+            f"{self.base_url}/",
+            wait_until="domcontentloaded",
+        )
+
+        timezone = page.locator("#timezone")
+        self.assertEqual(
+            timezone.input_value(),
+            "America/New_York",
+        )
+
+        timezone.fill("Europe/Paris")
+        page.locator("#create").click()
+        page.wait_for_selector("#result:not(.hidden)")
+
+        self.assertEqual(
+            self.server.last_create_timezone,
+            "Europe/Paris",
+            "A user-selected timezone must win over the initial browser detection",
+        )
+        self.assert_no_horizontal_overflow(page)
 
     def test_landing_html_failure_has_actionable_message(self):
         context = self.browser.new_context(
