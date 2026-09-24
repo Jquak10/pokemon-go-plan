@@ -982,6 +982,25 @@ Current decision:
 
 This is a CI/testing-governance change only. It requires no D1 migration, Worker/API behavior change, CSS/cache bump, Cloudflare binding, route, secret, Service Binding, Cron, or deployment configuration change.
 
+## ADR-056 — Canonical HTML pages run through Worker response hardening
+
+Status: Current  
+Introduced in PR #92.
+
+Cloudflare Workers Static Assets serve matching assets before Worker code unless a path is selected by `assets.run_worker_first`. The application already defined response hardening in `src/index.js` / `src/http-security.js`, but the public Landing and Data Sources canonical paths were not selected for Worker-first routing, so production asset routing could bypass those headers even though local browser fixtures exercised them.
+
+Current decision:
+
+- ordinary versioned JS, CSS, images, and other static assets remain asset-first for performance and lower Worker invocation cost;
+- `assets.run_worker_first` selectively covers the canonical HTML entry paths: Landing `/`, Data Sources `/sources`, Admin `/admin`, the direct Planner shell `/manage`, and private `/manage/*` links, in addition to the existing API/calendar routes;
+- every canonical product HTML page is served through the shared hardening boundary with `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, restrictive Permissions Policy, same-origin opener/resource policies, and a strict `script-src 'self'` policy with no inline executable script allowance;
+- Admin and Planner HTML remain `private, no-store`; Landing and Data Sources retain normal public caching semantics after Worker hardening;
+- `assets.html_handling` is explicitly `auto-trailing-slash`, preserving Cloudflare's canonical 307 redirects from `/index.html`, `/sources.html`, `/admin.html`, and `/manage.html` to their extensionless routes instead of introducing duplicate HTML pages;
+- deterministic release-safety tests assert both the Wrangler routing contract and the actual Worker response headers;
+- the read-only production smoke checks the deployed HTML security headers on canonical routes and verifies the direct `.html` redirects so a future configuration change cannot silently restore asset-first HTML serving.
+
+This is a routing/security fix. It changes `wrangler.jsonc` static-asset routing but does not change D1 schema/data, bindings, secrets, Cron schedules, Service Bindings, CSS/cache generations, or the protected GitHub status-check policy.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -1078,6 +1097,7 @@ The following sequence is retained as a compact repository implementation/change
 | #89 | BL-039 canonical Battle Planner branding | Standardizes **Pokémon GO Battle Planner** / **Personal Battle Strategy** across Landing, Planner, Data Sources, Admin, README, architecture guidance, and production-smoke title assertions; supporting copy explicitly covers Raids plus Dynamax/Gigantamax Max Battles without implying roster/storage management. |
 | #90 | BL-038 backup/recovery discoverability | Surfaces management-link and Planner Backup guidance before/after creation, documents the exact new-empty-planner restore flow, states that recovery requires the management link or a previously saved backup, updates mobile More/Preferences wording, and adds Chromium discoverability regressions without changing backup/auth/storage semantics. |
 | #91 | BL-037 focused WebKit smoke coverage | Extends the existing required `browser-ui` gate with a small deterministic Playwright WebKit suite for landing/theme, Planner shell, mobile fixed/safe-area navigation, More/Preferences/backup controls, Calendar, overflow, and desktop sticky behavior while retaining the full Chromium suite and existing protected-check name. |
+| #92 | BL-041 public HTML Worker hardening | Selectively routes canonical HTML pages through Worker response hardening, preserves canonical `.html` redirects, extends the strict external-script CSP to Data Sources, and adds deterministic plus production-smoke coverage for deployed security headers without making all static assets Worker-first. |
 
 ## Supersession map
 
