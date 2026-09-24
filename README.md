@@ -263,6 +263,8 @@ The **Preferences** tab contains:
 - **Usual personal ceiling**, an optional normal maximum for paid Remote Raids.
 - **Minimum Remote Raid score**, below which the planner stops allocating paid Remote Raids.
 - **Timezone**, which controls local event dates and the daily Remote Raid reset.
+- **Management Link**, the private access credential for the planner. Keep it secure; if it is exposed, rotate it. Losing it does not create an account-recovery path.
+- **Planner Backup**, which downloads a private portable JSON copy of planner-owned settings/data. Refresh it periodically. If the management link is lost but a backup exists, create a new planner, save the new management link, then restore the backup into that empty planner. Without either the original management link or a previously saved backup, the old planner cannot be recovered.
 - **Delete Planner** in the danger zone. Type `DELETE` exactly to enable the permanent action. Deletion removes this planner's Targets, Battle logs, resource history, settings/overrides, and calendar credential state and immediately invalidates its management and calendar links. It cannot be undone.
 
 Select **Save preferences** after making ordinary preference changes. These settings can make the plan more conservative but cannot raise the official game limit. Planner deletion is a separate irreversible action and does not use the Save preferences button.
