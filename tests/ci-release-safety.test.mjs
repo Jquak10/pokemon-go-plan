@@ -25,6 +25,16 @@ const workflow =
     ".github/workflows/raid-ranking-regression.yml"
   );
 
+const productionSmokeWorkflow =
+  read(
+    ".github/workflows/production-smoke.yml"
+  );
+
+const productionSmokeScript =
+  read(
+    "tests/production-smoke.mjs"
+  );
+
 const gitignore =
   read(".gitignore");
 
@@ -127,6 +137,57 @@ assert.match(
   "The external live-contract job must remain non-blocking on pull requests"
 );
 
+assert.match(
+  productionSmokeWorkflow,
+  /^name: Production smoke$/m,
+  "Production monitoring must remain a distinct workflow"
+);
+assert.match(
+  productionSmokeWorkflow,
+  /^  push:\n\s+branches:\n\s+- main$/m,
+  "Production smoke must run after main changes"
+);
+assert.match(
+  productionSmokeWorkflow,
+  /^  schedule:\n\s+- cron: "41 \*\/3 \* \* \*"$/m,
+  "Production smoke must retain its three-hour schedule"
+);
+assert.match(
+  productionSmokeWorkflow,
+  /^  workflow_dispatch:$/m,
+  "Production smoke must remain manually runnable"
+);
+assert.match(
+  productionSmokeWorkflow,
+  /^permissions:\n\s+contents: read$/m,
+  "Production smoke must keep read-only GitHub permissions"
+);
+assert.match(
+  productionSmokeWorkflow,
+  /node tests\/production-smoke\.mjs/,
+  "Production smoke workflow must execute the repository-owned smoke probe"
+);
+assert.doesNotMatch(
+  productionSmokeWorkflow,
+  /\$\{\{\s*secrets\./,
+  "Production smoke must not depend on repository secrets"
+);
+assert.doesNotMatch(
+  productionSmokeScript,
+  /\/api\/create|method:\s*["'](?:POST|PUT|PATCH|DELETE)["']/,
+  "Production smoke must never create or mutate planner state"
+);
+assert.match(
+  productionSmokeScript,
+  /\/api\/me/,
+  "Production smoke must exercise a Worker API route"
+);
+assert.match(
+  productionSmokeScript,
+  /bl-031-production-smoke-invalid/,
+  "Production smoke must use only its synthetic invalid management token"
+);
+
 console.log(
-  "CI dependency-install and Worker packaging checks passed."
+  "CI dependency-install, Worker packaging, and production smoke checks passed."
 );

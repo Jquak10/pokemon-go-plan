@@ -1,0 +1,33 @@
+name: Production smoke
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "41 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run read-only production smoke checks
+        env:
+          POGO_PRODUCTION_URL: https://pogo-plan.jquak-10.workers.dev
+          POGO_SMOKE_ATTEMPTS: "4"
+          POGO_SMOKE_RETRY_DELAY_MS: "10000"
+          POGO_SMOKE_TIMEOUT_MS: "10000"
+        run: node tests/production-smoke.mjs

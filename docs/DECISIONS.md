@@ -832,6 +832,26 @@ Current decision:
 
 Deletion is intentionally separate from ordinary preference saving and from credential rotation. Rotation remains the recovery action when a capability is exposed; deletion is irreversible data removal.
 
+## ADR-049 — Monitor production with a separate read-only smoke workflow
+
+Status: Current  
+Introduced in PR #79.
+
+The deterministic regression suite and upstream Pokémon-data live-contract checks answer different questions from whether the deployed production application is currently reachable and serving its core public/Worker paths. Increasing the existing scheduled regression workflow cadence would also increase unrelated upstream traffic and would make production availability dependent on third-party data availability.
+
+Current decision:
+
+- production availability is checked by a dedicated GitHub Actions workflow rather than by increasing the existing regression/live-contract schedule;
+- the workflow runs after pushes to `main`, on manual dispatch, and every three hours;
+- the smoke probe is read-only and requires no repository secret, planner creation, real management capability, calendar URL, or admin credential;
+- it verifies the landing HTML, the versioned `landing-app.js` asset expected by the checked-out repository, and the public Data Sources page;
+- it also calls `GET /api/me` with a fixed synthetic invalid management token and requires the normal `401` JSON/no-store response, exercising the deployed Worker authentication path and a D1 management-token lookup without mutating state;
+- short bounded retries absorb transient network failures and deployment overlap before the workflow is marked failed;
+- the production workflow is operational monitoring, not a required pull-request gate; its probe logic and safety invariants are covered by deterministic local fixture/release-safety tests in `npm test`;
+- upstream `live-contract` remains separate so a Pokémon-data provider outage or schema drift cannot be confused with application uptime.
+
+This provides repository-owned production coverage without introducing a new public health endpoint, persistent monitoring state, or additional credentials.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -916,6 +936,7 @@ The following sequence is retained as a compact repository implementation/change
 | #76 | BL-028 dependency install and Worker packaging CI gate | Makes the required `deterministic` PR job run lockfile-backed `npm ci` and a non-deploying Wrangler `deploy --dry-run` package/config check, with a regression that preserves the install/package gate and keeps `live-contract` non-blocking. |
 | #77 | BL-029 permanent self-service planner deletion | Adds exact typed/server confirmation plus authenticated `DELETE /api/planner`; deleting the parent planner row uses existing D1 cascades to remove planner-owned data and immediately invalidate management/calendar capabilities, with deterministic SQLite and Chromium regressions and no migration. |
 | #78 | BL-030 automatic new-planner timezone detection | Replaces the fixed Singapore onboarding value with validated browser timezone detection, preserves manual overrides, leaves the field empty when detection is unavailable instead of silently assuming another region, and adds deterministic plus Chromium coverage. |
+| #79 | BL-031 production smoke monitoring | Adds a separate read-only production smoke workflow on `main` pushes, manual dispatch, and a three-hour schedule; checks public assets plus a synthetic-invalid Worker/D1 lookup without secrets or state mutation, with deterministic fixture and release-safety coverage. |
 
 ## Supersession map
 
