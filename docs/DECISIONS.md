@@ -904,7 +904,7 @@ A backup is therefore a portable reconstruction artifact, not a bearer credentia
 ## ADR-052 — Appearance is browser-local and semantic-token driven
 
 Status: Current  
-Introduced in PR #85.
+Introduced in PR #85; accessibility gate extended in PR #88.
 
 The Planner needs Light and Dark presentation across its public, private, and administrative surfaces, but appearance does not affect Pokémon GO planning state and should not become part of the management capability or D1 schema.
 
@@ -918,7 +918,10 @@ Current decision:
 - shared semantic CSS variables own page, surface, text, border, input, status, overlay, shadow, and map-background roles; Planner-specific surfaces consume those same tokens rather than maintaining an independent dark stylesheet;
 - Pokémon/source/status accents retain their semantic identity with theme-appropriate backgrounds/text instead of being flattened into neutral colors;
 - `styles.css` moves to cache generation v43, `planner.css` to v5, and the theme controller begins at `theme.js?v=1`;
-- BL-040 remains responsible for dedicated automated contrast/theme-accessibility assertions, rather than making screenshot diffs the primary BL-035 correctness gate.
+- automated theme accessibility is a first-class regression invariant: deterministic checks calculate WCAG contrast from the semantic Light/Dark tokens, and Chromium measures representative rendered controls/status/calendar-source surfaces while exercising theme switching under existing focus, reduced-motion, tab, overlay, and live-region semantics;
+- ordinary representative text pairs target at least 4.5:1 and focus indicators target at least 3:1 against representative adjacent surfaces; disabled controls remain visibly distinguishable but are not treated as ordinary enabled-text contrast targets;
+- screenshot-golden comparison is not the primary accessibility gate because semantic/computed-style assertions are more stable and diagnostic;
+- the BL-040 gate exposed marginal light-theme contrast, so the shared primary blue, muted text, subtle text, and placeholder tokens were tightened and `styles.css` advanced to cache generation v44.
 
 No D1 migration, Worker API field, Cloudflare binding, secret, route, or Cron change is required.
 
@@ -1014,6 +1017,7 @@ The following sequence is retained as a compact repository implementation/change
 | #84 | BL-034 restore request hardening | Enforces the 25 MB restore boundary in the Worker, authenticates non-body management capabilities before reading restore JSON, preserves bounded legacy body-token compatibility, returns stable 413/400 failures, and adds focused deterministic coverage without changing the backup format or D1 restore semantics. |
 | #85 | BL-035 System / Light / Dark appearance | Adds browser-local System/Light/Dark theming with a pre-CSS same-origin initializer, semantic shared/Planner tokens, native color-scheme/theme-color integration, all-surface controls, cache bumps, and Chromium persistence/responsive regressions without adding planner/D1 state. |
 | #86 | BL-036 Planner-aware production smoke | Extends the existing secret-free GET-only production monitor to a synthetic no-store Planner shell plus every current versioned Planner asset, explicitly checks theme/shared CSS/Planner CSS/main Planner JS contracts, and adds deterministic success/missing-asset regressions without changing the workflow cadence or production app runtime. |
+| #88 | BL-040 automated theme accessibility | Adds deterministic Light/Dark WCAG contrast gates plus rendered Chromium contrast and theme-switch accessibility regressions, tightens marginal light-theme semantic colors, and bumps shared CSS to v44 without changing Planner/D1 state or Worker behavior. |
 
 ## Supersession map
 
