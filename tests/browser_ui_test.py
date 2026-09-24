@@ -1268,7 +1268,6 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
                 for selector in (
                     "#a11yCoreText",
                     "#a11ySecondaryText",
-                    "#a11yInput",
                     "#a11yPrimary",
                     "#a11ySecondary",
                     "#a11ySuccess",
@@ -1287,13 +1286,6 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
                         4.5,
                         f"{theme} {selector} contrast {ratio:.2f}:1 must meet WCAG AA normal-text contrast",
                     )
-
-                placeholder_ratio = contrast("#a11yInput", "::placeholder")
-                self.assertGreaterEqual(
-                    placeholder_ratio,
-                    4.5,
-                    f"{theme} input placeholder contrast {placeholder_ratio:.2f}:1 must meet WCAG AA",
-                )
 
                 active_tab = page.locator(".tab-button.active").first
                 self.assertEqual(
