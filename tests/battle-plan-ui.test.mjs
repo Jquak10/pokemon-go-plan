@@ -497,7 +497,7 @@ for (const page of [
   "../public/sources.html"
 ]) {
   const html = read(page);
-  assert.match(html, /styles\.css\?v=43/);
+  assert.match(html, /styles\.css\?v=44/);
   assert.match(html, /<script src="\/theme\.js\?v=1"><\/script>/);
   assert.match(html, /data-theme-select/);
   assert.ok(
