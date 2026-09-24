@@ -184,8 +184,33 @@ assert.match(
 );
 assert.match(
   productionSmokeScript,
-  /bl-031-production-smoke-invalid/,
+  /bl-036-production-smoke-invalid/,
   "Production smoke must use only its synthetic invalid management token"
+);
+assert.match(
+  productionSmokeScript,
+  /SYNTHETIC_MANAGE_PATH/,
+  "Production smoke must exercise the synthetic private Planner shell"
+);
+assert.match(
+  productionSmokeScript,
+  /versionedLocalAssets/,
+  "Production smoke must derive Planner assets from the repository shell"
+);
+assert.match(
+  productionSmokeScript,
+  /theme\\.js\\\?v=/,
+  "Production smoke must keep the theme initializer in the critical Planner asset contract"
+);
+assert.match(
+  productionSmokeScript,
+  /planner\\.css\\\?v=/,
+  "Production smoke must keep Planner-specific CSS in the critical asset contract"
+);
+assert.match(
+  productionSmokeScript,
+  /planner-app\\.js\\\?v=/,
+  "Production smoke must keep the main Planner JavaScript in the critical asset contract"
 );
 
 console.log(
