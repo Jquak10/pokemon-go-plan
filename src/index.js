@@ -12815,7 +12815,6 @@ async function handleFetch(request, env) {
       request.method === "GET" &&
       (
         path === "/manage" ||
-        path === "/manage.html" ||
         /^\/manage\/[A-Za-z0-9_-]+\/?$/.test(path)
       )
     ) {
@@ -12846,10 +12845,7 @@ async function handleFetch(request, env) {
 
     if (
       request.method === "GET" &&
-      (
-        path === "/admin" ||
-        path === "/admin.html"
-      )
+      path === "/admin"
     ) {
       return asset(
         request,
@@ -12864,10 +12860,7 @@ async function handleFetch(request, env) {
 
     if (
       request.method === "GET" &&
-      (
-        path === "/sources" ||
-        path === "/sources.html"
-      )
+      path === "/sources"
     ) {
       return asset(
         request,
