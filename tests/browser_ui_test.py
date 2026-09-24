@@ -955,7 +955,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
                     page.locator(f'.tab-button[data-tab="{tab}"]').click()
                     page.wait_for_function(
                         """name => document.querySelector('.tab-button[data-tab="' + name + '"]')?.classList.contains('active')""",
-                        tab,
+                        arg=tab,
                     )
                     self.assert_no_horizontal_overflow(page)
 
