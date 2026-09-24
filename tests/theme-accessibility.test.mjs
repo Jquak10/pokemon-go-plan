@@ -10,6 +10,15 @@ const styles =
     "utf8"
   );
 
+const plannerStyles =
+  readFileSync(
+    new URL(
+      "../public/planner.css",
+      import.meta.url
+    ),
+    "utf8"
+  );
+
 function cssBlock(
   selector
 ) {
@@ -476,8 +485,8 @@ assert.match(
   "Disabled controls must retain an explicit visual state"
 );
 assert.match(
-  styles,
-  /\.manage-page[\s\S]*?:focus-visible\s*\{[\s\S]*?outline:\s*3px solid var\(--go-blue\)/,
+  plannerStyles,
+  /:focus-visible\s*\{[\s\S]*?outline:\s*3px solid var\(--go-blue\)/,
   "Keyboard focus must retain a visible high-contrast outline"
 );
 
