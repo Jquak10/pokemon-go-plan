@@ -6396,6 +6396,95 @@ async function rotateManagementLink() {
   }
 }
 
+function updateDeletePlannerState() {
+  const input =
+    document.getElementById(
+      "deletePlannerConfirmation"
+    );
+
+  const button =
+    document.getElementById(
+      "deletePlanner"
+    );
+
+  button.disabled =
+    input.value.trim() !==
+    "DELETE";
+}
+
+async function deletePlanner() {
+  const input =
+    document.getElementById(
+      "deletePlannerConfirmation"
+    );
+
+  const button =
+    document.getElementById(
+      "deletePlanner"
+    );
+
+  const status =
+    document.getElementById(
+      "deletePlannerStatus"
+    );
+
+  const confirmation =
+    input.value.trim();
+
+  if (confirmation !== "DELETE") {
+    status.textContent =
+      "Type DELETE exactly before permanently deleting this planner.";
+    status.className =
+      "save-status error";
+    input.focus();
+    updateDeletePlannerState();
+    return;
+  }
+
+  input.disabled = true;
+  button.disabled = true;
+  status.textContent =
+    "Deleting planner permanently…";
+  status.className =
+    "save-status";
+
+  try {
+    await api(
+      "/api/planner",
+      {
+        method: "DELETE",
+        headers: {
+          "content-type":
+            "application/json"
+        },
+        body:
+          JSON.stringify({
+            confirmation
+          })
+      }
+    );
+
+    sessionStorage.removeItem(
+      "raid-planner-tab"
+    );
+    sessionStorage.removeItem(
+      "battle-plan-filter"
+    );
+
+    window.location.replace(
+      "/?planner_deleted=1"
+    );
+  } catch (error) {
+    input.disabled = false;
+    status.textContent =
+      error.message;
+    status.className =
+      "save-status error";
+    updateDeletePlannerState();
+  }
+}
+
+
 async function copySubscriptionUrl() {
   if (!recoverableFeedUrl) {
     return false;
@@ -7227,6 +7316,22 @@ document
   .addEventListener(
     "click",
     rotateManagementLink
+  );
+document
+  .getElementById(
+    "deletePlannerConfirmation"
+  )
+  .addEventListener(
+    "input",
+    updateDeletePlannerState
+  );
+document
+  .getElementById(
+    "deletePlanner"
+  )
+  .addEventListener(
+    "click",
+    deletePlanner
   );
 document
   .getElementById(
