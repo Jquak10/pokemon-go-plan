@@ -2121,7 +2121,7 @@ assert.match(
 );
 assert.match(
   portal,
-  /<script src="\/landing-app\.js\?v=3"><\/script>/
+  /<script src="\/landing-app\.js\?v=4"><\/script>/
 );
 assert.match(
   adminHtml,
@@ -2160,6 +2160,26 @@ for (const [name, html] of [
 assert.match(
   landingApp,
   /JsonApiClient\.fetchJson/
+);
+assert.match(
+  landingApp,
+  /Intl\.DateTimeFormat\(\)[\s\S]*resolvedOptions\(\)[\s\S]*\.timeZone/
+);
+assert.match(
+  landingApp,
+  /TimezoneValidation\.parse\([\s\S]*detected/
+);
+assert.match(
+  landingApp,
+  /!timezoneInput\.value\.trim\(\)/
+);
+assert.doesNotMatch(
+  portal,
+  /id="timezone"[\s\S]{0,240}value="Asia\/Singapore"/
+);
+assert.match(
+  portal,
+  /id="timezone"[\s\S]{0,240}placeholder="e\.g\. Asia\/Singapore"/
 );
 assert.match(
   adminApp,
