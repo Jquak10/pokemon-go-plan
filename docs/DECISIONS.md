@@ -1102,6 +1102,7 @@ The following sequence is retained as a compact repository implementation/change
 | #91 | BL-037 focused WebKit smoke coverage | Extends the existing required `browser-ui` gate with a small deterministic Playwright WebKit suite for landing/theme, Planner shell, mobile fixed/safe-area navigation, More/Preferences/backup controls, Calendar, overflow, and desktop sticky behavior while retaining the full Chromium suite and existing protected-check name. |
 | #92 | BL-041 public HTML Worker hardening | Selectively routes canonical HTML pages through Worker response hardening, preserves canonical `.html` redirects, extends the strict external-script CSP to Data Sources, and adds deterministic plus production-smoke coverage for deployed security headers without making all static assets Worker-first. |
 | #93 | BL-041 Static Asset header correction | Fixes forward after PR #92 production smoke proved Landing still bypassed the Worker CSP: public/static HTML now receives the same security contract through `public/_headers`, dynamic/private routes remain Worker-hardened, and the production smoke remains the live source of truth. |
+| #94 | Fresh product audit backlog promotion | Promotes the user-confirmed 25 September 2026 audit follow-ups into Active BL-042 through BL-046: accessibility semantics, production data-freshness monitoring, public data-handling/support guidance, Node-24-era GitHub Actions maintenance, and README/runbook separation. No product/runtime behavior changes in this PR. |
 
 ## Supersession map
 
