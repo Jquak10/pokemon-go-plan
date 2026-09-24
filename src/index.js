@@ -9560,50 +9560,38 @@ async function restorePlannerBackupApi(
           restoredLocalDate
       );
 
-  const targetIdMap =
-    new Map();
+  const restoreNamespace =
+    `restored:${user.id}`;
 
-  for (
-    const row of
-    backup.data.targets
-  ) {
-    targetIdMap.set(
-      row.id,
-      await sha256Hex(
-        `${user.id}|restore-target|${row.id}`
+  const targetIdMap =
+    new Map(
+      backup.data.targets.map(
+        row => [
+          row.id,
+          `${restoreNamespace}:target:${row.id}`
+        ]
       )
     );
-  }
 
   const legacyIdMap =
-    new Map();
-
-  for (
-    const row of
-    backup.data.raid_log
-  ) {
-    legacyIdMap.set(
-      row.id,
-      `legacy-${await sha256Hex(
-        `${user.id}|restore-legacy|${row.id}`
-      )}`
+    new Map(
+      backup.data.raid_log.map(
+        row => [
+          row.id,
+          `${restoreNamespace}:legacy:${row.id}`
+        ]
+      )
     );
-  }
 
   const battleIdMap =
-    new Map();
-
-  for (
-    const row of
-    backup.data.battle_log
-  ) {
-    battleIdMap.set(
-      row.id,
-      `battle-${await sha256Hex(
-        `${user.id}|restore-battle|${row.id}`
-      )}`
+    new Map(
+      backup.data.battle_log.map(
+        row => [
+          row.id,
+          `${restoreNamespace}:battle:${row.id}`
+        ]
+      )
     );
-  }
 
   const restoredTargets =
     backup.data.targets.map(
