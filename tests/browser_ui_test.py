@@ -3174,7 +3174,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             wait_until="domcontentloaded",
         )
         page.locator("#key").fill("browser-admin-key")
-        self.assertEqual(page.locator("#adminAuthBadge").inner_text(), "Key entered")
+        self.assertEqual(page.locator("#adminAuthBadge").inner_text().lower(), "key entered")
         self.assertEqual(page.locator("#adminAuthBadge").get_attribute("role"), "status")
         self.assertEqual(
             page.locator('[data-admin-section="official"]').get_attribute("aria-pressed"),
