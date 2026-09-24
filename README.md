@@ -10,7 +10,7 @@ The engineering references above are the durable source for current architecture
 
 **Change logging policy:** every product improvement and bug fix is recorded in the PR lineage in [docs/DECISIONS.md](docs/DECISIONS.md). Changes to current system behavior or invariants also update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); confirmed unshipped work and technical debt update [docs/BACKLOG.md](docs/BACKLOG.md); user/developer-facing behavior updates this README; development automation/policy updates [AGENTS.md](AGENTS.md). Documentation is maintained in the same PR as the change rather than reconstructed from chat history later.
 
-Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner. The Planner includes recovery controls for rotating an exposed management link and regenerating or revoking the preferred signed calendar URL without changing the other credential.
+Each planner receives a private management link and a separate read-only iCalendar (ICS) subscription link. Keep both private; anyone with the management link can change that planner. The Planner includes recovery controls for rotating an exposed management link and regenerating or revoking the preferred signed calendar URL without changing the other credential. The Preferences danger zone also supports permanent self-service planner deletion; deleting the planner invalidates every management/calendar capability and removes planner-owned data through the existing D1 cascade relationships.
 
 ## What the app does
 
@@ -137,6 +137,7 @@ Deployment order is safe. Before migration 0007 exists, every existing generatio
 - Planner API calls share one failure-normalization boundary: structured server errors are preserved, while non-JSON/empty server responses and network failures become concise retry/recovery messages instead of browser JSON/transport exceptions.
 - Administration views for synchronization, official raid supplements, Remote Raid limits, suppressions, meta assessments, and raid-ranking refreshes.
 - Capability-link access without a conventional email/password account, with independent recovery controls for management and preferred signed calendar credentials.
+- Permanent self-service planner deletion with an exact typed confirmation. Deleting the parent planner record cascades through Targets, battle logs, resource history, per-planner overrides, and calendar credential state; no separate migration is required.
 
 The project is independent and is not affiliated with Niantic, The Pokémon Company, Nintendo, or GAME FREAK.
 
@@ -260,8 +261,9 @@ The **Preferences** tab contains:
 - **Usual personal ceiling**, an optional normal maximum for paid Remote Raids.
 - **Minimum Remote Raid score**, below which the planner stops allocating paid Remote Raids.
 - **Timezone**, which controls local event dates and the daily Remote Raid reset.
+- **Delete Planner** in the danger zone. Type `DELETE` exactly to enable the permanent action. Deletion removes this planner's Targets, Battle logs, resource history, settings/overrides, and calendar credential state and immediately invalidates its management and calendar links. It cannot be undone.
 
-Select **Save preferences** after making changes. These settings can make the plan more conservative but cannot raise the official game limit.
+Select **Save preferences** after making ordinary preference changes. These settings can make the plan more conservative but cannot raise the official game limit. Planner deletion is a separate irreversible action and does not use the Save preferences button.
 
 ### Management and administration
 
