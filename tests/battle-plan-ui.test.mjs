@@ -497,12 +497,12 @@ for (const page of [
   "../public/sources.html"
 ]) {
   const html = read(page);
-  assert.match(html, /styles\.css\?v=43/);
+  assert.match(html, /styles\.css\?v=44/);
   assert.match(html, /<script src="\/theme\.js\?v=1"><\/script>/);
   assert.match(html, /data-theme-select/);
   assert.ok(
     html.indexOf("/theme.js?v=1") <
-      html.indexOf("/styles.css?v=43"),
+      html.indexOf("/styles.css?v=44"),
     page + " must initialize appearance before shared CSS to avoid a light flash"
   );
 }
@@ -547,7 +547,7 @@ assert.match(
 );
 assert.match(
   styles,
-  /BL-035 — SEMANTIC APPEARANCE \+ SHARED THEME SURFACES · v43/
+  /BL-035\/040 — SEMANTIC APPEARANCE \+ ACCESSIBLE THEME SURFACES · v44/
 );
 assert.match(
   plannerStyles,
