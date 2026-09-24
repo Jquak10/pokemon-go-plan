@@ -898,6 +898,27 @@ Current decision:
 
 A backup is therefore a portable reconstruction artifact, not a bearer credential and not an account-recovery token.
 
+## ADR-052 — Appearance is browser-local and semantic-token driven
+
+Status: Current  
+Introduced in PR #85.
+
+The Planner needs Light and Dark presentation across its public, private, and administrative surfaces, but appearance does not affect Pokémon GO planning state and should not become part of the management capability or D1 schema.
+
+Current decision:
+
+- appearance offers `system`, `light`, and `dark`, with System as the default;
+- the preference is stored only in browser localStorage under `pogo-theme`; it is not stored in D1, exported in Planner Backup, included in calendar data, or synchronized between devices;
+- one same-origin external `theme.js` is loaded synchronously before the shared stylesheet on Landing, Planner, Data Sources, and Admin so the resolved mode is applied before first paint without weakening the strict `script-src 'self'` policy;
+- System follows `prefers-color-scheme` continuously, while explicit Light/Dark choices remain stable until the user changes the preference;
+- the resolved mode updates root `data-theme` metadata, native `color-scheme`, and the page's existing `theme-color` meta value;
+- shared semantic CSS variables own page, surface, text, border, input, status, overlay, shadow, and map-background roles; Planner-specific surfaces consume those same tokens rather than maintaining an independent dark stylesheet;
+- Pokémon/source/status accents retain their semantic identity with theme-appropriate backgrounds/text instead of being flattened into neutral colors;
+- `styles.css` moves to cache generation v43, `planner.css` to v5, and the theme controller begins at `theme.js?v=1`;
+- BL-040 remains responsible for dedicated automated contrast/theme-accessibility assertions, rather than making screenshot diffs the primary BL-035 correctness gate.
+
+No D1 migration, Worker API field, Cloudflare binding, secret, route, or Cron change is required.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -988,6 +1009,7 @@ The following sequence is retained as a compact repository implementation/change
 | #82 | BL-033 responsive Preferences layout follow-up | Fixes the Backup & Recovery desktop regression by resetting grid card margins, pairing Management/Delete cards, giving backup controls a full-width row, preventing action-button collapse, bumping Planner CSS to v4, and adding cross-breakpoint primary-tab/Preferences layout regressions. |
 | #83 | Latest product audit backlog capture | Promotes the user-confirmed 24 September 2026 audit findings into Active BL-034 through BL-040: restore request hardening, semantic dark-mode theming, Planner-aware production smoke, WebKit/Safari smoke, backup/recovery discoverability, unified branding, and automated contrast/theme accessibility coverage. |
 | #84 | BL-034 restore request hardening | Enforces the 25 MB restore boundary in the Worker, authenticates non-body management capabilities before reading restore JSON, preserves bounded legacy body-token compatibility, returns stable 413/400 failures, and adds focused deterministic coverage without changing the backup format or D1 restore semantics. |
+| #85 | BL-035 System / Light / Dark appearance | Adds browser-local System/Light/Dark theming with a pre-CSS same-origin initializer, semantic shared/Planner tokens, native color-scheme/theme-color integration, all-surface controls, cache bumps, and Chromium persistence/responsive regressions without adding planner/D1 state. |
 
 ## Supersession map
 
