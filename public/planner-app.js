@@ -1193,10 +1193,19 @@ function setRaidLogType(
     )
     .forEach(
       button => {
+        const active =
+          button.dataset.raidType ===
+            raidLogType;
+
         button.classList.toggle(
           "active",
-          button.dataset.raidType ===
-            raidLogType
+          active
+        );
+        button.setAttribute(
+          "aria-pressed",
+          active
+            ? "true"
+            : "false"
         );
       }
     );
@@ -1827,6 +1836,18 @@ function renderRaidActivity() {
 
     status.className =
       "save-status raid-activity-status";
+    status.setAttribute(
+      "role",
+      "status"
+    );
+    status.setAttribute(
+      "aria-live",
+      "polite"
+    );
+    status.setAttribute(
+      "aria-atomic",
+      "true"
+    );
 
     document
       .querySelector(
@@ -2317,10 +2338,19 @@ function syncTargetViewUi() {
     )
     .forEach(
       button => {
+        const active =
+          button.dataset.targetView ===
+            targetViewMode;
+
         button.classList.toggle(
           "active",
-          button.dataset.targetView ===
-            targetViewMode
+          active
+        );
+        button.setAttribute(
+          "aria-pressed",
+          active
+            ? "true"
+            : "false"
         );
       }
     );
@@ -4955,7 +4985,7 @@ function maxTierOverrideControlHtml(
           </option>
         `).join("")}
       </select>
-      <small class="max-tier-override-status">
+      <small class="max-tier-override-status" role="status" aria-live="polite" aria-atomic="true">
         ${
           isUserOverride
             ? "Your tier setting"
@@ -5648,10 +5678,19 @@ function renderTargets() {
     )
     .forEach(
       button => {
+        const active =
+          button.dataset.targetStatus ===
+            targetFilterState.status;
+
         button.classList.toggle(
           "active",
-          button.dataset.targetStatus ===
-            targetFilterState.status
+          active
+        );
+        button.setAttribute(
+          "aria-pressed",
+          active
+            ? "true"
+            : "false"
         );
       }
     );
