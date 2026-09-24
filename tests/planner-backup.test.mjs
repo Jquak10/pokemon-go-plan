@@ -111,6 +111,70 @@ const sqlite =
 
 sqlite.exec(schema);
 
+function localDate(
+  timeZone
+) {
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-US",
+      {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }
+    )
+      .formatToParts(
+        new Date()
+      )
+      .reduce(
+        (result, part) => {
+          if (
+            ["year","month","day"]
+              .includes(
+                part.type
+              )
+          ) {
+            result[part.type] =
+              part.value;
+          }
+          return result;
+        },
+        {}
+      );
+
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function addDays(
+  iso,
+  days
+) {
+  const date =
+    new Date(
+      `${iso}T12:00:00Z`
+    );
+
+  date.setUTCDate(
+    date.getUTCDate() +
+      days
+  );
+
+  return date
+    .toISOString()
+    .slice(0, 10);
+}
+
+const today =
+  localDate(
+    "Asia/Singapore"
+  );
+const futureDate =
+  addDays(
+    today,
+    7
+  );
+
 function sha(value) {
   return createHash("sha256")
     .update(value)
@@ -248,7 +312,7 @@ sqlite.prepare(`
     raids_used,
     updated_at
   )
-  VALUES (?, '2026-09-24', 1, '2026-09-24T00:00:00.000Z')
+  VALUES (?, '${today}', 1, '2026-09-24T00:00:00.000Z')
 `).run(
   sourceUser
 );
@@ -260,7 +324,7 @@ sqlite.prepare(`
     budget_override,
     updated_at
   )
-  VALUES (?, '2026-09-24', 3, '2026-09-24T00:00:00.000Z')
+  VALUES (?, '${today}', 3, '2026-09-24T00:00:00.000Z')
 `).run(
   sourceUser
 );
@@ -282,8 +346,8 @@ sqlite.prepare(`
     'gengar-restore-opportunity',
     'Dynamax Gengar',
     'dynamax',
-    '2026-09-24',
-    '2026-10-01',
+    '${today}',
+    '${futureDate}',
     3,
     400,
     '2026-09-24T00:00:00.000Z'
@@ -311,7 +375,7 @@ sqlite.prepare(`
     remote_max_passes_used,
     updated_at
   )
-  VALUES (?, '2026-09-24', 800, 0, '2026-09-24T00:00:00.000Z')
+  VALUES (?, '${today}', 800, 0, '2026-09-24T00:00:00.000Z')
 `).run(
   sourceUser
 );
@@ -388,7 +452,7 @@ sqlite.prepare(`
     'source-target',
     10,
     15,
-    '2026-09-24',
+    '${today}',
     '2026-09-24T00:00:00.000Z',
     NULL
   )
@@ -713,7 +777,7 @@ assert.equal(
 
 assert.equal(
   sqlite.prepare(
-    "SELECT raids_used FROM remote_raid_usage WHERE user_id = ? AND local_date = '2026-09-24'"
+    "SELECT raids_used FROM remote_raid_usage WHERE user_id = ? AND local_date = '${today}'"
   ).get(
     destinationUser
   ).raids_used,
@@ -825,7 +889,7 @@ assert.equal(
 
 assert.equal(
   sqlite.prepare(
-    "SELECT raids_used FROM remote_raid_usage WHERE user_id = ? AND local_date = '2026-09-24'"
+    "SELECT raids_used FROM remote_raid_usage WHERE user_id = ? AND local_date = '${today}'"
   ).get(
     destinationUser
   ).raids_used,
