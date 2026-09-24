@@ -6396,6 +6396,247 @@ async function rotateManagementLink() {
   }
 }
 
+function plannerBackupFilename(
+  data
+) {
+  const date =
+    String(
+      data?.exported_at || ""
+    ).slice(
+      0,
+      10
+    );
+
+  return `pokemon-go-planner-backup-${/^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "backup"}.json`;
+}
+
+async function downloadPlannerBackup() {
+  const button =
+    document.getElementById(
+      "downloadPlannerBackup"
+    );
+
+  const status =
+    document.getElementById(
+      "plannerBackupStatus"
+    );
+
+  button.disabled = true;
+  status.textContent =
+    "Preparing backup…";
+  status.className =
+    "save-status";
+
+  try {
+    const data =
+      await api(
+        "/api/planner/backup"
+      );
+
+    const blob =
+      new Blob(
+        [
+          JSON.stringify(
+            data,
+            null,
+            2
+          )
+        ],
+        {
+          type:
+            "application/json"
+        }
+      );
+
+    const url =
+      URL.createObjectURL(
+        blob
+      );
+
+    const link =
+      document.createElement(
+        "a"
+      );
+
+    link.href = url;
+    link.download =
+      plannerBackupFilename(
+        data
+      );
+    link.hidden = true;
+
+    document.body.appendChild(
+      link
+    );
+    link.click();
+    link.remove();
+
+    setTimeout(
+      () =>
+        URL.revokeObjectURL(
+          url
+        ),
+      0
+    );
+
+    status.textContent =
+      "Backup downloaded ✓";
+  } catch (error) {
+    status.textContent =
+      error.message;
+    status.className =
+      "save-status error";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function updateRestorePlannerState() {
+  const fileInput =
+    document.getElementById(
+      "plannerBackupFile"
+    );
+
+  const confirmation =
+    document.getElementById(
+      "restorePlannerConfirmation"
+    );
+
+  const button =
+    document.getElementById(
+      "restorePlannerBackup"
+    );
+
+  button.disabled =
+    !fileInput.files?.length ||
+    confirmation.value.trim() !==
+      "RESTORE";
+}
+
+async function restorePlannerBackup() {
+  const fileInput =
+    document.getElementById(
+      "plannerBackupFile"
+    );
+
+  const confirmationInput =
+    document.getElementById(
+      "restorePlannerConfirmation"
+    );
+
+  const button =
+    document.getElementById(
+      "restorePlannerBackup"
+    );
+
+  const status =
+    document.getElementById(
+      "plannerRestoreStatus"
+    );
+
+  const file =
+    fileInput.files?.[0];
+
+  const confirmation =
+    confirmationInput
+      .value
+      .trim();
+
+  if (!file) {
+    status.textContent =
+      "Choose a Planner backup JSON file first.";
+    status.className =
+      "save-status error";
+    fileInput.focus();
+    updateRestorePlannerState();
+    return;
+  }
+
+  if (
+    confirmation !==
+    "RESTORE"
+  ) {
+    status.textContent =
+      "Type RESTORE exactly before restoring the backup.";
+    status.className =
+      "save-status error";
+    confirmationInput.focus();
+    updateRestorePlannerState();
+    return;
+  }
+
+  if (
+    file.size >
+    25 * 1024 * 1024
+  ) {
+    status.textContent =
+      "This backup file is too large to restore safely.";
+    status.className =
+      "save-status error";
+    return;
+  }
+
+  fileInput.disabled = true;
+  confirmationInput.disabled =
+    true;
+  button.disabled = true;
+  status.textContent =
+    "Restoring backup…";
+  status.className =
+    "save-status";
+
+  try {
+    let backup;
+
+    try {
+      backup =
+        JSON.parse(
+          await file.text()
+        );
+    } catch {
+      throw new Error(
+        "Choose a valid Planner backup JSON file."
+      );
+    }
+
+    await api(
+      "/api/planner/restore",
+      {
+        method: "POST",
+        headers: {
+          "content-type":
+            "application/json"
+        },
+        body:
+          JSON.stringify({
+            confirmation,
+            backup
+          })
+      }
+    );
+
+    calendarMonthCache.clear();
+    fileInput.value = "";
+    confirmationInput.value = "";
+
+    await load();
+
+    status.textContent =
+      "Backup restored ✓";
+  } catch (error) {
+    status.textContent =
+      error.message;
+    status.className =
+      "save-status error";
+  } finally {
+    fileInput.disabled = false;
+    confirmationInput.disabled =
+      false;
+    updateRestorePlannerState();
+  }
+}
+
+
 function updateDeletePlannerState() {
   const input =
     document.getElementById(
@@ -7316,6 +7557,38 @@ document
   .addEventListener(
     "click",
     rotateManagementLink
+  );
+document
+  .getElementById(
+    "downloadPlannerBackup"
+  )
+  .addEventListener(
+    "click",
+    downloadPlannerBackup
+  );
+document
+  .getElementById(
+    "plannerBackupFile"
+  )
+  .addEventListener(
+    "change",
+    updateRestorePlannerState
+  );
+document
+  .getElementById(
+    "restorePlannerConfirmation"
+  )
+  .addEventListener(
+    "input",
+    updateRestorePlannerState
+  );
+document
+  .getElementById(
+    "restorePlannerBackup"
+  )
+  .addEventListener(
+    "click",
+    restorePlannerBackup
   );
 document
   .getElementById(
