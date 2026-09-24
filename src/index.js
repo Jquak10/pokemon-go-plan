@@ -9563,12 +9563,20 @@ async function restorePlannerBackupApi(
   const restoreNamespace =
     `restored:${user.id}`;
 
+  const restoreTargetId =
+    sourceId =>
+      sourceId == null
+        ? null
+        : `${restoreNamespace}:target:${sourceId}`;
+
   const targetIdMap =
     new Map(
       backup.data.targets.map(
         row => [
           row.id,
-          `${restoreNamespace}:target:${row.id}`
+          restoreTargetId(
+            row.id
+          )
         ]
       )
     );
@@ -9613,11 +9621,9 @@ async function restorePlannerBackupApi(
             row.id
           ),
         target_id:
-          row.target_id == null
-            ? null
-            : targetIdMap.get(
-                row.target_id
-              )
+          restoreTargetId(
+            row.target_id
+          )
       })
     );
 
@@ -9633,23 +9639,16 @@ async function restorePlannerBackupApi(
           ...row,
           id,
           target_id:
-            row.target_id == null
-              ? null
-              : targetIdMap.get(
-                  row.target_id
-                ),
+            restoreTargetId(
+              row.target_id
+            ),
           // Restore current state directly rather than replaying historical
           // trigger effects. A non-null unique marker bypasses battle_log_apply.
           // Imported legacy-Undo rows retain their mapped legacy relationship
           // so unified_battle_log keeps the same visible history semantics.
           legacy_log_id:
-            row.legacy_log_id != null &&
-            legacyIdMap.has(
-              row.legacy_log_id
-            )
-              ? legacyIdMap.get(
-                  row.legacy_log_id
-                )
+            row.legacy_log_id != null
+              ? `${restoreNamespace}:legacy:${row.legacy_log_id}`
               : `restored-${id}`
         };
       }
