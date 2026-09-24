@@ -923,6 +923,52 @@
             <span id="managementLinkStatus" class="save-status"></span>
           </section>
 
+          <section class="dashboard-card">
+            <span class="section-eyebrow">DANGER ZONE</span>
+            <h2>Delete Planner</h2>
+            <p class="section-subtitle">
+              Permanently delete this planner, including its targets, battle logs,
+              resource history, preferences, and private calendar credentials.
+              This cannot be undone.
+            </p>
+
+            <div class="legacy-revoke-box">
+              <div>
+                <strong>Permanent planner deletion</strong>
+                <p id="deletePlannerHelp">
+                  Type <code>DELETE</code> exactly to enable the delete button.
+                  After deletion, every management and calendar link for this planner stops working.
+                </p>
+
+                <label for="deletePlannerConfirmation">Confirmation</label>
+                <input
+                  id="deletePlannerConfirmation"
+                  type="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  aria-describedby="deletePlannerHelp"
+                  placeholder="DELETE"
+                >
+              </div>
+
+              <button
+                id="deletePlanner"
+                type="button"
+                class="danger-soft"
+                disabled
+              >
+                Delete planner permanently
+              </button>
+            </div>
+
+            <span
+              id="deletePlannerStatus"
+              class="save-status"
+              role="status"
+              aria-live="polite"
+            ></span>
+          </section>
+
         </div>
       </section>
 
@@ -1496,6 +1542,6 @@
 <script src="/planner-hundo-logic.js?v=2"></script>
 <script src="/planner-battle-plan-logic.js?v=1"></script>
 <script src="/planner-battle-intel.js?v=1"></script>
-<script src="/planner-app.js?v=4"></script>
+<script src="/planner-app.js?v=5"></script>
 </body>
 </html>
