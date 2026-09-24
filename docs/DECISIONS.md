@@ -985,6 +985,7 @@ The following sequence is retained as a compact repository implementation/change
 | #80 | BL-032 planner storage growth bounds | Bounds per-planner Targets, Target-note length, daily/total battle-log rows, and active/future Max tier overrides; restricts the one-day Remote ceiling override to the current planner-local date and prunes obsolete override rows, with race-safe SQL predicates and focused SQLite coverage. |
 | #81 | BL-033 portable planner backup and restore | Adds management-authenticated credential-free JSON backup plus empty-planner atomic restore, preserves destination capabilities and history/Undo semantics through namespaced ID remapping, and adds deterministic plus Chromium recovery coverage without a migration. |
 | #82 | BL-033 responsive Preferences layout follow-up | Fixes the Backup & Recovery desktop regression by resetting grid card margins, pairing Management/Delete cards, giving backup controls a full-width row, preventing action-button collapse, bumping Planner CSS to v4, and adding cross-breakpoint primary-tab/Preferences layout regressions. |
+| #83 | Latest product audit backlog capture | Promotes the user-confirmed 24 September 2026 audit findings into Active BL-034 through BL-040: restore request hardening, semantic dark-mode theming, Planner-aware production smoke, WebKit/Safari smoke, backup/recovery discoverability, unified branding, and automated contrast/theme accessibility coverage. |
 
 ## Supersession map
 
