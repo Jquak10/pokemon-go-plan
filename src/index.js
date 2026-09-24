@@ -66,6 +66,14 @@ import {
   targetNotesLimitMessage,
   targetStorageLimitMessage
 } from "./planner-storage-limits.js";
+import {
+  PLANNER_BACKUP_FORMAT,
+  PLANNER_BACKUP_VERSION,
+  PLANNER_BACKUP_MAX_BATCH_STATEMENTS,
+  PlannerBackupError,
+  chunkJsonRows,
+  normalizePlannerBackup
+} from "./planner-backup.js";
 
 export {
   adminKeyFromRequest,
@@ -9168,6 +9176,798 @@ async function revokeLegacyFeedApi(
 }
 
 
+async function exportPlannerBackupApi(
+  request,
+  env
+) {
+  const user =
+    await userByManageRequest(
+      request,
+      env
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  const targets =
+    await env.DB.prepare(`
+      SELECT
+        id,
+        pokemon_name,
+        target_type,
+        battle_kind,
+        target_value,
+        current_value,
+        expected_progress_per_raid,
+        priority,
+        completed,
+        notes,
+        created_at,
+        updated_at
+      FROM targets
+      WHERE user_id = ?
+      ORDER BY created_at, id
+    `).bind(
+      user.id
+    ).all();
+
+  const remoteUsage =
+    await env.DB.prepare(`
+      SELECT
+        local_date,
+        raids_used,
+        updated_at
+      FROM remote_raid_usage
+      WHERE user_id = ?
+      ORDER BY local_date
+    `).bind(
+      user.id
+    ).all();
+
+  const dailyBudgetOverrides =
+    await env.DB.prepare(`
+      SELECT
+        local_date,
+        budget_override,
+        updated_at
+      FROM remote_raid_daily_budget_overrides
+      WHERE user_id = ?
+      ORDER BY local_date
+    `).bind(
+      user.id
+    ).all();
+
+  const maxOverrides =
+    await env.DB.prepare(`
+      SELECT
+        opportunity_key,
+        pokemon_name,
+        battle_variant,
+        start_date,
+        end_date,
+        max_battle_tier,
+        max_particle_cost,
+        updated_at
+      FROM max_battle_cost_overrides
+      WHERE user_id = ?
+      ORDER BY start_date, opportunity_key
+    `).bind(
+      user.id
+    ).all();
+
+  const resourceState =
+    await env.DB.prepare(`
+      SELECT
+        max_particles_held,
+        updated_at
+      FROM battle_resource_state
+      WHERE user_id = ?
+    `).bind(
+      user.id
+    ).first();
+
+  const resourceDaily =
+    await env.DB.prepare(`
+      SELECT
+        local_date,
+        max_particles_collected,
+        remote_max_passes_used,
+        updated_at
+      FROM battle_resource_daily
+      WHERE user_id = ?
+      ORDER BY local_date
+    `).bind(
+      user.id
+    ).all();
+
+  const legacyLogs =
+    await env.DB.prepare(`
+      SELECT
+        id,
+        pokemon_name,
+        raid_type,
+        raid_count,
+        progress_gained,
+        target_id,
+        target_before_value,
+        target_after_value,
+        local_date,
+        created_at,
+        undone_at
+      FROM raid_log
+      WHERE user_id = ?
+      ORDER BY created_at, id
+    `).bind(
+      user.id
+    ).all();
+
+  const battleLogs =
+    await env.DB.prepare(`
+      SELECT
+        id,
+        legacy_log_id,
+        pokemon_name,
+        battle_system,
+        battle_variant,
+        participation,
+        battle_count,
+        wins,
+        max_particle_cost,
+        max_particles_spent,
+        remote_passes_used,
+        progress_gained,
+        target_id,
+        target_before_value,
+        target_after_value,
+        local_date,
+        created_at,
+        undone_at
+      FROM battle_log
+      WHERE user_id = ?
+      ORDER BY created_at, id
+    `).bind(
+      user.id
+    ).all();
+
+  const exportedAt =
+    nowIso();
+
+  const backup = {
+    format:
+      PLANNER_BACKUP_FORMAT,
+    version:
+      PLANNER_BACKUP_VERSION,
+    exported_at:
+      exportedAt,
+    planner: {
+      timezone:
+        user.timezone,
+      included_sources:
+        parseSources(
+          user
+        ),
+      pve_weight:
+        user.pve_weight,
+      pvp_weight:
+        user.pvp_weight,
+      collector_weight:
+        user.collector_weight,
+      remote_raid_budget:
+        user.remote_raid_budget,
+      remote_raid_min_score:
+        user.remote_raid_min_score == null
+          ? DEFAULT_REMOTE_RAID_MIN_SCORE
+          : user.remote_raid_min_score
+    },
+    data: {
+      targets:
+        targets.results || [],
+      remote_raid_usage:
+        remoteUsage.results || [],
+      remote_raid_daily_budget_overrides:
+        dailyBudgetOverrides.results || [],
+      max_battle_cost_overrides:
+        maxOverrides.results || [],
+      battle_resource_state:
+        resourceState || null,
+      battle_resource_daily:
+        resourceDaily.results || [],
+      raid_log:
+        legacyLogs.results || [],
+      battle_log:
+        battleLogs.results || []
+    }
+  };
+
+  const date =
+    exportedAt.slice(
+      0,
+      10
+    );
+
+  return json(
+    backup,
+    200,
+    {
+      "content-disposition":
+        `attachment; filename="pokemon-go-planner-backup-${date}.json"`
+    }
+  );
+}
+
+async function plannerRestoreRowCount(
+  env,
+  userId
+) {
+  const row =
+    await env.DB.prepare(`
+      WITH owner(id) AS (
+        SELECT ?
+      )
+      SELECT
+        (SELECT COUNT(*) FROM targets
+          WHERE user_id = (SELECT id FROM owner)) +
+        (SELECT COUNT(*) FROM remote_raid_usage
+          WHERE user_id = (SELECT id FROM owner)) +
+        (SELECT COUNT(*) FROM remote_raid_daily_budget_overrides
+          WHERE user_id = (SELECT id FROM owner)) +
+        (SELECT COUNT(*) FROM max_battle_cost_overrides
+          WHERE user_id = (SELECT id FROM owner)) +
+        (SELECT COUNT(*) FROM battle_resource_state
+          WHERE user_id = (SELECT id FROM owner)) +
+        (SELECT COUNT(*) FROM battle_resource_daily
+          WHERE user_id = (SELECT id FROM owner)) +
+        (SELECT COUNT(*) FROM raid_log
+          WHERE user_id = (SELECT id FROM owner)) +
+        (SELECT COUNT(*) FROM battle_log
+          WHERE user_id = (SELECT id FROM owner))
+        AS owned_rows
+    `).bind(
+      userId
+    ).first();
+
+  return Number(
+    row?.owned_rows || 0
+  );
+}
+
+function plannerRestoreJsonInsertStatements(
+  env,
+  sql,
+  rows,
+  userId
+) {
+  return chunkJsonRows(
+    rows
+  ).map(
+    chunk =>
+      env.DB.prepare(
+        sql
+      ).bind(
+        userId,
+        JSON.stringify(
+          chunk
+        )
+      )
+  );
+}
+
+async function restorePlannerBackupApi(
+  request,
+  env
+) {
+  let body;
+
+  try {
+    body =
+      await request.json();
+  } catch {
+    return bad(
+      "Choose a valid Planner backup JSON file."
+    );
+  }
+
+  const user =
+    await userByManageRequest(
+      request,
+      env,
+      body
+    );
+
+  if (!user) {
+    return bad(
+      "Invalid management link.",
+      401
+    );
+  }
+
+  if (
+    String(
+      body?.confirmation || ""
+    ) !== "RESTORE"
+  ) {
+    return bad(
+      "Type RESTORE to confirm backup restoration."
+    );
+  }
+
+  let backup;
+
+  try {
+    backup =
+      normalizePlannerBackup(
+        body?.backup
+      );
+  } catch (error) {
+    if (
+      error instanceof
+        PlannerBackupError
+    ) {
+      return bad(
+        error.message,
+        error.status
+      );
+    }
+
+    throw error;
+  }
+
+  const ownedRows =
+    await plannerRestoreRowCount(
+      env,
+      user.id
+    );
+
+  if (ownedRows > 0) {
+    return bad(
+      "Restore requires an empty planner. Create a new planner and restore the backup there.",
+      409
+    );
+  }
+
+  const includedSources =
+    backup.planner
+      .included_sources
+      .filter(
+        source =>
+          SOURCES[source]
+      );
+
+  const restoredLocalDate =
+    localDateForTimezone(
+      backup.planner.timezone
+    );
+
+  const restoredBudgetOverrides =
+    backup.data
+      .remote_raid_daily_budget_overrides
+      .filter(
+        row =>
+          row.local_date ===
+          restoredLocalDate
+      );
+
+  const restoredMaxOverrides =
+    backup.data
+      .max_battle_cost_overrides
+      .filter(
+        row =>
+          row.end_date >=
+          restoredLocalDate
+      );
+
+  const targetIdMap =
+    new Map();
+
+  for (
+    const row of
+    backup.data.targets
+  ) {
+    targetIdMap.set(
+      row.id,
+      await sha256Hex(
+        `${user.id}|restore-target|${row.id}`
+      )
+    );
+  }
+
+  const legacyIdMap =
+    new Map();
+
+  for (
+    const row of
+    backup.data.raid_log
+  ) {
+    legacyIdMap.set(
+      row.id,
+      `legacy-${await sha256Hex(
+        `${user.id}|restore-legacy|${row.id}`
+      )}`
+    );
+  }
+
+  const battleIdMap =
+    new Map();
+
+  for (
+    const row of
+    backup.data.battle_log
+  ) {
+    battleIdMap.set(
+      row.id,
+      `battle-${await sha256Hex(
+        `${user.id}|restore-battle|${row.id}`
+      )}`
+    );
+  }
+
+  const restoredTargets =
+    backup.data.targets.map(
+      row => ({
+        ...row,
+        id:
+          targetIdMap.get(
+            row.id
+          )
+      })
+    );
+
+  const restoredLegacyLogs =
+    backup.data.raid_log.map(
+      row => ({
+        ...row,
+        id:
+          legacyIdMap.get(
+            row.id
+          ),
+        target_id:
+          row.target_id == null
+            ? null
+            : targetIdMap.get(
+                row.target_id
+              )
+      })
+    );
+
+  const restoredBattleLogs =
+    backup.data.battle_log.map(
+      row => {
+        const id =
+          battleIdMap.get(
+            row.id
+          );
+
+        return {
+          ...row,
+          id,
+          target_id:
+            row.target_id == null
+              ? null
+              : targetIdMap.get(
+                  row.target_id
+                ),
+          // Restore current state directly rather than replaying historical
+          // trigger effects. A non-null unique marker bypasses battle_log_apply.
+          // Imported legacy-Undo rows retain their mapped legacy relationship
+          // so unified_battle_log keeps the same visible history semantics.
+          legacy_log_id:
+            row.legacy_log_id != null &&
+            legacyIdMap.has(
+              row.legacy_log_id
+            )
+              ? legacyIdMap.get(
+                  row.legacy_log_id
+                )
+              : `restored-${id}`
+        };
+      }
+    );
+
+  const statements = [
+    env.DB.prepare(`
+      UPDATE users
+      SET
+        timezone = ?,
+        included_sources = ?,
+        pve_weight = ?,
+        pvp_weight = ?,
+        collector_weight = ?,
+        remote_raid_budget = ?,
+        remote_raid_min_score = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).bind(
+      backup.planner.timezone,
+      JSON.stringify(
+        includedSources
+      ),
+      backup.planner.pve_weight,
+      backup.planner.pvp_weight,
+      backup.planner.collector_weight,
+      backup.planner.remote_raid_budget,
+      backup.planner.remote_raid_min_score,
+      nowIso(),
+      user.id
+    ),
+    ...plannerRestoreJsonInsertStatements(
+      env,
+      `
+        INSERT INTO targets (
+          id,
+          user_id,
+          pokemon_name,
+          target_type,
+          battle_kind,
+          target_value,
+          current_value,
+          expected_progress_per_raid,
+          priority,
+          completed,
+          notes,
+          created_at,
+          updated_at
+        )
+        SELECT
+          json_extract(value, '$.id'),
+          ?,
+          json_extract(value, '$.pokemon_name'),
+          json_extract(value, '$.target_type'),
+          json_extract(value, '$.battle_kind'),
+          json_extract(value, '$.target_value'),
+          json_extract(value, '$.current_value'),
+          json_extract(value, '$.expected_progress_per_raid'),
+          json_extract(value, '$.priority'),
+          json_extract(value, '$.completed'),
+          json_extract(value, '$.notes'),
+          json_extract(value, '$.created_at'),
+          json_extract(value, '$.updated_at')
+        FROM json_each(?)
+      `,
+      restoredTargets,
+      user.id
+    ),
+    ...plannerRestoreJsonInsertStatements(
+      env,
+      `
+        INSERT INTO remote_raid_usage (
+          user_id,
+          local_date,
+          raids_used,
+          updated_at
+        )
+        SELECT
+          ?,
+          json_extract(value, '$.local_date'),
+          json_extract(value, '$.raids_used'),
+          json_extract(value, '$.updated_at')
+        FROM json_each(?)
+      `,
+      backup.data.remote_raid_usage,
+      user.id
+    ),
+    ...plannerRestoreJsonInsertStatements(
+      env,
+      `
+        INSERT INTO remote_raid_daily_budget_overrides (
+          user_id,
+          local_date,
+          budget_override,
+          updated_at
+        )
+        SELECT
+          ?,
+          json_extract(value, '$.local_date'),
+          json_extract(value, '$.budget_override'),
+          json_extract(value, '$.updated_at')
+        FROM json_each(?)
+      `,
+      restoredBudgetOverrides,
+      user.id
+    ),
+    ...plannerRestoreJsonInsertStatements(
+      env,
+      `
+        INSERT INTO max_battle_cost_overrides (
+          user_id,
+          opportunity_key,
+          pokemon_name,
+          battle_variant,
+          start_date,
+          end_date,
+          max_battle_tier,
+          max_particle_cost,
+          updated_at
+        )
+        SELECT
+          ?,
+          json_extract(value, '$.opportunity_key'),
+          json_extract(value, '$.pokemon_name'),
+          json_extract(value, '$.battle_variant'),
+          json_extract(value, '$.start_date'),
+          json_extract(value, '$.end_date'),
+          json_extract(value, '$.max_battle_tier'),
+          json_extract(value, '$.max_particle_cost'),
+          json_extract(value, '$.updated_at')
+        FROM json_each(?)
+      `,
+      restoredMaxOverrides,
+      user.id
+    ),
+    ...(
+      backup.data
+        .battle_resource_state
+        ? [
+            env.DB.prepare(`
+              INSERT INTO battle_resource_state (
+                user_id,
+                max_particles_held,
+                updated_at
+              )
+              VALUES (?, ?, ?)
+            `).bind(
+              user.id,
+              backup.data
+                .battle_resource_state
+                .max_particles_held,
+              backup.data
+                .battle_resource_state
+                .updated_at
+            )
+          ]
+        : []
+    ),
+    ...plannerRestoreJsonInsertStatements(
+      env,
+      `
+        INSERT INTO battle_resource_daily (
+          user_id,
+          local_date,
+          max_particles_collected,
+          remote_max_passes_used,
+          updated_at
+        )
+        SELECT
+          ?,
+          json_extract(value, '$.local_date'),
+          json_extract(value, '$.max_particles_collected'),
+          json_extract(value, '$.remote_max_passes_used'),
+          json_extract(value, '$.updated_at')
+        FROM json_each(?)
+      `,
+      backup.data.battle_resource_daily,
+      user.id
+    ),
+    ...plannerRestoreJsonInsertStatements(
+      env,
+      `
+        INSERT INTO raid_log (
+          id,
+          user_id,
+          pokemon_name,
+          raid_type,
+          raid_count,
+          progress_gained,
+          target_id,
+          target_before_value,
+          target_after_value,
+          local_date,
+          created_at,
+          undone_at
+        )
+        SELECT
+          json_extract(value, '$.id'),
+          ?,
+          json_extract(value, '$.pokemon_name'),
+          json_extract(value, '$.raid_type'),
+          json_extract(value, '$.raid_count'),
+          json_extract(value, '$.progress_gained'),
+          json_extract(value, '$.target_id'),
+          json_extract(value, '$.target_before_value'),
+          json_extract(value, '$.target_after_value'),
+          json_extract(value, '$.local_date'),
+          json_extract(value, '$.created_at'),
+          json_extract(value, '$.undone_at')
+        FROM json_each(?)
+      `,
+      restoredLegacyLogs,
+      user.id
+    ),
+    ...plannerRestoreJsonInsertStatements(
+      env,
+      `
+        INSERT INTO battle_log (
+          id,
+          legacy_log_id,
+          user_id,
+          pokemon_name,
+          battle_system,
+          battle_variant,
+          participation,
+          battle_count,
+          wins,
+          max_particle_cost,
+          max_particles_spent,
+          remote_passes_used,
+          progress_gained,
+          target_id,
+          target_before_value,
+          target_after_value,
+          local_date,
+          created_at,
+          undone_at
+        )
+        SELECT
+          json_extract(value, '$.id'),
+          json_extract(value, '$.legacy_log_id'),
+          ?,
+          json_extract(value, '$.pokemon_name'),
+          json_extract(value, '$.battle_system'),
+          json_extract(value, '$.battle_variant'),
+          json_extract(value, '$.participation'),
+          json_extract(value, '$.battle_count'),
+          json_extract(value, '$.wins'),
+          json_extract(value, '$.max_particle_cost'),
+          json_extract(value, '$.max_particles_spent'),
+          json_extract(value, '$.remote_passes_used'),
+          json_extract(value, '$.progress_gained'),
+          json_extract(value, '$.target_id'),
+          json_extract(value, '$.target_before_value'),
+          json_extract(value, '$.target_after_value'),
+          json_extract(value, '$.local_date'),
+          json_extract(value, '$.created_at'),
+          json_extract(value, '$.undone_at')
+        FROM json_each(?)
+      `,
+      restoredBattleLogs,
+      user.id
+    )
+  ];
+
+  if (
+    statements.length >
+    PLANNER_BACKUP_MAX_BATCH_STATEMENTS
+  ) {
+    return bad(
+      "This backup is too large to restore safely in one transaction.",
+      413
+    );
+  }
+
+  try {
+    await env.DB.batch(
+      statements
+    );
+  } catch (error) {
+    console.error(
+      "Planner backup restore failed:",
+      error
+    );
+
+    return bad(
+      "The Planner backup could not be restored. No backup data was applied.",
+      409
+    );
+  }
+
+  return json({
+    ok: true,
+    restored: true,
+    target_count:
+      restoredTargets.length,
+    battle_log_count:
+      restoredBattleLogs.length,
+    legacy_raid_log_count:
+      restoredLegacyLogs.length,
+    note:
+      "Planner backup restored. This destination planner keeps its current management and calendar credentials."
+  });
+}
+
+
 async function deletePlannerApi(
   request,
   env
@@ -11797,6 +12597,26 @@ async function handleFetch(request, env) {
       path === "/api/manage-link/rotate"
     ) {
       return rotateManagementLinkApi(
+        request,
+        env
+      );
+    }
+
+    if (
+      request.method === "GET" &&
+      path === "/api/planner/backup"
+    ) {
+      return exportPlannerBackupApi(
+        request,
+        env
+      );
+    }
+
+    if (
+      request.method === "POST" &&
+      path === "/api/planner/restore"
+    ) {
+      return restorePlannerBackupApi(
         request,
         env
       );
