@@ -59,18 +59,6 @@ Required outcome:
 - apply it consistently to page titles, primary headings, landing copy, Planner shell, Data Sources/Admin references where appropriate, README, and production-smoke title assertions;
 - ensure the wording accurately includes ordinary Raids plus Dynamax/Gigantamax and shared battle-planning features without suggesting the app is a full Pokémon storage manager.
 
-### BL-040 — Add automated contrast and theme accessibility checks
-
-Turn color accessibility into an explicit regression invariant, especially once BL-035 introduces multiple themes.
-
-Required outcome:
-
-- add deterministic or browser-based checks for representative foreground/background contrast pairs in Light and Dark modes;
-- cover core text, secondary text, inputs, buttons, focus states, danger/warning/success surfaces, selected navigation, overlays/sheets, calendar/source indicators, and disabled states where practical;
-- verify theme switching does not regress keyboard semantics, reduced-motion behavior, live regions, or existing focus management;
-- avoid brittle whole-page screenshot diffs as the primary gate;
-- coordinate implementation with BL-035 so the theme token system is testable rather than relying on hundreds of isolated literal colors.
-
 ## Deferred
 
 No confirmed deferred feature commitments are currently recorded.
@@ -113,6 +101,8 @@ BL-034 shipped in PR #84 on 24 September 2026: restore capabilities presented ou
 
 BL-035 shipped in PR #85 on 24 September 2026 with browser-local System/Light/Dark appearance, early pre-CSS theme initialization, semantic shared/Planner theme tokens, all-surface controls, native `color-scheme`/theme-color integration, and Chromium persistence/responsive coverage.
 
-BL-036 was then selected on 24 September 2026 and is implemented by the current change: Production smoke now checks a synthetic no-store Planner shell, requires its current versioned asset references, fetches every referenced Planner script/stylesheet read-only, explicitly validates theme/shared CSS/Planner CSS/main Planner JavaScript contracts, and has a deterministic missing-asset failure regression. BL-037 through BL-040 remain active.
+BL-036 shipped in PR #86 on 24 September 2026: Production smoke checks a synthetic no-store Planner shell, requires its current versioned asset references, fetches every referenced Planner script/stylesheet read-only, explicitly validates theme/shared CSS/Planner CSS/main Planner JavaScript contracts, and has a deterministic missing-asset failure regression.
+
+BL-040 was then selected on 24 September 2026 and is implemented by the current change: deterministic Light/Dark semantic-token contrast calculations plus rendered Chromium contrast/accessibility checks now gate the theme system; the light primary/secondary/subtle/placeholder palette was tightened where the new gate exposed marginal contrast. BL-037 through BL-039 remain active.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
