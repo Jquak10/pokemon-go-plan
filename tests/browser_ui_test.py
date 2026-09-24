@@ -1162,8 +1162,12 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             """() => {
                 const probe = document.createElement('section');
                 probe.id = 'themeAccessibilityProbe';
-                probe.className = 'dashboard-card';
                 probe.setAttribute('aria-label', 'Theme accessibility probe');
+                probe.style.cssText = [
+                    'padding: 16px',
+                    'background: var(--surface)',
+                    'color: var(--ink)'
+                ].join(';');
                 probe.innerHTML = `
                     <p id="a11yCoreText">Core text</p>
                     <p id="a11ySecondaryText" class="muted">Secondary text</p>
