@@ -30,6 +30,16 @@ const sourcesHtml =
     "utf8"
   );
 
+const expectedLandingAsset =
+  indexHtml.match(
+    /<script src="(\/landing-app\.js\?v=\d+)"><\/script>/
+  )?.[1];
+
+assert.ok(
+  expectedLandingAsset,
+  "Fixture landing page must reference a versioned landing-app.js asset"
+);
+
 const requests = [];
 
 const server =
@@ -162,7 +172,7 @@ try {
     ),
     [
       "/",
-      "/landing-app.js?v=4",
+      expectedLandingAsset,
       "/sources",
       "/api/me"
     ]
