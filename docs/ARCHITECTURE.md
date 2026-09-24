@@ -210,7 +210,7 @@ The fixed bottom navigation is:
 - Calendar
 - More
 
-Preferences live under More rather than occupying a permanent bottom-nav slot.
+Preferences live under More rather than occupying a permanent bottom-nav slot. Its mobile More description explicitly surfaces private access plus backup/recovery alongside timezone and budget controls so recovery is discoverable without already knowing where Preferences lives.
 
 Mobile invariants:
 
@@ -222,6 +222,7 @@ Mobile invariants:
 - No horizontal page scrolling.
 - Secondary filters are hidden until explicitly requested.
 - Opening the mobile More sheet does not change the current Planner tab; navigation changes only after the user chooses a More action.
+- Landing/onboarding and Preferences must state the planner-loss recovery contract consistently: keep the management link secure and refresh Planner Backups periodically; if the link is lost, recovery is only possible from a previously saved backup restored into a newly created empty planner.
 - Target advanced filters open in a bottom drawer.
 - Add Target and destructive actions must remain inside the viewport.
 

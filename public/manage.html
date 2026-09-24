@@ -893,7 +893,8 @@
             <h2>Management Link</h2>
             <p class="section-subtitle">
               This page URL is the private credential that can read and change your planner.
-              Rotate it immediately if you think the link has been exposed.
+              Keep it somewhere secure and rotate it immediately if you think it has been exposed.
+              Without this link or a previously saved Planner Backup, this planner cannot be recovered.
             </p>
 
             <div class="subscription-url-row">
@@ -949,8 +950,8 @@
                 <strong>Download a current backup</strong>
                 <p>
                   Create a fresh backup after important Target, resource, or battle-log changes.
-                  You can restore it into a newly created empty planner if this management link
-                  is ever lost.
+                  If this management link is ever lost, create a new planner, save its new
+                  management link, then restore this backup into that new empty planner.
                 </p>
               </div>
 
@@ -974,6 +975,7 @@
               <div>
                 <strong>Restore into this empty planner</strong>
                 <p id="restorePlannerHelp">
+                  Use this after creating a new empty planner when recovering from a saved backup.
                   Restore never changes this destination planner's management or calendar
                   credentials. The destination must not already contain Targets, battle logs,
                   usage/resource history, or saved Max tier overrides. Choose a backup, then
@@ -1358,7 +1360,7 @@
         <span class="tab-icon">⚙</span>
         <span>
           <strong>Preferences</strong>
-          <small>Recommendation weights, timezone, raid budget</small>
+          <small>Access, backup &amp; recovery, timezone, raid budget</small>
         </span>
       </button>
 

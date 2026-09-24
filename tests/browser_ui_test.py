@@ -1732,6 +1732,65 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         )
         self.assertNotIn("Failed to fetch", message)
 
+    def test_backup_recovery_guidance_is_discoverable_before_and_after_creation(self):
+        context = self.browser.new_context(
+            viewport={"width": 390, "height": 844},
+            locale="en-US",
+            timezone_id="Asia/Singapore",
+            reduced_motion="reduce",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+
+        page.goto(
+            f"{self.base_url}/",
+            wait_until="domcontentloaded",
+        )
+
+        create_text = page.locator(".portal-create-card").inner_text()
+        self.assertIn(
+            "periodically download a Planner Backup from Preferences",
+            create_text,
+        )
+        self.assertIn(
+            "Recovery requires either this management link or a previously saved Planner Backup",
+            create_text,
+        )
+
+        page.locator("#create").click()
+        page.wait_for_selector("#result:not(.hidden)")
+        result_text = page.locator("#result").inner_text()
+        self.assertIn(
+            "Preferences → Planner Backup",
+            result_text,
+        )
+        self.assertIn(
+            "Without this management link or a saved backup, this planner cannot be recovered",
+            result_text,
+        )
+        self.assert_no_horizontal_overflow(page)
+
+        planner = self.open_planner(390, 844)
+        planner.locator("#mobileMoreButton").click()
+        planner.locator("#mobileMoreBackdrop").wait_for(state="visible")
+        self.assertEqual(
+            planner.locator('[data-mobile-more-tab="preferences"] small').inner_text(),
+            "Access, backup & recovery, timezone, raid budget",
+        )
+        planner.locator('[data-mobile-more-tab="preferences"]').click()
+        planner.wait_for_function(
+            """() => document.getElementById('panel-preferences')?.classList.contains('active')"""
+        )
+        self.assertIn(
+            "Without this link or a previously saved Planner Backup, this planner cannot be recovered",
+            planner.locator(".settings-card-access").inner_text(),
+        )
+        self.assertIn(
+            "create a new planner, save its new management link, then restore this backup into that new empty planner",
+            planner.locator(".settings-card-backup").inner_text(),
+        )
+        self.assert_no_horizontal_overflow(planner)
+
     def test_landing_detects_browser_timezone_and_uses_it_for_creation(self):
         context = self.browser.new_context(
             viewport={"width": 1024, "height": 800},
