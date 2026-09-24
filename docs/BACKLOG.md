@@ -27,23 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-042 — Complete accessibility semantics across interactive controls and status feedback
-
-Priority: High
-
-Close the remaining screen-reader semantics gaps without changing the established visual interaction model.
-
-Required outcome:
-
-- ensure every interactive form control has a programmatic accessible name, including search/filter inputs that currently rely only on placeholder text;
-- audit Landing, Planner, Data Sources, and Admin controls for missing or ambiguous labels;
-- make dynamically updated user-action feedback consistently discoverable to assistive technology with appropriate `role="status"`, `aria-live`, or equivalent semantics;
-- include the currently identified gaps such as Target search and status regions for Landing, Planner settings, Calendar, Raid/Battle logging, and Targets;
-- preserve existing focus management, keyboard navigation, modal/drawer semantics, reduced-motion behavior, and theme contrast guarantees;
-- add deterministic and real-browser regressions that fail if covered controls lose their accessible name or covered feedback regions lose their announcement semantics.
-
-No D1 migration should be introduced solely for this work.
-
 ### BL-043 — Add production data-freshness monitoring
 
 Priority: High
@@ -162,5 +145,7 @@ BL-040 shipped in PR #87 on 24 September 2026: semantic Light/Dark tokens receiv
 A fresh post-PR-#91 product audit identified BL-041 as a verified production-routing security mismatch. PR #92 added selective Worker-first public HTML routing and stronger production smoke, but the post-merge smoke correctly proved that the live release path still served the Landing asset without the Worker CSP. PR #93 fixes the live path by using Cloudflare Static Assets `public/_headers` for public/static HTML while retaining Worker hardening on dynamic/private routes, so the deployed security policy no longer depends on public HTML being Worker-first. No D1 migration is required.
 
 The same 25 September 2026 fresh product audit identified five additional concrete follow-ups. The user explicitly promoted all of them into the durable backlog: BL-042 completes remaining accessibility semantics, BL-043 adds production data-freshness monitoring, BL-044 adds a public data-handling/support surface, BL-045 updates GitHub Actions for Node-24-era runtime compatibility, and BL-046 separates current README guidance from historical rollout instructions. These are now confirmed Active work rather than optional audit notes.
+
+BL-042 is implemented by the current change: all static form controls across Landing, Planner, Data Sources, and Admin receive programmatic names; remaining short user-action feedback becomes polite atomic status output; Target view/status, battle participation, and Admin section controls expose their selected state programmatically; generated recent-battle and Max-tier feedback receives the same live semantics; and deterministic plus Chromium regressions protect the contract. No D1 or CSS migration is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
