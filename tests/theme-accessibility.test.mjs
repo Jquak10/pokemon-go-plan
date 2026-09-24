@@ -16,9 +16,7 @@ function cssBlock(
   const escaped =
     selector.replace(
       /[.*+?^${}()|[\]\\]/g,
-      "\\      /[.*+?^${}()|[]\\]/g,
       "\\$&"
-"
     );
   const match =
     styles.match(
