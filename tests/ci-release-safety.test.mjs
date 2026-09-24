@@ -209,39 +209,35 @@ for (const {
   route,
   noStore
 } of requiredStaticHtmlHeaderBlocks) {
-  const escapedRoute =
-    route.replace(
-      /[.*+?^$\{\}()|[\]\\]/g,
-      "\\for (const path of [
-  "/",
-  "/sources",
-  "/admin",
-  "/manage",
-  "/manage/*"
-]) {
-  assert.ok(
-    workerFirstRoutes.includes(
-      path
-    ),
-    `Worker-first routing must cover hardened HTML entry path ${path}`
-  );
-}
-"
+  const marker =
+    `${route}\n`;
+  const startIndex =
+    staticHeaders.indexOf(
+      marker
     );
-  const nextRoute =
-    "(?=\\n\\/|$)";
-  const block =
-    staticHeaders.match(
-      new RegExp(
-        `^${escapedRoute}\\n([\\s\\S]*?)${nextRoute}`,
-        "m"
-      )
-    )?.[1] || "";
 
   assert.ok(
-    block,
+    startIndex >= 0,
     `public/_headers must define ${route}`
   );
+
+  const remainder =
+    staticHeaders.slice(
+      startIndex +
+        marker.length
+    );
+  const nextRouteIndex =
+    remainder.search(
+      /\n\/[A-Za-z0-9_-]*\n/
+    );
+  const block =
+    nextRouteIndex >= 0
+      ? remainder.slice(
+          0,
+          nextRouteIndex
+        )
+      : remainder;
+
   assert.match(
     block,
     /Content-Security-Policy: .*script-src 'self'/,
