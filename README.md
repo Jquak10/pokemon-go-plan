@@ -655,6 +655,8 @@ Production availability is monitored separately by the **Production smoke** GitH
 
 The browser suite protects the 768/900/1024/1179/1180/1280 responsive boundaries, intermediate-desktop text visibility, management-header credential transport, actionable non-JSON/empty/network API failure messages, asynchronous Dynamax battle-intel rendering, mobile modal containment, keyboard focus trapping/restoration, Escape handling, background isolation, reduced-motion overlay behavior, strict Planner `script-src 'self'` CSP execution, and horizontal-overflow regressions. Its Pokémon/event records are fixed regression fixtures rather than live schedule data, so a Pokémon leaving the current Raid/Max rotation does not make the test stale or flaky.
 
+Theme accessibility is also a regression invariant. The deterministic test suite calculates WCAG contrast for the shared Light/Dark semantic tokens (core/secondary/subtle text, inputs/placeholders, primary and secondary actions, success/warning/danger/info/violet states, selected navigation and focus indicators). Chromium then measures representative rendered controls, status badges, calendar source pills, and focus indicators in both themes and verifies that switching themes does not steal modal focus, break background isolation, disable reduced-motion behavior, alter tab semantics, or remove polite live regions. Disabled controls remain visually distinguishable but are not treated as ordinary enabled-text contrast targets.
+
 For an optional local browser run, install Playwright once in the Dev Container and then run the test directly:
 
 ```bash

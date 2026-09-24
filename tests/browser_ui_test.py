@@ -1074,6 +1074,313 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             "system",
         )
 
+    def test_theme_contrast_and_accessibility_invariants(self):
+        contrast_script = r"""
+        () => {
+            const harness = document.createElement('section');
+            harness.id = 'themeContrastHarness';
+            harness.setAttribute('aria-hidden', 'true');
+            harness.style.cssText = [
+                'position:fixed',
+                'left:-10000px',
+                'top:0',
+                'width:420px',
+                'padding:20px',
+                'background:var(--surface)',
+                'color:var(--ink)'
+            ].join(';');
+
+            harness.innerHTML = `
+                <p id="contrastCore">Core text</p>
+                <p id="contrastMuted" class="muted">Secondary text</p>
+                <p id="contrastSubtle" style="color:var(--text-subtle)">Subtle text</p>
+                <input id="contrastInput" placeholder="Placeholder text" value="Input text">
+                <button id="contrastPrimary" type="button">Primary action</button>
+                <button id="contrastSecondary" type="button" class="secondary">Secondary action</button>
+                <button id="contrastDisabled" type="button" disabled>Disabled action</button>
+                <span id="contrastSuccess" class="status-badge tone-good">Success</span>
+                <span id="contrastWarning" class="purchase-advice-card advice-max">Warning</span>
+                <span id="contrastDanger" class="status-badge tone-bad">Danger</span>
+                <span id="contrastInfo" class="badge-blue">Information</span>
+                <span id="contrastViolet" class="source-confidence-badge source-meta">Meta</span>
+                <span id="contrastRaid" class="calendar-event-pill calendar-source-raid_battles">Raid</span>
+                <span id="contrastCommunity" class="calendar-event-pill calendar-source-community_day">Community Day</span>
+                <span id="contrastSpotlight" class="calendar-event-pill calendar-source-pokemon_spotlight_hour">Spotlight</span>
+                <span id="contrastMax" class="calendar-event-pill calendar-source-max_battles">Max Battle</span>
+            `;
+
+            document.body.appendChild(harness);
+
+            const parse = value => {
+                const match = value.match(
+                    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/i
+                );
+                if (!match) {
+                    throw new Error('Unsupported computed color: ' + value);
+                }
+                return {
+                    r: Number(match[1]) / 255,
+                    g: Number(match[2]) / 255,
+                    b: Number(match[3]) / 255,
+                    a: match[4] === undefined ? 1 : Number(match[4])
+                };
+            };
+
+            const composite = (foreground, background) => {
+                const alpha =
+                    foreground.a +
+                    background.a * (1 - foreground.a);
+                if (!alpha) {
+                    return {r: 0, g: 0, b: 0, a: 0};
+                }
+                return {
+                    r: (
+                        foreground.r * foreground.a +
+                        background.r * background.a * (1 - foreground.a)
+                    ) / alpha,
+                    g: (
+                        foreground.g * foreground.a +
+                        background.g * background.a * (1 - foreground.a)
+                    ) / alpha,
+                    b: (
+                        foreground.b * foreground.a +
+                        background.b * background.a * (1 - foreground.a)
+                    ) / alpha,
+                    a: alpha
+                };
+            };
+
+            const effectiveBackground = element => {
+                let background = {r: 0, g: 0, b: 0, a: 0};
+                let current = element;
+                while (current) {
+                    const layer = parse(
+                        getComputedStyle(current).backgroundColor
+                    );
+                    background = composite(layer, background);
+                    if (background.a >= 0.999) {
+                        break;
+                    }
+                    current = current.parentElement;
+                }
+                if (background.a < 0.999) {
+                    background = composite(
+                        {r: 1, g: 1, b: 1, a: 1},
+                        background
+                    );
+                }
+                return background;
+            };
+
+            const channel = value =>
+                value <= 0.04045
+                    ? value / 12.92
+                    : Math.pow((value + 0.055) / 1.055, 2.4);
+
+            const luminance = color =>
+                0.2126 * channel(color.r) +
+                0.7152 * channel(color.g) +
+                0.0722 * channel(color.b);
+
+            const ratio = (foreground, background) => {
+                const first = luminance(foreground);
+                const second = luminance(background);
+                return (
+                    Math.max(first, second) + 0.05
+                ) / (
+                    Math.min(first, second) + 0.05
+                );
+            };
+
+            const contrastFor = (selector, pseudo = null) => {
+                const element = document.querySelector(selector);
+                const style = getComputedStyle(element, pseudo);
+                return ratio(
+                    parse(style.color),
+                    effectiveBackground(element)
+                );
+            };
+
+            const input = document.getElementById('contrastInput');
+            input.focus();
+            const focusRatio = ratio(
+                parse(getComputedStyle(input).outlineColor),
+                effectiveBackground(input)
+            );
+
+            const result = {
+                core: contrastFor('#contrastCore'),
+                muted: contrastFor('#contrastMuted'),
+                subtle: contrastFor('#contrastSubtle'),
+                input: contrastFor('#contrastInput'),
+                placeholder: contrastFor('#contrastInput', '::placeholder'),
+                primary: contrastFor('#contrastPrimary'),
+                secondary: contrastFor('#contrastSecondary'),
+                success: contrastFor('#contrastSuccess'),
+                warning: contrastFor('#contrastWarning'),
+                danger: contrastFor('#contrastDanger'),
+                info: contrastFor('#contrastInfo'),
+                violet: contrastFor('#contrastViolet'),
+                raid: contrastFor('#contrastRaid'),
+                community: contrastFor('#contrastCommunity'),
+                spotlight: contrastFor('#contrastSpotlight'),
+                max: contrastFor('#contrastMax'),
+                focus: focusRatio,
+                disabledOpacity: Number(
+                    getComputedStyle(
+                        document.getElementById('contrastDisabled')
+                    ).opacity
+                )
+            };
+
+            harness.remove();
+            return result;
+        }
+        """
+
+        for theme in ("light", "dark"):
+            with self.subTest(theme=theme):
+                context = self.browser.new_context(
+                    viewport={"width": 1180, "height": 900},
+                    locale="en-US",
+                    timezone_id="Asia/Singapore",
+                    reduced_motion="reduce",
+                    color_scheme="light",
+                )
+                self.addCleanup(context.close)
+                page = context.new_page()
+                page.add_init_script(
+                    f"localStorage.setItem('pogo-theme', '{theme}')"
+                )
+                page.goto(
+                    f"{self.base_url}/manage/browser-test-token",
+                    wait_until="domcontentloaded",
+                )
+                page.wait_for_selector("#app:not(.hidden)")
+
+                ratios = page.evaluate(contrast_script)
+
+                for name in (
+                    "core",
+                    "muted",
+                    "subtle",
+                    "input",
+                    "placeholder",
+                    "primary",
+                    "secondary",
+                    "success",
+                    "warning",
+                    "danger",
+                    "info",
+                    "violet",
+                    "raid",
+                    "community",
+                    "spotlight",
+                    "max",
+                ):
+                    self.assertGreaterEqual(
+                        ratios[name],
+                        4.5,
+                        f"{theme} {name} text contrast should meet 4.5:1; got {ratios[name]:.2f}",
+                    )
+
+                self.assertGreaterEqual(
+                    ratios["focus"],
+                    3.0,
+                    f"{theme} focus indicator should meet the 3:1 non-text threshold",
+                )
+                self.assertGreaterEqual(
+                    ratios["disabledOpacity"],
+                    0.5,
+                    "Disabled controls should remain visibly present",
+                )
+                self.assertLess(
+                    ratios["disabledOpacity"],
+                    1.0,
+                    "Disabled controls should remain distinguishable from enabled controls",
+                )
+
+                live_region_count = page.locator(
+                    '[role="status"][aria-live="polite"]'
+                ).count()
+                self.assertGreater(
+                    live_region_count,
+                    0,
+                    "Planner must retain polite live regions in every theme",
+                )
+
+                page.locator('.tab-button[data-tab="targets"]').click()
+                opener = page.locator("#openAddTarget")
+                opener.focus()
+                opener.click()
+                page.locator("#targetModal").wait_for(state="visible")
+                page.wait_for_function(
+                    "() => document.activeElement?.id === 'pokemonName'"
+                )
+
+                opposite = "dark" if theme == "light" else "light"
+                page.evaluate(
+                    "(nextTheme) => window.PogoTheme.setPreference(nextTheme)",
+                    opposite,
+                )
+                page.wait_for_function(
+                    "(nextTheme) => document.documentElement.dataset.theme === nextTheme",
+                    arg=opposite,
+                )
+
+                self.assertEqual(
+                    page.evaluate("() => document.activeElement?.id"),
+                    "pokemonName",
+                    "Theme switching must not steal focus from the active modal",
+                )
+                self.assertFalse(
+                    page.locator("#targetModal").evaluate(
+                        "element => element.classList.contains('hidden')"
+                    ),
+                    "Theme switching must not close the active modal",
+                )
+                self.assertTrue(
+                    page.evaluate(
+                        "() => document.querySelector('main').inert"
+                    ),
+                    "Theme switching must preserve modal background isolation",
+                )
+
+                transition_ms = page.locator("#targetModal").evaluate(
+                    """element => {
+                        const value = getComputedStyle(element)
+                            .transitionDuration.split(',')[0].trim();
+                        if (value.endsWith('ms')) return parseFloat(value);
+                        if (value.endsWith('s')) return parseFloat(value) * 1000;
+                        return 0;
+                    }"""
+                )
+                self.assertLessEqual(
+                    transition_ms,
+                    0.02,
+                    "Reduced-motion behavior must survive theme switching",
+                )
+
+                self.assertEqual(
+                    page.locator('.tab-button[data-tab="targets"]').get_attribute("role"),
+                    "tab",
+                    "Theme switching must preserve Planner tab semantics",
+                )
+                self.assertEqual(
+                    page.locator("#targetActionStatus").get_attribute("aria-live"),
+                    "polite",
+                    "Theme switching must preserve live-region semantics",
+                )
+
+                page.keyboard.press("Escape")
+                page.wait_for_function(
+                    "() => document.getElementById('targetModal').classList.contains('hidden')"
+                )
+                page.wait_for_function(
+                    "() => document.activeElement?.id === 'openAddTarget'"
+                )
+                self.assert_no_horizontal_overflow(page)
+
     def test_dark_theme_planner_surfaces_remain_responsive(self):
         for width, height in (
             (390, 844),

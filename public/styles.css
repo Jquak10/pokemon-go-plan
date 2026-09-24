@@ -8,7 +8,7 @@
     "Segoe UI",
     sans-serif;
 
-  --go-blue: #2474e5;
+  --go-blue: #1f6feb;
   --go-blue-deep: #173c70;
   --go-sky: #58bbf5;
   --go-green: #36b76c;
@@ -22,8 +22,8 @@
   --page-bg-soft: #f7faff;
   --ink: #172033;
   --ink-soft: #3c4c61;
-  --muted: #67758a;
-  --text-subtle: #8090a5;
+  --muted: #647286;
+  --text-subtle: #637386;
   --line: #dbe5f0;
   --line-strong: #cfd9e6;
   --border: var(--line);
@@ -35,7 +35,7 @@
   --surface-glass-strong: rgba(255, 255, 255, 0.94);
   --surface-hover: #edf5ff;
   --input-bg: #ffffff;
-  --input-placeholder: #7a899b;
+  --input-placeholder: #68788b;
   --control-soft-bg: #eaf1f9;
   --control-soft-ink: #29445f;
   --overlay-bg: rgba(16, 33, 54, 0.54);
@@ -5448,7 +5448,7 @@ details[open] > summary .details-chevron {
 
 
 /* ============================================================
-   BL-035 — SEMANTIC APPEARANCE + SHARED THEME SURFACES · v43
+   BL-040 — ACCESSIBLE SEMANTIC APPEARANCE + SHARED THEME SURFACES · v44
    Dark mode changes semantic tokens above; component rules below consume
    those tokens so the product does not require a parallel dark-only cascade.
    ============================================================ */
