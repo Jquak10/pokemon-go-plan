@@ -687,6 +687,73 @@ async function runSmokeAttempt({
     );
   }
 
+  const freshnessResponse =
+    await fetchWithTimeout(
+      new URL(
+        "/api/health/data-freshness",
+        baseUrl
+      ),
+      {
+        headers: {
+          accept:
+            "application/json"
+        }
+      },
+      timeoutMs
+    );
+
+  assertContentType(
+    freshnessResponse,
+    /application\/json/i
+  );
+  assert.match(
+    freshnessResponse.headers.get(
+      "cache-control"
+    ) || "",
+    /no-store/i,
+    "Production data freshness health must remain no-store"
+  );
+
+  const freshnessBody =
+    await freshnessResponse.json();
+
+  assert.equal(
+    freshnessResponse.status,
+    200,
+    `Production data freshness returned HTTP ${freshnessResponse.status} with status ${freshnessBody?.status || "unknown"}`
+  );
+  assert.equal(
+    freshnessBody?.monitor_ok,
+    true,
+    `Production data freshness is not monitor-safe: ${freshnessBody?.status || "unknown"}`
+  );
+  assert.ok(
+    [
+      "healthy",
+      "degraded"
+    ].includes(
+      freshnessBody?.status
+    ),
+    `Unexpected production data freshness status: ${freshnessBody?.status || "missing"}`
+  );
+  assert.equal(
+    Number(
+      freshnessBody
+        ?.stale_after_hours
+    ),
+    18,
+    "Production freshness threshold must remain aligned with the two-missed-cycle policy"
+  );
+
+  if (
+    freshnessBody.status ===
+      "degraded"
+  ) {
+    console.warn(
+      `Production data freshness is degraded but still within threshold: ${freshnessBody.degraded_count || 0} source(s)`
+    );
+  }
+
   const apiResponse =
     await fetchWithTimeout(
       new URL(
