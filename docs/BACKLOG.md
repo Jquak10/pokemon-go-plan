@@ -27,22 +27,7 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-046 — Separate current README guidance from historical rollout instructions
-
-Priority: Recommended maintenance
-
-Reduce operator confusion by keeping the README focused on the current product and moving historical one-time rollout material into a durable historical/runbook location.
-
-Required outcome:
-
-- keep the main README focused on current product usage, architecture links, current setup, current deployment/operation, and current migration state;
-- move shipped historical Part-by-Part rollout/migration instructions that are no longer meant to be executed into an appropriate durable history/runbook document rather than deleting their context;
-- clearly distinguish fresh-environment setup from historical production migrations;
-- ensure non-repeatable historical SQL instructions cannot be mistaken for current steps;
-- preserve links to architecture, decisions/supersession history, backlog, and any migration/runbook reference;
-- update documentation tests/checks if any current automation relies on README wording.
-
-This is documentation/operational-safety work only unless the implementation audit identifies a separate real deployment defect.
+No confirmed active backlog items are currently recorded.
 
 ## Deferred
 
@@ -101,5 +86,7 @@ BL-043 is implemented by PR #96 using the existing migration-0006 source-health 
 BL-044 is implemented by PR #97 with a static public `/help` surface linked from Landing, Data Sources, and Planner Preferences. It documents planner-owned D1 data, browser-local appearance, bearer management/calendar credential safety, backup/recovery limits, permanent deletion, and safe issue reporting through the repository's public GitHub tracker without exposing private URLs or backup files. Static-header, deterministic content, Chromium discovery/overflow, and production-smoke coverage protect the surface. No D1, identity, analytics, or support-backend change is required.
 
 BL-045 is implemented by PR #98: Planner regression and Production smoke use the current v7 GitHub first-party checkout/setup actions whose internal runtime is Node 24-era compatible, while the repository test runtime remains Node 22. `package.json` now explicitly declares `"type": "module"` to match the existing ESM source modules and remove `MODULE_TYPELESS_PACKAGE_JSON` reparsing warnings, and deterministic release-safety coverage rejects regressions to pre-v7 first-party Action majors. Existing PR gates, live-contract behavior, browser coverage, Worker dry-run packaging, and read-only Production smoke cadence are unchanged.
+
+BL-046 is implemented by PR #99: the README is now current-state guidance for product usage, fresh-environment setup, deployment, and migration state; historical Part 4/5 rollout notes and one-time D1 commands are preserved in `docs/ROLLOUT_HISTORY.md` behind an explicit do-not-rerun warning. Fresh databases use `schema.sql`, older installations apply only release-specific migrations after schema inspection, and deterministic documentation-safety coverage prevents historical rollout commands from drifting back into the current README. No D1, Worker/API, CSS, Cloudflare configuration, Cron, secret, binding, or gameplay behavior change is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
