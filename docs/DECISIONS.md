@@ -1004,6 +1004,25 @@ PR #92 remains part of the history because its stronger production smoke exposed
 
 This is a routing/security fix only. It changes Static Asset configuration but does not change D1 schema/data, bindings, secrets, Cron schedules, Service Bindings, CSS/cache generations, or the protected GitHub status-check policy.
 
+## ADR-057 — Production freshness alerts on missed successful syncs, not single failed attempts
+
+Status: Current  
+Introduced in PR #96.
+
+The application already persists per-source synchronization health for event feeds, official schedule discovery, and automatic Pokémon meta inputs. Production monitoring now uses that same health model rather than inventing a second set of freshness timestamps or probing upstream providers directly.
+
+Current decision:
+
+- expose a public, credential-free, read-only `GET /api/health/data-freshness` endpoint backed only by `sync_source_health`;
+- evaluate all scheduled event sources, the derived weekly Max rotation, current Max tier evidence, the official Pokémon GO schedule source, and the three automatic meta dependencies;
+- preserve the six-hour synchronization cadence and treat **18 hours without a successful refresh** as materially stale;
+- a failed latest attempt remains `degraded` but monitor-safe while the source still has a successful refresh younger than 18 hours, so one transient failed cycle does not alert;
+- stale sources, missing required source-health records, or unavailable health storage are non-monitor-safe and return HTTP 503;
+- public health output may expose source keys/labels, attempt/success timestamps, item counts, and aggregate status/counts, but not raw upstream errors, source URLs, planner data, management capabilities, calendar capabilities, or admin credentials;
+- the existing three-hour Production smoke consumes this endpoint and remains outside required PR checks; deterministic tests own healthy/degraded/stale/missing and read-only behavior.
+
+This reuses migration 0006 and requires no schema change, new Cron, secret, binding, Service Binding, or deployment-configuration change.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -1104,6 +1123,7 @@ The following sequence is retained as a compact repository implementation/change
 | #93 | BL-041 Static Asset header correction | Fixes forward after PR #92 production smoke proved Landing still bypassed the Worker CSP: public/static HTML now receives the same security contract through `public/_headers`, dynamic/private routes remain Worker-hardened, and the production smoke remains the live source of truth. |
 | #94 | Fresh product audit backlog promotion | Promotes the user-confirmed 25 September 2026 audit follow-ups into Active BL-042 through BL-046: accessibility semantics, production data-freshness monitoring, public data-handling/support guidance, Node-24-era GitHub Actions maintenance, and README/runbook separation. No product/runtime behavior changes in this PR. |
 | #95 | BL-042 accessibility semantics completion | Gives every static form control a programmatic accessible name, standardizes polite atomic status feedback, exposes selected state for Target/Admin/Battle toggle groups, extends the same semantics to generated recent-battle/Max-tier feedback, and adds deterministic plus Chromium regressions without changing visual layout or persistence. |
+| #96 | BL-043 production data-freshness monitoring | Reuses D1 source-health records to expose a sanitized read-only freshness endpoint, tolerates one transient six-hour sync failure while last-known-good data is fresh, alerts after 18 hours without success or missing health evidence, and extends the three-hour Production smoke with deterministic healthy/degraded/stale coverage. |
 
 ## Supersession map
 
