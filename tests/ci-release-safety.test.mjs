@@ -109,9 +109,49 @@ assert.ok(
 );
 assert.match(
   deterministic,
-  /actions\/setup-node@v4[\s\S]*cache:\s*npm/,
+  /actions\/setup-node@v7[\s\S]*cache:\s*npm/,
   "Deterministic CI should reuse npm's lockfile-aware cache"
 );
+
+assert.equal(
+  packageJson.type,
+  "module",
+  "Repository .js modules must stay explicitly ESM to avoid MODULE_TYPELESS_PACKAGE_JSON reparsing warnings"
+);
+
+const workflowSources = [
+  ["Planner regression", workflow],
+  ["Production smoke", productionSmokeWorkflow]
+];
+
+for (const [
+  workflowName,
+  source
+] of workflowSources) {
+  const actionRefs = [
+    ...source.matchAll(
+      /uses:\s+(actions\/(?:checkout|setup-node|setup-python))@v(\d+)\b/g
+    )
+  ];
+
+  assert.ok(
+    actionRefs.length > 0,
+    `${workflowName} must use GitHub first-party setup actions`
+  );
+
+  for (const [
+    ,
+    action,
+    major
+  ] of actionRefs) {
+    assert.ok(
+      Number(
+        major
+      ) >= 7,
+      `${workflowName} must not downgrade ${action} to a pre-v7 runtime`
+    );
+  }
+}
 
 assert.equal(
   packageLock.lockfileVersion,

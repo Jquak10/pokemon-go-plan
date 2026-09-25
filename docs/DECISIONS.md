@@ -1043,6 +1043,24 @@ Current decision:
 
 This is a trust/help surface decision only. It does not change D1 schema/data, application APIs, Cron, secrets, bindings, Service Bindings, CSS cache generation, or deployment configuration.
 
+## ADR-059 — CI action runtimes are maintained separately from the repository Node test runtime
+
+Status: Current  
+Introduced in PR #98.
+
+GitHub first-party JavaScript actions have their own bundled Node runtime. Updating that runtime does not require changing the Node version used to execute this repository's tests and Worker tooling, so those concerns are kept explicit and independently reviewable.
+
+Current decision:
+
+- Planner regression and Production smoke use current v7 majors for `actions/checkout`, `actions/setup-node`, and `actions/setup-python`; these releases are compatible with the Node 24-era GitHub runner runtime;
+- the repository's Node-based deterministic, live-contract, and Production smoke commands continue to run on Node 22 unless a separate compatibility change justifies moving the project test runtime;
+- the required `deterministic` and `browser-ui` PR checks remain unchanged, and `live-contract` remains excluded from pull requests;
+- lockfile-backed `npm ci`, Wrangler dry-run packaging, full Chromium plus focused WebKit coverage, and secret-free read-only Production smoke keep their existing behavior and cadence;
+- `package.json` explicitly declares `"type": "module"` because the repository's server-side `.js` files are already ESM and do not use CommonJS-only constructs, eliminating Node's `MODULE_TYPELESS_PACKAGE_JSON` reparsing warning without changing browser script delivery;
+- deterministic release-safety tests assert the ESM package declaration and reject known first-party checkout/setup Action references below v7 so deprecated runtime majors cannot be reintroduced silently.
+
+This is CI/developer-runtime governance only. It changes no D1 schema/data, Worker/API behavior, CSS/cache generation, Cloudflare route/binding/secret/Service Binding configuration, Cron schedule, or Pokémon GO planning behavior.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -1145,6 +1163,7 @@ The following sequence is retained as a compact repository implementation/change
 | #95 | BL-042 accessibility semantics completion | Gives every static form control a programmatic accessible name, standardizes polite atomic status feedback, exposes selected state for Target/Admin/Battle toggle groups, extends the same semantics to generated recent-battle/Max-tier feedback, and adds deterministic plus Chromium regressions without changing visual layout or persistence. |
 | #96 | BL-043 production data-freshness monitoring | Reuses D1 source-health records to expose a sanitized read-only freshness endpoint, tolerates one transient six-hour sync failure while last-known-good data is fresh, alerts after 18 hours without success or missing health evidence, and extends the three-hour Production smoke with deterministic healthy/degraded/stale coverage. |
 | #97 | BL-044 public Help & Data Handling | Adds a static public trust/help surface linked from Landing, Data Sources, and Planner Preferences; explains planner storage, bearer-link safety, browser-local appearance, backup/recovery/deletion, and routes issue reports through GitHub with explicit credential-redaction guidance. |
+| #98 | BL-045 Node-24-era Actions maintenance | Moves Planner regression and Production smoke to v7 first-party checkout/setup actions, keeps the repository test runtime on Node 22, declares the existing source tree explicitly ESM to eliminate module-type reparsing warnings, and adds deterministic guards against deprecated Action-major regressions without changing CI gate names or cadence. |
 
 ## Supersession map
 

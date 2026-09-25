@@ -27,23 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-045 — Update GitHub Actions for Node 24-era runner compatibility
-
-Priority: Recommended maintenance
-
-Remove the current GitHub Actions runtime deprecation warnings and keep CI on supported first-party action runtimes without weakening the required gates.
-
-Required outcome:
-
-- update first-party GitHub Actions used by Planner regression and Production smoke to current Node-24-compatible releases;
-- preserve the existing `deterministic`, `browser-ui`, `live-contract`, and Production smoke behavior/cadence;
-- keep `deterministic` and `browser-ui` as the required PR checks and keep `live-contract` non-blocking on PRs;
-- preserve lockfile-backed `npm ci`, Worker dry-run packaging, Chromium + focused WebKit coverage, and secret-free read-only production smoke;
-- reassess the repository's repeated `MODULE_TYPELESS_PACKAGE_JSON` warnings and add `"type": "module"` only if the full Node/test/Worker toolchain remains compatible;
-- update deterministic workflow-safety assertions so a future downgrade to deprecated action runtimes is caught where practical.
-
-This is CI/developer maintenance; it must not change production Pokémon GO behavior.
-
 ### BL-046 — Separate current README guidance from historical rollout instructions
 
 Priority: Recommended maintenance
@@ -116,5 +99,7 @@ BL-042 is implemented by PR #95: all static form controls across Landing, Planne
 BL-043 is implemented by PR #96 using the existing migration-0006 source-health table: a public read-only `/api/health/data-freshness` signal evaluates every scheduled event/official/meta dependency, allows transient degraded state while last-known-good data is under 18 hours old, and marks stale/missing/unavailable health as non-monitor-safe. Production smoke consumes the signal every three hours, and deterministic tests cover healthy, degraded, stale, missing-health, sanitization, and read-only behavior. No D1 migration is required.
 
 BL-044 is implemented by PR #97 with a static public `/help` surface linked from Landing, Data Sources, and Planner Preferences. It documents planner-owned D1 data, browser-local appearance, bearer management/calendar credential safety, backup/recovery limits, permanent deletion, and safe issue reporting through the repository's public GitHub tracker without exposing private URLs or backup files. Static-header, deterministic content, Chromium discovery/overflow, and production-smoke coverage protect the surface. No D1, identity, analytics, or support-backend change is required.
+
+BL-045 is implemented by PR #98: Planner regression and Production smoke use the current v7 GitHub first-party checkout/setup actions whose internal runtime is Node 24-era compatible, while the repository test runtime remains Node 22. `package.json` now explicitly declares `"type": "module"` to match the existing ESM source modules and remove `MODULE_TYPELESS_PACKAGE_JSON` reparsing warnings, and deterministic release-safety coverage rejects regressions to pre-v7 first-party Action majors. Existing PR gates, live-contract behavior, browser coverage, Worker dry-run packaging, and read-only Production smoke cadence are unchanged.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
