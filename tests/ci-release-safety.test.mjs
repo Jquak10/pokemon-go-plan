@@ -196,6 +196,10 @@ const requiredStaticHtmlHeaderBlocks = [
     noStore: false
   },
   {
+    route: "/help",
+    noStore: false
+  },
+  {
     route: "/admin",
     noStore: true
   },
