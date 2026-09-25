@@ -27,23 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-043 — Add production data-freshness monitoring
-
-Priority: High
-
-Extend production monitoring beyond page/API availability so stale Pokémon/event/meta data is detected proactively rather than only when a user opens a Planner.
-
-Required outcome:
-
-- add a secret-free, read-only production freshness signal using the existing synchronization/source-health model where practical;
-- detect materially stale event, official-source, and/or Pokémon meta synchronization state that could make recommendations or Calendar output misleading;
-- avoid alerting on a single transient sync failure when current last-known-good data is still acceptably fresh;
-- keep the monitor non-mutating and independent of private management/calendar credentials;
-- preserve the separation between deterministic PR gates and external production monitoring;
-- add deterministic fixture coverage for healthy, transiently degraded, and meaningfully stale states before enabling the live monitor.
-
-Do not invent a new data-health model if the existing source-health records can support the requirement. Inspect current production/schema state before deciding whether any migration is necessary.
-
 ### BL-044 — Add a public data-handling and support surface
 
 Priority: Recommended
@@ -146,6 +129,8 @@ A fresh post-PR-#91 product audit identified BL-041 as a verified production-rou
 
 The same 25 September 2026 fresh product audit identified five additional concrete follow-ups. The user explicitly promoted all of them into the durable backlog: BL-042 completes remaining accessibility semantics, BL-043 adds production data-freshness monitoring, BL-044 adds a public data-handling/support surface, BL-045 updates GitHub Actions for Node-24-era runtime compatibility, and BL-046 separates current README guidance from historical rollout instructions. These are now confirmed Active work rather than optional audit notes.
 
-BL-042 is implemented by the current change: all static form controls across Landing, Planner, Data Sources, and Admin receive programmatic names; remaining short user-action feedback becomes polite atomic status output; Target view/status, battle participation, and Admin section controls expose their selected state programmatically; generated recent-battle and Max-tier feedback receives the same live semantics; and deterministic plus Chromium regressions protect the contract. No D1 or CSS migration is required.
+BL-042 is implemented by PR #95: all static form controls across Landing, Planner, Data Sources, and Admin receive programmatic names; remaining short user-action feedback becomes polite atomic status output; Target view/status, battle participation, and Admin section controls expose their selected state programmatically; generated recent-battle and Max-tier feedback receives the same live semantics; and deterministic plus Chromium regressions protect the contract. No D1 or CSS migration is required.
+
+BL-043 is implemented by the current change using the existing migration-0006 source-health table: a public read-only `/api/health/data-freshness` signal evaluates every scheduled event/official/meta dependency, allows transient degraded state while last-known-good data is under 18 hours old, and marks stale/missing/unavailable health as non-monitor-safe. Production smoke consumes the signal every three hours, and deterministic tests cover healthy, degraded, stale, missing-health, sanitization, and read-only behavior. No D1 migration is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
