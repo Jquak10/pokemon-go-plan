@@ -27,21 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-047 — Prevent capability URLs entering Worker invocation logs
-
-Priority: **Must fix — security/privacy**
-
-The Planner intentionally treats management URLs and calendar subscription URLs as bearer credentials, but the current Cloudflare Workers observability configuration enables persisted Workers Logs without disabling invocation logs. Cloudflare invocation logs include the request method and request URL for Fetch handlers, so `/manage/<token>` and `/calendar/...` capability URLs can be retained by the platform logging layer.
-
-Required outcome:
-
-- keep useful Worker observability/custom error logging available;
-- disable persisted invocation logs that include raw request URLs for production Worker fetches;
-- do not log, echo, persist, or add analytics for raw management/calendar bearer URLs;
-- add deterministic configuration coverage so invocation URL logging cannot be silently re-enabled;
-- update architecture/security documentation to describe the production logging boundary;
-- preserve D1 bindings, routes, Cron jobs, secrets, Service Bindings, and application behavior.
-
 ### BL-048 — Generalize official cancellation/reschedule suppression
 
 Priority: **High**
@@ -172,5 +157,8 @@ BL-044 is implemented by PR #97 with a static public `/help` surface linked from
 BL-045 is implemented by PR #98: Planner regression and Production smoke use the current v7 GitHub first-party checkout/setup actions whose internal runtime is Node 24-era compatible, while the repository test runtime remains Node 22. `package.json` now explicitly declares `"type": "module"` to match the existing ESM source modules and remove `MODULE_TYPELESS_PACKAGE_JSON` reparsing warnings, and deterministic release-safety coverage rejects regressions to pre-v7 first-party Action majors. Existing PR gates, live-contract behavior, browser coverage, Worker dry-run packaging, and read-only Production smoke cadence are unchanged.
 
 BL-046 is implemented by PR #99: the README is now current-state guidance for product usage, fresh-environment setup, deployment, and migration state; historical Part 4/5 rollout notes and one-time D1 commands are preserved in `docs/ROLLOUT_HISTORY.md` behind an explicit do-not-rerun warning. Fresh databases use `schema.sql`, older installations apply only release-specific migrations after schema inspection, and deterministic documentation-safety coverage prevents historical rollout commands from drifting back into the current README. No D1, Worker/API, CSS, Cloudflare configuration, Cron, secret, binding, or gameplay behavior change is required.
+A fresh post-PR-#99 product audit on 25 September 2026 identified six concrete follow-ups. The user explicitly promoted them into the durable backlog as BL-047 through BL-052: bearer-safe Worker observability, generalized official cancellation/reschedule suppression, expiry of stale pinned official pages, completion of the 44px mobile touch-target contract, implausibly-empty upstream sync rejection, and production D1 schema-compatibility health.
+
+BL-047 is implemented by PR #100: Workers Logs/custom error output stays enabled, but automatic Fetch invocation logs are explicitly disabled because Cloudflare invocation records include request URLs and this product intentionally carries management/calendar bearer credentials in URL paths. Deterministic release-safety coverage locks that configuration, and the architecture now records the bearer-safe observability boundary. No D1 migration, route, Cron, secret, binding, Service Binding, CSS, or application behavior change is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
