@@ -57,6 +57,7 @@ import {
   isValidTimeZone
 } from "./timezone.js";
 import {
+  PRODUCTION_FRESHNESS_STALE_AFTER_MS,
   SYNC_HEALTH_GROUPS,
   evaluateProductionFreshness,
   summarizeSyncHealth
@@ -10892,7 +10893,8 @@ async function productionDataFreshnessApi(
         checked_at:
           nowIso(),
         stale_after_hours:
-          18,
+          PRODUCTION_FRESHNESS_STALE_AFTER_MS /
+          (60 * 60 * 1000),
         source_count:
           expectedSources.length,
         stale_count: 0,
