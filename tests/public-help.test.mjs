@@ -27,6 +27,12 @@ const planner =
     "public/manage.html"
   );
 
+const helpText =
+  help.replace(
+    /\s+/g,
+    " "
+  );
+
 for (const [
   label,
   html
@@ -53,7 +59,7 @@ for (const phrase of [
   "Do not include private management URLs, calendar subscription URLs"
 ]) {
   assert.ok(
-    help.includes(
+    helpText.includes(
       phrase
     ),
     `Help page must explain: ${phrase}`
