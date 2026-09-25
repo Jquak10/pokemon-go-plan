@@ -190,6 +190,16 @@ function hardenedHtmlHeaders({
 
 const requests = [];
 let unavailableAsset = null;
+let freshnessStatus = 200;
+let freshnessBody = {
+  monitor_ok: true,
+  status: "healthy",
+  stale_after_hours: 18,
+  source_count: 19,
+  stale_count: 0,
+  missing_count: 0,
+  degraded_count: 0
+};
 
 const server =
   http.createServer(
@@ -341,6 +351,28 @@ const server =
 
       if (
         request.method === "GET" &&
+        request.url ===
+          "/api/health/data-freshness"
+      ) {
+        response.writeHead(
+          freshnessStatus,
+          {
+            "content-type":
+              "application/json; charset=utf-8",
+            "cache-control":
+              "no-store"
+          }
+        );
+        response.end(
+          JSON.stringify(
+            freshnessBody
+          )
+        );
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
         request.url === "/api/me"
       ) {
         response.writeHead(
@@ -418,6 +450,7 @@ try {
       "/manage.html",
       "/manage/bl-036-production-smoke-invalid",
       ...expectedPlannerAssets,
+      "/api/health/data-freshness",
       "/api/me"
     ],
     "Production smoke must probe the current Planner shell and every versioned Planner asset"
@@ -460,6 +493,86 @@ try {
   );
 
   requests.length = 0;
+  freshnessStatus = 200;
+  freshnessBody = {
+    monitor_ok: true,
+    status: "degraded",
+    stale_after_hours: 18,
+    source_count: 19,
+    stale_count: 0,
+    missing_count: 0,
+    degraded_count: 1
+  };
+
+  await runProductionSmoke({
+    baseUrl,
+    attempts: 1,
+    timeoutMs: 1000
+  });
+
+  assert.equal(
+    requests.some(
+      request =>
+        request.url ===
+          "/api/health/data-freshness"
+    ),
+    true,
+    "Transiently degraded source health must still be monitored"
+  );
+  assert.equal(
+    requests.some(
+      request =>
+        request.method !==
+          "GET"
+    ),
+    false,
+    "Degraded freshness smoke checks must remain read-only"
+  );
+
+  requests.length = 0;
+  freshnessStatus = 503;
+  freshnessBody = {
+    monitor_ok: false,
+    status: "stale",
+    stale_after_hours: 18,
+    source_count: 19,
+    stale_count: 1,
+    missing_count: 0,
+    degraded_count: 1
+  };
+
+  await assert.rejects(
+    () =>
+      runProductionSmoke({
+        baseUrl,
+        attempts: 1,
+        timeoutMs: 1000
+      }),
+    /Production data freshness returned HTTP 503 with status stale/,
+    "Materially stale source health must fail the production smoke gate"
+  );
+
+  assert.equal(
+    requests.some(
+      request =>
+        request.method !==
+          "GET"
+    ),
+    false,
+    "Stale freshness failure checks must remain read-only"
+  );
+
+  requests.length = 0;
+  freshnessStatus = 200;
+  freshnessBody = {
+    monitor_ok: true,
+    status: "healthy",
+    stale_after_hours: 18,
+    source_count: 19,
+    stale_count: 0,
+    missing_count: 0,
+    degraded_count: 0
+  };
   unavailableAsset =
     expectedPlannerStylesAsset;
 
