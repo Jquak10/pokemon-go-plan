@@ -29,6 +29,14 @@ const sourcesHtml =
     ),
     "utf8"
   );
+const helpHtml =
+  await readFile(
+    new URL(
+      "../public/help.html",
+      import.meta.url
+    ),
+    "utf8"
+  );
 const adminHtml =
   await readFile(
     new URL(
@@ -245,6 +253,20 @@ const server =
 
       if (
         request.method === "GET" &&
+        request.url === "/help"
+      ) {
+        response.writeHead(
+          200,
+          hardenedHtmlHeaders()
+        );
+        response.end(
+          helpHtml
+        );
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
         request.url === "/admin"
       ) {
         response.writeHead(
@@ -284,6 +306,7 @@ const server =
         [
           "/index.html",
           "/sources.html",
+          "/help.html",
           "/admin.html",
           "/manage.html"
         ].includes(
@@ -293,6 +316,7 @@ const server =
         const canonical = {
           "/index.html": "/",
           "/sources.html": "/sources",
+          "/help.html": "/help",
           "/admin.html": "/admin",
           "/manage.html": "/manage"
         }[request.url];
@@ -442,10 +466,12 @@ try {
       "/",
       expectedLandingAsset,
       "/sources",
+      "/help",
       "/admin",
       "/manage",
       "/index.html",
       "/sources.html",
+      "/help.html",
       "/admin.html",
       "/manage.html",
       "/manage/bl-036-production-smoke-invalid",
