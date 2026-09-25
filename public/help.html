@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1f6feb">
+  <script src="/theme.js?v=1"></script>
+  <title>Help & Data Handling · Pokémon GO Battle Planner</title>
+  <link rel="stylesheet" href="/styles.css?v=44">
+  <style>
+    @media (max-width: 700px) {
+      body.portal-page {
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+      }
+
+      .portal-hero {
+        min-height: 0;
+      }
+
+      .portal-page .button {
+        min-height: 44px;
+      }
+    }
+  </style>
+</head>
+<body class="manage-page portal-page">
+  <div class="ambient-orb ambient-orb-one" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb-two" aria-hidden="true"></div>
+
+  <main class="portal-shell sources-shell">
+    <div class="theme-toolbar">
+      <label class="theme-control">
+        <span>Appearance</span>
+        <select data-theme-select aria-label="Appearance">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+    </div>
+
+    <header class="dashboard-hero portal-hero">
+      <div class="hero-copy">
+        <div class="brand-kicker">
+          <span class="brand-mark" aria-hidden="true">?</span>
+          HELP &amp; DATA HANDLING
+        </div>
+        <h1>Privacy, recovery & support</h1>
+        <p>
+          What the Pokémon GO Battle Planner stores, how its private links work,
+          how backups and deletion behave, and how to report a problem safely.
+        </p>
+      </div>
+      <div class="hero-status">
+        <span class="live-dot" aria-hidden="true"></span>
+        No account required
+      </div>
+    </header>
+
+    <section class="source-precedence-card dashboard-card">
+      <span class="section-eyebrow">THE SHORT VERSION</span>
+      <h2>Your private links are your credentials</h2>
+      <p>
+        The planner does not use an email/password account. Your management URL is
+        a bearer credential with read/write access to your planner, and your calendar
+        subscription URL is a bearer credential for a read-only calendar feed. Anyone
+        who has one of those links can use the access it grants, so keep both private.
+      </p>
+      <p>
+        Never post a management URL, calendar URL, Admin key, or Planner Backup in a
+        public issue, screenshot, chat, or support request.
+      </p>
+    </section>
+
+    <section class="source-card-grid" aria-label="Data handling details">
+      <article class="dashboard-card source-info-card" id="stored-data">
+        <span class="source-confidence-badge source-meta">Planner data</span>
+        <h2>What the planner stores</h2>
+        <p>
+          Planner-owned data in D1 includes your timezone, selected event sources,
+          recommendation weights and paid-battle preferences, Targets and Target notes,
+          battle history, Remote usage, Max Particle/resource state, temporary per-day
+          planning overrides, and any saved Max tier/cost overrides.
+        </p>
+        <p>
+          The service also stores hashed or generated credential state needed to validate
+          management and calendar capabilities. Public event, Pokémon, ranking, and source-
+          health data is stored separately from your personal planner.
+        </p>
+      </article>
+
+      <article class="dashboard-card source-info-card" id="not-stored">
+        <span class="source-confidence-badge source-calendar">Local-only</span>
+        <h2>What is not part of your planner record</h2>
+        <p>
+          There is no email/password account and the planner does not maintain a full copy
+          of your Pokémon storage or battle team roster. The System / Light / Dark appearance
+          choice is saved only in this browser's local storage, not in your D1 planner record.
+        </p>
+        <p>
+          Downloading a Planner Backup creates a JSON file for you. The planner does not keep
+          that downloaded file as a separate server-side recovery archive.
+        </p>
+      </article>
+
+      <article class="dashboard-card source-info-card" id="private-links">
+        <span class="source-confidence-badge source-official">Private access</span>
+        <h2>Management and calendar links</h2>
+        <p>
+          The management URL can read and change the planner. If it may have been exposed,
+          open Preferences and rotate it; the old management URL stops working immediately.
+        </p>
+        <p>
+          Calendar URLs are read-only bearer credentials. Signed calendar URLs can be
+          regenerated or revoked independently. Rotating the management link does not rotate
+          calendar credentials, and rotating a calendar URL does not replace the management link.
+        </p>
+      </article>
+
+      <article class="dashboard-card source-info-card" id="backup-recovery">
+        <span class="source-confidence-badge source-calendar">Backup &amp; recovery</span>
+        <h2>Backups are your recovery path</h2>
+        <p>
+          A Planner Backup contains preferences, Targets, notes, battle/resource history, and
+          related planner state. It does not contain your management link, calendar links, or
+          credential hashes, but it can still contain private notes and gameplay history.
+        </p>
+        <p>
+          If you lose the management link, recovery requires a previously saved Planner Backup:
+          create a new planner, save its new management link, then restore the backup into that
+          new empty planner. Without the management link or a saved backup, the old planner
+          cannot be recovered.
+        </p>
+      </article>
+
+      <article class="dashboard-card source-info-card" id="deletion">
+        <span class="source-confidence-badge source-meta">Deletion</span>
+        <h2>Permanent planner deletion</h2>
+        <p>
+          Preferences → Delete Planner permanently removes that planner's stored Targets,
+          notes, battle/resource history, settings, and private calendar credential state.
+          Its management and calendar links stop working. The deletion cannot be undone.
+        </p>
+        <p>
+          A backup file you already downloaded is on your own device or storage provider;
+          deleting the server-side planner does not delete copies you kept elsewhere.
+        </p>
+      </article>
+
+      <article class="dashboard-card source-info-card" id="support">
+        <span class="source-confidence-badge source-official">Support</span>
+        <h2>Report incorrect data or an app problem</h2>
+        <p>
+          Use the public GitHub issue tracker for incorrect Pokémon/form/event data,
+          broken behavior, or other application defects. Describe what you expected,
+          what happened, and—when relevant—the Pokémon/form, event name, date/time,
+          timezone, browser/device, and a redacted screenshot.
+        </p>
+        <p>
+          <strong>Do not include private management URLs, calendar subscription URLs,
+          Admin keys, Planner Backup files, or screenshots that reveal those values.</strong>
+        </p>
+        <p>
+          <a class="button" href="https://github.com/Jquak10/pokemon-go-plan/issues/new">
+            Report a problem on GitHub
+          </a>
+        </p>
+      </article>
+    </section>
+
+    <footer class="portal-footer">
+      <a href="/">Planner setup</a>
+      <span> · </span>
+      <a href="/sources">Data sources</a>
+      <span> · </span>
+      Independent Pokémon GO planning tool. Not affiliated with Niantic,
+      The Pokémon Company, Nintendo, or GAME FREAK.
+    </footer>
+  </main>
+</body>
+</html>
