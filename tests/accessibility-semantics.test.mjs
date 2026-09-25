@@ -11,6 +11,7 @@ const pages = {
   landing: read("public/index.html"),
   planner: read("public/manage.html"),
   sources: read("public/sources.html"),
+  help: read("public/help.html"),
   admin: read("public/admin.html")
 };
 

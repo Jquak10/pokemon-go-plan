@@ -27,24 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-044 — Add a public data-handling and support surface
-
-Priority: Recommended
-
-Add a concise public trust/help surface for users who need to understand what the Planner stores or how to report a problem.
-
-Required outcome:
-
-- provide a public, easily discoverable Data Handling / Privacy / Help surface or equivalent section linked from the public product experience;
-- explain in plain language what planner data is stored, what is not stored, and that management/calendar URLs are bearer capabilities that must remain private;
-- explain Planner Backup, management-link recovery limits, calendar credential handling, and permanent planner deletion;
-- distinguish browser-local appearance preferences from planner/D1 data;
-- provide a clear route for reporting incorrect Pokémon/event data, application defects, or other support issues without asking users to expose private management/calendar URLs;
-- keep the wording accurate to the no-account/capability-link architecture and avoid implying recovery is possible without a management link or prior backup;
-- add focused browser/content regressions for discoverability and the critical privacy/recovery statements.
-
-No new account, email, identity, or analytics layer is implied by this item.
-
 ### BL-045 — Update GitHub Actions for Node 24-era runner compatibility
 
 Priority: Recommended maintenance
@@ -132,5 +114,7 @@ The same 25 September 2026 fresh product audit identified five additional concre
 BL-042 is implemented by PR #95: all static form controls across Landing, Planner, Data Sources, and Admin receive programmatic names; remaining short user-action feedback becomes polite atomic status output; Target view/status, battle participation, and Admin section controls expose their selected state programmatically; generated recent-battle and Max-tier feedback receives the same live semantics; and deterministic plus Chromium regressions protect the contract. No D1 or CSS migration is required.
 
 BL-043 is implemented by PR #96 using the existing migration-0006 source-health table: a public read-only `/api/health/data-freshness` signal evaluates every scheduled event/official/meta dependency, allows transient degraded state while last-known-good data is under 18 hours old, and marks stale/missing/unavailable health as non-monitor-safe. Production smoke consumes the signal every three hours, and deterministic tests cover healthy, degraded, stale, missing-health, sanitization, and read-only behavior. No D1 migration is required.
+
+BL-044 is implemented by PR #97 with a static public `/help` surface linked from Landing, Data Sources, and Planner Preferences. It documents planner-owned D1 data, browser-local appearance, bearer management/calendar credential safety, backup/recovery limits, permanent deletion, and safe issue reporting through the repository's public GitHub tracker without exposing private URLs or backup files. Static-header, deterministic content, Chromium discovery/overflow, and production-smoke coverage protect the surface. No D1, identity, analytics, or support-backend change is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

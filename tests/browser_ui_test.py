@@ -499,6 +499,16 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
                 },
             )
 
+        if path == "/help":
+            return self._file(
+                PUBLIC / "help.html",
+                "text/html; charset=utf-8",
+                headers={
+                    "content-security-policy": PLANNER_CSP,
+                },
+            )
+
+
         if path == "/api/admin/meta":
             self.server.last_admin_key = self.headers.get("x-admin-key")
             return self._json({"metas": []})
@@ -1022,7 +1032,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             "light",
         )
 
-        for path in ("/admin", "/sources", "/manage/browser-test-token"):
+        for path in ("/admin", "/sources", "/help", "/manage/browser-test-token"):
             page.goto(f"{self.base_url}{path}", wait_until="domcontentloaded")
             page.wait_for_selector("[data-theme-select]")
             if path.startswith("/manage/"):
@@ -1043,7 +1053,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             "() => document.documentElement.dataset.theme === 'dark'"
         )
 
-        for path in ("/", "/admin", "/sources", "/manage/browser-test-token"):
+        for path in ("/", "/admin", "/sources", "/help", "/manage/browser-test-token"):
             page.goto(f"{self.base_url}{path}", wait_until="domcontentloaded")
             page.wait_for_selector("[data-theme-select]")
             if path.startswith("/manage/"):
@@ -3246,6 +3256,59 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertEqual(max_status.get_attribute("role"), "status")
         self.assertEqual(max_status.get_attribute("aria-live"), "polite")
         self.assert_no_horizontal_overflow(planner)
+
+
+    def test_public_help_is_discoverable_and_safe_to_share(self):
+        context = self.browser.new_context(
+            viewport={"width": 390, "height": 844},
+            locale="en-US",
+            timezone_id="Asia/Singapore",
+        )
+        self.addCleanup(context.close)
+        page = context.new_page()
+
+        page.goto(f"{self.base_url}/", wait_until="domcontentloaded")
+        help_link = page.locator('footer a[href="/help"]')
+        self.assertTrue(help_link.is_visible())
+        self.assertIn("Help", help_link.inner_text())
+        self.assert_no_horizontal_overflow(page)
+
+        help_link.click()
+        page.wait_for_url(f"{self.base_url}/help")
+        self.assertEqual(
+            page.locator("h1").inner_text(),
+            "Privacy, recovery & support",
+        )
+        help_text = page.locator("main").inner_text()
+        for expected in (
+            "management URL is a bearer credential",
+            "There is no email/password account",
+            "saved only in this browser's local storage",
+            "Without the management link or a saved backup, the old planner cannot be recovered",
+            "Do not include private management URLs, calendar subscription URLs",
+        ):
+            self.assertIn(expected, help_text)
+
+        issue_link = page.locator(
+            'a[href="https://github.com/Jquak10/pokemon-go-plan/issues/new"]'
+        )
+        self.assertTrue(issue_link.is_visible())
+        self.assert_no_horizontal_overflow(page)
+
+        page.goto(f"{self.base_url}/sources", wait_until="domcontentloaded")
+        self.assertTrue(page.locator('footer a[href="/help"]').is_visible())
+
+        planner = self.open_planner(1280, 900)
+        planner.locator('.tab-button[data-tab="preferences"]').click()
+        planner_help = planner.locator('.settings-card-access a[href="/help"]')
+        self.assertTrue(planner_help.is_visible())
+        self.assertIn("Help & Data Handling", planner_help.inner_text())
+        self.assert_no_horizontal_overflow(planner)
+
+        desktop_help = context.new_page()
+        desktop_help.set_viewport_size({"width": 1280, "height": 900})
+        desktop_help.goto(f"{self.base_url}/help", wait_until="domcontentloaded")
+        self.assert_no_horizontal_overflow(desktop_help)
 
 
 if __name__ == "__main__":
