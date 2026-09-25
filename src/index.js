@@ -477,6 +477,70 @@ function normalizeName(value) {
     .toLowerCase();
 }
 
+function eventSuppressionAliases(value) {
+  const normalized =
+    normalizeName(value);
+
+  if (!normalized) {
+    return [];
+  }
+
+  const withoutBrand =
+    normalized.replace(
+      /^pokemon go\s+/,
+      ""
+    );
+
+  const withoutYear =
+    withoutBrand
+      .replace(
+        /\b20\d{2}\b/g,
+        " "
+      )
+      .replace(
+        /\s+/g,
+        " "
+      )
+      .trim();
+
+  return [
+    ...new Set([
+      withoutYear,
+      withoutBrand,
+      normalized
+    ])
+  ].filter(
+    alias =>
+      alias.length >= 8 &&
+      alias.split(/\s+/).length >= 2
+  );
+}
+
+export function eventSuppressionSelector(
+  event
+) {
+  const sourceType =
+    String(
+      event?.source_type || ""
+    ).trim();
+
+  const eventName =
+    eventSuppressionAliases(
+      event?.summary
+    )[0] || "";
+
+  if (!sourceType || !eventName) {
+    return null;
+  }
+
+  return [
+    "event",
+    sourceType,
+    eventName
+  ].join(":");
+}
+
+
 function randomToken(bytes = 24) {
   const data = new Uint8Array(bytes);
   crypto.getRandomValues(data);
@@ -3360,13 +3424,26 @@ export function suppressionSourceTypesForEvent(
       event?.source_type || ""
     );
 
-  return sourceType ===
-    MAX_ROTATION_SOURCE_TYPE
+  const selector =
+    eventSuppressionSelector(
+      event
+    );
+
+  const sourceTypes =
+    sourceType ===
+      MAX_ROTATION_SOURCE_TYPE
+      ? [
+          MAX_ROTATION_SOURCE_TYPE,
+          "max_battles"
+        ]
+      : [sourceType];
+
+  return selector
     ? [
-        MAX_ROTATION_SOURCE_TYPE,
-        "max_battles"
+        ...sourceTypes,
+        selector
       ]
-    : [sourceType];
+    : sourceTypes;
 }
 
 
@@ -6018,57 +6095,280 @@ export async function officialRaidSupplementStatements(
 
 
 
-function officialEventSuppressionRulesFromText(text, sourceUrl) {
-  const fullText = String(text || "");
+function definiteOfficialEventSuppressionSentence(
+  sentence
+) {
+  const value =
+    String(
+      sentence || ""
+    );
+
+  return (
+    /\b(?:will be|has been|have been|is being|are being|was|were|is|are)\s+(?:officially\s+)?(?:rescheduled|postponed|cancelled|canceled|suspended)\b/i.test(
+      value
+    ) ||
+    /\b(?:will not|will no longer)\s+take place\b/i.test(
+      value
+    ) ||
+    /\b(?:will be|has been|have been|is being|are being|was|were|is|are)\s+(?:officially\s+)?moved\s+to\s+(?:a\s+)?(?:later|new|different)\b/i.test(
+      value
+    )
+  );
+}
+
+function suppressionRuleSourceTypes(
+  rule
+) {
+  if (
+    Array.isArray(
+      rule?.suppressed_source_types
+    )
+  ) {
+    return rule.suppressed_source_types;
+  }
+
+  return parseSuppressedSourceTypes(
+    rule?.suppressed_source_types
+  );
+}
+
+function sourceAlreadySuppressesSelector(
+  rules,
+  sourceUrl,
+  selector
+) {
+  return (
+    Array.isArray(rules) &&
+    rules.some(
+      rule =>
+        String(
+          rule?.source_url || ""
+        ) ===
+          String(
+            sourceUrl || ""
+          ) &&
+        suppressionRuleSourceTypes(
+          rule
+        ).includes(
+          selector
+        )
+    )
+  );
+}
+
+export function officialEventSuppressionRulesFromText(
+  text,
+  sourceUrl,
+  knownEvents = [],
+  existingRules = []
+) {
+  const fullText =
+    String(
+      text || ""
+    );
   const rules = [];
 
+  // Keep the existing broad Mega Finale replacement-window rule. This one
+  // intentionally suppresses several seasonal schedule categories at once.
   const phraseIndex =
     fullText.search(
       /Seasonal Mega Raids,\s*Seasonal Five-Star Raids,\s*Seasonal Shadow Raids,\s*Seasonal Raid Hours,\s*and Seasonal Spotlight Hours will not take place/i
     );
 
-  if (phraseIndex < 0) {
+  if (phraseIndex >= 0) {
+    const window =
+      fullText.slice(
+        phraseIndex,
+        phraseIndex + 760
+      );
+
+    const range =
+      inferDateRangeFromText(
+        window
+      );
+
+    if (range) {
+      rules.push({
+        event_name:
+          "Mega Ascension + Mega Finale seasonal schedule suspension",
+
+        start_date:
+          range.start_date,
+
+        end_date:
+          range.end_date,
+
+        suppressed_source_types: [
+          "raid_battles",
+          "raid_hour",
+          "pokemon_spotlight_hour"
+        ],
+
+        note:
+          "Hide normal seasonal Mega Raid, five-star Raid, Shadow Raid, Raid Hour, and Spotlight Hour schedule entries during the official replacement window. Official event supplements remain visible. Pokémon GO separately notes that seasonal Raid Bosses may still appear during Mega Ascension, so this suppresses scheduled calendar entries rather than claiming random seasonal appearances are impossible.",
+
+        source_url:
+          sourceUrl,
+
+        source_excerpt:
+          window.slice(
+            0,
+            700
+          )
+      });
+    }
+  }
+
+  const changeSentences =
+    fullText
+      .split(
+        /\n+|(?<=[.!?])\s+/
+      )
+      .map(
+        sentence =>
+          sentence.trim()
+      )
+      .filter(Boolean)
+      .filter(
+        definiteOfficialEventSuppressionSentence
+      );
+
+  if (
+    !changeSentences.length ||
+    !Array.isArray(
+      knownEvents
+    ) ||
+    !knownEvents.length
+  ) {
     return rules;
   }
 
-  const window =
-    fullText.slice(
-      phraseIndex,
-      phraseIndex + 760
-    );
+  const candidates =
+    knownEvents
+      .filter(
+        event =>
+          event &&
+          event.start_date &&
+          !isOfficialSupplementEvent(
+            event
+          )
+      )
+      .map(
+        event => ({
+          event,
+          selector:
+            eventSuppressionSelector(
+              event
+            ),
+          aliases:
+            eventSuppressionAliases(
+              event.summary
+            )
+        })
+      )
+      .filter(
+        item =>
+          item.selector &&
+          item.aliases.length
+      )
+      .sort(
+        (a, b) =>
+          String(
+            a.event.start_date
+          ).localeCompare(
+            String(
+              b.event.start_date
+            )
+          ) ||
+          String(
+            a.event.summary || ""
+          ).localeCompare(
+            String(
+              b.event.summary || ""
+            )
+          )
+      );
 
-  const range =
-    inferDateRangeFromText(window);
+  const matchedSelectors =
+    new Set();
 
-  if (!range) {
-    return rules;
+  for (
+    const sentence of
+    changeSentences
+  ) {
+    const normalizedSentence =
+      normalizeName(
+        sentence
+      );
+
+    for (
+      const candidate of
+      candidates
+    ) {
+      if (
+        matchedSelectors.has(
+          candidate.selector
+        ) ||
+        sourceAlreadySuppressesSelector(
+          existingRules,
+          sourceUrl,
+          candidate.selector
+        )
+      ) {
+        continue;
+      }
+
+      const namedInSentence =
+        candidate.aliases.some(
+          alias =>
+            normalizedSentence.includes(
+              alias
+            )
+        );
+
+      if (!namedInSentence) {
+        continue;
+      }
+
+      const eventEnd =
+        candidate.event.end_date ||
+        candidate.event.start_date;
+
+      rules.push({
+        event_name:
+          `Official schedule change: ${candidate.event.summary}`,
+
+        start_date:
+          candidate.event.start_date,
+
+        end_date:
+          eventEnd,
+
+        suppressed_source_types: [
+          candidate.selector
+        ],
+
+        note:
+          "Suppress only the specifically matched normalized event during its existing stored date window after an official cancellation, postponement, reschedule, suspension, or move notice. Other events sharing the same source type and dates remain visible; any later replacement date can appear normally.",
+
+        source_url:
+          sourceUrl,
+
+        source_excerpt:
+          sentence.slice(
+            0,
+            700
+          )
+      });
+
+      // A notice about a recurring event name applies to the earliest matching
+      // active occurrence only. The persisted rule then prevents this same
+      // notice from suppressing a later replacement occurrence on future syncs.
+      matchedSelectors.add(
+        candidate.selector
+      );
+    }
   }
-
-  rules.push({
-    event_name:
-      "Mega Ascension + Mega Finale seasonal schedule suspension",
-
-    start_date:
-      range.start_date,
-
-    end_date:
-      range.end_date,
-
-    suppressed_source_types: [
-      "raid_battles",
-      "raid_hour",
-      "pokemon_spotlight_hour"
-    ],
-
-    note:
-      "Hide normal seasonal Mega Raid, five-star Raid, Shadow Raid, Raid Hour, and Spotlight Hour schedule entries during the official replacement window. Official event supplements remain visible. Pokémon GO separately notes that seasonal Raid Bosses may still appear during Mega Ascension, so this suppresses scheduled calendar entries rather than claiming random seasonal appearances are impossible.",
-
-    source_url:
-      sourceUrl,
-
-    source_excerpt:
-      window.slice(0, 700)
-  });
 
   return rules;
 }
@@ -6503,6 +6803,60 @@ async function syncOfficialRemoteRaidLimits(env) {
   const dbStatements = [];
   const refreshedPageUrls = [];
 
+  let knownSuppressionEvents = [];
+  let existingSuppressionRules = [];
+
+  try {
+    const [
+      eventRows,
+      suppressionRows
+    ] = await Promise.all([
+      env.DB.prepare(`
+        SELECT
+          id,
+          source_type,
+          source_uid,
+          summary,
+          start_date,
+          end_date
+        FROM events
+        WHERE status = 'active'
+          AND start_date IS NOT NULL
+        ORDER BY start_date, summary
+        LIMIT 1200
+      `).all(),
+      env.DB.prepare(`
+        SELECT
+          source_url,
+          suppressed_source_types
+        FROM event_suppression_rules
+        WHERE active = 1
+          AND detected_automatically = 1
+      `).all()
+    ]);
+
+    knownSuppressionEvents =
+      eventRows.results || [];
+
+    existingSuppressionRules =
+      (suppressionRows.results || [])
+        .map(
+          rule => ({
+            ...rule,
+            suppressed_source_types:
+              parseSuppressedSourceTypes(
+                rule.suppressed_source_types
+              )
+          })
+        );
+  } catch (error) {
+    errors.push(
+      `suppression context: ${String(
+        error.message || error
+      )}`
+    );
+  }
+
   for (const url of pageUrls) {
     try {
       const html = await fetchOfficialHtml(url);
@@ -6555,7 +6909,12 @@ async function syncOfficialRemoteRaidLimits(env) {
       const pageSuppressions =
         officialEventSuppressionRulesFromText(
           plainText,
-          url
+          url,
+          knownSuppressionEvents,
+          [
+            ...existingSuppressionRules,
+            ...suppressionRules
+          ]
         );
 
       for (
@@ -11857,7 +12216,7 @@ async function eventSuppressionRules(
   }));
 }
 
-function eventIsSuppressedByRules(event, rules) {
+export function eventIsSuppressedByRules(event, rules) {
   if (isOfficialSupplementEvent(event)) {
     return false;
   }
@@ -11897,7 +12256,7 @@ function eventIsSuppressedByRules(event, rules) {
 }
 
 
-function visibleEventSegments(event, rules) {
+export function visibleEventSegments(event, rules) {
   if (
     isOfficialSupplementEvent(event) ||
     !event.start_date

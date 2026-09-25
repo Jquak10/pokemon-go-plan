@@ -1098,6 +1098,28 @@ Current decision:
 
 This changes only Cloudflare observability configuration and its durable security contract. It changes no D1 schema/data, routes, Cron schedules, secrets, bindings, Service Bindings, CSS/cache generation, Planner APIs, or Pokémon GO planning behavior.
 
+
+## ADR-062 — Official schedule-change suppression must target stored event identity before availability changes
+
+Status: Current  
+Introduced in PR #101.
+
+Official replacement/suppression notices outrank normalized calendar data, but generic cancellation words are not sufficient evidence to hide an entire event category. Multiple unrelated events can share the same normalized source type and dates, so broad source/date suppression would create false availability gaps.
+
+Current decision:
+
+- retain the existing explicitly broad Mega Finale seasonal replacement rule for the categories it intentionally replaces;
+- for general official schedule changes, recognize only definite action language such as **rescheduled**, **postponed**, **cancelled/canceled**, **suspended**, **will not take place**, or a definite move to a later/new/different date;
+- require that the same action sentence positively names an already-normalized stored event; generic warnings, "subject to change" copy, and conditional phrases such as **may be suspended** do not qualify;
+- derive a targeted suppression selector from the stored event's source type plus normalized event name, while also preserving the ordinary source-type selector for older/broad rules;
+- use the matched event's existing stored date window rather than inventing dates from a notice that may omit them;
+- apply targeted rules through the existing suppression path so Calendar display, private ICS, current availability, recommendations, and Remote planning stay consistent;
+- never delete the normalized event or Pokémon meta/ranking data solely because of a suppression notice, allowing later replacement dates/evidence to appear normally;
+- reuse the existing `event_suppression_rules` JSON source-selector field, so BL-048 requires no D1 schema migration.
+
+This strengthens official source precedence without broadening suppression scope. It changes no CSS/cache generation, route, Cron schedule, secret, binding, Service Binding, or planner-owned persistence schema.
+
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -1203,6 +1225,7 @@ The following sequence is retained as a compact repository implementation/change
 | #98 | BL-045 Node-24-era Actions maintenance | Moves Planner regression and Production smoke to v7 first-party checkout/setup actions, keeps the repository test runtime on Node 22, declares the existing source tree explicitly ESM to eliminate module-type reparsing warnings, and adds deterministic guards against deprecated Action-major regressions without changing CI gate names or cadence. |
 | #99 | BL-046 current README / historical rollout split | Keeps README operational guidance present-tense, moves historical Part 4/5 rollout and one-time D1 commands to a warned archival reference, distinguishes fresh `schema.sql` setup from older-installation migrations, and adds deterministic documentation-safety coverage without changing runtime behavior. |
 | #100 | BL-047 bearer-safe Worker observability | Keeps Workers Logs/custom error output available while disabling automatic Fetch invocation logs that include request URLs, locks the configuration with deterministic release-safety coverage, and closes the platform-logging gap for management/calendar bearer capability paths without changing app behavior. |
+| #101 | BL-048 targeted official schedule-change suppression | Generalizes definite official cancellation/reschedule detection while requiring a positively named stored event, adds event-specific suppression selectors so same-source/same-date peers remain visible, preserves the broad Mega Finale rule, and covers Calendar/ICS plus availability filtering and false-positive cases without a D1 migration. |
 
 ## Supersession map
 

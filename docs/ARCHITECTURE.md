@@ -479,7 +479,9 @@ Suppression must affect:
 - Battle recommendations.
 - Remote allocation/planning.
 
-Suppression does not delete underlying Pokémon meta or ranking data.
+Official schedule-change detection is deliberately conservative. A definite official cancellation/reschedule statement such as **rescheduled**, **postponed**, **cancelled/canceled**, **suspended**, **will not take place**, or a definite move to a later/new date may create a targeted suppression only when the same sentence positively names an already-normalized stored event. Targeted rules use an event selector derived from the event source type plus normalized event name and use that event's existing stored date window. This allows one City Safari, Community Day, or other event to be suppressed without hiding unrelated events that share the same source type and dates. Conditional wording such as **may be suspended** or generic **subject to change** copy is not sufficient. Existing explicitly broad replacement-window rules, such as the Mega Finale seasonal schedule suppression, remain category-scoped by design.
+
+Suppression does not delete or rewrite the underlying normalized event or Pokémon meta/ranking data. A later replacement event/date can therefore appear normally when upstream/official evidence supplies it.
 
 ### 9.1 GO Calendar ingestion
 
