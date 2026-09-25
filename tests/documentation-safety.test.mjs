@@ -50,7 +50,7 @@ assert.match(
 for (let number = 1; number <= 7; number += 1) {
   assert.match(
     history,
-    new RegExp(`\\`000${number}_[^\\`]+\\``),
+    new RegExp("`000" + number + "_[^`]+`"),
     `historical migration inventory must retain migration 000${number}`
   );
 }
