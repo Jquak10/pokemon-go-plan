@@ -1061,6 +1061,25 @@ Current decision:
 
 This is CI/developer-runtime governance only. It changes no D1 schema/data, Worker/API behavior, CSS/cache generation, Cloudflare route/binding/secret/Service Binding configuration, Cron schedule, or Pokémon GO planning behavior.
 
+## ADR-060 — Current operations and historical rollout instructions stay separate
+
+Status: Current  
+Introduced in PR #99.
+
+README guidance is an operational surface, so one-time rollout commands from older implementation stages must not look like instructions for the current deployment.
+
+Current decision:
+
+- keep `README.md` focused on current product use, fresh-environment setup, development, deployment, and the current migration boundary;
+- treat `schema.sql` as the authoritative baseline for a fresh D1 database and never instruct operators to replay numbered historical migrations on top of that baseline;
+- retain `migrations/0001` through `0007` for older-installation upgrades and auditability, but require a release to name any migration that actually needs to be applied;
+- call out `0003_target_battle_kind.sql` as intentionally one-time/non-repeatable because it uses SQLite `ALTER TABLE ... ADD COLUMN`;
+- preserve the former Part 4/5 rollout notes and their one-time production commands in `docs/ROLLOUT_HISTORY.md`, headed by an explicit warning that they are historical reference rather than a current checklist;
+- keep normal `main` deployment and D1 migration execution separate: merging code does not imply that historical SQL should run;
+- enforce the separation with deterministic documentation-safety assertions that require the history link/fresh-schema guidance and reject Part-number rollout headings or historical remote migration commands in the current README.
+
+This is documentation and operational-safety governance only. It changes no D1 schema/data, Worker/API behavior, CSS/cache generation, Cloudflare route/binding/secret/Service Binding configuration, Cron schedule, or Pokémon GO planning behavior.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -1164,6 +1183,7 @@ The following sequence is retained as a compact repository implementation/change
 | #96 | BL-043 production data-freshness monitoring | Reuses D1 source-health records to expose a sanitized read-only freshness endpoint, tolerates one transient six-hour sync failure while last-known-good data is fresh, alerts after 18 hours without success or missing health evidence, and extends the three-hour Production smoke with deterministic healthy/degraded/stale coverage. |
 | #97 | BL-044 public Help & Data Handling | Adds a static public trust/help surface linked from Landing, Data Sources, and Planner Preferences; explains planner storage, bearer-link safety, browser-local appearance, backup/recovery/deletion, and routes issue reports through GitHub with explicit credential-redaction guidance. |
 | #98 | BL-045 Node-24-era Actions maintenance | Moves Planner regression and Production smoke to v7 first-party checkout/setup actions, keeps the repository test runtime on Node 22, declares the existing source tree explicitly ESM to eliminate module-type reparsing warnings, and adds deterministic guards against deprecated Action-major regressions without changing CI gate names or cadence. |
+| #99 | BL-046 current README / historical rollout split | Keeps README operational guidance present-tense, moves historical Part 4/5 rollout and one-time D1 commands to a warned archival reference, distinguishes fresh `schema.sql` setup from older-installation migrations, and adds deterministic documentation-safety coverage without changing runtime behavior. |
 
 ## Supersession map
 
