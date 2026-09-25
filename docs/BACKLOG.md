@@ -27,7 +27,91 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-No confirmed active backlog items are currently recorded.
+### BL-047 — Prevent capability URLs entering Worker invocation logs
+
+Priority: **Must fix — security/privacy**
+
+The Planner intentionally treats management URLs and calendar subscription URLs as bearer credentials, but the current Cloudflare Workers observability configuration enables persisted Workers Logs without disabling invocation logs. Cloudflare invocation logs include the request method and request URL for Fetch handlers, so `/manage/<token>` and `/calendar/...` capability URLs can be retained by the platform logging layer.
+
+Required outcome:
+
+- keep useful Worker observability/custom error logging available;
+- disable persisted invocation logs that include raw request URLs for production Worker fetches;
+- do not log, echo, persist, or add analytics for raw management/calendar bearer URLs;
+- add deterministic configuration coverage so invocation URL logging cannot be silently re-enabled;
+- update architecture/security documentation to describe the production logging boundary;
+- preserve D1 bindings, routes, Cron jobs, secrets, Service Bindings, and application behavior.
+
+### BL-048 — Generalize official cancellation/reschedule suppression
+
+Priority: **High**
+
+The automatic official-notice suppression parser currently recognizes a narrow Mega Finale-specific cancellation sentence. Official Pokémon GO notices may instead describe events as rescheduled, postponed, cancelled/canceled, or moved, so a replacement/suppression notice can fail to propagate consistently to Calendar, ICS, recommendations, current availability, and Remote allocation.
+
+Required outcome:
+
+- add conservative official-notice detection for cancellation/reschedule/postponement language;
+- require a positively identified affected event/date window before suppressing availability;
+- reuse the existing suppression model rather than deleting underlying event/meta data;
+- keep official source precedence above normalized calendar data;
+- add deterministic parsing and downstream suppression regressions, including false-positive protection.
+
+### BL-049 — Expire stale pinned official source pages
+
+Priority: **High**
+
+`PINNED_OFFICIAL_EVENT_PAGES` currently contains Mega Finale / Armored Mewtwo pages whose event windows have ended, while pinned URLs are prepended before the bounded official-news discovery list. Expired pins can therefore consume part of the current discovery budget unnecessarily.
+
+Required outcome:
+
+- make pinned official pages time/event bounded or remove pins once their purpose has expired;
+- preserve the existing retained-future-source recovery mechanism for still-relevant official pages;
+- ensure current official-news discovery receives the intended bounded capacity;
+- add deterministic coverage for expiry and retained-future behavior;
+- do not weaken exact official evidence already stored for historical/shipped events.
+
+### BL-050 — Complete the 44px mobile touch-target contract
+
+Priority: **Recommended**
+
+The mobile layout, safe-area, modal/sheet locking, and overflow behavior are well covered, but several interactive controls can still compute below the project's 44px touch-target minimum, including compact close/icon controls and some collapsible/filter/forecast controls.
+
+Required outcome:
+
+- ensure interactive mobile controls are at least 44px by 44px where applicable;
+- preserve desktop density where a smaller visual control is intentional by expanding the mobile hit area rather than broadly bloating desktop UI;
+- cover representative mobile controls with computed-size browser regressions;
+- preserve safe-area, no-horizontal-scroll, bottom-nav, and overlay behavior;
+- bump the CSS cache version if `styles.css` changes.
+
+### BL-051 — Reject implausibly empty upstream sync successes
+
+Priority: **Recommended**
+
+Synchronization health records source `item_count`, but production freshness currently treats a recent HTTP-successful/parse-successful sync as healthy even when a source that should contain data returns an implausibly empty payload. This can move `last_success_at` forward and hide an upstream contract break.
+
+Required outcome:
+
+- define source-specific minimum viable yield checks where an empty payload cannot reasonably be valid;
+- at minimum cover the Pokémon GO API Pokédex and PvPoke ranking inputs;
+- do not overwrite last-known-good success/item-count state when a payload is structurally valid but implausibly empty;
+- surface the failed attempt through existing sync-health/freshness monitoring;
+- add deterministic healthy/empty/degraded recovery coverage.
+
+### BL-052 — Add production schema-compatibility health
+
+Priority: **Recommended**
+
+Production smoke validates public/private route behavior, critical assets, security headers, and source freshness, but it does not currently prove that production D1 has every schema component required by the deployed Worker. Because D1 migrations are explicit rather than automatically run on `main` merges, a missed migration could remain undetected until a user exercises the affected feature.
+
+Required outcome:
+
+- add a sanitized read-only schema-compatibility health signal;
+- verify the current required tables/columns/indexes/triggers without returning private data or full schema SQL;
+- include the signal in repository-owned Production smoke;
+- make missing required schema fail monitoring with actionable component names only;
+- add deterministic compatible/incompatible regressions;
+- do not mutate or auto-migrate production D1 from the health check.
 
 ## Deferred
 
