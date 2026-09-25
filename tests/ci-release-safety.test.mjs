@@ -180,6 +180,27 @@ assert.match(
   "package-lock.json must pin an installed Wrangler version"
 );
 
+assert.equal(
+  wranglerConfig.observability
+    ?.enabled,
+  true,
+  "Worker observability must remain enabled for custom/error logging"
+);
+assert.equal(
+  wranglerConfig.observability
+    ?.logs
+    ?.enabled,
+  true,
+  "Workers Logs must remain enabled for explicit custom/error logs"
+);
+assert.equal(
+  wranglerConfig.observability
+    ?.logs
+    ?.invocation_logs,
+  false,
+  "Raw Worker invocation logs must stay disabled because management/calendar bearer credentials appear in request URLs"
+);
+
 const workerFirstRoutes =
   wranglerConfig.assets
     ?.run_worker_first;

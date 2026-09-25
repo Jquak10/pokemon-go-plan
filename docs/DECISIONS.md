@@ -1080,6 +1080,24 @@ Current decision:
 
 This is documentation and operational-safety governance only. It changes no D1 schema/data, Worker/API behavior, CSS/cache generation, Cloudflare route/binding/secret/Service Binding configuration, Cron schedule, or Pokémon GO planning behavior.
 
+## ADR-061 — Persisted Worker invocation logs must not capture bearer capability URLs
+
+Status: Current  
+Introduced in PR #100.
+
+Management URLs and calendar subscription URLs are bearer credentials, and both intentionally carry capability material in the request path for compatibility with saved management links and calendar clients. Cloudflare Workers Fetch invocation logs include request URLs, so retaining automatic invocation logs conflicts with the application's existing rule that capability URLs must not be logged.
+
+Current decision:
+
+- keep Worker observability enabled so explicit custom logs, warnings, errors, and uncaught exceptions remain available for operations;
+- keep Workers Logs enabled for those explicit application-generated records;
+- set `observability.logs.invocation_logs` to `false` so automatic Fetch invocation records do not persist `/manage/<token>` or `/calendar/...` request URLs;
+- do not treat query-string redaction alone as sufficient because the sensitive management/calendar capabilities live in path segments;
+- keep custom Worker log messages credential-free and never add raw request URLs, management/calendar capabilities, Admin keys, or backup contents to console logging;
+- enforce the production logging boundary in deterministic release-safety tests and validate the Wrangler configuration through the existing dry-run packaging gate.
+
+This changes only Cloudflare observability configuration and its durable security contract. It changes no D1 schema/data, routes, Cron schedules, secrets, bindings, Service Bindings, CSS/cache generation, Planner APIs, or Pokémon GO planning behavior.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -1184,6 +1202,7 @@ The following sequence is retained as a compact repository implementation/change
 | #97 | BL-044 public Help & Data Handling | Adds a static public trust/help surface linked from Landing, Data Sources, and Planner Preferences; explains planner storage, bearer-link safety, browser-local appearance, backup/recovery/deletion, and routes issue reports through GitHub with explicit credential-redaction guidance. |
 | #98 | BL-045 Node-24-era Actions maintenance | Moves Planner regression and Production smoke to v7 first-party checkout/setup actions, keeps the repository test runtime on Node 22, declares the existing source tree explicitly ESM to eliminate module-type reparsing warnings, and adds deterministic guards against deprecated Action-major regressions without changing CI gate names or cadence. |
 | #99 | BL-046 current README / historical rollout split | Keeps README operational guidance present-tense, moves historical Part 4/5 rollout and one-time D1 commands to a warned archival reference, distinguishes fresh `schema.sql` setup from older-installation migrations, and adds deterministic documentation-safety coverage without changing runtime behavior. |
+| #100 | BL-047 bearer-safe Worker observability | Keeps Workers Logs/custom error output available while disabling automatic Fetch invocation logs that include request URLs, locks the configuration with deterministic release-safety coverage, and closes the platform-logging gap for management/calendar bearer capability paths without changing app behavior. |
 
 ## Supersession map
 

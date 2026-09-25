@@ -27,7 +27,76 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-No confirmed active backlog items are currently recorded.
+### BL-048 — Generalize official cancellation/reschedule suppression
+
+Priority: **High**
+
+The automatic official-notice suppression parser currently recognizes a narrow Mega Finale-specific cancellation sentence. Official Pokémon GO notices may instead describe events as rescheduled, postponed, cancelled/canceled, or moved, so a replacement/suppression notice can fail to propagate consistently to Calendar, ICS, recommendations, current availability, and Remote allocation.
+
+Required outcome:
+
+- add conservative official-notice detection for cancellation/reschedule/postponement language;
+- require a positively identified affected event/date window before suppressing availability;
+- reuse the existing suppression model rather than deleting underlying event/meta data;
+- keep official source precedence above normalized calendar data;
+- add deterministic parsing and downstream suppression regressions, including false-positive protection.
+
+### BL-049 — Expire stale pinned official source pages
+
+Priority: **High**
+
+`PINNED_OFFICIAL_EVENT_PAGES` currently contains Mega Finale / Armored Mewtwo pages whose event windows have ended, while pinned URLs are prepended before the bounded official-news discovery list. Expired pins can therefore consume part of the current discovery budget unnecessarily.
+
+Required outcome:
+
+- make pinned official pages time/event bounded or remove pins once their purpose has expired;
+- preserve the existing retained-future-source recovery mechanism for still-relevant official pages;
+- ensure current official-news discovery receives the intended bounded capacity;
+- add deterministic coverage for expiry and retained-future behavior;
+- do not weaken exact official evidence already stored for historical/shipped events.
+
+### BL-050 — Complete the 44px mobile touch-target contract
+
+Priority: **Recommended**
+
+The mobile layout, safe-area, modal/sheet locking, and overflow behavior are well covered, but several interactive controls can still compute below the project's 44px touch-target minimum, including compact close/icon controls and some collapsible/filter/forecast controls.
+
+Required outcome:
+
+- ensure interactive mobile controls are at least 44px by 44px where applicable;
+- preserve desktop density where a smaller visual control is intentional by expanding the mobile hit area rather than broadly bloating desktop UI;
+- cover representative mobile controls with computed-size browser regressions;
+- preserve safe-area, no-horizontal-scroll, bottom-nav, and overlay behavior;
+- bump the CSS cache version if `styles.css` changes.
+
+### BL-051 — Reject implausibly empty upstream sync successes
+
+Priority: **Recommended**
+
+Synchronization health records source `item_count`, but production freshness currently treats a recent HTTP-successful/parse-successful sync as healthy even when a source that should contain data returns an implausibly empty payload. This can move `last_success_at` forward and hide an upstream contract break.
+
+Required outcome:
+
+- define source-specific minimum viable yield checks where an empty payload cannot reasonably be valid;
+- at minimum cover the Pokémon GO API Pokédex and PvPoke ranking inputs;
+- do not overwrite last-known-good success/item-count state when a payload is structurally valid but implausibly empty;
+- surface the failed attempt through existing sync-health/freshness monitoring;
+- add deterministic healthy/empty/degraded recovery coverage.
+
+### BL-052 — Add production schema-compatibility health
+
+Priority: **Recommended**
+
+Production smoke validates public/private route behavior, critical assets, security headers, and source freshness, but it does not currently prove that production D1 has every schema component required by the deployed Worker. Because D1 migrations are explicit rather than automatically run on `main` merges, a missed migration could remain undetected until a user exercises the affected feature.
+
+Required outcome:
+
+- add a sanitized read-only schema-compatibility health signal;
+- verify the current required tables/columns/indexes/triggers without returning private data or full schema SQL;
+- include the signal in repository-owned Production smoke;
+- make missing required schema fail monitoring with actionable component names only;
+- add deterministic compatible/incompatible regressions;
+- do not mutate or auto-migrate production D1 from the health check.
 
 ## Deferred
 
@@ -88,5 +157,8 @@ BL-044 is implemented by PR #97 with a static public `/help` surface linked from
 BL-045 is implemented by PR #98: Planner regression and Production smoke use the current v7 GitHub first-party checkout/setup actions whose internal runtime is Node 24-era compatible, while the repository test runtime remains Node 22. `package.json` now explicitly declares `"type": "module"` to match the existing ESM source modules and remove `MODULE_TYPELESS_PACKAGE_JSON` reparsing warnings, and deterministic release-safety coverage rejects regressions to pre-v7 first-party Action majors. Existing PR gates, live-contract behavior, browser coverage, Worker dry-run packaging, and read-only Production smoke cadence are unchanged.
 
 BL-046 is implemented by PR #99: the README is now current-state guidance for product usage, fresh-environment setup, deployment, and migration state; historical Part 4/5 rollout notes and one-time D1 commands are preserved in `docs/ROLLOUT_HISTORY.md` behind an explicit do-not-rerun warning. Fresh databases use `schema.sql`, older installations apply only release-specific migrations after schema inspection, and deterministic documentation-safety coverage prevents historical rollout commands from drifting back into the current README. No D1, Worker/API, CSS, Cloudflare configuration, Cron, secret, binding, or gameplay behavior change is required.
+A fresh post-PR-#99 product audit on 25 September 2026 identified six concrete follow-ups. The user explicitly promoted them into the durable backlog as BL-047 through BL-052: bearer-safe Worker observability, generalized official cancellation/reschedule suppression, expiry of stale pinned official pages, completion of the 44px mobile touch-target contract, implausibly-empty upstream sync rejection, and production D1 schema-compatibility health.
+
+BL-047 is implemented by PR #100: Workers Logs/custom error output stays enabled, but automatic Fetch invocation logs are explicitly disabled because Cloudflare invocation records include request URLs and this product intentionally carries management/calendar bearer credentials in URL paths. Deterministic release-safety coverage locks that configuration, and the architecture now records the bearer-safe observability boundary. No D1 migration, route, Cron, secret, binding, Service Binding, CSS, or application behavior change is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

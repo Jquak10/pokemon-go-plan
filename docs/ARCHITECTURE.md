@@ -108,7 +108,7 @@ Current wrangler.jsonc defines:
 - asset binding: ASSETS.
 - D1 binding: DB.
 - Rate Limiting bindings: `PLANNER_CREATE_CLIENT_RATE_LIMITER` and `PLANNER_CREATE_ROUTE_RATE_LIMITER`.
-- observability enabled.
+- observability enabled for explicit custom/error logs, with automatic Fetch invocation logs disabled so request URLs containing bearer capabilities are not persisted in Workers Logs.
 - recurring Cron expressions:
   - 23 */6 * * *
   - 33 */6 * * *
@@ -125,7 +125,7 @@ Each planner has private credentials represented by non-guessable links/tokens:
 - A management link that can read and modify that planner.
 - A separate private read-only calendar subscription URL.
 
-Calendar URLs are bearer credentials. Management URLs are also sensitive. They must not be logged, printed into tests, committed to the repository, or pasted into support prompts. The public `/help` surface makes that contract explicit and routes defect/data reports to the repository's public GitHub issue tracker with instructions to redact credentials, Planner Backup files, and credential-bearing screenshots.
+Calendar URLs are bearer credentials. Management URLs are also sensitive. They must not be logged, printed into tests, committed to the repository, or pasted into support prompts. The public `/help` surface makes that contract explicit and routes defect/data reports to the repository's public GitHub issue tracker with instructions to redact credentials, Planner Backup files, and credential-bearing screenshots. Production Workers Logs therefore keep observability/custom error output enabled but disable automatic invocation logs, because Cloudflare Fetch invocation records include the request URL and both `/manage/<token>` and calendar subscription paths can carry bearer credentials. Custom Worker logging must remain credential-free.
 
 The management capability remains in the private `/manage/<token>` URL so existing saved links keep working, but the current Planner UI does not repeat that token in API query strings or JSON bodies. Same-origin management API requests send it as an `Authorization: Bearer` header. The Worker accepts that header first while retaining the historical query/body token forms for older clients and bookmarks. Admin browser requests similarly use `X-Admin-Key`, with legacy query/body key forms accepted server-side for compatibility.
 
