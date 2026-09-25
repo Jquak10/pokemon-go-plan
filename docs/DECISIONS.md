@@ -1023,6 +1023,26 @@ Current decision:
 
 This reuses migration 0006 and requires no schema change, new Cron, secret, binding, Service Binding, or deployment-configuration change.
 
+## ADR-058 — Public support guidance must preserve the capability-link security model
+
+Status: Current  
+Introduced in PR #97.
+
+The product uses bearer management/calendar links rather than an identity account, so public support and privacy guidance must reinforce that access model instead of implying password recovery, operator-side account lookup, or a private support backend that does not exist.
+
+Current decision:
+
+- provide a public static `/help` surface linked from Landing, Data Sources, and Planner Preferences;
+- state plainly which planner-owned data is stored in D1 and distinguish it from public Pokémon/event/meta data;
+- explicitly identify email/password identity, a full Pokémon storage/team roster, browser-local appearance, and a separate server-side backup archive as outside the planner-owned record;
+- describe management URLs as read/write bearer credentials and calendar subscription URLs as read-only bearer credentials that must remain private;
+- document management-link rotation, signed-calendar regeneration/revocation, Planner Backup contents, lost-link recovery limits, and permanent planner deletion without implying recovery is possible without either the current management capability or a previously saved backup;
+- use the repository's public GitHub issue tracker as the support path for incorrect data and application defects, while instructing users never to include private management/calendar URLs, Admin keys, backup files, or credential-bearing screenshots;
+- keep the Help surface static and credential-free: no account, email, analytics, telemetry, or support-form backend is added;
+- apply the same Static Asset security-header contract and production-smoke coverage as other public HTML surfaces.
+
+This is a trust/help surface decision only. It does not change D1 schema/data, application APIs, Cron, secrets, bindings, Service Bindings, CSS cache generation, or deployment configuration.
+
 ## PR lineage
 
 The following sequence is retained as a compact repository implementation/change history. Non-merged PRs are included only when their status is explicitly stated so they cannot be mistaken for shipped behavior.
@@ -1124,6 +1144,7 @@ The following sequence is retained as a compact repository implementation/change
 | #94 | Fresh product audit backlog promotion | Promotes the user-confirmed 25 September 2026 audit follow-ups into Active BL-042 through BL-046: accessibility semantics, production data-freshness monitoring, public data-handling/support guidance, Node-24-era GitHub Actions maintenance, and README/runbook separation. No product/runtime behavior changes in this PR. |
 | #95 | BL-042 accessibility semantics completion | Gives every static form control a programmatic accessible name, standardizes polite atomic status feedback, exposes selected state for Target/Admin/Battle toggle groups, extends the same semantics to generated recent-battle/Max-tier feedback, and adds deterministic plus Chromium regressions without changing visual layout or persistence. |
 | #96 | BL-043 production data-freshness monitoring | Reuses D1 source-health records to expose a sanitized read-only freshness endpoint, tolerates one transient six-hour sync failure while last-known-good data is fresh, alerts after 18 hours without success or missing health evidence, and extends the three-hour Production smoke with deterministic healthy/degraded/stale coverage. |
+| #97 | BL-044 public Help & Data Handling | Adds a static public trust/help surface linked from Landing, Data Sources, and Planner Preferences; explains planner storage, bearer-link safety, browser-local appearance, backup/recovery/deletion, and routes issue reports through GitHub with explicit credential-redaction guidance. |
 
 ## Supersession map
 
