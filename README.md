@@ -4,9 +4,9 @@ Pokémon GO Battle Planner is a private, personalized battle-planning and calend
 
 **Production app:** [https://pogo-plan.jquak-10.workers.dev](https://pogo-plan.jquak-10.workers.dev)
 
-**Engineering references:** [Current architecture](docs/ARCHITECTURE.md) · [Architecture decisions and supersession history](docs/DECISIONS.md) · [Unshipped backlog](docs/BACKLOG.md)
+**Engineering references:** [Current architecture](docs/ARCHITECTURE.md) · [Architecture decisions and supersession history](docs/DECISIONS.md) · [Unshipped backlog](docs/BACKLOG.md) · [Historical rollout and migration reference](docs/ROLLOUT_HISTORY.md)
 
-The engineering references above are the durable source for current architecture, design history, and confirmed unshipped work. Some Part-by-Part notes below intentionally describe the state at that implementation stage; when a later decision superseded an earlier one, docs/DECISIONS.md records the replacement. Future ideas or known technical debt that have not shipped belong in docs/BACKLOG.md rather than relying on project chat history.
+The README is intentionally present-tense guidance for users, developers, and operators. Historical one-time rollout SQL and superseded Part-by-Part implementation notes live in [docs/ROLLOUT_HISTORY.md](docs/ROLLOUT_HISTORY.md), where they are preserved without being presented as current steps. Current architecture and supersession history live in docs/ARCHITECTURE.md and docs/DECISIONS.md; confirmed unshipped work belongs in docs/BACKLOG.md rather than project chat history.
 
 **Change logging policy:** every product improvement and bug fix is recorded in the PR lineage in [docs/DECISIONS.md](docs/DECISIONS.md). Changes to current system behavior or invariants also update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); confirmed unshipped work and technical debt update [docs/BACKLOG.md](docs/BACKLOG.md); user/developer-facing behavior updates this README; development automation/policy updates [AGENTS.md](AGENTS.md). Documentation is maintained in the same PR as the change rather than reconstructed from chat history later.
 
@@ -24,105 +24,15 @@ Create a planner with your timezone, save its private management link, and then 
 
 Planner creation is deliberately low-friction but abuse-bounded. If creation traffic exceeds the configured Cloudflare limit, the page receives an explicit temporary rate-limit error and can be retried after one minute.
 
-## Part 4: unified Battle logging
+## Database setup and migrations
 
-The Battle logger records ordinary Raids, Dynamax and Gigantamax separately. Recommendations prefill battle identity, participation eligibility and confidently known MP costs. Unknown or estimated costs remain blank and must be supplied for wins. Actual target progress stays editable. For Max Battles, enter attempts, wins and actual Remote Passes consumed; same-boss retries can use fewer passes than attempts. Log groups with different MP costs separately.
+`schema.sql` is the authoritative baseline for a **fresh** D1 database. Initialize a new environment from that file; do not initialize a fresh database and then replay numbered migrations on top of it.
 
-Official rules checked on 17 September 2026:
+The numbered files under `migrations/` are retained to move older installations forward and preserve rollout history. They are not a current deployment checklist. Existing installations must inspect their schema and apply only the migration explicitly required by the release they are adopting. `0003_target_battle_kind.sql` is especially important because it uses `ALTER TABLE ... ADD COLUMN` and is intentionally one-time/non-repeatable.
 
-- [Niantic: Joining Battles Remotely](https://niantic.helpshift.com/hc/en/6-pokemon-go/faq/2487-joining-battles-remotely/) confirms Remote Max Battles use a Remote Raid Pass plus the same MP cost as local participation. The pass is consumed when battle starts, including a loss; eligible retries against the same boss do not consume another pass.
-- [Pokémon GO: Max Battles](https://pokemongo.com/max-pokemon-battle) confirms MP is spent only after defeating the boss. The logger therefore deducts MP for wins and records pass consumption separately.
-- The Part 4 implementation initially kept ordinary Remote Raid and Remote Max numeric usage separate while the official relationship was unclear. That historical choice was superseded in PR #27: ordinary Remote Raids and Remote Max Battles now consume one shared official daily Remote participation ceiling, while their underlying ledgers remain separate for auditability. Temporary increases and unlimited windows apply to the combined usage.
+**Current migration state:** the latest retained numbered migration is `0007_feed_link_credentials.sql`; BL-046 adds no database change and no `0008` migration. The current fresh-database shape is already represented by `schema.sql`. Merging to `main` does not automatically execute D1 SQL.
 
-### Required D1 migration
-
-`migrations/0002_battle_logging.sql` is required because aggregate Part 3 resource counters cannot preserve each transaction's battle identity, pass/MP deltas and reversible target progress. It adds a durable `battle_log` table, an index, atomic apply/Undo triggers and a unified history view. It reuses `battle_resource_state`, `battle_resource_daily` and ordinary `remote_raid_usage`. `schema.sql` includes the same additions for fresh databases.
-
-The migration uses `CREATE IF NOT EXISTS` and does not replay history or attach triggers to the historical `raid_log` table. Historical Undo imports and reverses one old row in a single D1 batch. New Undo reverses the original deltas and original usage date atomically; repeated requests are harmless. Conflicting manual corrections or deleted targets reject the entire Undo rather than partially refunding resources. MP refunds are not clamped, so later collection cannot cause a lossy Undo.
-
-After merge, an authorized operator must apply **only** the new migration to production using the existing binding:
-
-```bash
-npx wrangler d1 execute DB --remote --file=migrations/0002_battle_logging.sql
-```
-
-This command is a manual production step, not part of tests or this PR's execution. Part 3 migration `0001_battle_resources.sql` must already be applied. The additive migration is compatible with the old Worker; if the new Worker arrives first, logging returns an actionable migration-required error until the migration is applied. Do not initialize production with the full `schema.sql`.
-
-`/api/battle-log` and `/api/battle-log/undo` serve the unified logger; the existing `/api/raid-log` paths remain aliases. No Worker deployment settings change. CSS references are bumped to v33 on all four public pages. The deterministic suite includes actual SQLite transaction tests (Node 22.13+ or Node 24), API compatibility, resource/Undo regressions, UI contracts and inline JavaScript syntax checks.
-
-## Part 5: Targets integration
-
-Targets now distinguish ordinary Raids, Dynamax and Gigantamax. Add a target from a recommendation, or choose its battle type in the editor. Max goals default to battles won; Candy, Candy XL and editable custom progress remain supported. A matching existing recommendation target opens Edit. Existing targets can correct Pokémon/form, battle type, and target type while keeping the same stable target ID so historical battle-log/Undo links remain attached. Duplicate identity changes are rejected. The logger offers a goal selector when several goals match the same battle.
-
-Matching uses the exact Pokémon/form plus battle identity across recommendations, current/upcoming availability, calendar personalization and logging. A Raid target never automatically receives Max progress. Explicitly named legacy Max targets retain that identity; otherwise historical targets remain Raid targets. New Max targets use capability-prefixed names (for example, Gigantamax Gengar) so separate goals coexist under the existing per-user/name/goal uniqueness rule. No existing name, ID or progress is rewritten.
-
-When several goals match, recommendations prioritize active targets, then personal priority, with a stable goal/ID tie-break. The logger initially selects that target, but the user can select another matching goal and edit actual progress. Completed/Skip goals retain their planning exclusions. Battle-count goals use wins, not failed attempts. The planner does not automatically mark targets complete.
-
-Battle and availability filters participate in the existing Active/Completed/All counts. Max Target cards omit ordinary Raid attacker information and never substitute a base sprite for a missing exact form. The Target editor and logger retain visible actions at narrow mobile sizes; CSS references are v34. Single-target deletion now reports progress/failure inline in Targets: a failed delete preserves the current tab, search/filter context, and target card, while a successful delete reloads state as before.
-
-### Part 5 migration and rollout
-
-`migrations/0003_target_battle_kind.sql` adds one nullable, constrained `targets.battle_kind` column. It preserves Target IDs and historical Raid foreign keys without rebuilding tables. It does not change Part 4 logs or resource tables. `schema.sql` includes the column for fresh databases.
-
-Apply the migration **once**, after merge and production authorization, with the existing binding:
-
-```bash
-npx wrangler d1 execute DB --remote --file=migrations/0003_target_battle_kind.sql
-```
-
-Unlike the CREATE-based Part 4 migration, SQLite ADD COLUMN is not repeatable. Check `PRAGMA table_info(targets)` first if application status is uncertain. Do not apply it again to a database already containing `battle_kind`, including a fresh database initialized with the new schema. Before migration, reads retain legacy identity inference and Target saves return an actionable 503.
-
-Editing preserves a target's stable ID and history link, but Pokémon/form, battle type, and target type can now be corrected in place. A change that would collide with another existing target is rejected instead of merging/resetting progress. Progress, desired amount, expected progress, priority, completion and notes remain editable.
-
-The Part 5 suite covers migration/FK preservation, separate same-species goals, CRUD/authentication, duplicate protection, form matching, recommendations, suppression-aware availability, allocation caps, editable progress and Undo, and filtered UI counts. No production migration, merge or deployment is part of Part 5 PR preparation.
-
-### Schema baseline reconciliation
-
-`schema.sql` is the supported fresh-database baseline. On 18 September 2026, the production D1 schema was inspected directly and confirmed to contain `event_suppression_rules`, `remote_raid_daily_budget_overrides`, `idx_event_suppression_dates`, and `idx_remote_raid_daily_budget_overrides_date`. The repository baseline now carries those verified definitions.
-
-`migrations/0004_schema_baseline_operational_tables.sql` is an idempotent repair migration for an existing installation that is missing either operational table or explicit index. It uses only `CREATE ... IF NOT EXISTS`, so it preserves existing rows and objects. The current production database already contains all four verified objects, so BL-001 does **not** require applying migration 0004 to production.
-
-For another installation, inspect `sqlite_schema` first. If any of the four objects are missing, apply the migration with the existing D1 binding:
-
-```bash
-npx wrangler d1 execute DB --remote --file=migrations/0004_schema_baseline_operational_tables.sql
-```
-
-Fresh databases should be initialized from `schema.sql`, not by replaying production migrations.
-
-### Max Battle tier override migration
-
-`migrations/0005_max_battle_cost_overrides.sql` adds private per-user, per-opportunity Max Battle tier/cost fallback data. It is additive and uses `CREATE ... IF NOT EXISTS`. Apply it to an existing production D1 database before deploying the Worker/UI that exposes **Set Max tier…**:
-
-```bash
-npx wrangler d1 execute DB --remote --file=migrations/0005_max_battle_cost_overrides.sql
-```
-
-The override is used only when automatic cost evidence is unavailable. It does not replace official event evidence or trusted current tier data.
-
-### Sync source health migration
-
-`migrations/0006_sync_source_health.sql` adds per-source synchronization health for event feeds, official schedules, and meta inputs. It stores the latest attempt, latest successful attempt, last error, and last successful item count. The migration is additive and idempotent.
-
-Apply it to an existing production D1 database with the existing binding:
-
-```bash
-npx wrangler d1 execute DB --remote --file=migrations/0006_sync_source_health.sql
-```
-
-The Worker is intentionally backward compatible with deployment order: if the new Worker runs before migration 0006 is applied, synchronization continues and the Planner falls back to its legacy freshness timestamps. Once the table exists and the next synchronization runs, per-source health begins populating automatically.
-
-### Credential rotation migration
-
-`migrations/0007_feed_link_credentials.sql` adds per-planner generation/enable state for the preferred signed calendar subscription. It is additive and idempotent.
-
-Apply it to an existing production D1 database with the existing binding:
-
-```bash
-npx wrangler d1 execute DB --remote --file=migrations/0007_feed_link_credentials.sql
-```
-
-Deployment order is safe. Before migration 0007 exists, every existing generation-0 signed URL keeps working exactly as before and the Planner disables signed-feed rotation controls. After the migration is applied, regenerating or revoking the preferred signed URL advances only that planner's generation and immediately invalidates its previous signed URL. Legacy `/calendar/<random-token>.ics` subscriptions remain independently compatible until the existing legacy-revoke control is used. Management-link rotation does not require migration 0007 and does not alter either calendar credential.
+Historical Part-by-Part rollout details and one-time production commands are preserved in [Historical rollout and migration reference](docs/ROLLOUT_HISTORY.md). Treat that document as history, not as instructions to rerun against a current database.
 
 ## Features
 
@@ -349,6 +259,12 @@ Manual `wrangler deploy` is available as an npm script, but it is not the normal
 │   ├── devcontainer.json      # Container, mounts, extension, and port settings
 │   ├── post-create.sh         # Dependencies and first-create setup
 │   └── post-start.sh          # GitHub Git setup and local author identity
+├── docs/
+│   ├── ARCHITECTURE.md        # Current system architecture and invariants
+│   ├── BACKLOG.md             # Confirmed unshipped work
+│   ├── DECISIONS.md           # Durable decisions and shipped PR lineage
+│   └── ROLLOUT_HISTORY.md     # Historical one-time rollout/migration notes
+├── migrations/                # Forward migrations for older existing D1 databases
 ├── public/
 │   ├── admin.html             # Administration interface markup
 │   ├── admin-app.js           # Admin same-origin application script
@@ -650,7 +566,7 @@ Smoke-test checklist:
 - Static styling responds at desktop and narrow viewport widths.
 - Developer tools show no unexpected request or JavaScript errors.
 
-The repository does not currently include a script that initializes the local D1 schema automatically. Planner creation, management APIs, and other D1-backed behavior require separate manual local D1 setup using `schema.sql`; runtime-secret and external-source behavior may also differ from production. Stop Wrangler with `Ctrl+C`.
+The repository does not currently include a script that initializes the local D1 schema automatically. For a **fresh** local D1 database, initialize from `schema.sql`; do not replay the numbered `migrations/` files afterward. Planner creation, management APIs, and other D1-backed behavior require that local schema setup, while runtime-secret and external-source behavior may still differ from production. Stop Wrangler with `Ctrl+C`.
 
 ### Automated regression checks
 
@@ -752,6 +668,8 @@ feature branch
 ```
 
 Production: [https://pogo-plan.jquak-10.workers.dev](https://pogo-plan.jquak-10.workers.dev)
+
+Database migrations are a separate, explicit operation; merging to `main` does not run D1 SQL automatically. Use `schema.sql` for a fresh environment. For an older existing database, inspect its schema and apply only a migration explicitly required by the release being adopted. Do not replay the historical `0001`–`0007` sequence as a generic deployment step; see [docs/ROLLOUT_HISTORY.md](docs/ROLLOUT_HISTORY.md) only when older-installation history is actually needed.
 
 Do not routinely use `wrangler deploy`. Never expose account IDs, tokens, private management URLs, private calendar URLs, or secrets.
 
