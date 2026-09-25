@@ -58,6 +58,7 @@ import {
 } from "./timezone.js";
 import {
   SYNC_HEALTH_GROUPS,
+  evaluateProductionFreshness,
   summarizeSyncHealth
 } from "./sync-health.js";
 import {
@@ -10800,6 +10801,115 @@ export function eventSyncHealthSourcesForUser(
   ];
 }
 
+function productionSyncHealthSources() {
+  const sources =
+    Object.entries(
+      SOURCES
+    ).map(
+      ([
+        sourceType,
+        sourceUrl
+      ]) =>
+        eventSyncSource(
+          sourceType,
+          sourceUrl
+        )
+    );
+
+  sources.push(
+    eventSyncSource(
+      MAX_ROTATION_SOURCE_TYPE
+    ),
+    eventSyncSource(
+      "pokemon_go_api_current_max_battles",
+      POGO_API_MAX_BATTLES
+    ),
+    OFFICIAL_SYNC_SOURCE,
+    ...Object.values(
+      META_SYNC_SOURCES
+    )
+  );
+
+  return [
+    ...new Map(
+      sources.map(
+        source => [
+          source.source_key,
+          source
+        ]
+      )
+    ).values()
+  ];
+}
+
+async function productionDataFreshnessApi(
+  env
+) {
+  const expectedSources =
+    productionSyncHealthSources();
+
+  try {
+    const { results } =
+      await env.DB.prepare(`
+        SELECT
+          source_key,
+          source_group,
+          source_label,
+          last_attempt_at,
+          last_success_at,
+          last_error,
+          item_count
+        FROM sync_source_health
+        ORDER BY
+          source_group,
+          source_label
+      `).all();
+
+    const freshness =
+      evaluateProductionFreshness(
+        results || [],
+        expectedSources
+      );
+
+    return json(
+      freshness,
+      freshness.monitor_ok
+        ? 200
+        : 503
+    );
+  } catch (error) {
+    console.warn(
+      "Production freshness health unavailable:",
+      syncHealthErrorMessage(
+        error
+      )
+    );
+
+    return json(
+      {
+        monitor_ok: false,
+        status: "unavailable",
+        checked_at:
+          nowIso(),
+        stale_after_hours:
+          18,
+        source_count:
+          expectedSources.length,
+        stale_count: 0,
+        missing_count:
+          expectedSources.length,
+        degraded_count: 0,
+        oldest_success_at: null,
+        newest_attempt_at: null,
+        groups: {},
+        sources: []
+      },
+      503
+    );
+  }
+}
+
+
 async function dataFreshnessForDashboard(
   env,
   user
@@ -12561,6 +12671,16 @@ async function handleFetch(request, env) {
       }
 
       return createUser(request, env);
+    }
+
+    if (
+      request.method === "GET" &&
+      path ===
+        "/api/health/data-freshness"
+    ) {
+      return productionDataFreshnessApi(
+        env
+      );
     }
 
     if (request.method === "GET" && path === "/api/me") {
