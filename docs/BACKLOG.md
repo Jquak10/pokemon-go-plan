@@ -27,20 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-048 — Generalize official cancellation/reschedule suppression
-
-Priority: **High**
-
-The automatic official-notice suppression parser currently recognizes a narrow Mega Finale-specific cancellation sentence. Official Pokémon GO notices may instead describe events as rescheduled, postponed, cancelled/canceled, or moved, so a replacement/suppression notice can fail to propagate consistently to Calendar, ICS, recommendations, current availability, and Remote allocation.
-
-Required outcome:
-
-- add conservative official-notice detection for cancellation/reschedule/postponement language;
-- require a positively identified affected event/date window before suppressing availability;
-- reuse the existing suppression model rather than deleting underlying event/meta data;
-- keep official source precedence above normalized calendar data;
-- add deterministic parsing and downstream suppression regressions, including false-positive protection.
-
 ### BL-049 — Expire stale pinned official source pages
 
 Priority: **High**
@@ -160,5 +146,7 @@ BL-046 is implemented by PR #99: the README is now current-state guidance for pr
 A fresh post-PR-#99 product audit on 25 September 2026 identified six concrete follow-ups. The user explicitly promoted them into the durable backlog as BL-047 through BL-052: bearer-safe Worker observability, generalized official cancellation/reschedule suppression, expiry of stale pinned official pages, completion of the 44px mobile touch-target contract, implausibly-empty upstream sync rejection, and production D1 schema-compatibility health.
 
 BL-047 is implemented by PR #100: Workers Logs/custom error output stays enabled, but automatic Fetch invocation logs are explicitly disabled because Cloudflare invocation records include request URLs and this product intentionally carries management/calendar bearer credentials in URL paths. Deterministic release-safety coverage locks that configuration, and the architecture now records the bearer-safe observability boundary. No D1 migration, route, Cron, secret, binding, Service Binding, CSS, or application behavior change is required.
+
+BL-048 is implemented by PR #101: official cancellation/reschedule parsing now recognizes definite rescheduled, postponed, cancelled/canceled, suspended, will-not-take-place, and move-to-later/new-date language only when the same sentence positively names an already-normalized stored event. Targeted suppression selectors combine source type with normalized event identity and reuse the event's stored date window, so one event can be hidden without suppressing unrelated same-source/same-date events. Conditional wording such as "may be suspended" remains non-suppressing, the existing broad Mega Finale replacement rule remains intact, and Calendar/ICS plus recommendation/current-availability paths reuse the same suppression model. No D1 migration, CSS/cache, route, Cron, secret, binding, or Service Binding change is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
