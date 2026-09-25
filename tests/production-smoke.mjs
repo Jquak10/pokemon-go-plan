@@ -477,6 +477,48 @@ async function runSmokeAttempt({
     "Data Sources page heading is missing"
   );
 
+  const helpResponse =
+    await fetchWithTimeout(
+      new URL(
+        "/help",
+        baseUrl
+      ),
+      {
+        headers: {
+          accept: "text/html"
+        }
+      },
+      timeoutMs
+    );
+
+  assert.equal(
+    helpResponse.status,
+    200,
+    `Help & Data Handling page returned HTTP ${helpResponse.status}`
+  );
+  assertContentType(
+    helpResponse,
+    /text\/html/i
+  );
+  assertHardenedHtmlHeaders(
+    helpResponse,
+    "Help & Data Handling page"
+  );
+
+  const helpHtml =
+    await helpResponse.text();
+
+  assert.match(
+    helpHtml,
+    /<h1>Privacy, recovery &amp; support<\/h1>|<h1>Privacy, recovery & support<\/h1>/,
+    "Help & Data Handling page heading is missing"
+  );
+  assert.match(
+    helpHtml,
+    /github\.com\/Jquak10\/pokemon-go-plan\/issues\/new/,
+    "Help & Data Handling page is missing the public support route"
+  );
+
   for (const {
     path,
     label
@@ -537,6 +579,11 @@ async function runSmokeAttempt({
       path: "/sources.html",
       canonicalPath: "/sources",
       label: "Direct Data Sources HTML"
+    },
+    {
+      path: "/help.html",
+      canonicalPath: "/help",
+      label: "Direct Help HTML"
     },
     {
       path: "/admin.html",
