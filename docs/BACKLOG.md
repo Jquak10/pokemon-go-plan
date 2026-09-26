@@ -27,20 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-050 — Complete the 44px mobile touch-target contract
-
-Priority: **Recommended**
-
-The mobile layout, safe-area, modal/sheet locking, and overflow behavior are well covered, but several interactive controls can still compute below the project's 44px touch-target minimum, including compact close/icon controls and some collapsible/filter/forecast controls.
-
-Required outcome:
-
-- ensure interactive mobile controls are at least 44px by 44px where applicable;
-- preserve desktop density where a smaller visual control is intentional by expanding the mobile hit area rather than broadly bloating desktop UI;
-- cover representative mobile controls with computed-size browser regressions;
-- preserve safe-area, no-horizontal-scroll, bottom-nav, and overlay behavior;
-- bump the CSS cache version if `styles.css` changes.
-
 ### BL-051 — Reject implausibly empty upstream sync successes
 
 Priority: **Recommended**
@@ -136,5 +122,7 @@ BL-047 is implemented by PR #100: Workers Logs/custom error output stays enabled
 BL-048 is implemented by PR #101: official cancellation/reschedule parsing now recognizes definite rescheduled, postponed, cancelled/canceled, suspended, will-not-take-place, and move-to-later/new-date language only when the same sentence positively names an already-normalized stored event. Targeted suppression selectors combine source type with normalized event identity and reuse the event's stored date window, so one event can be hidden without suppressing unrelated same-source/same-date events. Conditional wording such as "may be suspended" remains non-suppressing, the existing broad Mega Finale replacement rule remains intact, and Calendar/ICS plus recommendation/current-availability paths reuse the same suppression model. No D1 migration, CSS/cache, route, Cron, secret, binding, or Service Binding change is required.
 
 BL-049 is implemented by PR #102: temporary official-page pins now carry explicit event horizons, so the Mega Finale/Armored Mewtwo pages stop receiving pinned discovery priority after 6 September 2026 and no longer consume current-news discovery slots. The retained-future-source lane remains separately bounded and can still revisit an expired former pin when a stored future official supplement references it. Existing historical event/evidence rows are not deleted or rewritten. No D1 migration, CSS/cache, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
+
+BL-050 is implemented by PR #103: the Planner-only mobile stylesheet now enforces a 44×44 touch-box contract across discrete buttons, selects, text inputs, collapsible summaries, compact icon/month/overflow controls, range inputs, Battle Plan filters, resource editors, forecast expansion, Max-tier controls, and the appearance selector while leaving desktop density unchanged. Range sliders retain an 8 px visual track inside a 44 px interaction height. Chromium measures representative rendered controls across Plan, More, Targets, Calendar, and Preferences, and the Planner stylesheet cache advances to v6. Shared `styles.css` is unchanged, so its v44 cache generation does not move. No D1 migration, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

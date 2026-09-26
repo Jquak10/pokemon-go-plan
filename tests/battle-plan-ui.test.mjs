@@ -304,7 +304,7 @@ assert.match(manage, /nav-label-desktop">Battle Plan/);
 assert.match(manage, /nav-label-mobile">Plan/);
 assert.match(manage, /<script src="\/planner-client\.js\?v=3"><\/script>/);
 assert.match(manage, /<script src="\/planner-overlay\.js\?v=1"><\/script>/);
-assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=5">/);
+assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=6">/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
@@ -509,7 +509,7 @@ for (const page of [
 
 assert.match(
   manage,
-  /<link rel="stylesheet" href="\/planner\.css\?v=5">/
+  /<link rel="stylesheet" href="\/planner\.css\?v=6">/
 );
 
 assert.match(themeApp, /pogo-theme/);
