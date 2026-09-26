@@ -509,7 +509,7 @@ for (const page of [
 
 assert.match(
   manage,
-  /<link rel="stylesheet" href="\/planner\.css\?v=5">/
+  /<link rel="stylesheet" href="\/planner\.css\?v=6">/
 );
 
 assert.match(themeApp, /pogo-theme/);
