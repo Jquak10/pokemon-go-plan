@@ -177,8 +177,18 @@ const OFFICIAL_POKEMON_GO_NEWS_URL =
   "https://pokemongo.com/news";
 
 const PINNED_OFFICIAL_EVENT_PAGES = [
-  "https://pokemongo.com/gofest/megafinale",
-  "https://pokemongo.com/news/megafinale-2026-armored-mewtwo"
+  {
+    url:
+      "https://pokemongo.com/gofest/megafinale",
+    through_date:
+      "2026-09-06"
+  },
+  {
+    url:
+      "https://pokemongo.com/news/megafinale-2026-armored-mewtwo",
+    through_date:
+      "2026-09-06"
+  }
 ];
 
 const MAX_OFFICIAL_EVENT_PAGES_PER_SYNC = 8;
@@ -4638,7 +4648,37 @@ function normalizedOfficialEventPageUrl(
   }
 }
 
-function officialEventLinksFromHtml(html, baseUrl) {
+export function activePinnedOfficialEventPageUrls(
+  day = todayUtc()
+) {
+  const normalizedDay =
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      String(day || "")
+    )
+      ? String(day)
+      : todayUtc();
+
+  return PINNED_OFFICIAL_EVENT_PAGES
+    .filter(
+      pin =>
+        !pin.through_date ||
+        normalizedDay <=
+          pin.through_date
+    )
+    .map(
+      pin =>
+        normalizedOfficialEventPageUrl(
+          pin.url
+        )
+    )
+    .filter(Boolean);
+}
+
+export function officialEventLinksFromHtml(
+  html,
+  baseUrl,
+  day = todayUtc()
+) {
   const maxBattleLinks = [];
   const otherLinks = [];
 
@@ -4677,12 +4717,16 @@ function officialEventLinksFromHtml(html, baseUrl) {
   }
 
   // Max-event articles often carry the only official difficulty evidence
-  // needed to derive a safe standard MP entry cost. Prioritize them before
-  // general news pages. The overall discovery budget is applied later so
-  // retained future-event source pages can be added without displacing them.
+  // needed to derive a safe standard MP entry cost. Time-bounded pins may
+  // temporarily outrank current-news discovery for a known event, but they
+  // expire with that event horizon so they cannot consume discovery capacity
+  // indefinitely. Retained future-event sources are merged separately after
+  // the discovery limit and therefore remain independent of pin expiry.
   return [
     ...new Set([
-      ...PINNED_OFFICIAL_EVENT_PAGES,
+      ...activePinnedOfficialEventPageUrls(
+        day
+      ),
       ...maxBattleLinks,
       ...otherLinks
     ])
