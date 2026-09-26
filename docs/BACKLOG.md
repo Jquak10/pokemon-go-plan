@@ -1,6 +1,6 @@
 # Pokémon GO Battle Planner — Backlog
 
-Last reviewed: 25 September 2026
+Last reviewed: 27 September 2026
 
 This file is the durable home for **confirmed but unshipped work** and explicitly deferred/rejected ideas that would otherwise exist only in project chats.
 
@@ -26,20 +26,6 @@ It is intentionally different from the other repository references:
 7. Never create a production migration solely because an item appears here. Inspect current production state and follow the normal migration/release workflow.
 
 ## Active
-
-### BL-049 — Expire stale pinned official source pages
-
-Priority: **High**
-
-`PINNED_OFFICIAL_EVENT_PAGES` currently contains Mega Finale / Armored Mewtwo pages whose event windows have ended, while pinned URLs are prepended before the bounded official-news discovery list. Expired pins can therefore consume part of the current discovery budget unnecessarily.
-
-Required outcome:
-
-- make pinned official pages time/event bounded or remove pins once their purpose has expired;
-- preserve the existing retained-future-source recovery mechanism for still-relevant official pages;
-- ensure current official-news discovery receives the intended bounded capacity;
-- add deterministic coverage for expiry and retained-future behavior;
-- do not weaken exact official evidence already stored for historical/shipped events.
 
 ### BL-050 — Complete the 44px mobile touch-target contract
 
@@ -148,5 +134,7 @@ A fresh post-PR-#99 product audit on 25 September 2026 identified six concrete f
 BL-047 is implemented by PR #100: Workers Logs/custom error output stays enabled, but automatic Fetch invocation logs are explicitly disabled because Cloudflare invocation records include request URLs and this product intentionally carries management/calendar bearer credentials in URL paths. Deterministic release-safety coverage locks that configuration, and the architecture now records the bearer-safe observability boundary. No D1 migration, route, Cron, secret, binding, Service Binding, CSS, or application behavior change is required.
 
 BL-048 is implemented by PR #101: official cancellation/reschedule parsing now recognizes definite rescheduled, postponed, cancelled/canceled, suspended, will-not-take-place, and move-to-later/new-date language only when the same sentence positively names an already-normalized stored event. Targeted suppression selectors combine source type with normalized event identity and reuse the event's stored date window, so one event can be hidden without suppressing unrelated same-source/same-date events. Conditional wording such as "may be suspended" remains non-suppressing, the existing broad Mega Finale replacement rule remains intact, and Calendar/ICS plus recommendation/current-availability paths reuse the same suppression model. No D1 migration, CSS/cache, route, Cron, secret, binding, or Service Binding change is required.
+
+BL-049 is implemented by PR #102: temporary official-page pins now carry explicit event horizons, so the Mega Finale/Armored Mewtwo pages stop receiving pinned discovery priority after 6 September 2026 and no longer consume current-news discovery slots. The retained-future-source lane remains separately bounded and can still revisit an expired former pin when a stored future official supplement references it. Existing historical event/evidence rows are not deleted or rewritten. No D1 migration, CSS/cache, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
