@@ -971,6 +971,68 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             """() => document.getElementById('panel-preferences')?.classList.contains('active')"""
         )
 
+    def assert_minimum_touch_target(self, page, selector: str, minimum: float = 44):
+        locator = page.locator(selector).first
+        self.assertTrue(locator.is_visible(), f"{selector} should be visible")
+        box = locator.bounding_box()
+        self.assertIsNotNone(box, f"{selector} should have a layout box")
+        self.assertGreaterEqual(
+            box["width"],
+            minimum - 0.5,
+            f"{selector} width should be at least {minimum}px: {box}",
+        )
+        self.assertGreaterEqual(
+            box["height"],
+            minimum - 0.5,
+            f"{selector} height should be at least {minimum}px: {box}",
+        )
+
+    def test_mobile_touch_targets_meet_44px_contract(self):
+        page = self.open_planner(390, 844)
+
+        for selector in (
+            '.tab-button[data-tab="plan"]',
+            '[data-theme-select]',
+            '.battle-filter-button',
+            '.battle-resource-editor > summary',
+            "[data-forecast-day-index='1']",
+        ):
+            self.assert_minimum_touch_target(page, selector)
+
+        page.locator("[data-forecast-day-index='1']").click()
+        page.locator("#budgetForecastDetails").wait_for(state="visible")
+        self.assertGreaterEqual(
+            page.locator(".max-tier-override-select").count(),
+            1,
+            "Fixture should expose a Max-tier selector for touch-size coverage",
+        )
+        self.assert_minimum_touch_target(page, ".max-tier-override-select")
+
+        page.locator("#mobileMoreButton").click()
+        page.locator("#mobileMoreBackdrop").wait_for(state="visible")
+        self.assert_minimum_touch_target(page, "#closeMobileMore")
+        page.locator("#closeMobileMore").click()
+
+        page.locator('.tab-button[data-tab="targets"]').click()
+        page.wait_for_function(
+            """() => document.getElementById('panel-targets')?.classList.contains('active')"""
+        )
+        self.assert_minimum_touch_target(page, ".target-more-button")
+
+        page.locator('.tab-button[data-tab="calendar"]').click()
+        page.wait_for_selector("#calendarMonthGrid .calendar-day-cell")
+        self.assert_minimum_touch_target(page, "#calendarPrevMonth")
+        self.assert_minimum_touch_target(page, "#calendarNextMonth")
+
+        self.open_preferences(page, 390)
+        self.assertGreaterEqual(
+            page.locator('input[type="range"]').count(),
+            1,
+            "Preferences should expose a range control for touch-size coverage",
+        )
+        self.assert_minimum_touch_target(page, 'input[type="range"]')
+        self.assert_no_horizontal_overflow(page)
+
     def test_theme_system_light_dark_and_cross_surface_persistence(self):
         context = self.browser.new_context(
             viewport={"width": 1180, "height": 900},
