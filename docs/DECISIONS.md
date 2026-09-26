@@ -1226,6 +1226,7 @@ The following sequence is retained as a compact repository implementation/change
 | #99 | BL-046 current README / historical rollout split | Keeps README operational guidance present-tense, moves historical Part 4/5 rollout and one-time D1 commands to a warned archival reference, distinguishes fresh `schema.sql` setup from older-installation migrations, and adds deterministic documentation-safety coverage without changing runtime behavior. |
 | #100 | BL-047 bearer-safe Worker observability | Keeps Workers Logs/custom error output available while disabling automatic Fetch invocation logs that include request URLs, locks the configuration with deterministic release-safety coverage, and closes the platform-logging gap for management/calendar bearer capability paths without changing app behavior. |
 | #101 | BL-048 targeted official schedule-change suppression | Generalizes definite official cancellation/reschedule detection while requiring a positively named stored event, adds event-specific suppression selectors so same-source/same-date peers remain visible, preserves the broad Mega Finale rule, and covers Calendar/ICS plus availability filtering and false-positive cases without a D1 migration. |
+| #102 | BL-049 bounded official source pins | Gives temporary official-page pins explicit event horizons so expired one-off pages stop consuming the bounded current-news discovery budget, while preserving the independently bounded retained-future recovery lane and all already-stored historical official evidence. |
 
 ## Supersession map
 
