@@ -217,7 +217,7 @@ Preferences live under More rather than occupying a permanent bottom-nav slot. I
 
 Mobile invariants:
 
-- Touch targets are at least 44 px where practical.
+- Interactive Planner controls on mobile use at least a 44×44 px touch box where the control is a discrete tappable target. Compact visual affordances may remain visually smaller inside that box; desktop density is unaffected. Range sliders keep a thin visual track while the input owns a 44 px mobile interaction height.
 - Safe-area insets are respected.
 - Sheets/drawers must not be hidden behind the bottom nav.
 - Background page scrolling is frozen while a modal/drawer is open.
@@ -296,7 +296,7 @@ The external `live-contract` job remains separate and non-blocking on pull reque
 
 Whenever public/styles.css changes, every page that references it must have its CSS cache/version reference bumped. This prevents stale production styling after deployment.
 
-The current shared CSS cache generation is v42 after the BL-011G Planner stylesheet split. Future `styles.css` changes must continue the version bump. Planner-only overrides are loaded separately from `planner.css`; BL-026 advances the Planner-only stylesheet reference to v3 for the Mobile More fifth-slot positioning needed after moving that control outside the ARIA tablist, without changing shared `styles.css`.
+The current shared CSS cache generation is v44; future `styles.css` changes must continue the shared version bump. Planner-only overrides are loaded separately from `planner.css`; BL-050 advances the Planner-only stylesheet reference to v6 for the mobile 44×44 touch-target contract without changing shared `styles.css`.
 
 JavaScript assets use explicit query-version bumps when their browser contract changes. BL-018 advances the `planner-client.js` reference from v2 to v3 so cached clients cannot retain the old unconditional-`response.json()` behavior after deployment. BL-026 advances `planner-app.js` from v3 to v4 for the roving-tabindex and keyboard-navigation contract.
 

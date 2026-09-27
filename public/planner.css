@@ -2932,3 +2932,56 @@ html[data-theme="dark"] .tab-button.active,
 html[data-theme="dark"] .battle-filter-button.active {
   box-shadow: 0 7px 18px rgba(0, 0, 0, .26);
 }
+
+/* ============================================================
+   MOBILE TOUCH-TARGET CONTRACT · BL-050
+   ============================================================ */
+@media (max-width: 760px) {
+  /*
+    Keep desktop density unchanged while making the actual mobile hitboxes
+    large enough for touch. Component-specific visuals may stay compact inside
+    these boxes.
+  */
+  .manage-page button,
+  .manage-page .button,
+  .manage-page select,
+  .manage-page input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .manage-page details > summary {
+    min-height: 44px;
+  }
+
+  .manage-page .icon-button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .manage-page .icon-month-button,
+  .manage-page .target-more-button {
+    min-width: 44px;
+  }
+
+  /*
+    The visual range track remains 8px tall via background-clip while the
+    input itself owns a 44px touch box.
+  */
+  .manage-page input[type="range"] {
+    height: 44px;
+    min-height: 44px;
+    padding-block: 18px;
+    background-clip: content-box;
+  }
+
+  /* Final cascade guards for compact controls defined later in older blocks. */
+  .manage-page .tab-button,
+  .manage-page .battle-filter-button,
+  .manage-page .raid-rank-details > summary,
+  .manage-page .battle-resource-editor > summary,
+  .manage-page .forecast-expand-button,
+  .manage-page .max-tier-override-select,
+  .manage-page .theme-control select,
+  .manage-page .target-clear-filters {
+    min-height: 44px;
+  }
+}
+
