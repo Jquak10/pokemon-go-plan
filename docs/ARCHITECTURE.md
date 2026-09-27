@@ -1101,3 +1101,8 @@ Every feature, improvement, bug fix, refactor, migration, maintenance change, an
 Not every fix requires a new ADR, and unrelated docs should not be churned. However, product improvements and bug fixes are always logged in the DECISIONS.md PR lineage so the repository can reconstruct its evolution without old chats. Unshipped commitments must likewise be captured in BACKLOG.md if they need to survive chat cleanup.
 
 Because a PR number does not exist until the PR is opened, the development workflow may add the final PR-lineage entry as a small follow-up commit on the same branch. The PR is not considered ready to merge until that entry and any other relevant documentation are current.
+
+
+### Sync yield integrity
+
+Pokémon GO API Pokédex and PvPoke Master League syncs require at least one returned item before an attempt can advance last-known-good sync health. Implausibly empty payloads use the existing failed-attempt path, preserving the prior success timestamp/item count while surfacing the new failed attempt to freshness monitoring. Sources without an explicit minimum retain their existing zero-item semantics.
