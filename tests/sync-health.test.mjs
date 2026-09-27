@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   PRODUCTION_FRESHNESS_STALE_AFTER_MS,
   evaluateProductionFreshness,
+  requireMinimumSyncYield,
   summarizeSyncHealth
 } from "../src/sync-health.js";
 
@@ -428,4 +429,57 @@ assert.equal(
 
 console.log(
   "sync health tests passed"
+);
+
+
+const guardedPokedex = {
+  source_key: "meta:pokemon-go-api-pokedex",
+  source_label: "Pokémon GO API Pokédex",
+  minimum_viable_item_count: 1
+};
+const guardedPvpoke = {
+  source_key: "meta:pvpoke-master-league",
+  source_label: "PvPoke Master League",
+  minimum_viable_item_count: 1
+};
+
+assert.equal(
+  requireMinimumSyncYield(
+    guardedPokedex,
+    1200
+  ),
+  1200
+);
+assert.equal(
+  requireMinimumSyncYield(
+    guardedPvpoke,
+    500
+  ),
+  500
+);
+assert.throws(
+  () =>
+    requireMinimumSyncYield(
+      guardedPokedex,
+      0
+    ),
+  /implausibly empty payload.*minimum 1/i
+);
+assert.throws(
+  () =>
+    requireMinimumSyncYield(
+      guardedPvpoke,
+      0
+    ),
+  /implausibly empty payload.*minimum 1/i
+);
+assert.equal(
+  requireMinimumSyncYield(
+    {
+      source_key: "event:possibly-empty"
+    },
+    0
+  ),
+  0,
+  "Sources without a minimum remain allowed to report zero items"
 );
