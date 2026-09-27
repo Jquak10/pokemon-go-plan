@@ -426,7 +426,7 @@ async function recordSyncSourceHealth(
   }
 }
 
-async function withSyncSourceHealth(
+export async function withSyncSourceHealth(
   env,
   source,
   work,
