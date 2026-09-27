@@ -27,20 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-051 — Reject implausibly empty upstream sync successes
-
-Priority: **Recommended**
-
-Synchronization health records source `item_count`, but production freshness currently treats a recent HTTP-successful/parse-successful sync as healthy even when a source that should contain data returns an implausibly empty payload. This can move `last_success_at` forward and hide an upstream contract break.
-
-Required outcome:
-
-- define source-specific minimum viable yield checks where an empty payload cannot reasonably be valid;
-- at minimum cover the Pokémon GO API Pokédex and PvPoke ranking inputs;
-- do not overwrite last-known-good success/item-count state when a payload is structurally valid but implausibly empty;
-- surface the failed attempt through existing sync-health/freshness monitoring;
-- add deterministic healthy/empty/degraded recovery coverage.
-
 ### BL-052 — Add production schema-compatibility health
 
 Priority: **Recommended**
@@ -55,6 +41,8 @@ Required outcome:
 - make missing required schema fail monitoring with actionable component names only;
 - add deterministic compatible/incompatible regressions;
 - do not mutate or auto-migrate production D1 from the health check.
+
+
 
 ## Deferred
 
@@ -122,6 +110,8 @@ BL-047 is implemented by PR #100: Workers Logs/custom error output stays enabled
 BL-048 is implemented by PR #101: official cancellation/reschedule parsing now recognizes definite rescheduled, postponed, cancelled/canceled, suspended, will-not-take-place, and move-to-later/new-date language only when the same sentence positively names an already-normalized stored event. Targeted suppression selectors combine source type with normalized event identity and reuse the event's stored date window, so one event can be hidden without suppressing unrelated same-source/same-date events. Conditional wording such as "may be suspended" remains non-suppressing, the existing broad Mega Finale replacement rule remains intact, and Calendar/ICS plus recommendation/current-availability paths reuse the same suppression model. No D1 migration, CSS/cache, route, Cron, secret, binding, or Service Binding change is required.
 
 BL-049 is implemented by PR #102: temporary official-page pins now carry explicit event horizons, so the Mega Finale/Armored Mewtwo pages stop receiving pinned discovery priority after 6 September 2026 and no longer consume current-news discovery slots. The retained-future-source lane remains separately bounded and can still revisit an expired former pin when a stored future official supplement references it. Existing historical event/evidence rows are not deleted or rewritten. No D1 migration, CSS/cache, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
+
+BL-051 is implemented by PR #104: Pokédex and PvPoke meta inputs now declare a minimum viable yield of one item. A structurally valid zero-item response is converted into the existing failed-attempt health path before success persistence, preserving the previous last-success timestamp and item count while recording the new attempt/error for freshness monitoring. Sources without an explicit minimum remain zero-safe. Deterministic coverage protects healthy, empty/degraded, and recovery-compatible semantics. No D1 migration, CSS/cache, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
 
 BL-050 is implemented by PR #103: the Planner-only mobile stylesheet now enforces a 44×44 touch-box contract across discrete buttons, selects, text inputs, collapsible summaries, compact icon/month/overflow controls, range inputs, Battle Plan filters, resource editors, forecast expansion, Max-tier controls, and the appearance selector while leaving desktop density unchanged. Range sliders retain an 8 px visual track inside a 44 px interaction height. Chromium measures representative rendered controls across Plan, More, Targets, Calendar, and Preferences, and the Planner stylesheet cache advances to v6. Shared `styles.css` is unchanged, so its v44 cache generation does not move. No D1 migration, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
 

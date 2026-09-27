@@ -1267,3 +1267,8 @@ Create or update an ADR entry when a change affects or supersedes durable decisi
 A routine bug fix that restores an existing invariant usually needs a PR-lineage entry, focused regression coverage, and—when the invariant was previously unclear—an architecture clarification. It does not need a new ADR unless the underlying decision or rationale changed.
 
 README, ARCHITECTURE, and BACKLOG updates are selected by impact rather than mechanically: update README for user/developer/operator-facing changes, ARCHITECTURE for current-system/invariant changes, and BACKLOG for confirmed unshipped work/status changes. AGENTS.md owns the mandatory assessment and PR workflow.
+
+
+### PR #104 — BL-051 implausibly-empty sync rejection
+
+Pokémon GO API Pokédex and PvPoke Master League synchronization inputs now declare a minimum viable yield of one item. The shared sync-health wrapper validates that yield before recording success, so a structurally valid zero-item payload follows the existing failed-attempt path: `last_attempt_at` and the sanitized error advance while `last_success_at` and `item_count` remain at their last-known-good values. A later healthy attempt clears the degraded state and advances success normally. Sources without an explicit minimum retain their existing zero-item behavior. Deterministic coverage exercises healthy, empty/degraded, and recovered transitions. No D1 migration, CSS/cache, route, Cron, secret, binding, Service Binding, or deployment-config change is required.

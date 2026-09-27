@@ -60,6 +60,7 @@ import {
   PRODUCTION_FRESHNESS_STALE_AFTER_MS,
   SYNC_HEALTH_GROUPS,
   evaluateProductionFreshness,
+  requireMinimumSyncYield,
   summarizeSyncHealth
 } from "./sync-health.js";
 import {
@@ -225,7 +226,8 @@ const META_SYNC_SOURCES =
       source_label:
         "Pokémon GO API Pokédex",
       source_url:
-        POGO_API_POKEDEX
+        POGO_API_POKEDEX,
+      minimum_viable_item_count: 1
     },
     pvpoke: {
       source_key:
@@ -235,7 +237,8 @@ const META_SYNC_SOURCES =
       source_label:
         "PvPoke Master League",
       source_url:
-        PVPOKE_MASTER_LEAGUE
+        PVPOKE_MASTER_LEAGUE,
+      minimum_viable_item_count: 1
     },
     assessments: {
       source_key:
@@ -423,7 +426,7 @@ async function recordSyncSourceHealth(
   }
 }
 
-async function withSyncSourceHealth(
+export async function withSyncSourceHealth(
   env,
   source,
   work,
@@ -440,15 +443,22 @@ async function withSyncSourceHealth(
     const result =
       await work();
 
+    const itemCount =
+      itemCountFromResult(
+        result
+      );
+
+    requireMinimumSyncYield(
+      source,
+      itemCount
+    );
+
     await recordSyncSourceHealth(
       env,
       source,
       {
         ok: true,
-        itemCount:
-          itemCountFromResult(
-            result
-          ),
+        itemCount,
         attemptedAt
       }
     );
