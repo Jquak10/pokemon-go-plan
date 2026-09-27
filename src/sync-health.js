@@ -590,3 +590,39 @@ export function evaluateProductionFreshness(
     sources
   };
 }
+
+
+export function requireMinimumSyncYield(
+  source,
+  itemCount
+) {
+  const minimum =
+    Number(
+      source?.minimum_viable_item_count
+    );
+
+  if (
+    !Number.isFinite(minimum) ||
+    minimum <= 0
+  ) {
+    return itemCount;
+  }
+
+  const count =
+    Math.max(
+      0,
+      Number(itemCount) || 0
+    );
+
+  if (count < minimum) {
+    throw new Error(
+      `${String(
+        source?.source_label ||
+        source?.source_key ||
+        "Synchronization source"
+      )} returned an implausibly empty payload (${count} items; minimum ${minimum}).`
+    );
+  }
+
+  return count;
+}
