@@ -42,9 +42,6 @@ Required outcome:
 - add deterministic compatible/incompatible regressions;
 - do not mutate or auto-migrate production D1 from the health check.
 
-<!-- BL-051 moved to shipped history by its implementation PR. -->
-
-
 
 
 ## Deferred
