@@ -107,6 +107,73 @@ async function fetchWithRetry(
     );
 }
 
+async function checkCompatibilityFallback({
+  fetchImpl,
+  baseUrl,
+  candidateFingerprint,
+  bootstrapFingerprint,
+  timeoutMs,
+  attempts,
+  retryDelayMs,
+  modeWhenUnversioned
+}) {
+  const compatibilityResponse =
+    await fetchWithRetry(
+      fetchImpl,
+      new URL(
+        "/api/health/schema-compatibility",
+        baseUrl
+      ),
+      {
+        timeoutMs,
+        attempts,
+        retryDelayMs
+      }
+    );
+
+  const compatibilityBody =
+    await responseJson(
+      compatibilityResponse,
+      "Production schema compatibility"
+    );
+
+  if (
+    compatibilityResponse.status !== 200 ||
+    compatibilityBody?.monitor_ok !== true ||
+    compatibilityBody?.status !== "compatible"
+  ) {
+    throw new Error(
+      `Fallback production schema compatibility is not healthy: ${compatibilityBody?.status || compatibilityResponse.status}`
+    );
+  }
+
+  const deployedFingerprint =
+    String(
+      compatibilityBody
+        ?.required_schema_fingerprint ||
+      bootstrapFingerprint ||
+      ""
+    );
+
+  if (
+    !deployedFingerprint ||
+    candidateFingerprint !==
+      deployedFingerprint
+  ) {
+    throw new Error(
+      "Production schema snapshot is unavailable and this candidate changes the required schema contract relative to the deployed Worker. Restore the snapshot endpoint and apply any explicitly required production migration before merging this schema-changing candidate."
+    );
+  }
+
+  return {
+    mode:
+      compatibilityBody
+        ?.required_schema_fingerprint
+        ? "deployed_contract_fallback"
+        : modeWhenUnversioned
+  };
+}
+
 export async function checkProductionSchemaRelease({
   fetchImpl = fetch,
   baseUrl =
@@ -151,39 +218,23 @@ export async function checkProductionSchemaRelease({
       );
     }
 
-    const compatibilityResponse =
-      await fetchWithRetry(
+    const fallback =
+      await checkCompatibilityFallback({
         fetchImpl,
-        new URL(
-          "/api/health/schema-compatibility",
-          baseUrl
-        ),
-        {
-          timeoutMs,
-          attempts,
-          retryDelayMs
-        }
-      );
-
-    const compatibilityBody =
-      await responseJson(
-        compatibilityResponse,
-        "Production schema compatibility"
-      );
-
-    if (
-      compatibilityResponse.status !== 200 ||
-      compatibilityBody?.monitor_ok !== true ||
-      compatibilityBody?.status !== "compatible"
-    ) {
-      throw new Error(
-        `Bootstrap production schema compatibility is not healthy: ${compatibilityBody?.status || compatibilityResponse.status}`
-      );
-    }
+        baseUrl,
+        candidateFingerprint,
+        bootstrapFingerprint,
+        timeoutMs,
+        attempts,
+        retryDelayMs,
+        modeWhenUnversioned:
+          "bootstrap"
+      });
 
     return {
       ok: true,
-      mode: "bootstrap",
+      mode:
+        fallback.mode,
       candidate_fingerprint:
         candidateFingerprint,
       required_component_count:
@@ -198,6 +249,37 @@ export async function checkProductionSchemaRelease({
       snapshotResponse,
       "Production schema component snapshot"
     );
+
+  if (
+    snapshotResponse.status === 503 &&
+    snapshotBody?.status ===
+      "unavailable"
+  ) {
+    const fallback =
+      await checkCompatibilityFallback({
+        fetchImpl,
+        baseUrl,
+        candidateFingerprint,
+        bootstrapFingerprint,
+        timeoutMs,
+        attempts,
+        retryDelayMs,
+        modeWhenUnversioned:
+          "bootstrap"
+      });
+
+    return {
+      ok: true,
+      mode:
+        fallback.mode,
+      candidate_fingerprint:
+        candidateFingerprint,
+      required_component_count:
+        requiredSchemaComponentIdentifiers(
+          requiredSchema
+        ).length
+    };
+  }
 
   if (snapshotResponse.status !== 200) {
     throw new Error(
