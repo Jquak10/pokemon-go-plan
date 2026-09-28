@@ -28,6 +28,11 @@ jobs:
           find src public tests -type f \( -name '*.js' -o -name '*.mjs' \) -print0 \
             | xargs -0 -n1 node --check
       - run: npm test
+      - name: Verify candidate schema against production D1
+        if: github.event_name == 'pull_request'
+        env:
+          POGO_PRODUCTION_URL: https://pogo-plan.jquak-10.workers.dev
+        run: npm run check:schema-release
       - name: Validate Worker package
         run: npm run check:worker
       - run: git diff --check
