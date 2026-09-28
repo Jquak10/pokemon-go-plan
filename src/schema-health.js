@@ -27,6 +27,138 @@ export const REQUIRED_SCHEMA = Object.freeze({
   views: ["unified_battle_log"]
 });
 
+export const SCHEMA_COMPONENT_HASH_ALGORITHM = "sha256";
+
+export function requiredSchemaComponentIdentifiers(required = REQUIRED_SCHEMA) {
+  const identifiers = [];
+
+  for (const [table, columns] of Object.entries(required.tables || {})) {
+    identifiers.push(`table:${table}`);
+    for (const column of columns || []) {
+      identifiers.push(`column:${table}.${column}`);
+    }
+  }
+
+  for (const index of required.indexes || []) {
+    identifiers.push(`index:${index}`);
+  }
+  for (const trigger of required.triggers || []) {
+    identifiers.push(`trigger:${trigger}`);
+  }
+  for (const view of required.views || []) {
+    identifiers.push(`view:${view}`);
+  }
+
+  return [...new Set(identifiers)].sort();
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(String(value))
+  );
+
+  return [...new Uint8Array(digest)]
+    .map(byte => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function schemaContractFingerprint(required = REQUIRED_SCHEMA) {
+  return sha256Hex(
+    requiredSchemaComponentIdentifiers(required).join("\n")
+  );
+}
+
+export async function hashSchemaComponentIdentifiers(identifiers = []) {
+  const pairs = await Promise.all(
+    [...new Set(identifiers.map(value => String(value)))].sort()
+      .map(async identifier => [
+        identifier,
+        await sha256Hex(identifier)
+      ])
+  );
+
+  return new Map(pairs);
+}
+
+export async function evaluateSchemaComponentHashes(
+  componentHashes = [],
+  required = REQUIRED_SCHEMA
+) {
+  const present = new Set(
+    (componentHashes || []).map(value => String(value).toLowerCase())
+  );
+  const requiredHashes =
+    await hashSchemaComponentIdentifiers(
+      requiredSchemaComponentIdentifiers(required)
+    );
+
+  const missing = [];
+  for (const [identifier, hash] of requiredHashes) {
+    if (!present.has(hash)) {
+      missing.push(identifier);
+    }
+  }
+
+  return {
+    monitor_ok: missing.length === 0,
+    status: missing.length === 0 ? "compatible" : "incompatible",
+    missing_count: missing.length,
+    missing_components: missing
+  };
+}
+
+export async function inspectSchemaComponentHashes(db) {
+  const { results: objects = [] } = await db.prepare(`
+    SELECT type, name
+    FROM sqlite_master
+    WHERE type IN ('table', 'index', 'trigger', 'view')
+      AND name NOT LIKE 'sqlite_%'
+    ORDER BY type, name
+  `).all();
+
+  const identifiers = [];
+  const tableNames = [];
+
+  for (const row of objects || []) {
+    const type = String(row?.type || "").toLowerCase();
+    const name = String(row?.name || "");
+
+    if (!name || !["table", "index", "trigger", "view"].includes(type)) {
+      continue;
+    }
+
+    identifiers.push(`${type}:${name}`);
+    if (type === "table") {
+      tableNames.push(name);
+    }
+  }
+
+  for (const table of tableNames.sort()) {
+    const escapedTable = table.replace(/"/g, '""');
+    const { results: columns = [] } = await db.prepare(
+      `PRAGMA table_info("${escapedTable}")`
+    ).all();
+
+    for (const column of columns || []) {
+      const name = String(column?.name || "");
+      if (name) {
+        identifiers.push(`column:${table}.${name}`);
+      }
+    }
+  }
+
+  const hashes =
+    await hashSchemaComponentIdentifiers(identifiers);
+
+  return {
+    status: "available",
+    algorithm: SCHEMA_COMPONENT_HASH_ALGORITHM,
+    component_count: hashes.size,
+    component_hashes: [...hashes.values()].sort()
+  };
+}
+
 export function evaluateSchemaCompatibility(objects = [], columnsByTable = {}) {
   const objectKeys = new Set(
     (objects || []).map(row => `${String(row.type || "").toLowerCase()}:${String(row.name || "")}`)
