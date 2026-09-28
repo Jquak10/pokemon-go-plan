@@ -65,7 +65,8 @@ import {
 } from "./sync-health.js";
 import {
   inspectSchemaCompatibility,
-  inspectSchemaComponentHashes
+  inspectSchemaComponentHashes,
+  schemaContractFingerprint
 } from "./schema-health.js";
 import {
   PLANNER_STORAGE_LIMITS,
@@ -11335,9 +11336,15 @@ export async function productionSchemaCompatibilityApi(env) {
       await inspectSchemaCompatibility(
         env.DB
       );
+    const requiredSchemaFingerprint =
+      await schemaContractFingerprint();
 
     return json(
-      compatibility,
+      {
+        ...compatibility,
+        required_schema_fingerprint:
+          requiredSchemaFingerprint
+      },
       compatibility.monitor_ok
         ? 200
         : 503
