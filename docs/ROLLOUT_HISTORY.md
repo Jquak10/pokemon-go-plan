@@ -17,6 +17,7 @@ Before applying any historical migration to an existing database, inspect that d
 - `0005_max_battle_cost_overrides.sql` — additive per-planner Max Battle tier/cost fallback table and index.
 - `0006_sync_source_health.sql` — additive synchronization-source health table and index.
 - `0007_feed_link_credentials.sql` — additive signed-calendar generation/revocation state.
+- `0008_remote_raid_limit_index.sql` — idempotent repair for the Remote Raid limit date index verified missing from production by BL-052 schema health.
 
 The presence of a file in `migrations/` does **not** mean it should be run now. A current release that requires a migration must name that migration explicitly in its rollout notes.
 
@@ -123,3 +124,17 @@ npx wrangler d1 execute DB --remote --file=migrations/0007_feed_link_credentials
 ```
 
 Deployment order is safe. Before migration 0007 exists, every existing generation-0 signed URL keeps working exactly as before and the Planner disables signed-feed rotation controls. After the migration is applied, regenerating or revoking the preferred signed URL advances only that planner's generation and immediately invalidates its previous signed URL. Legacy `/calendar/<random-token>.ics` subscriptions remain independently compatible until the existing legacy-revoke control is used. Management-link rotation does not require migration 0007 and does not alter either calendar credential.
+
+### BL-053 production schema drift repair
+
+After BL-052 shipped, the read-only production schema-compatibility health check reported one and only one missing required component: `idx_remote_raid_limit_dates`. The table and all other required tables, columns, indexes, triggers, and views were present. This exposed an older-installation upgrade gap: the fresh `schema.sql` baseline already contained the index, but retained migrations 0001–0007 did not create it.
+
+`migrations/0008_remote_raid_limit_index.sql` repairs that verified drift with only `CREATE INDEX IF NOT EXISTS`. It does not rebuild `remote_raid_limit_overrides`, modify rows, or change Worker behavior, and it is safe to rerun.
+
+For the production database that reported the missing index, the authorized repair command after the BL-053 merge is:
+
+```bash
+npx wrangler d1 execute DB --remote --file=migrations/0008_remote_raid_limit_index.sql
+```
+
+After the migration, rerun the repository-owned Production smoke and require `/api/health/schema-compatibility` to return HTTP 200 with `status: compatible`. Do not replay migrations 0001–0007 as part of this repair.
