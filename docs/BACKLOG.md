@@ -27,20 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-053 — Reconcile production D1 schema drift
-
-**Priority:** Must do
-
-The post-BL-052 Production smoke proved that the live D1 schema is incompatible with the schema contract required by the deployed Worker.
-
-Required outcome:
-- inspect the sanitized production schema-health missing-component list;
-- map each missing component to the current baseline and retained migrations;
-- apply only the production SQL required to reconcile verified drift;
-- do not blindly replay migrations or replace production data;
-- rerun schema health and Production smoke until the deployed application reports compatible;
-- document the exact production repair and whether any repository migration artifact is required.
-
 ### BL-054 — Make schema compatibility a release gate
 
 **Priority:** High
@@ -131,5 +117,7 @@ BL-051 is implemented by PR #104: Pokédex and PvPoke meta inputs now declare a 
 BL-050 is implemented by PR #103: the Planner-only mobile stylesheet now enforces a 44×44 touch-box contract across discrete buttons, selects, text inputs, collapsible summaries, compact icon/month/overflow controls, range inputs, Battle Plan filters, resource editors, forecast expansion, Max-tier controls, and the appearance selector while leaving desktop density unchanged. Range sliders retain an 8 px visual track inside a 44 px interaction height. Chromium measures representative rendered controls across Plan, More, Targets, Calendar, and Preferences, and the Planner stylesheet cache advances to v6. Shared `styles.css` is unchanged, so its v44 cache generation does not move. No D1 migration, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
 
 BL-052 is implemented by PR #105: production now exposes a sanitized read-only schema-compatibility signal covering the current required tables, columns, named indexes, battle-log triggers, and unified battle-log view. Missing components return 503 with actionable component identifiers only, and Production smoke consumes the signal so an omitted explicit D1 migration fails monitoring without mutating or auto-migrating production. Deterministic coverage protects compatible, incompatible, unavailable, and smoke-failure behavior. No D1 migration, CSS/cache, Cron, secret, binding, Service Binding, or deployment-config change is required.
+
+BL-053 is implemented by PR #106 after the BL-052 production signal identified exactly one missing component: `idx_remote_raid_limit_dates`. The repository now carries idempotent migration `0008_remote_raid_limit_index.sql` to add only that index for older installations, with regression coverage proving existing Remote Raid limit rows are preserved and repeat execution is safe. Production still requires the explicit post-merge 0008 repair and a green Production smoke before BL-053 is operationally complete.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
