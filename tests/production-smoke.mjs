@@ -834,7 +834,7 @@ async function runSmokeAttempt({
   assert.equal(
     schemaResponse.status,
     200,
-    `Production schema compatibility returned HTTP ${schemaResponse.status} with status ${schemaBody?.status || "unknown"}`
+    `Production schema compatibility returned HTTP ${schemaResponse.status} with status ${schemaBody?.status || "unknown"}; missing components: ${(schemaBody?.missing_components || []).join(", ") || "none reported"}`
   );
   assert.equal(
     schemaBody?.monitor_ok,
