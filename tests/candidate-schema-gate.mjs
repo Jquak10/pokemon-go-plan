@@ -2,6 +2,7 @@ import {
   REQUIRED_SCHEMA,
   SCHEMA_COMPONENT_HASH_ALGORITHM,
   evaluateSchemaComponentHashes,
+  requiredSchemaComponentIdentifiers,
   schemaContractFingerprint
 } from "../src/schema-health.js";
 import { pathToFileURL } from "node:url";
@@ -124,8 +125,8 @@ export async function checkProductionSchemaRelease({
       candidate_fingerprint:
         candidateFingerprint,
       required_component_count:
-        Object.keys(
-          requiredSchema.tables || {}
+        requiredSchemaComponentIdentifiers(
+          requiredSchema
         ).length
     };
   }
