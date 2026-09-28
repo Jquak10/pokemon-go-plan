@@ -30,7 +30,7 @@ Planner creation is deliberately low-friction but abuse-bounded. If creation tra
 
 The numbered files under `migrations/` are retained to move older installations forward and preserve rollout history. They are not a current deployment checklist. Existing installations must inspect their schema and apply only the migration explicitly required by the release they are adopting. `0003_target_battle_kind.sql` is especially important because it uses `ALTER TABLE ... ADD COLUMN` and is intentionally one-time/non-repeatable.
 
-**Current migration state:** the latest retained numbered migration is `0007_feed_link_credentials.sql`; BL-046 adds no database change and no `0008` migration. The current fresh-database shape is already represented by `schema.sql`. Merging to `main` does not automatically execute D1 SQL.
+**Current migration state:** the latest retained numbered migration is `0008_remote_raid_limit_index.sql`. BL-052 production schema health verified on 29 September 2026 that the live database was missing only `idx_remote_raid_limit_dates`; BL-053 therefore adds an idempotent index-only repair for older installations. The current fresh-database shape already includes this index in `schema.sql`, so fresh databases must not replay migration 0008. Merging to `main` does not automatically execute D1 SQL; an existing installation that reports this component missing must apply only migration 0008 and then re-run schema health.
 
 Historical Part-by-Part rollout details and one-time production commands are preserved in [Historical rollout and migration reference](docs/ROLLOUT_HISTORY.md). Treat that document as history, not as instructions to rerun against a current database.
 
