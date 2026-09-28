@@ -55,6 +55,58 @@ async function fetchWithTimeout(
   }
 }
 
+async function fetchWithRetry(
+  fetchImpl,
+  url,
+  {
+    timeoutMs,
+    attempts,
+    retryDelayMs
+  }
+) {
+  let lastError = null;
+
+  for (
+    let attempt = 1;
+    attempt <= attempts;
+    attempt += 1
+  ) {
+    try {
+      const response =
+        await fetchWithTimeout(
+          fetchImpl,
+          url,
+          timeoutMs
+        );
+
+      if (
+        response.status < 500 ||
+        attempt === attempts
+      ) {
+        return response;
+      }
+    } catch (error) {
+      lastError = error;
+
+      if (attempt === attempts) {
+        throw error;
+      }
+    }
+
+    await new Promise(resolve =>
+      setTimeout(
+        resolve,
+        retryDelayMs
+      )
+    );
+  }
+
+  throw lastError ||
+    new Error(
+      "Production schema release gate request failed."
+    );
+}
+
 export async function checkProductionSchemaRelease({
   fetchImpl = fetch,
   baseUrl =
@@ -63,7 +115,9 @@ export async function checkProductionSchemaRelease({
   requiredSchema = REQUIRED_SCHEMA,
   bootstrapFingerprint =
     BL054_BOOTSTRAP_SCHEMA_FINGERPRINT,
-  timeoutMs = 10000
+  timeoutMs = 10000,
+  attempts = 3,
+  retryDelayMs = 1000
 } = {}) {
   const candidateFingerprint =
     await schemaContractFingerprint(
@@ -77,10 +131,14 @@ export async function checkProductionSchemaRelease({
     );
 
   const snapshotResponse =
-    await fetchWithTimeout(
+    await fetchWithRetry(
       fetchImpl,
       snapshotUrl,
-      timeoutMs
+      {
+        timeoutMs,
+        attempts,
+        retryDelayMs
+      }
     );
 
   if (snapshotResponse.status === 404) {
@@ -94,13 +152,17 @@ export async function checkProductionSchemaRelease({
     }
 
     const compatibilityResponse =
-      await fetchWithTimeout(
+      await fetchWithRetry(
         fetchImpl,
         new URL(
           "/api/health/schema-compatibility",
           baseUrl
         ),
-        timeoutMs
+        {
+          timeoutMs,
+          attempts,
+          retryDelayMs
+        }
       );
 
     const compatibilityBody =
