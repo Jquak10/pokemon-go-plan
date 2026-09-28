@@ -124,7 +124,11 @@ export async function inspectSchemaComponentHashes(db) {
     const type = String(row?.type || "").toLowerCase();
     const name = String(row?.name || "");
 
-    if (!name || !["table", "index", "trigger", "view"].includes(type)) {
+    if (
+      !name ||
+      name.startsWith("_cf_") ||
+      !["table", "index", "trigger", "view"].includes(type)
+    ) {
       continue;
     }
 
@@ -136,11 +140,22 @@ export async function inspectSchemaComponentHashes(db) {
 
   for (const table of tableNames.sort()) {
     const escapedTable = table.replace(/"/g, '""');
-    const { results: columns = [] } = await db.prepare(
-      `PRAGMA table_info("${escapedTable}")`
-    ).all();
 
-    for (const column of columns || []) {
+    let columns = [];
+    try {
+      const result = await db.prepare(
+        `PRAGMA table_info("${escapedTable}")`
+      ).all();
+      columns = result?.results || [];
+    } catch {
+      // D1 may expose platform-managed catalog objects that cannot be
+      // introspected through PRAGMA. Omitting their columns is fail-safe:
+      // any candidate that actually requires one of those columns will not
+      // find its hash and the release gate will remain red.
+      continue;
+    }
+
+    for (const column of columns) {
       const name = String(column?.name || "");
       if (name) {
         identifiers.push(`column:${table}.${name}`);
