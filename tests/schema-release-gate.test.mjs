@@ -55,7 +55,8 @@ const hashedResult =
     },
     baseUrl:
       "https://planner.example",
-    timeoutMs: 1000
+    timeoutMs: 1000,
+    attempts: 1
   });
 
 assert.equal(
@@ -97,7 +98,8 @@ await assert.rejects(
         }),
       baseUrl:
         "https://planner.example",
-      timeoutMs: 1000
+      timeoutMs: 1000,
+    attempts: 1
     }),
   /column:targets\.battle_kind/,
   "Candidate gate must report the candidate-owned missing component name"
@@ -141,7 +143,8 @@ const bootstrapResult =
     },
     baseUrl:
       "https://planner.example",
-    timeoutMs: 1000
+    timeoutMs: 1000,
+    attempts: 1
   });
 
 assert.equal(
@@ -200,7 +203,8 @@ await assert.rejects(
         "https://planner.example",
       requiredSchema:
         changedSchema,
-      timeoutMs: 1000
+      timeoutMs: 1000,
+    attempts: 1
     }),
   /candidate changes the required schema contract/i,
   "Bootstrap fallback must fail closed for schema-changing candidates"
@@ -228,7 +232,8 @@ await assert.rejects(
         ),
       baseUrl:
         "https://planner.example",
-      timeoutMs: 1000
+      timeoutMs: 1000,
+    attempts: 1
     }),
   /snapshot is unavailable/i,
   "Unavailable production schema evidence must block the release gate"
