@@ -8,7 +8,8 @@ import {
   hashSchemaComponentIdentifiers,
   inspectSchemaCompatibility,
   inspectSchemaComponentHashes,
-  requiredSchemaComponentIdentifiers
+  requiredSchemaComponentIdentifiers,
+  schemaContractFingerprint
 } from "../src/schema-health.js";
 import {
   productionSchemaCompatibilityApi,
@@ -48,6 +49,9 @@ const compatible =
     d1Adapter(compatibleDb)
   );
 
+const requiredSchemaFingerprint =
+  await schemaContractFingerprint();
+
 assert.deepEqual(
   compatible,
   {
@@ -75,7 +79,11 @@ assert.match(
 );
 assert.deepEqual(
   await compatibleResponse.json(),
-  compatible
+  {
+    ...compatible,
+    required_schema_fingerprint:
+      requiredSchemaFingerprint
+  }
 );
 
 const componentSnapshot =
@@ -145,6 +153,144 @@ assert.match(
 assert.deepEqual(
   await componentSnapshotResponse.json(),
   componentSnapshot
+);
+
+let cloudflareInternalPragmaCalls = 0;
+
+const resilientSnapshotDb = {
+  prepare(sql) {
+    if (
+      /FROM\s+sqlite_master/i.test(
+        sql
+      )
+    ) {
+      return {
+        async all() {
+          return {
+            results: [
+              ...compatibleDb.prepare(`
+                SELECT type, name
+                FROM sqlite_master
+                WHERE type IN ('table', 'index', 'trigger', 'view')
+                  AND name NOT LIKE 'sqlite_%'
+                ORDER BY type, name
+              `).all(),
+              {
+                type: "table",
+                name: "_cf_KV"
+              },
+              {
+                type: "table",
+                name: "platform_shadow"
+              }
+            ]
+          };
+        }
+      };
+    }
+
+    if (
+      /PRAGMA\s+table_info\("_cf_KV"\)/i.test(
+        sql
+      )
+    ) {
+      cloudflareInternalPragmaCalls +=
+        1;
+
+      return {
+        async all() {
+          throw new Error(
+            "Cloudflare internal table must not be inspected"
+          );
+        }
+      };
+    }
+
+    if (
+      /PRAGMA\s+table_info\("platform_shadow"\)/i.test(
+        sql
+      )
+    ) {
+      return {
+        async all() {
+          throw new Error(
+            "production-only table is not PRAGMA-readable"
+          );
+        }
+      };
+    }
+
+    return d1Adapter(
+      compatibleDb
+    ).prepare(
+      sql
+    );
+  }
+};
+
+const resilientSnapshot =
+  await inspectSchemaComponentHashes(
+    resilientSnapshotDb
+  );
+
+assert.equal(
+  cloudflareInternalPragmaCalls,
+  0,
+  "Cloudflare-managed _cf_ tables must be excluded before PRAGMA inspection"
+);
+
+const resilientCompatibility =
+  await evaluateSchemaComponentHashes(
+    resilientSnapshot
+      .component_hashes,
+    REQUIRED_SCHEMA
+  );
+
+assert.equal(
+  resilientCompatibility.monitor_ok,
+  true,
+  "An unrelated production-only table that cannot be introspected must not make the current candidate unavailable"
+);
+
+const futurePlatformRequirement = {
+  ...REQUIRED_SCHEMA,
+  tables: {
+    ...REQUIRED_SCHEMA.tables,
+    platform_shadow: [
+      "id"
+    ]
+  }
+};
+
+const futurePlatformCompatibility =
+  await evaluateSchemaComponentHashes(
+    resilientSnapshot
+      .component_hashes,
+    futurePlatformRequirement
+  );
+
+assert.equal(
+  futurePlatformCompatibility.monitor_ok,
+  false
+);
+assert.ok(
+  futurePlatformCompatibility
+    .missing_components
+    .includes(
+      "column:platform_shadow.id"
+    ),
+  "Skipping an uninspectable table's columns must fail closed if a future candidate actually requires them"
+);
+
+const resilientSnapshotResponse =
+  await productionSchemaComponentHashesApi({
+    DB: resilientSnapshotDb
+  });
+
+assert.equal(
+  resilientSnapshotResponse.status,
+  200,
+  "Production-only non-required catalog objects must not make the schema snapshot endpoint unavailable"
 );
 
 const objects =
@@ -254,7 +400,11 @@ assert.equal(
 );
 assert.deepEqual(
   await incompatibleResponse.json(),
-  incompatible
+  {
+    ...incompatible,
+    required_schema_fingerprint:
+      requiredSchemaFingerprint
+  }
 );
 
 const unavailableResponse =
