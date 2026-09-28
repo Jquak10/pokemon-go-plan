@@ -215,6 +215,16 @@ let schemaBody = {
   missing_count: 0,
   missing_components: []
 };
+let schemaComponentsStatus = 200;
+let schemaComponentsBody = {
+  status: "available",
+  algorithm: "sha256",
+  component_count: 2,
+  component_hashes: [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  ]
+};
 
 const server =
   http.createServer(
@@ -426,6 +436,28 @@ const server =
 
       if (
         request.method === "GET" &&
+        request.url ===
+          "/api/health/schema-components"
+      ) {
+        response.writeHead(
+          schemaComponentsStatus,
+          {
+            "content-type":
+              "application/json; charset=utf-8",
+            "cache-control":
+              "no-store"
+          }
+        );
+        response.end(
+          JSON.stringify(
+            schemaComponentsBody
+          )
+        );
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
         request.url === "/api/me"
       ) {
         response.writeHead(
@@ -507,6 +539,7 @@ try {
       ...expectedPlannerAssets,
       "/api/health/data-freshness",
       "/api/health/schema-compatibility",
+      "/api/health/schema-components",
       "/api/me"
     ],
     "Production smoke must probe the current Planner shell and every versioned Planner asset"
@@ -624,6 +657,47 @@ try {
     status: "compatible",
     missing_count: 0,
     missing_components: []
+  };
+
+  requests.length = 0;
+  schemaComponentsStatus = 503;
+  schemaComponentsBody = {
+    status: "unavailable",
+    algorithm: "sha256",
+    component_count: 0,
+    component_hashes: []
+  };
+
+  await assert.rejects(
+    () =>
+      runProductionSmoke({
+        baseUrl,
+        attempts: 1,
+        timeoutMs: 1000
+      }),
+    /Production schema component snapshot returned HTTP 503/,
+    "Unavailable schema component snapshot must fail Production smoke"
+  );
+
+  assert.equal(
+    requests.some(
+      request =>
+        request.method !==
+          "GET"
+    ),
+    false,
+    "Schema component snapshot failure checks must remain read-only"
+  );
+
+  schemaComponentsStatus = 200;
+  schemaComponentsBody = {
+    status: "available",
+    algorithm: "sha256",
+    component_count: 2,
+    component_hashes: [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    ]
   };
 
   requests.length = 0;

@@ -44,6 +44,11 @@ const productionSmokeScript =
     "tests/production-smoke.mjs"
   );
 
+const candidateSchemaGateScript =
+  read(
+    "tests/candidate-schema-gate.mjs"
+  );
+
 const gitignore =
   read(".gitignore");
 
@@ -90,6 +95,10 @@ const testIndex =
   deterministic.indexOf(
     "run: npm test"
   );
+const schemaGateIndex =
+  deterministic.indexOf(
+    "run: npm run check:schema-release"
+  );
 const packageIndex =
   deterministic.indexOf(
     "run: npm run check:worker"
@@ -104,8 +113,39 @@ assert.ok(
   "npm ci must run before the test suite"
 );
 assert.ok(
-  packageIndex > testIndex,
-  "Worker packaging validation must run after the test suite"
+  schemaGateIndex > testIndex,
+  "Candidate production schema compatibility must run after deterministic tests"
+);
+assert.ok(
+  packageIndex > schemaGateIndex,
+  "Worker packaging validation must run after the candidate schema release gate"
+);
+assert.match(
+  deterministic,
+  /name: Verify candidate schema against production D1[\s\S]*if: github\.event_name == 'pull_request'[\s\S]*run: npm run check:schema-release/,
+  "The existing required deterministic PR check must include the BL-054 production schema release gate"
+);
+assert.doesNotMatch(
+  deterministic,
+  /Verify candidate schema against production D1[\s\S]{0,400}\$\{\{\s*secrets\./,
+  "Candidate schema gate must not require GitHub or Cloudflare secrets"
+);
+assert.equal(
+  packageJson.scripts?.[
+    "check:schema-release"
+  ],
+  "node tests/candidate-schema-gate.mjs",
+  "Candidate schema release gate must remain repository-owned"
+);
+assert.doesNotMatch(
+  candidateSchemaGateScript,
+  /method:\s*["'](?:POST|PUT|PATCH|DELETE)["']/,
+  "Candidate schema release gate must remain read-only and GET-only"
+);
+assert.doesNotMatch(
+  candidateSchemaGateScript,
+  /CLOUDFLARE_API_TOKEN|ADMIN_KEY|FEED_LINK_KEY/,
+  "Candidate schema release gate must not depend on private credentials"
 );
 assert.match(
   deterministic,

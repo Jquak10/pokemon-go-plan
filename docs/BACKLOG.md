@@ -27,12 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-054 — Make schema compatibility a release gate
-
-**Priority:** High
-
-Prevent a candidate Worker release from being considered healthy when production D1 does not satisfy that candidate's required schema. The gate must remain read-only and must never auto-migrate production.
-
 ### BL-055 — Surface actionable sanitized production-health diagnostics
 
 **Priority:** Recommended
@@ -119,5 +113,7 @@ BL-050 is implemented by PR #103: the Planner-only mobile stylesheet now enforce
 BL-052 is implemented by PR #105: production now exposes a sanitized read-only schema-compatibility signal covering the current required tables, columns, named indexes, battle-log triggers, and unified battle-log view. Missing components return 503 with actionable component identifiers only, and Production smoke consumes the signal so an omitted explicit D1 migration fails monitoring without mutating or auto-migrating production. Deterministic coverage protects compatible, incompatible, unavailable, and smoke-failure behavior. No D1 migration, CSS/cache, Cron, secret, binding, Service Binding, or deployment-config change is required.
 
 BL-053 is implemented by PR #106 after the BL-052 production signal identified exactly one missing component: `idx_remote_raid_limit_dates`. The repository now carries idempotent migration `0008_remote_raid_limit_index.sql` to add only that index for older installations, with regression coverage proving existing Remote Raid limit rows are preserved and repeat execution is safe. Production still requires the explicit post-merge 0008 repair and a green Production smoke before BL-053 is operationally complete.
+
+BL-054 is implemented by PR #107: the existing required `deterministic` PR check now compares each candidate branch's `REQUIRED_SCHEMA` with a credential-free production D1 component-hash snapshot before merge. Production publishes only SHA-256 hashes/count metadata through a read-only endpoint, CI maps any missing hashes back to candidate-owned component identifiers, transient failures receive bounded retries, and missing/unavailable evidence fails closed. Schema-changing PRs must therefore apply their explicitly named backward-compatible production migration before merge; the gate never runs migration SQL or requires Cloudflare/GitHub secrets.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

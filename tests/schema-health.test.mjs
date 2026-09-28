@@ -4,10 +4,15 @@ import { DatabaseSync } from "node:sqlite";
 import {
   REQUIRED_SCHEMA,
   evaluateSchemaCompatibility,
-  inspectSchemaCompatibility
+  evaluateSchemaComponentHashes,
+  hashSchemaComponentIdentifiers,
+  inspectSchemaCompatibility,
+  inspectSchemaComponentHashes,
+  requiredSchemaComponentIdentifiers
 } from "../src/schema-health.js";
 import {
-  productionSchemaCompatibilityApi
+  productionSchemaCompatibilityApi,
+  productionSchemaComponentHashesApi
 } from "../src/index.js";
 
 function d1Adapter(db) {
@@ -73,6 +78,75 @@ assert.deepEqual(
   compatible
 );
 
+const componentSnapshot =
+  await inspectSchemaComponentHashes(
+    d1Adapter(compatibleDb)
+  );
+
+assert.equal(
+  componentSnapshot.status,
+  "available"
+);
+assert.equal(
+  componentSnapshot.algorithm,
+  "sha256"
+);
+assert.ok(
+  componentSnapshot.component_count >
+    0
+);
+assert.equal(
+  componentSnapshot.component_hashes
+    .length,
+  componentSnapshot.component_count
+);
+
+const requiredComponentHashes =
+  await hashSchemaComponentIdentifiers(
+    requiredSchemaComponentIdentifiers(
+      REQUIRED_SCHEMA
+    )
+  );
+
+for (const hash of requiredComponentHashes.values()) {
+  assert.ok(
+    componentSnapshot
+      .component_hashes
+      .includes(
+        hash
+      ),
+    "Compatible schema snapshot must contain every candidate-required component hash"
+  );
+}
+
+assert.doesNotMatch(
+  JSON.stringify(
+    componentSnapshot
+  ),
+  /users|targets|manage_hash|feed_hash|CREATE|SELECT/i,
+  "Public schema snapshot must expose hashes only, never object names, SQL, or private column identifiers"
+);
+
+const componentSnapshotResponse =
+  await productionSchemaComponentHashesApi({
+    DB: d1Adapter(compatibleDb)
+  });
+
+assert.equal(
+  componentSnapshotResponse.status,
+  200
+);
+assert.match(
+  componentSnapshotResponse.headers.get(
+    "cache-control"
+  ) || "",
+  /no-store/i
+);
+assert.deepEqual(
+  await componentSnapshotResponse.json(),
+  componentSnapshot
+);
+
 const objects =
   compatibleDb.prepare(`
     SELECT type, name
@@ -114,6 +188,30 @@ assert.deepEqual(
 
 compatibleDb.exec(
   "DROP INDEX idx_sync_source_health_group"
+);
+
+const incompatibleSnapshot =
+  await inspectSchemaComponentHashes(
+    d1Adapter(compatibleDb)
+  );
+const candidateCompatibility =
+  await evaluateSchemaComponentHashes(
+    incompatibleSnapshot
+      .component_hashes,
+    REQUIRED_SCHEMA
+  );
+
+assert.equal(
+  candidateCompatibility.monitor_ok,
+  false
+);
+assert.deepEqual(
+  candidateCompatibility
+    .missing_components,
+  [
+    "index:idx_sync_source_health_group"
+  ],
+  "Candidate comparison must map a missing production hash back to the candidate-owned component name"
 );
 
 const incompatible =
@@ -183,6 +281,32 @@ assert.deepEqual(
     missing_components: []
   },
   "Unexpected inspection errors must not leak database details"
+);
+
+const unavailableComponentResponse =
+  await productionSchemaComponentHashesApi({
+    DB: {
+      prepare() {
+        throw new Error(
+          "sensitive schema inventory detail"
+        );
+      }
+    }
+  });
+
+assert.equal(
+  unavailableComponentResponse.status,
+  503
+);
+assert.deepEqual(
+  await unavailableComponentResponse.json(),
+  {
+    status: "unavailable",
+    algorithm: "sha256",
+    component_count: 0,
+    component_hashes: []
+  },
+  "Schema component snapshot errors must remain sanitized"
 );
 
 console.log(
