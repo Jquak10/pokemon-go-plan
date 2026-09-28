@@ -111,8 +111,8 @@ After editing:
 4. Run appropriate syntax checks for every changed JavaScript file.
 5. Run relevant existing automated tests/checks.
 6. Run targeted behavioral checks appropriate to the change.
-7. The required `deterministic` PR gate must install repository dependencies with `npm ci` from `package-lock.json`, then run syntax/tests and `npm run check:worker`. The Worker check must remain a non-deploying Wrangler dry run that validates the current Worker bundle/configuration; never replace it with a live deploy in CI.
-8. For UI/responsive changes, require the PR's automated `browser-ui` job to pass. That required job runs the full Chromium regression suite plus the focused WebKit/Safari-engine smoke suite; keep WebKit intentionally smaller than Chromium and centered on cross-browser layout/input/theme risks rather than duplicating every Chromium assertion. Treat deterministic/unit/browser checks as PR gates; do not make external availability checks such as `live-contract` or the production smoke workflow required PR gates because upstream or production availability can fail independently of the branch. Both browser suites start/stop their own deterministic fixture server; never ask the user to manually start Wrangler or another server just to satisfy them. Keep browser fixtures deterministic and independent of the live Pokémon/event rotation; update them only when the product contract they encode intentionally changes. Production smoke logic must likewise retain deterministic local fixture coverage, remain read-only, and never require private planner/calendar credentials.
+7. The required `deterministic` PR gate must install repository dependencies with `npm ci` from `package-lock.json`, run syntax/tests, run `npm run check:schema-release` on pull requests, and then run `npm run check:worker`. The schema release gate is GET-only and credential-free: it compares the candidate branch's `REQUIRED_SCHEMA` against the sanitized SHA-256 component-hash snapshot exposed by production D1, uses bounded retries for transient failures, and fails closed if a candidate-required component is missing or production schema evidence is unavailable. It must never apply migrations or require Cloudflare/GitHub secrets. The Worker check must remain a non-deploying Wrangler dry run that validates the current Worker bundle/configuration; never replace it with a live deploy in CI.
+8. For UI/responsive changes, require the PR's automated `browser-ui` job to pass. That required job runs the full Chromium regression suite plus the focused WebKit/Safari-engine smoke suite; keep WebKit intentionally smaller than Chromium and centered on cross-browser layout/input/theme risks rather than duplicating every Chromium assertion. Treat deterministic/unit/browser checks as PR gates. The targeted BL-054 candidate-schema check inside `deterministic` is the deliberate exception to the usual rule against production-dependent PR gates because live D1 compatibility is itself a release precondition; it is bounded, read-only, credential-free, and fails closed. Do not make broader external checks such as `live-contract` or the Production smoke workflow required PR gates because upstream or unrelated production availability can fail independently of the branch. Both browser suites start/stop their own deterministic fixture server; never ask the user to manually start Wrangler or another server just to satisfy them. Keep browser fixtures deterministic and independent of the live Pokémon/event rotation; update them only when the product contract they encode intentionally changes. Production smoke logic must likewise retain deterministic local fixture coverage, remain read-only, and never require private planner/calendar credentials.
 9. Use `npm run dev` / local Worker testing when the change affects runtime behavior and a separate local smoke test is useful.
 10. Confirm no unrelated files changed.
 11. Confirm protected Cloudflare/D1/deployment files did not change unless explicitly required.
@@ -145,6 +145,7 @@ Required rules:
 - Require status checks to pass before merging:
   - `deterministic`
   - `browser-ui`
+- The required `deterministic` check includes the candidate-to-production D1 schema compatibility gate. A schema-changing PR must not merge until its explicitly required production migration has been applied and this check is green; the gate never auto-migrates D1.
 - Do **not** require `live-contract` on pull requests. It intentionally does not run for `pull_request` events because external Pokémon/event availability can fail independently of a branch.
 - Do not require branches to be up to date before merging unless the repository policy is deliberately changed later. The required deterministic/browser checks must still pass on the PR head used for merge.
 - Restrict deletion of `main`.
@@ -210,14 +211,15 @@ If the user explicitly says `ship it`, `merge it`, or clearly authorizes product
 2. Confirm required checks pass.
 3. Confirm the PR contains only intended changes.
 4. Confirm the documentation/backlog-impact assessment is complete, any affected backlog item is current, and the PR is recorded in `docs/DECISIONS.md` when required.
-5. Merge using the repository's normal safe merge method.
-6. Do not run a manual `wrangler deploy` unless explicitly required.
-7. Switch local checkout back to `main`.
-8. Fetch and fast-forward to `origin/main`.
-9. Remove the completed local feature branch if safe.
-10. Confirm the working tree is clean.
-11. Verify the existing GitHub → Cloudflare deployment flow where possible.
-12. Verify the repository-owned production smoke workflow/run where possible. Do not create planner state or use private capability URLs merely to smoke-test production.
+5. If the candidate changes `REQUIRED_SCHEMA`, confirm the required `deterministic` gate has already proven production D1 satisfies the candidate schema contract. If it does not, stop and apply only the explicitly named safe production migration before merging; never bypass or auto-migrate through CI.
+6. Merge using the repository's normal safe merge method.
+7. Do not run a manual `wrangler deploy` unless explicitly required.
+8. Switch local checkout back to `main`.
+9. Fetch and fast-forward to `origin/main`.
+10. Remove the completed local feature branch if safe.
+11. Confirm the working tree is clean.
+12. Verify the existing GitHub → Cloudflare deployment flow where possible.
+13. Verify the repository-owned production smoke workflow/run where possible. Do not create planner state or use private capability URLs merely to smoke-test production.
 
 ## Safety
 
