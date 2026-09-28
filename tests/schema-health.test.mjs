@@ -8,7 +8,8 @@ import {
   hashSchemaComponentIdentifiers,
   inspectSchemaCompatibility,
   inspectSchemaComponentHashes,
-  requiredSchemaComponentIdentifiers
+  requiredSchemaComponentIdentifiers,
+  schemaContractFingerprint
 } from "../src/schema-health.js";
 import {
   productionSchemaCompatibilityApi,
@@ -48,6 +49,9 @@ const compatible =
     d1Adapter(compatibleDb)
   );
 
+const requiredSchemaFingerprint =
+  await schemaContractFingerprint();
+
 assert.deepEqual(
   compatible,
   {
@@ -75,7 +79,11 @@ assert.match(
 );
 assert.deepEqual(
   await compatibleResponse.json(),
-  compatible
+  {
+    ...compatible,
+    required_schema_fingerprint:
+      requiredSchemaFingerprint
+  }
 );
 
 const componentSnapshot =
@@ -392,7 +400,11 @@ assert.equal(
 );
 assert.deepEqual(
   await incompatibleResponse.json(),
-  incompatible
+  {
+    ...incompatible,
+    required_schema_fingerprint:
+      requiredSchemaFingerprint
+  }
 );
 
 const unavailableResponse =
