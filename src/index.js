@@ -64,7 +64,8 @@ import {
   summarizeSyncHealth
 } from "./sync-health.js";
 import {
-  inspectSchemaCompatibility
+  inspectSchemaCompatibility,
+  inspectSchemaComponentHashes
 } from "./schema-health.js";
 import {
   PLANNER_STORAGE_LIMITS,
@@ -11363,6 +11364,39 @@ export async function productionSchemaCompatibilityApi(env) {
   }
 }
 
+export async function productionSchemaComponentHashesApi(env) {
+  try {
+    const snapshot =
+      await inspectSchemaComponentHashes(
+        env.DB
+      );
+
+    return json(
+      snapshot,
+      200
+    );
+  } catch (error) {
+    console.warn(
+      "Production schema component hash snapshot unavailable:",
+      String(
+        error?.message ||
+        error ||
+        "unknown error"
+      )
+    );
+
+    return json(
+      {
+        status: "unavailable",
+        algorithm: "sha256",
+        component_count: 0,
+        component_hashes: []
+      },
+      503
+    );
+  }
+}
+
 
 async function dataFreshnessForDashboard(
   env,
@@ -13143,6 +13177,16 @@ async function handleFetch(request, env) {
         "/api/health/schema-compatibility"
     ) {
       return productionSchemaCompatibilityApi(
+        env
+      );
+    }
+
+    if (
+      request.method === "GET" &&
+      path ===
+        "/api/health/schema-components"
+    ) {
+      return productionSchemaComponentHashesApi(
         env
       );
     }
