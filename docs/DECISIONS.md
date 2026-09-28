@@ -1277,3 +1277,9 @@ Pokémon GO API Pokédex and PvPoke Master League synchronization inputs now dec
 ### PR #105 — BL-052 production schema-compatibility health
 
 Production exposes a credential-free, read-only `GET /api/health/schema-compatibility` signal that checks the live D1 catalog against the schema components required by the current Worker: tables, columns, named indexes, battle-log triggers, and the unified battle-log view. Compatible state returns 200. Missing components return 503 with stable identifiers such as `column:targets.battle_kind`; unavailable inspection also returns 503 without exposing the internal database error. The endpoint never returns schema SQL or row data and never mutates or auto-migrates D1. Repository-owned Production smoke requires the signal to be compatible, with deterministic regressions for compatible, incompatible, unavailable, sanitized, and GET-only failure behavior. No D1 migration, CSS/cache, Cron, secret, binding, Service Binding, or deployment-config change is required.
+
+
+### PR #106 — BL-053 production D1 schema drift repair
+
+BL-052 production schema health identified exactly one missing required component in the live D1 database: `idx_remote_raid_limit_dates`. The fresh `schema.sql` baseline already carried the index, but older-installation migrations 0001–0007 did not provide a path to add it. Migration `0008_remote_raid_limit_index.sql` therefore adds only that verified missing index using idempotent `CREATE INDEX IF NOT EXISTS`, preserving existing `remote_raid_limit_overrides` rows and leaving application/runtime behavior unchanged. Deterministic coverage verifies the migration is repeatable and data-preserving. Production application of 0008 remains an explicit authorized post-merge step; schema health and Production smoke must be green afterward. No CSS/cache, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
+

@@ -1,6 +1,6 @@
 # Pokémon GO Battle Planner — Backlog
 
-Last reviewed: 27 September 2026
+Last reviewed: 29 September 2026
 
 This file is the durable home for **confirmed but unshipped work** and explicitly deferred/rejected ideas that would otherwise exist only in project chats.
 
@@ -26,6 +26,24 @@ It is intentionally different from the other repository references:
 7. Never create a production migration solely because an item appears here. Inspect current production state and follow the normal migration/release workflow.
 
 ## Active
+
+### BL-054 — Make schema compatibility a release gate
+
+**Priority:** High
+
+Prevent a candidate Worker release from being considered healthy when production D1 does not satisfy that candidate's required schema. The gate must remain read-only and must never auto-migrate production.
+
+### BL-055 — Surface actionable sanitized production-health diagnostics
+
+**Priority:** Recommended
+
+When Production smoke fails schema or freshness health, include the already-sanitized actionable component/source identifiers in CI output while continuing to exclude SQL, row contents, bearer credentials, hashes, and internal exceptions.
+
+### BL-056 — Add a lightweight release-health summary
+
+**Priority:** Optional
+
+Provide a repository-owned operator summary of deployment SHA, regression status, Production smoke, data freshness, and schema compatibility without creating a public operational dashboard or exposing private data.
 
 ## Deferred
 
@@ -99,5 +117,7 @@ BL-051 is implemented by PR #104: Pokédex and PvPoke meta inputs now declare a 
 BL-050 is implemented by PR #103: the Planner-only mobile stylesheet now enforces a 44×44 touch-box contract across discrete buttons, selects, text inputs, collapsible summaries, compact icon/month/overflow controls, range inputs, Battle Plan filters, resource editors, forecast expansion, Max-tier controls, and the appearance selector while leaving desktop density unchanged. Range sliders retain an 8 px visual track inside a 44 px interaction height. Chromium measures representative rendered controls across Plan, More, Targets, Calendar, and Preferences, and the Planner stylesheet cache advances to v6. Shared `styles.css` is unchanged, so its v44 cache generation does not move. No D1 migration, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
 
 BL-052 is implemented by PR #105: production now exposes a sanitized read-only schema-compatibility signal covering the current required tables, columns, named indexes, battle-log triggers, and unified battle-log view. Missing components return 503 with actionable component identifiers only, and Production smoke consumes the signal so an omitted explicit D1 migration fails monitoring without mutating or auto-migrating production. Deterministic coverage protects compatible, incompatible, unavailable, and smoke-failure behavior. No D1 migration, CSS/cache, Cron, secret, binding, Service Binding, or deployment-config change is required.
+
+BL-053 is implemented by PR #106 after the BL-052 production signal identified exactly one missing component: `idx_remote_raid_limit_dates`. The repository now carries idempotent migration `0008_remote_raid_limit_index.sql` to add only that index for older installations, with regression coverage proving existing Remote Raid limit rows are preserved and repeat execution is safe. Production still requires the explicit post-merge 0008 repair and a green Production smoke before BL-053 is operationally complete.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
