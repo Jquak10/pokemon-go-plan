@@ -801,6 +801,57 @@ async function runSmokeAttempt({
     );
   }
 
+  const schemaResponse =
+    await fetchWithTimeout(
+      new URL(
+        "/api/health/schema-compatibility",
+        baseUrl
+      ),
+      {
+        headers: {
+          accept:
+            "application/json"
+        }
+      },
+      timeoutMs
+    );
+
+  assertContentType(
+    schemaResponse,
+    /application\/json/i
+  );
+  assert.match(
+    schemaResponse.headers.get(
+      "cache-control"
+    ) || "",
+    /no-store/i,
+    "Production schema compatibility health must remain no-store"
+  );
+
+  const schemaBody =
+    await schemaResponse.json();
+
+  assert.equal(
+    schemaResponse.status,
+    200,
+    `Production schema compatibility returned HTTP ${schemaResponse.status} with status ${schemaBody?.status || "unknown"}`
+  );
+  assert.equal(
+    schemaBody?.monitor_ok,
+    true,
+    `Production schema is not compatible: ${(schemaBody?.missing_components || []).join(", ") || schemaBody?.status || "unknown"}`
+  );
+  assert.equal(
+    schemaBody?.status,
+    "compatible",
+    `Unexpected production schema compatibility status: ${schemaBody?.status || "missing"}`
+  );
+  assert.deepEqual(
+    schemaBody?.missing_components,
+    [],
+    "Compatible production schema must not report missing components"
+  );
+
   const apiResponse =
     await fetchWithTimeout(
       new URL(
