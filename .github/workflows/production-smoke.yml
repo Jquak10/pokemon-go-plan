@@ -28,7 +28,7 @@ jobs:
       - name: Run read-only production smoke checks
         env:
           POGO_PRODUCTION_URL: https://pogo-plan.jquak-10.workers.dev
-          POGO_SMOKE_ATTEMPTS: "4"
+          POGO_SMOKE_ATTEMPTS: "1"
           POGO_SMOKE_RETRY_DELAY_MS: "10000"
           POGO_SMOKE_TIMEOUT_MS: "10000"
         run: node tests/production-smoke.mjs
