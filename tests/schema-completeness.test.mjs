@@ -8,6 +8,7 @@ const migration = read('../migrations/0004_schema_baseline_operational_tables.sq
 const maxCostMigration = read('../migrations/0005_max_battle_cost_overrides.sql');
 const syncHealthMigration = read('../migrations/0006_sync_source_health.sql');
 const feedCredentialMigration = read('../migrations/0007_feed_link_credentials.sql');
+const remoteRaidLimitIndexMigration = read('../migrations/0008_remote_raid_limit_index.sql');
 
 const expectedColumns = {
   event_suppression_rules: [
@@ -299,6 +300,47 @@ assert.equal(
   `).get().count,
   0,
   'feed credential state must cascade when its user is deleted'
+);
+
+const legacyRemoteLimitDb = new DatabaseSync(':memory:');
+legacyRemoteLimitDb.exec(`
+  CREATE TABLE remote_raid_limit_overrides (
+    id TEXT PRIMARY KEY,
+    event_name TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    remote_raid_limit INTEGER NOT NULL,
+    source_url TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL,
+    is_unlimited INTEGER NOT NULL DEFAULT 0,
+    detected_automatically INTEGER NOT NULL DEFAULT 0,
+    source_excerpt TEXT,
+    detected_at TEXT
+  );
+  INSERT INTO remote_raid_limit_overrides (
+    id, event_name, start_date, end_date, remote_raid_limit, updated_at
+  ) VALUES (
+    'existing-limit', 'Existing event', '2026-09-01', '2026-09-02', 20, 'now'
+  );
+`);
+
+legacyRemoteLimitDb.exec(remoteRaidLimitIndexMigration);
+legacyRemoteLimitDb.exec(remoteRaidLimitIndexMigration);
+
+assert.ok(
+  legacyRemoteLimitDb
+    .prepare('PRAGMA index_list(remote_raid_limit_overrides)')
+    .all()
+    .some(row => row.name === 'idx_remote_raid_limit_dates'),
+  'migration 0008 must add the missing Remote Raid limit date index'
+);
+assert.equal(
+  legacyRemoteLimitDb
+    .prepare('SELECT COUNT(*) AS count FROM remote_raid_limit_overrides WHERE id = ?')
+    .get('existing-limit').count,
+  1,
+  'migration 0008 must preserve existing Remote Raid limit rows'
 );
 
 console.log('schema completeness regression tests passed');
