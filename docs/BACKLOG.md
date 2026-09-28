@@ -1,6 +1,6 @@
 # Pokémon GO Battle Planner — Backlog
 
-Last reviewed: 27 September 2026
+Last reviewed: 29 September 2026
 
 This file is the durable home for **confirmed but unshipped work** and explicitly deferred/rejected ideas that would otherwise exist only in project chats.
 
@@ -26,6 +26,38 @@ It is intentionally different from the other repository references:
 7. Never create a production migration solely because an item appears here. Inspect current production state and follow the normal migration/release workflow.
 
 ## Active
+
+### BL-053 — Reconcile production D1 schema drift
+
+**Priority:** Must do
+
+The post-BL-052 Production smoke proved that the live D1 schema is incompatible with the schema contract required by the deployed Worker.
+
+Required outcome:
+- inspect the sanitized production schema-health missing-component list;
+- map each missing component to the current baseline and retained migrations;
+- apply only the production SQL required to reconcile verified drift;
+- do not blindly replay migrations or replace production data;
+- rerun schema health and Production smoke until the deployed application reports compatible;
+- document the exact production repair and whether any repository migration artifact is required.
+
+### BL-054 — Make schema compatibility a release gate
+
+**Priority:** High
+
+Prevent a candidate Worker release from being considered healthy when production D1 does not satisfy that candidate's required schema. The gate must remain read-only and must never auto-migrate production.
+
+### BL-055 — Surface actionable sanitized production-health diagnostics
+
+**Priority:** Recommended
+
+When Production smoke fails schema or freshness health, include the already-sanitized actionable component/source identifiers in CI output while continuing to exclude SQL, row contents, bearer credentials, hashes, and internal exceptions.
+
+### BL-056 — Add a lightweight release-health summary
+
+**Priority:** Optional
+
+Provide a repository-owned operator summary of deployment SHA, regression status, Production smoke, data freshness, and schema compatibility without creating a public operational dashboard or exposing private data.
 
 ## Deferred
 
