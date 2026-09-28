@@ -852,6 +852,80 @@ async function runSmokeAttempt({
     "Compatible production schema must not report missing components"
   );
 
+  const schemaComponentsResponse =
+    await fetchWithTimeout(
+      new URL(
+        "/api/health/schema-components",
+        baseUrl
+      ),
+      {
+        headers: {
+          accept:
+            "application/json"
+        }
+      },
+      timeoutMs
+    );
+
+  assertContentType(
+    schemaComponentsResponse,
+    /application\/json/i
+  );
+  assert.match(
+    schemaComponentsResponse.headers.get(
+      "cache-control"
+    ) || "",
+    /no-store/i,
+    "Production schema component snapshot must remain no-store"
+  );
+
+  const schemaComponentsBody =
+    await schemaComponentsResponse.json();
+
+  assert.equal(
+    schemaComponentsResponse.status,
+    200,
+    `Production schema component snapshot returned HTTP ${schemaComponentsResponse.status} with status ${schemaComponentsBody?.status || "unknown"}`
+  );
+  assert.equal(
+    schemaComponentsBody?.status,
+    "available",
+    `Unexpected production schema component snapshot status: ${schemaComponentsBody?.status || "missing"}`
+  );
+  assert.equal(
+    schemaComponentsBody?.algorithm,
+    "sha256",
+    "Production schema component snapshot must use SHA-256"
+  );
+  assert.ok(
+    Number(
+      schemaComponentsBody?.component_count
+    ) > 0,
+    "Production schema component snapshot must contain at least one component"
+  );
+  assert.equal(
+    schemaComponentsBody
+      ?.component_hashes
+      ?.length,
+    Number(
+      schemaComponentsBody
+        ?.component_count
+    ),
+    "Production schema component snapshot count must match its hash list"
+  );
+  assert.equal(
+    schemaComponentsBody
+      ?.component_hashes
+      ?.every(
+        hash =>
+          /^[a-f0-9]{64}$/.test(
+            String(hash)
+          )
+      ),
+    true,
+    "Production schema component snapshot must contain only SHA-256 hex hashes"
+  );
+
   const apiResponse =
     await fetchWithTimeout(
       new URL(
