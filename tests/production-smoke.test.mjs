@@ -208,6 +208,13 @@ let freshnessBody = {
   missing_count: 0,
   degraded_count: 0
 };
+let schemaStatus = 200;
+let schemaBody = {
+  monitor_ok: true,
+  status: "compatible",
+  missing_count: 0,
+  missing_components: []
+};
 
 const server =
   http.createServer(
@@ -397,6 +404,28 @@ const server =
 
       if (
         request.method === "GET" &&
+        request.url ===
+          "/api/health/schema-compatibility"
+      ) {
+        response.writeHead(
+          schemaStatus,
+          {
+            "content-type":
+              "application/json; charset=utf-8",
+            "cache-control":
+              "no-store"
+          }
+        );
+        response.end(
+          JSON.stringify(
+            schemaBody
+          )
+        );
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
         request.url === "/api/me"
       ) {
         response.writeHead(
@@ -477,6 +506,7 @@ try {
       "/manage/bl-036-production-smoke-invalid",
       ...expectedPlannerAssets,
       "/api/health/data-freshness",
+      "/api/health/schema-compatibility",
       "/api/me"
     ],
     "Production smoke must probe the current Planner shell and every versioned Planner asset"
@@ -554,6 +584,47 @@ try {
     false,
     "Degraded freshness smoke checks must remain read-only"
   );
+
+  requests.length = 0;
+  schemaStatus = 503;
+  schemaBody = {
+    monitor_ok: false,
+    status: "incompatible",
+    missing_count: 2,
+    missing_components: [
+      "column:targets.battle_kind",
+      "trigger:battle_log_undo"
+    ]
+  };
+
+  await assert.rejects(
+    () =>
+      runProductionSmoke({
+        baseUrl,
+        attempts: 1,
+        timeoutMs: 1000
+      }),
+    /Production schema compatibility returned HTTP 503 with status incompatible/,
+    "Missing production schema components must fail the production smoke gate"
+  );
+
+  assert.equal(
+    requests.some(
+      request =>
+        request.method !==
+          "GET"
+    ),
+    false,
+    "Schema compatibility failure checks must remain read-only"
+  );
+
+  schemaStatus = 200;
+  schemaBody = {
+    monitor_ok: true,
+    status: "compatible",
+    missing_count: 0,
+    missing_components: []
+  };
 
   requests.length = 0;
   freshnessStatus = 503;

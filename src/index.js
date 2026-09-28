@@ -64,6 +64,9 @@ import {
   summarizeSyncHealth
 } from "./sync-health.js";
 import {
+  inspectSchemaCompatibility
+} from "./schema-health.js";
+import {
   PLANNER_STORAGE_LIMITS,
   maxBattleOverrideLimitMessage,
   targetNotesLimitMessage,
@@ -11325,6 +11328,42 @@ async function productionDataFreshnessApi(
 }
 
 
+export async function productionSchemaCompatibilityApi(env) {
+  try {
+    const compatibility =
+      await inspectSchemaCompatibility(
+        env.DB
+      );
+
+    return json(
+      compatibility,
+      compatibility.monitor_ok
+        ? 200
+        : 503
+    );
+  } catch (error) {
+    console.warn(
+      "Production schema compatibility health unavailable:",
+      String(
+        error?.message ||
+        error ||
+        "unknown error"
+      )
+    );
+
+    return json(
+      {
+        monitor_ok: false,
+        status: "unavailable",
+        missing_count: 0,
+        missing_components: []
+      },
+      503
+    );
+  }
+}
+
+
 async function dataFreshnessForDashboard(
   env,
   user
@@ -13094,6 +13133,16 @@ async function handleFetch(request, env) {
         "/api/health/data-freshness"
     ) {
       return productionDataFreshnessApi(
+        env
+      );
+    }
+
+    if (
+      request.method === "GET" &&
+      path ===
+        "/api/health/schema-compatibility"
+    ) {
+      return productionSchemaCompatibilityApi(
         env
       );
     }

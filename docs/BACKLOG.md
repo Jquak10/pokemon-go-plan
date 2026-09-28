@@ -27,23 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-052 — Add production schema-compatibility health
-
-Priority: **Recommended**
-
-Production smoke validates public/private route behavior, critical assets, security headers, and source freshness, but it does not currently prove that production D1 has every schema component required by the deployed Worker. Because D1 migrations are explicit rather than automatically run on `main` merges, a missed migration could remain undetected until a user exercises the affected feature.
-
-Required outcome:
-
-- add a sanitized read-only schema-compatibility health signal;
-- verify the current required tables/columns/indexes/triggers without returning private data or full schema SQL;
-- include the signal in repository-owned Production smoke;
-- make missing required schema fail monitoring with actionable component names only;
-- add deterministic compatible/incompatible regressions;
-- do not mutate or auto-migrate production D1 from the health check.
-
-
-
 ## Deferred
 
 No confirmed deferred feature commitments are currently recorded.
@@ -114,5 +97,7 @@ BL-049 is implemented by PR #102: temporary official-page pins now carry explici
 BL-051 is implemented by PR #104: Pokédex and PvPoke meta inputs now declare a minimum viable yield of one item. A structurally valid zero-item response is converted into the existing failed-attempt health path before success persistence, preserving the previous last-success timestamp and item count while recording the new attempt/error for freshness monitoring. Sources without an explicit minimum remain zero-safe. Deterministic coverage protects healthy, empty/degraded, and recovery-compatible semantics. No D1 migration, CSS/cache, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
 
 BL-050 is implemented by PR #103: the Planner-only mobile stylesheet now enforces a 44×44 touch-box contract across discrete buttons, selects, text inputs, collapsible summaries, compact icon/month/overflow controls, range inputs, Battle Plan filters, resource editors, forecast expansion, Max-tier controls, and the appearance selector while leaving desktop density unchanged. Range sliders retain an 8 px visual track inside a 44 px interaction height. Chromium measures representative rendered controls across Plan, More, Targets, Calendar, and Preferences, and the Planner stylesheet cache advances to v6. Shared `styles.css` is unchanged, so its v44 cache generation does not move. No D1 migration, route, Cron, secret, binding, Service Binding, or deployment-config change is required.
+
+BL-052 is implemented by PR #105: production now exposes a sanitized read-only schema-compatibility signal covering the current required tables, columns, named indexes, battle-log triggers, and unified battle-log view. Missing components return 503 with actionable component identifiers only, and Production smoke consumes the signal so an omitted explicit D1 migration fails monitoring without mutating or auto-migrating production. Deterministic coverage protects compatible, incompatible, unavailable, and smoke-failure behavior. No D1 migration, CSS/cache, Cron, secret, binding, Service Binding, or deployment-config change is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

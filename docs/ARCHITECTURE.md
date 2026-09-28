@@ -995,6 +995,8 @@ Production monitoring consumes the same persisted source-health records through 
 
 Migration 0006 is deployment-order tolerant for the Planner UI. Before the table exists, health writes remain best-effort and `/api/me` falls back to legacy freshness timestamps instead of failing synchronization. Production freshness monitoring intentionally treats an unavailable health table as unhealthy, because production cannot prove its event/meta freshness without those records.
 
+Production schema compatibility is monitored separately through the public, credential-free, read-only `GET /api/health/schema-compatibility` endpoint. The Worker compares the live D1 catalog against the schema components required by the current code: required tables and columns, named indexes, battle-log triggers, and the unified battle-log view. Compatible state returns 200; missing components or an unavailable inspection return 503. Incompatible responses contain only stable component identifiers such as `column:targets.battle_kind` or `trigger:battle_log_undo`; schema SQL, row values, capability hashes, and internal inspection errors are never returned. The probe performs catalog/PRAGMA reads only and never creates, alters, drops, or migrates D1. Production smoke requires this signal to be compatible, so a missed explicit migration becomes an operational failure before the affected feature must be exercised by a user.
+
 ## 26. Testing strategy
 
 package.json runs a deterministic regression suite covering the major domains, including:
