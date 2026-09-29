@@ -164,18 +164,19 @@ function runUrl(
     : `https://github.com/${repo}/actions/runs/${id}`;
 }
 
-function chooseWorkflowRun(
+function workflowCandidates(
   runs,
   name,
   sha
 ) {
-  const candidates =
-    (Array.isArray(
+  return (
+    Array.isArray(
       runs
     )
       ? runs
       : []
-    ).filter(
+  )
+    .filter(
       run =>
         String(
           run?.name || ""
@@ -183,21 +184,51 @@ function chooseWorkflowRun(
         safeSha(
           run?.head_sha
         ) === sha
+    )
+    .sort(
+      (left, right) =>
+        Date.parse(
+          right?.created_at ||
+          ""
+        ) -
+        Date.parse(
+          left?.created_at ||
+          ""
+        )
     );
+}
 
-  if (
-    !candidates.length
-  ) {
-    return null;
-  }
-
+function chooseWorkflowRun(
+  runs,
+  name,
+  sha
+) {
   return (
-    candidates.find(
+    workflowCandidates(
+      runs,
+      name,
+      sha
+    )[0] ||
+    null
+  );
+}
+
+function choosePushWorkflowRun(
+  runs,
+  name,
+  sha
+) {
+  return (
+    workflowCandidates(
+      runs,
+      name,
+      sha
+    ).find(
       run =>
         run?.event ===
           "push"
     ) ||
-    candidates[0]
+    null
   );
 }
 
@@ -448,6 +479,12 @@ export async function collectReleaseHealth({
       WORKFLOW_NAMES.smoke,
       sha
     );
+  const deploymentSmokeRun =
+    choosePushWorkflowRun(
+      runs,
+      WORKFLOW_NAMES.smoke,
+      sha
+    );
 
   const regression = {
     ...workflowState(
@@ -594,7 +631,9 @@ export async function collectReleaseHealth({
     commit_url:
       `https://github.com/${repo}/commit/${sha}`,
     production_verified:
-      smoke.healthy ===
+      workflowState(
+        deploymentSmokeRun
+      ).healthy ===
         true,
     overall,
     regression,
@@ -617,6 +656,8 @@ function stateIcon(
     compatible: "✅",
     incompatible: "❌",
     unavailable: "⚪",
+    stale: "❌",
+    unknown: "❌",
     completed: "✅",
     missing: "⚪",
     queued: "⏳",
