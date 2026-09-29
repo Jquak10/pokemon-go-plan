@@ -1,0 +1,37 @@
+name: Release health
+
+on:
+  workflow_run:
+    workflows:
+      - Planner regression
+      - Production smoke
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-health
+  cancel-in-progress: true
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Build release health summary
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          POGO_PRODUCTION_URL: https://pogo-plan.jquak-10.workers.dev
+        run: node tests/release-health-summary.mjs
