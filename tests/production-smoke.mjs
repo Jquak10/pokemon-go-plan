@@ -9,6 +9,147 @@ const SYNTHETIC_MANAGEMENT_TOKEN =
 const SYNTHETIC_MANAGE_PATH =
   `/manage/${SYNTHETIC_MANAGEMENT_TOKEN}`;
 
+
+const MAX_HEALTH_DIAGNOSTIC_IDENTIFIERS = 24;
+const MAX_HEALTH_DIAGNOSTIC_IDENTIFIER_LENGTH = 120;
+
+function sanitizedIdentifier(
+  value,
+  pattern
+) {
+  const identifier =
+    String(
+      value || ""
+    ).trim();
+
+  if (
+    !identifier ||
+    identifier.length >
+      MAX_HEALTH_DIAGNOSTIC_IDENTIFIER_LENGTH ||
+    !pattern.test(
+      identifier
+    )
+  ) {
+    return null;
+  }
+
+  return identifier;
+}
+
+function boundedUniqueIdentifiers(
+  values,
+  pattern
+) {
+  return [
+    ...new Set(
+      (Array.isArray(values)
+        ? values
+        : []
+      )
+        .map(
+          value =>
+            sanitizedIdentifier(
+              value,
+              pattern
+            )
+        )
+        .filter(Boolean)
+    )
+  ].slice(
+    0,
+    MAX_HEALTH_DIAGNOSTIC_IDENTIFIERS
+  );
+}
+
+export function schemaHealthDiagnostic(
+  body
+) {
+  const identifiers =
+    boundedUniqueIdentifiers(
+      body?.missing_components,
+      /^(?:table|column|index|trigger|view):[A-Za-z0-9_.-]+$/
+    );
+
+  return identifiers.length
+    ? identifiers.join(", ")
+    : "none reported";
+}
+
+export function freshnessHealthDiagnostic(
+  body
+) {
+  const byStatus = {
+    stale: [],
+    missing: [],
+    degraded: []
+  };
+
+  for (
+    const source of
+      Array.isArray(
+        body?.sources
+      )
+        ? body.sources
+        : []
+  ) {
+    const status =
+      String(
+        source?.status || ""
+      );
+
+    if (
+      !Object.hasOwn(
+        byStatus,
+        status
+      )
+    ) {
+      continue;
+    }
+
+    const identifier =
+      sanitizedIdentifier(
+        source?.source_key,
+        /^[A-Za-z0-9:_-]+$/
+      );
+
+    if (identifier) {
+      byStatus[
+        status
+      ].push(
+        identifier
+      );
+    }
+  }
+
+  const parts = [];
+
+  for (const status of [
+    "stale",
+    "missing",
+    "degraded"
+  ]) {
+    const identifiers =
+      boundedUniqueIdentifiers(
+        byStatus[
+          status
+        ],
+        /^[A-Za-z0-9:_-]+$/
+      );
+
+    if (
+      identifiers.length
+    ) {
+      parts.push(
+        `${status}: ${identifiers.join(", ")}`
+      );
+    }
+  }
+
+  return parts.length
+    ? parts.join("; ")
+    : "none reported";
+}
+
 const sleep = milliseconds =>
   new Promise(resolve =>
     setTimeout(
@@ -763,16 +904,20 @@ async function runSmokeAttempt({
 
   const freshnessBody =
     await freshnessResponse.json();
+  const freshnessDiagnostic =
+    freshnessHealthDiagnostic(
+      freshnessBody
+    );
 
   assert.equal(
     freshnessResponse.status,
     200,
-    `Production data freshness returned HTTP ${freshnessResponse.status} with status ${freshnessBody?.status || "unknown"}`
+    `Production data freshness returned HTTP ${freshnessResponse.status} with status ${freshnessBody?.status || "unknown"}; affected sources: ${freshnessDiagnostic}`
   );
   assert.equal(
     freshnessBody?.monitor_ok,
     true,
-    `Production data freshness is not monitor-safe: ${freshnessBody?.status || "unknown"}`
+    `Production data freshness is not monitor-safe: ${freshnessBody?.status || "unknown"}; affected sources: ${freshnessDiagnostic}`
   );
   assert.ok(
     [
@@ -797,7 +942,7 @@ async function runSmokeAttempt({
       "degraded"
   ) {
     console.warn(
-      `Production data freshness is degraded but still within threshold: ${freshnessBody.degraded_count || 0} source(s)`
+      `Production data freshness is degraded but still within threshold: ${freshnessBody.degraded_count || 0} source(s); affected sources: ${freshnessDiagnostic}`
     );
   }
 
@@ -830,16 +975,20 @@ async function runSmokeAttempt({
 
   const schemaBody =
     await schemaResponse.json();
+  const schemaDiagnostic =
+    schemaHealthDiagnostic(
+      schemaBody
+    );
 
   assert.equal(
     schemaResponse.status,
     200,
-    `Production schema compatibility returned HTTP ${schemaResponse.status} with status ${schemaBody?.status || "unknown"}`
+    `Production schema compatibility returned HTTP ${schemaResponse.status} with status ${schemaBody?.status || "unknown"}; missing components: ${schemaDiagnostic}`
   );
   assert.equal(
     schemaBody?.monitor_ok,
     true,
-    `Production schema is not compatible: ${(schemaBody?.missing_components || []).join(", ") || schemaBody?.status || "unknown"}`
+    `Production schema is not compatible: ${schemaBody?.status || "unknown"}; missing components: ${schemaDiagnostic}`
   );
   assert.equal(
     schemaBody?.status,
