@@ -33,7 +33,8 @@ function workflowRun({
   event,
   status = "completed",
   conclusion = "success",
-  createdAt
+  createdAt,
+  headSha = SHA
 }) {
   return {
     id,
@@ -42,7 +43,7 @@ function workflowRun({
     status,
     conclusion,
     head_sha:
-      SHA,
+      headSha,
     created_at:
       createdAt
   };
@@ -140,7 +141,7 @@ function healthyFetch({
               "failure",
             createdAt:
               "2026-09-29T17:20:00Z",
-            head_sha:
+            headSha:
               "1111111111111111111111111111111111111111"
           })
         ]
