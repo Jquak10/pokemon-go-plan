@@ -220,6 +220,7 @@ If the user explicitly says `ship it`, `merge it`, or clearly authorizes product
 11. Confirm the working tree is clean.
 12. Verify the existing GitHub → Cloudflare deployment flow where possible.
 13. Verify the repository-owned production smoke workflow/run where possible. Do not create planner state or use private capability URLs merely to smoke-test production.
+14. Verify the repository-owned Release health summary where possible. It is informational rather than a required merge gate and must stay read-only: current-main SHA, Actions metadata, and existing public health endpoints only.
 
 ## Safety
 
