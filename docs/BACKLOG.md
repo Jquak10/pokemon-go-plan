@@ -27,12 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-056 — Add a lightweight release-health summary
-
-**Priority:** Optional
-
-Provide a repository-owned operator summary of deployment SHA, regression status, Production smoke, data freshness, and schema compatibility without creating a public operational dashboard or exposing private data.
-
 ## Deferred
 
 No confirmed deferred feature commitments are currently recorded.
@@ -111,5 +105,7 @@ BL-053 is implemented by PR #106 after the BL-052 production signal identified e
 BL-054 is implemented by PR #107: the existing required `deterministic` PR check now compares each candidate branch's `REQUIRED_SCHEMA` with a credential-free production D1 component-hash snapshot before merge. Production publishes only SHA-256 hashes/count metadata through a read-only endpoint, CI maps any missing hashes back to candidate-owned component identifiers, transient failures receive bounded retries, and missing/unavailable evidence fails closed. Schema-changing PRs must therefore apply their explicitly named backward-compatible production migration before merge; the gate never runs migration SQL or requires Cloudflare/GitHub secrets. PR #108 is the production-only D1 compatibility follow-up: it excludes Cloudflare-managed `_cf_` catalog objects and tolerates an unrelated table that rejects column PRAGMA inspection while preserving fail-closed behavior for any candidate that actually requires an omitted component.
 
 BL-055 is implemented by PR #109: Production smoke now includes only allow-listed actionable health identifiers in CI diagnostics. Schema failures report sanitized missing table/column/index/trigger/view component IDs; freshness failures report sanitized non-healthy `source_key` values grouped as stale/missing/degraded, and degraded-but-monitor-safe warnings use the same boundary. Raw health bodies, source URLs, raw errors, bearer credentials, SQL, schema fingerprints/component hashes, and malformed/log-injection strings are excluded, with deterministic malicious-fixture coverage protecting that contract.
+
+BL-056 is implemented by PR #110: a repository-owned **Release health** GitHub Actions workflow now consolidates the current `main` SHA, exact-SHA production verification, latest same-SHA Planner regression and Production smoke state, data freshness, and schema compatibility into a single GitHub job summary. It refreshes after completed `main` regression/smoke workflows and on manual dispatch, uses only read-only Actions/contents permissions plus existing credential-free health endpoints, preserves BL-055 sanitization, and remains informational rather than a branch-protection/deployment gate. No D1 migration, application route, CSS/cache, Cloudflare binding, Cron, secret, Service Binding, or deployment-config change is required.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.

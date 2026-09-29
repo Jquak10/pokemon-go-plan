@@ -44,6 +44,16 @@ const productionSmokeScript =
     "tests/production-smoke.mjs"
   );
 
+const releaseHealthWorkflow =
+  read(
+    ".github/workflows/release-health.yml"
+  );
+
+const releaseHealthScript =
+  read(
+    "tests/release-health-summary.mjs"
+  );
+
 const candidateSchemaGateScript =
   read(
     "tests/candidate-schema-gate.mjs"
@@ -161,7 +171,8 @@ assert.equal(
 
 const workflowSources = [
   ["Planner regression", workflow],
-  ["Production smoke", productionSmokeWorkflow]
+  ["Production smoke", productionSmokeWorkflow],
+  ["Release health", releaseHealthWorkflow]
 ];
 
 for (const [
@@ -472,6 +483,77 @@ assert.match(
   productionSmokeScript,
   /planner-app\\.js\\\?v=/,
   "Production smoke must keep the main Planner JavaScript in the critical asset contract"
+);
+
+assert.match(
+  releaseHealthWorkflow,
+  /^name: Release health$/m,
+  "Release health must remain a distinct repository-owned workflow"
+);
+assert.match(
+  releaseHealthWorkflow,
+  /^  workflow_run:\n    workflows:\n      - Planner regression\n      - Production smoke\n    types:\n      - completed\n    branches:\n      - main$/m,
+  "Release health must refresh after completed main regression/smoke runs"
+);
+assert.match(
+  releaseHealthWorkflow,
+  /^  workflow_dispatch:$/m,
+  "Release health must remain manually runnable"
+);
+assert.match(
+  releaseHealthWorkflow,
+  /^permissions:\n  contents: read\n  actions: read$/m,
+  "Release health must use only read-only repository and Actions permissions"
+);
+assert.match(
+  releaseHealthWorkflow,
+  /GITHUB_TOKEN:\s*\$\{\{ github\.token \}\}/,
+  "Release health may use only the workflow-scoped GitHub token for Actions metadata"
+);
+assert.doesNotMatch(
+  releaseHealthWorkflow,
+  /\$\{\{\s*secrets\./,
+  "Release health must not depend on repository secrets"
+);
+assert.match(
+  releaseHealthWorkflow,
+  /node tests\/release-health-summary\.mjs/,
+  "Release health workflow must execute the repository-owned summary collector"
+);
+assert.match(
+  releaseHealthScript,
+  /GITHUB_STEP_SUMMARY/,
+  "Release health must render through the GitHub job-summary surface"
+);
+assert.match(
+  releaseHealthScript,
+  /\/api\/health\/data-freshness/,
+  "Release health must include production freshness"
+);
+assert.match(
+  releaseHealthScript,
+  /\/api\/health\/schema-compatibility/,
+  "Release health must include production schema compatibility"
+);
+assert.match(
+  releaseHealthScript,
+  /Planner regression/,
+  "Release health must include regression state"
+);
+assert.match(
+  releaseHealthScript,
+  /Production smoke/,
+  "Release health must include Production smoke state"
+);
+assert.doesNotMatch(
+  releaseHealthScript,
+  /method:\s*["'](?:POST|PUT|PATCH|DELETE)["']|\/api\/create|\/api\/planner|\/calendar\//,
+  "Release health collection must remain read-only and avoid private/capability routes"
+);
+assert.doesNotMatch(
+  releaseHealthScript,
+  /ADMIN_KEY|FEED_LINK_KEY|CLOUDFLARE_API_TOKEN/,
+  "Release health must not depend on application or Cloudflare secrets"
 );
 
 const assetFetches = [];
