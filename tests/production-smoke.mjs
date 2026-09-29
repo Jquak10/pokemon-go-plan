@@ -57,6 +57,24 @@ function healthStatusLabel(
     : "unexpected";
 }
 
+function healthCountLabel(
+  value
+) {
+  const count =
+    Number(
+      value
+    );
+
+  return Number.isInteger(
+    count
+  ) &&
+    count >= 0
+    ? String(
+        count
+      )
+    : "unknown";
+}
+
 function boundedUniqueIdentifiers(
   values,
   pattern
@@ -963,7 +981,7 @@ async function runSmokeAttempt({
       "degraded"
   ) {
     console.warn(
-      `Production data freshness is degraded but still within threshold: ${freshnessBody.degraded_count || 0} source(s); affected sources: ${freshnessDiagnostic}`
+      `Production data freshness is degraded but still within threshold: ${healthCountLabel(freshnessBody?.degraded_count)} source(s); affected sources: ${freshnessDiagnostic}`
     );
   }
 
@@ -1014,7 +1032,7 @@ async function runSmokeAttempt({
   assert.equal(
     schemaBody?.status,
     "compatible",
-    `Unexpected production schema compatibility status: ${schemaBody?.status || "missing"}`
+    `Unexpected production schema compatibility status: ${healthStatusLabel(schemaBody?.status, ["compatible", "incompatible", "unavailable"])}`
   );
   assert.deepEqual(
     schemaBody?.missing_components,
