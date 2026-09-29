@@ -27,6 +27,48 @@ It is intentionally different from the other repository references:
 
 ## Active
 
+### BL-057 — Correct Mega/Primal Hundo benchmark semantics and add Hundo correctness regressions
+
+**Priority: HIGH**
+
+The standalone Hundo CP calculator currently includes Mega and Primal forms from the Pokémon GO API catalog, but its fixed benchmark labels still present Lv20 as **Raid / Egg** and Lv25 as **Weather-boosted raid** regardless of the selected form.
+
+For Mega/Primal selections, that can imply that CP calculated from transformed-form stats is the Pokémon actually encountered after the raid. Pokémon GO instead uses the Mega/Primal form for the battle while the catch encounter is the underlying encounter form. The Battle Plan's Battle Intel path already models that boss/encounter separation correctly; the standalone Hundo calculator must do the same.
+
+Required outcome:
+
+- keep Mega/Primal forms searchable without presenting transformed-form CP as the post-raid catch CP;
+- when battle form and catch form differ, make the distinction explicit in the Hundo result;
+- use the underlying encounter form for raid-catch Lv20/Lv25 benchmarks, or clearly label transformed-form CP as theoretical rather than encounter CP;
+- preserve form-specific stats and exact form identity for legitimate theoretical/custom-level calculations;
+- add deterministic Hundo tests covering known Lv15/Lv20/Lv25/Lv30/Lv35/Lv40/Lv50 15/15/15 values, half-level behavior, regional forms, and Mega/Primal boss-versus-encounter semantics;
+- add focused UI coverage so benchmark labels cannot silently regress back to misleading raid-catch semantics.
+
+This is a gameplay-correctness issue, not a cosmetic enhancement.
+
+### BL-058 — Make Release health production-verification lookup history-independent
+
+**Priority: RECOMMENDED**
+
+BL-056 currently resolves the latest Actions metadata through a bounded recent-run query and searches that window for the push-triggered Production smoke associated with the current `main` SHA. Because scheduled Production smoke, scheduled Planner regression, and the Release health workflow continue producing runs even when no deployment occurs, the original push smoke can eventually fall out of that bounded history window.
+
+When that happens, the same unchanged production SHA could be incorrectly shown as **not yet production-verified** even though it previously passed its post-merge push smoke and all current health signals remain green.
+
+Required outcome:
+
+- determine exact-SHA deployment verification independently from the rolling general Actions history window;
+- query the Production smoke workflow/event history directly, or otherwise retain an equivalent exact-SHA push-verification lookup that does not decay merely because newer scheduled runs accumulate;
+- continue using the newest same-SHA smoke/regression run for **current health**, so later scheduled failures remain visible;
+- preserve the distinction between historical deployment verification and current operational health;
+- keep Release health read-only, non-gating, credential-safe, and bounded;
+- add deterministic coverage proving production-verification remains true after enough unrelated/scheduled runs would have displaced the original push run from the previous 50-run window.
+
+### Repository housekeeping — close superseded PR #88
+
+PR #88 (**Add BL-040 automated theme accessibility checks**) remains open even though BL-040 shipped through the later completed implementation lineage and the current `main` already contains the intended accessibility/theme protections.
+
+Close PR #88 as superseded after confirming it contains no unique unmerged work. This is repository hygiene only and intentionally does **not** receive a BL number.
+
 ## Deferred
 
 No confirmed deferred feature commitments are currently recorded.
@@ -107,5 +149,7 @@ BL-054 is implemented by PR #107: the existing required `deterministic` PR check
 BL-055 is implemented by PR #109: Production smoke now includes only allow-listed actionable health identifiers in CI diagnostics. Schema failures report sanitized missing table/column/index/trigger/view component IDs; freshness failures report sanitized non-healthy `source_key` values grouped as stale/missing/degraded, and degraded-but-monitor-safe warnings use the same boundary. Raw health bodies, source URLs, raw errors, bearer credentials, SQL, schema fingerprints/component hashes, and malformed/log-injection strings are excluded, with deterministic malicious-fixture coverage protecting that contract.
 
 BL-056 is implemented by PR #110: a repository-owned **Release health** GitHub Actions workflow now consolidates the current `main` SHA, exact-SHA production verification, latest same-SHA Planner regression and Production smoke state, data freshness, and schema compatibility into a single GitHub job summary. It refreshes after completed `main` regression/smoke workflows and on manual dispatch, uses only read-only Actions/contents permissions plus existing credential-free health endpoints, preserves BL-055 sanitization, and remains informational rather than a branch-protection/deployment gate. No D1 migration, application route, CSS/cache, Cloudflare binding, Cron, secret, Service Binding, or deployment-config change is required.
+
+A fresh full product audit on 30 September 2026 reviewed the newest production `main`, release health, Production smoke, Planner regression, D1/schema safeguards, event/meta freshness, backup/recovery, mobile/desktop UX, accessibility, bearer-credential security, Pokémon/form handling, and repository governance. Production was assessed as public-ready with no release-blocking defect. Two concrete follow-ups were promoted into Active: BL-057 corrects Mega/Primal Hundo raid-catch semantics and adds missing Hundo correctness regressions; BL-058 makes Release health exact-SHA deployment verification independent of a bounded rolling Actions history window. The same audit identified stale PR #88 as housekeeping rather than product backlog scope.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
