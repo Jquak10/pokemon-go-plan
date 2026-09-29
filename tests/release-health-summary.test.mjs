@@ -414,33 +414,12 @@ const pending =
 
       if (
         parsed.pathname ===
-          "/api/health/data-freshness"
-      ) {
-        return new Response(
-          "upstream error",
-          {
-            status: 503,
-            headers: {
-              "content-type":
-                "text/plain"
-            }
-          }
-        );
-      }
-
-      if (
+          "/api/health/data-freshness" ||
         parsed.pathname ===
           "/api/health/schema-compatibility"
       ) {
-        return new Response(
-          "upstream error",
-          {
-            status: 503,
-            headers: {
-              "content-type":
-                "text/plain"
-            }
-          }
+        throw new Error(
+          "fixture network failure"
         );
       }
 
