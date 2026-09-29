@@ -1,6 +1,6 @@
 # Pokémon GO Battle Planner — Backlog
 
-Last reviewed: 29 September 2026
+Last reviewed: 30 September 2026
 
 This file is the durable home for **confirmed but unshipped work** and explicitly deferred/rejected ideas that would otherwise exist only in project chats.
 
@@ -26,12 +26,6 @@ It is intentionally different from the other repository references:
 7. Never create a production migration solely because an item appears here. Inspect current production state and follow the normal migration/release workflow.
 
 ## Active
-
-### BL-055 — Surface actionable sanitized production-health diagnostics
-
-**Priority:** Recommended
-
-When Production smoke fails schema or freshness health, include the already-sanitized actionable component/source identifiers in CI output while continuing to exclude SQL, row contents, bearer credentials, hashes, and internal exceptions.
 
 ### BL-056 — Add a lightweight release-health summary
 
@@ -115,5 +109,7 @@ BL-052 is implemented by PR #105: production now exposes a sanitized read-only s
 BL-053 is implemented by PR #106 after the BL-052 production signal identified exactly one missing component: `idx_remote_raid_limit_dates`. The repository now carries idempotent migration `0008_remote_raid_limit_index.sql` to add only that index for older installations, with regression coverage proving existing Remote Raid limit rows are preserved and repeat execution is safe. Production still requires the explicit post-merge 0008 repair and a green Production smoke before BL-053 is operationally complete.
 
 BL-054 is implemented by PR #107: the existing required `deterministic` PR check now compares each candidate branch's `REQUIRED_SCHEMA` with a credential-free production D1 component-hash snapshot before merge. Production publishes only SHA-256 hashes/count metadata through a read-only endpoint, CI maps any missing hashes back to candidate-owned component identifiers, transient failures receive bounded retries, and missing/unavailable evidence fails closed. Schema-changing PRs must therefore apply their explicitly named backward-compatible production migration before merge; the gate never runs migration SQL or requires Cloudflare/GitHub secrets. PR #108 is the production-only D1 compatibility follow-up: it excludes Cloudflare-managed `_cf_` catalog objects and tolerates an unrelated table that rejects column PRAGMA inspection while preserving fail-closed behavior for any candidate that actually requires an omitted component.
+
+BL-055 is implemented by PR #109: Production smoke now includes only allow-listed actionable health identifiers in CI diagnostics. Schema failures report sanitized missing table/column/index/trigger/view component IDs; freshness failures report sanitized non-healthy `source_key` values grouped as stale/missing/degraded, and degraded-but-monitor-safe warnings use the same boundary. Raw health bodies, source URLs, raw errors, bearer credentials, SQL, schema fingerprints/component hashes, and malformed/log-injection strings are excluded, with deterministic malicious-fixture coverage protecting that contract.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
