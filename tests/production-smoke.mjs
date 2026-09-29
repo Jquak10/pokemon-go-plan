@@ -36,6 +36,27 @@ function sanitizedIdentifier(
   return identifier;
 }
 
+function healthStatusLabel(
+  value,
+  allowed
+) {
+  const status =
+    String(
+      value || ""
+    );
+
+  return (
+    Array.isArray(
+      allowed
+    ) &&
+    allowed.includes(
+      status
+    )
+  )
+    ? status
+    : "unexpected";
+}
+
 function boundedUniqueIdentifiers(
   values,
   pattern
@@ -912,12 +933,12 @@ async function runSmokeAttempt({
   assert.equal(
     freshnessResponse.status,
     200,
-    `Production data freshness returned HTTP ${freshnessResponse.status} with status ${freshnessBody?.status || "unknown"}; affected sources: ${freshnessDiagnostic}`
+    `Production data freshness returned HTTP ${freshnessResponse.status} with status ${healthStatusLabel(freshnessBody?.status, ["healthy", "degraded", "stale", "unknown", "unavailable"])}; affected sources: ${freshnessDiagnostic}`
   );
   assert.equal(
     freshnessBody?.monitor_ok,
     true,
-    `Production data freshness is not monitor-safe: ${freshnessBody?.status || "unknown"}; affected sources: ${freshnessDiagnostic}`
+    `Production data freshness is not monitor-safe: ${healthStatusLabel(freshnessBody?.status, ["healthy", "degraded", "stale", "unknown", "unavailable"])}; affected sources: ${freshnessDiagnostic}`
   );
   assert.ok(
     [
@@ -926,7 +947,7 @@ async function runSmokeAttempt({
     ].includes(
       freshnessBody?.status
     ),
-    `Unexpected production data freshness status: ${freshnessBody?.status || "missing"}`
+    `Unexpected production data freshness status: ${healthStatusLabel(freshnessBody?.status, ["healthy", "degraded", "stale", "unknown", "unavailable"])}`
   );
   assert.equal(
     Number(
@@ -983,12 +1004,12 @@ async function runSmokeAttempt({
   assert.equal(
     schemaResponse.status,
     200,
-    `Production schema compatibility returned HTTP ${schemaResponse.status} with status ${schemaBody?.status || "unknown"}; missing components: ${schemaDiagnostic}`
+    `Production schema compatibility returned HTTP ${schemaResponse.status} with status ${healthStatusLabel(schemaBody?.status, ["compatible", "incompatible", "unavailable"])}; missing components: ${schemaDiagnostic}`
   );
   assert.equal(
     schemaBody?.monitor_ok,
     true,
-    `Production schema is not compatible: ${schemaBody?.status || "unknown"}; missing components: ${schemaDiagnostic}`
+    `Production schema is not compatible: ${healthStatusLabel(schemaBody?.status, ["compatible", "incompatible", "unavailable"])}; missing components: ${schemaDiagnostic}`
   );
   assert.equal(
     schemaBody?.status,
@@ -1034,12 +1055,12 @@ async function runSmokeAttempt({
   assert.equal(
     schemaComponentsResponse.status,
     200,
-    `Production schema component snapshot returned HTTP ${schemaComponentsResponse.status} with status ${schemaComponentsBody?.status || "unknown"}`
+    `Production schema component snapshot returned HTTP ${schemaComponentsResponse.status} with status ${healthStatusLabel(schemaComponentsBody?.status, ["available", "unavailable"])}`
   );
   assert.equal(
     schemaComponentsBody?.status,
     "available",
-    `Unexpected production schema component snapshot status: ${schemaComponentsBody?.status || "missing"}`
+    `Unexpected production schema component snapshot status: ${healthStatusLabel(schemaComponentsBody?.status, ["available", "unavailable"])}`
   );
   assert.equal(
     schemaComponentsBody?.algorithm,
