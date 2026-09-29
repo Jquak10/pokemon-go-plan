@@ -2,8 +2,66 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
 import {
-  runProductionSmoke
+  freshnessHealthDiagnostic,
+  runProductionSmoke,
+  schemaHealthDiagnostic
 } from "./production-smoke.mjs";
+
+assert.equal(
+  schemaHealthDiagnostic({
+    missing_components: [
+      "column:targets.battle_kind",
+      "trigger:battle_log_undo",
+      "column:targets.battle_kind",
+      "CREATE TABLE private_data(secret TEXT)",
+      "column:targets.bad\n::warning::injected"
+    ],
+    internal_error:
+      "sensitive SQL detail",
+    required_schema_fingerprint:
+      "a".repeat(64)
+  }),
+  "column:targets.battle_kind, trigger:battle_log_undo",
+  "Schema diagnostics must keep only bounded allow-listed component identifiers"
+);
+
+assert.equal(
+  freshnessHealthDiagnostic({
+    sources: [
+      {
+        source_key:
+          "event:raid_hour",
+        status: "stale",
+        source_url:
+          "https://secret.example/token",
+        last_error:
+          "sensitive upstream exception"
+      },
+      {
+        source_key:
+          "official:pokemon-go-schedules",
+        status: "missing"
+      },
+      {
+        source_key:
+          "meta:pvpoke-master-league",
+        status: "degraded"
+      },
+      {
+        source_key:
+          "https://secret.example/?token=bad",
+        status: "stale"
+      },
+      {
+        source_key:
+          "event:healthy",
+        status: "healthy"
+      }
+    ]
+  }),
+  "stale: event:raid_hour; missing: official:pokemon-go-schedules; degraded: meta:pvpoke-master-league",
+  "Freshness diagnostics must keep only allow-listed source keys for actionable non-healthy states"
+);
 
 const indexHtml =
   await readFile(
@@ -623,11 +681,17 @@ try {
   schemaBody = {
     monitor_ok: false,
     status: "incompatible",
-    missing_count: 2,
+    missing_count: 4,
     missing_components: [
       "column:targets.battle_kind",
-      "trigger:battle_log_undo"
-    ]
+      "trigger:battle_log_undo",
+      "CREATE TABLE leaked_sql(secret TEXT)",
+      "column:targets.bad\n::error::injected"
+    ],
+    internal_error:
+      "sensitive internal exception",
+    required_schema_fingerprint:
+      "c".repeat(64)
   };
 
   await assert.rejects(
@@ -637,8 +701,30 @@ try {
         attempts: 1,
         timeoutMs: 1000
       }),
-    /Production schema compatibility returned HTTP 503 with status incompatible/,
-    "Missing production schema components must fail the production smoke gate"
+    error => {
+      const message =
+        String(
+          error?.message ||
+          error
+        );
+
+      assert.match(
+        message,
+        /Production schema compatibility returned HTTP 503 with status incompatible/
+      );
+      assert.match(
+        message,
+        /missing components: column:targets\.battle_kind, trigger:battle_log_undo/
+      );
+      assert.doesNotMatch(
+        message,
+        /CREATE TABLE|sensitive internal exception|::error::|[a-f0-9]{64}/i,
+        "Schema failure output must not leak SQL, internal errors, log-injection text, or fingerprints"
+      );
+
+      return true;
+    },
+    "Missing production schema components must fail with sanitized actionable identifiers"
   );
 
   assert.equal(
@@ -708,8 +794,34 @@ try {
     stale_after_hours: 18,
     source_count: 19,
     stale_count: 1,
-    missing_count: 0,
-    degraded_count: 1
+    missing_count: 1,
+    degraded_count: 1,
+    sources: [
+      {
+        source_key:
+          "event:raid_hour",
+        status: "stale",
+        source_url:
+          "https://secret.example/calendar?credential=private",
+        last_error:
+          "sensitive upstream exception"
+      },
+      {
+        source_key:
+          "meta:pvpoke-master-league",
+        status: "missing"
+      },
+      {
+        source_key:
+          "official:pokemon-go-schedules",
+        status: "degraded"
+      },
+      {
+        source_key:
+          "https://secret.example/?token=bad",
+        status: "stale"
+      }
+    ]
   };
 
   await assert.rejects(
@@ -719,8 +831,30 @@ try {
         attempts: 1,
         timeoutMs: 1000
       }),
-    /Production data freshness returned HTTP 503 with status stale/,
-    "Materially stale source health must fail the production smoke gate"
+    error => {
+      const message =
+        String(
+          error?.message ||
+          error
+        );
+
+      assert.match(
+        message,
+        /Production data freshness returned HTTP 503 with status stale/
+      );
+      assert.match(
+        message,
+        /affected sources: stale: event:raid_hour; missing: meta:pvpoke-master-league; degraded: official:pokemon-go-schedules/
+      );
+      assert.doesNotMatch(
+        message,
+        /secret\.example|credential=private|sensitive upstream exception|token=bad/,
+        "Freshness failure output must not leak source URLs, credentials, or raw upstream errors"
+      );
+
+      return true;
+    },
+    "Materially stale source health must fail with sanitized actionable source identifiers"
   );
 
   assert.equal(
