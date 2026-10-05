@@ -27,25 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-057 — Correct Mega/Primal Hundo benchmark semantics and add Hundo correctness regressions
-
-**Priority: HIGH**
-
-The standalone Hundo CP calculator currently includes Mega and Primal forms from the Pokémon GO API catalog, but its fixed benchmark labels still present Lv20 as **Raid / Egg** and Lv25 as **Weather-boosted raid** regardless of the selected form.
-
-For Mega/Primal selections, that can imply that CP calculated from transformed-form stats is the Pokémon actually encountered after the raid. Pokémon GO instead uses the Mega/Primal form for the battle while the catch encounter is the underlying encounter form. The Battle Plan's Battle Intel path already models that boss/encounter separation correctly; the standalone Hundo calculator must do the same.
-
-Required outcome:
-
-- keep Mega/Primal forms searchable without presenting transformed-form CP as the post-raid catch CP;
-- when battle form and catch form differ, make the distinction explicit in the Hundo result;
-- use the underlying encounter form for raid-catch Lv20/Lv25 benchmarks, or clearly label transformed-form CP as theoretical rather than encounter CP;
-- preserve form-specific stats and exact form identity for legitimate theoretical/custom-level calculations;
-- add deterministic Hundo tests covering known Lv15/Lv20/Lv25/Lv30/Lv35/Lv40/Lv50 15/15/15 values, half-level behavior, regional forms, and Mega/Primal boss-versus-encounter semantics;
-- add focused UI coverage so benchmark labels cannot silently regress back to misleading raid-catch semantics.
-
-This is a gameplay-correctness issue, not a cosmetic enhancement.
-
 ### BL-058 — Make Release health production-verification lookup history-independent
 
 **Priority: RECOMMENDED**
@@ -151,5 +132,7 @@ BL-055 is implemented by PR #109: Production smoke now includes only allow-liste
 BL-056 is implemented by PR #110: a repository-owned **Release health** GitHub Actions workflow now consolidates the current `main` SHA, exact-SHA production verification, latest same-SHA Planner regression and Production smoke state, data freshness, and schema compatibility into a single GitHub job summary. It refreshes after completed `main` regression/smoke workflows and on manual dispatch, uses only read-only Actions/contents permissions plus existing credential-free health endpoints, preserves BL-055 sanitization, and remains informational rather than a branch-protection/deployment gate. No D1 migration, application route, CSS/cache, Cloudflare binding, Cron, secret, Service Binding, or deployment-config change is required.
 
 A fresh full product audit on 30 September 2026 reviewed the newest production `main`, release health, Production smoke, Planner regression, D1/schema safeguards, event/meta freshness, backup/recovery, mobile/desktop UX, accessibility, bearer-credential security, Pokémon/form handling, and repository governance. Production was assessed as public-ready with no release-blocking defect. Two concrete follow-ups were promoted into Active: BL-057 corrects Mega/Primal Hundo raid-catch semantics and adds missing Hundo correctness regressions; BL-058 makes Release health exact-SHA deployment verification independent of a bounded rolling Actions history window. The same audit identified stale PR #88 as housekeeping rather than product backlog scope.
+
+BL-057 is implemented by PR #112: Mega and Primal selections remain searchable in the Hundo calculator, but Lv20/Lv25 cards now resolve and name the underlying same-dex base raid encounter form instead of using transformed stats. Other Mega/Primal benchmark levels and custom levels intentionally keep the selected transformed form and are labeled theoretical; if the encounter form cannot be resolved, raid CP is omitted rather than substituted. Deterministic coverage now locks known Hundo CP values, half-level behavior, regional-form separation, Mega/Primal encounter semantics, and the missing-encounter fail-safe, while Chromium verifies the real result labels and CP values. BL-058 remains Active.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
