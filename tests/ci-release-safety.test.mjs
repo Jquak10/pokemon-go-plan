@@ -545,6 +545,21 @@ assert.match(
   /Production smoke/,
   "Release health must include Production smoke state"
 );
+assert.match(
+  releaseHealthScript,
+  /actions\/workflows\/\$\{WORKFLOW_FILES\.smoke\}\/runs\?branch=\$\{MAIN_BRANCH\}&event=push&head_sha=\$\{sha\}&per_page=10/,
+  "Release health deployment verification must use an exact-SHA push query against the Production smoke workflow"
+);
+assert.match(
+  releaseHealthScript,
+  /actions\/runs\?branch=\$\{MAIN_BRANCH\}&per_page=50/,
+  "Release health current operational state must continue using the bounded recent Actions window"
+);
+assert.match(
+  releaseHealthScript,
+  /chooseSuccessfulPushWorkflowRun\(\s*deploymentRuns,/,
+  "Release health must derive deployment verification from the dedicated exact-SHA workflow response, not the rolling Actions window"
+);
 assert.doesNotMatch(
   releaseHealthScript,
   /method:\s*["'](?:POST|PUT|PATCH|DELETE)["']|\/api\/create|\/api\/planner|\/calendar\//,
