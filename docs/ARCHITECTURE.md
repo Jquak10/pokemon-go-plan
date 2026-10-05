@@ -179,7 +179,7 @@ The main public files are:
 - public/planner-overlay.js — centralized modal/sheet/drawer keyboard containment, Escape dispatch, opener focus restoration, and background inert/aria-hidden isolation.
 - public/planner-target-logic.js — pure Target progress, availability, non-status/status filtering, sorting, counts, and grouping/view-model logic. It accepts BattleTargets and normalization/formatting helpers as dependencies and contains no DOM or API mutation code.
 - public/planner-calendar-logic.js — pure UTC date/month helpers, day-event range matching, source-class normalization, and six-week Monday-first month-grid projection. Calendar DOM rendering, fetch/cache state, and selected date/month state remain in planner-app.js.
-- public/planner-hundo-logic.js — pure Hundo CP multiplier/formula logic, standard benchmark generation, and search ranking. Pokémon catalog loading/cache, recent selections, DOM rendering, and input events remain in planner-app.js.
+- public/planner-hundo-logic.js — pure Hundo CP multiplier/formula logic, form-aware benchmark generation, Mega/Primal raid-encounter resolution, and search ranking. Pokémon catalog loading/cache, recent selections, DOM rendering, and input events remain in planner-app.js.
 - public/planner-battle-plan-logic.js — pure Battle Plan/resource view-model logic: recommendation system counts/filtering, primary/additional split, legacy/shared allocation lookup maps, zero-allocation compatibility merging/reason labels, score tone, and Max tier/cost display metadata. Recommendation-card DOM and actions remain in planner-app.js.
 - public/planner-battle-intel.js — pure Pokémon GO type-effectiveness, compounded weakness/resistance grouping, type symbols, and battle/encounter Intel aggregation. Exact catalog/form resolution and Intel DOM rendering remain in planner-app.js so Mega/Primal/Max battle-form versus encounter-form rules stay explicit.
 - public/admin.html — administration/synchronization controls.
@@ -934,7 +934,7 @@ The Hundo CP calculator and battle cards use the Pokémon GO CP formula with 15/
 
 Whole-level CP multipliers use the canonical stored values. Supported half levels derive their CPM as `sqrt((lowerCPM² + upperCPM²) / 2)`, matching Pokémon GO's half-level multiplier relationship; arithmetic interpolation is not valid.
 
-Common levels:
+Common levels for ordinary forms:
 
 - Level 15 — Research.
 - Level 20 — standard Raid/egg.
@@ -944,9 +944,19 @@ Common levels:
 - Level 40.
 - Level 50.
 
-Values outside actual encounter contexts should be labeled theoretical when appropriate.
+Values outside actual encounter contexts must be labeled theoretical when appropriate.
 
-For Mega/Primal Raids, weakness calculations use the Raid boss form, while catch Hundo CP uses the actual post-Raid encounter form.
+Mega and Primal forms remain searchable in the standalone calculator because their transformed CP is useful for form/state comparison, but battle form and raid encounter form are never conflated:
+
+- selecting a Mega/Primal form keeps that transformed form as the selected form;
+- the Level 20 and Level 25 raid cards resolve the same Pokédex number's exact `kind: "base"` catalog entry and calculate CP from that caught encounter form;
+- those cards are labeled **Raid encounter** / **Weather-boosted raid encounter** and name the actual encounter form;
+- Level 15, Level 30, Level 35, Level 40, Level 50, and custom-level calculations continue to use the selected Mega/Primal stats and are explicitly treated as selected-form/theoretical values;
+- if the exact underlying encounter entry cannot be resolved, Lv20/Lv25 raid CP is omitted instead of falling back to transformed-form stats.
+
+Raid recommendation Battle Intel follows the same invariant: weakness/type calculations use the boss form, while catch Hundo CP uses the actual post-Raid encounter form.
+
+Deterministic Hundo regressions lock known 15/15/15 values at Levels 15/20/25/30/35/40/50, canonical half-level behavior, regional-form stat separation, and Mega/Primal boss-versus-encounter semantics. Chromium UI coverage locks the transformed-form explanatory note and the Lv20/Lv25 encounter-form labels/CP values.
 
 ## 23. Sprites
 
