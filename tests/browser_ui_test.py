@@ -459,6 +459,32 @@ CATALOG = {
             "types": ["Ground", "Rock"],
             "sprite_url": None,
             "shiny_sprite_url": None,
+        },
+        {
+            "key": "6|base|charizard|charizard",
+            "dex_nr": 6,
+            "name": "Charizard",
+            "form_id": "CHARIZARD",
+            "kind": "base",
+            "attack": 223,
+            "defense": 173,
+            "stamina": 186,
+            "types": ["Fire", "Flying"],
+            "sprite_url": None,
+            "shiny_sprite_url": None,
+        },
+        {
+            "key": "6|mega|mega charizard x|charizard mega x",
+            "dex_nr": 6,
+            "name": "Mega Charizard X",
+            "form_id": "CHARIZARD_MEGA_X",
+            "kind": "mega",
+            "attack": 273,
+            "defense": 213,
+            "stamina": 186,
+            "types": ["Fire", "Dragon"],
+            "sprite_url": None,
+            "shiny_sprite_url": None,
         }
     ],
 }
@@ -2527,6 +2553,77 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
             timezone.evaluate(
                 "element => Boolean(element.validationMessage)"
             )
+        )
+
+        self.assert_no_horizontal_overflow(page)
+
+    def test_hundo_mega_raid_uses_underlying_encounter_cp(self):
+        page = self.open_planner(1024, 800)
+
+        page.locator('.tab-button[data-tab="hundo"]').click()
+        page.locator("#hundoCatalogStatus").get_by_text(
+            "Pokémon catalog ready",
+            exact=False,
+        ).wait_for(state="visible")
+
+        search = page.locator("#hundoPokemonSearch")
+        search.fill("Mega Charizard X")
+
+        result = page.locator(
+            '[data-hundo-key="6|mega|mega charizard x|charizard mega x"]'
+        )
+        result.wait_for(state="visible")
+        self.assertIn(
+            "mega",
+            result.locator(".form-badge").inner_text().lower(),
+        )
+        result.click()
+
+        card = page.locator("#hundoResultCard")
+        card.wait_for(state="visible")
+
+        note = page.locator("#hundoEncounterNote")
+        self.assertTrue(note.is_visible())
+        self.assertIn(
+            "Battle form: Mega Charizard X",
+            note.inner_text(),
+        )
+        self.assertIn(
+            "Raid encounter form: Charizard",
+            note.inner_text(),
+        )
+        self.assertIn(
+            "Lv20/Lv25 raid CP uses Charizard",
+            note.inner_text(),
+        )
+
+        primary = page.locator("#hundoBenchmarks article")
+        self.assertEqual(primary.count(), 3)
+
+        research = primary.nth(0).inner_text()
+        normal_raid = primary.nth(1).inner_text()
+        boosted_raid = primary.nth(2).inner_text()
+
+        self.assertIn("Selected form", research)
+        self.assertIn("1,650", research)
+        self.assertIn("Theoretical · Lv 15", research)
+
+        self.assertIn("Raid encounter", normal_raid)
+        self.assertIn("1,651", normal_raid)
+        self.assertIn("Charizard · Lv 20", normal_raid)
+        self.assertNotIn("2,200", normal_raid)
+
+        self.assertIn(
+            "Weather-boosted raid encounter",
+            boosted_raid,
+        )
+        self.assertIn("2,064", boosted_raid)
+        self.assertIn("Charizard · Lv 25", boosted_raid)
+
+        self.assertEqual(
+            page.locator("#hundoCustomCp").inner_text().strip(),
+            "2,200",
+            "Custom Level 20 must keep Mega Charizard X stats as a theoretical selected-form calculation",
         )
 
         self.assert_no_horizontal_overflow(page)
