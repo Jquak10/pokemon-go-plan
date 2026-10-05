@@ -119,8 +119,6 @@ function healthyFetch({
     "success",
   deploymentSmokeStatus =
     "completed",
-  latestSmokeStatus =
-    "completed",
   freshnessBody = {
     monitor_ok: true,
     status: "healthy",
