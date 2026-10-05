@@ -14,6 +14,9 @@ const WORKFLOW_NAMES = {
   regression: "Planner regression",
   smoke: "Production smoke"
 };
+const WORKFLOW_FILES = {
+  smoke: "production-smoke.yml"
+};
 
 function safeInteger(
   value
@@ -213,7 +216,7 @@ function chooseWorkflowRun(
   );
 }
 
-function choosePushWorkflowRun(
+function chooseSuccessfulPushWorkflowRun(
   runs,
   name,
   sha
@@ -226,7 +229,15 @@ function choosePushWorkflowRun(
     ).find(
       run =>
         run?.event ===
-          "push"
+          "push" &&
+        safeWorkflowStatus(
+          run?.status
+        ) ===
+          "completed" &&
+        safeWorkflowConclusion(
+          run?.conclusion
+        ) ===
+          "success"
     ) ||
     null
   );
@@ -442,18 +453,34 @@ export async function collectReleaseHealth({
     );
   }
 
-  const runsResponse =
-    await fetchJson(
-      fetchImpl,
-      new URL(
-        `/repos/${repo}/actions/runs?branch=${MAIN_BRANCH}&per_page=50`,
-        apiBase
+  const [
+    runsResponse,
+    deploymentRunsResponse
+  ] =
+    await Promise.all([
+      fetchJson(
+        fetchImpl,
+        new URL(
+          `/repos/${repo}/actions/runs?branch=${MAIN_BRANCH}&per_page=50`,
+          apiBase
+        ),
+        {
+          token,
+          timeoutMs
+        }
       ),
-      {
-        token,
-        timeoutMs
-      }
-    );
+      fetchJson(
+        fetchImpl,
+        new URL(
+          `/repos/${repo}/actions/workflows/${WORKFLOW_FILES.smoke}/runs?branch=${MAIN_BRANCH}&event=push&head_sha=${sha}&per_page=10`,
+          apiBase
+        ),
+        {
+          token,
+          timeoutMs
+        }
+      )
+    ]);
 
   const runs =
     runsResponse.ok &&
@@ -463,6 +490,18 @@ export async function collectReleaseHealth({
         ?.workflow_runs
     )
       ? runsResponse
+          .body
+          .workflow_runs
+      : [];
+
+  const deploymentRuns =
+    deploymentRunsResponse.ok &&
+    Array.isArray(
+      deploymentRunsResponse
+        ?.body
+        ?.workflow_runs
+    )
+      ? deploymentRunsResponse
           .body
           .workflow_runs
       : [];
@@ -480,8 +519,8 @@ export async function collectReleaseHealth({
       sha
     );
   const deploymentSmokeRun =
-    choosePushWorkflowRun(
-      runs,
+    chooseSuccessfulPushWorkflowRun(
+      deploymentRuns,
       WORKFLOW_NAMES.smoke,
       sha
     );
