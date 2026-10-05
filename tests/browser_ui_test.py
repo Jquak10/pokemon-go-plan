@@ -2562,7 +2562,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
 
         page.locator('.tab-button[data-tab="hundo"]').click()
         page.locator("#hundoCatalogStatus").get_by_text(
-            "Pokémon catalog ready",
+            "Pokémon/forms ready",
             exact=False,
         ).wait_for(state="visible")
 
