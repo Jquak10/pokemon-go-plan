@@ -1,6 +1,6 @@
 # Pokémon GO Battle Planner — Backlog
 
-Last reviewed: 30 September 2026
+Last reviewed: 5 October 2026
 
 This file is the durable home for **confirmed but unshipped work** and explicitly deferred/rejected ideas that would otherwise exist only in project chats.
 
@@ -26,23 +26,6 @@ It is intentionally different from the other repository references:
 7. Never create a production migration solely because an item appears here. Inspect current production state and follow the normal migration/release workflow.
 
 ## Active
-
-### BL-058 — Make Release health production-verification lookup history-independent
-
-**Priority: RECOMMENDED**
-
-BL-056 currently resolves the latest Actions metadata through a bounded recent-run query and searches that window for the push-triggered Production smoke associated with the current `main` SHA. Because scheduled Production smoke, scheduled Planner regression, and the Release health workflow continue producing runs even when no deployment occurs, the original push smoke can eventually fall out of that bounded history window.
-
-When that happens, the same unchanged production SHA could be incorrectly shown as **not yet production-verified** even though it previously passed its post-merge push smoke and all current health signals remain green.
-
-Required outcome:
-
-- determine exact-SHA deployment verification independently from the rolling general Actions history window;
-- query the Production smoke workflow/event history directly, or otherwise retain an equivalent exact-SHA push-verification lookup that does not decay merely because newer scheduled runs accumulate;
-- continue using the newest same-SHA smoke/regression run for **current health**, so later scheduled failures remain visible;
-- preserve the distinction between historical deployment verification and current operational health;
-- keep Release health read-only, non-gating, credential-safe, and bounded;
-- add deterministic coverage proving production-verification remains true after enough unrelated/scheduled runs would have displaced the original push run from the previous 50-run window.
 
 ### Repository housekeeping — close superseded PR #88
 
@@ -133,6 +116,8 @@ BL-056 is implemented by PR #110: a repository-owned **Release health** GitHub A
 
 A fresh full product audit on 30 September 2026 reviewed the newest production `main`, release health, Production smoke, Planner regression, D1/schema safeguards, event/meta freshness, backup/recovery, mobile/desktop UX, accessibility, bearer-credential security, Pokémon/form handling, and repository governance. Production was assessed as public-ready with no release-blocking defect. Two concrete follow-ups were promoted into Active: BL-057 corrects Mega/Primal Hundo raid-catch semantics and adds missing Hundo correctness regressions; BL-058 makes Release health exact-SHA deployment verification independent of a bounded rolling Actions history window. The same audit identified stale PR #88 as housekeeping rather than product backlog scope.
 
-BL-057 is implemented by PR #112: Mega and Primal selections remain searchable in the Hundo calculator, but Lv20/Lv25 cards now resolve and name the underlying same-dex base raid encounter form instead of using transformed stats. Other Mega/Primal benchmark levels and custom levels intentionally keep the selected transformed form and are labeled theoretical; if the encounter form cannot be resolved, raid CP is omitted rather than substituted. Deterministic coverage now locks known Hundo CP values, half-level behavior, regional-form separation, Mega/Primal encounter semantics, and the missing-encounter fail-safe, while Chromium verifies the real result labels and CP values. BL-058 remains Active.
+BL-057 is implemented by PR #112: Mega and Primal selections remain searchable in the Hundo calculator, but Lv20/Lv25 cards now resolve and name the underlying same-dex base raid encounter form instead of using transformed stats. Other Mega/Primal benchmark levels and custom levels intentionally keep the selected transformed form and are labeled theoretical; if the encounter form cannot be resolved, raid CP is omitted rather than substituted. Deterministic coverage now locks known Hundo CP values, half-level behavior, regional-form separation, Mega/Primal encounter semantics, and the missing-encounter fail-safe, while Chromium verifies the real result labels and CP values.
+
+BL-058 is implemented by PR #113: Release health keeps its bounded 50-run Actions window for the newest same-SHA Planner regression and Production smoke **current health**, but deployment verification now comes from a separate `production-smoke.yml` workflow query filtered to `branch=main`, `event=push`, and the exact current `head_sha`. The SHA remains production-verified when that bounded exact-SHA workflow history contains a completed successful push smoke, even after scheduled workflows have displaced that original run from the general recent-run window. Deterministic coverage reproduces a full 50-run rolling window with no push run and proves the historical exact-SHA deployment verification remains intact.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
