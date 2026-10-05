@@ -307,10 +307,10 @@ assert.match(manage, /<script src="\/planner-overlay\.js\?v=1"><\/script>/);
 assert.match(manage, /<link rel="stylesheet" href="\/planner\.css\?v=6">/);
 assert.match(manage, /<script src="\/planner-target-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>/);
-assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=2"><\/script>/);
+assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=3"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-intel\.js\?v=1"><\/script>/);
-assert.match(manage, /<script src="\/planner-app\.js\?v=7"><\/script>/);
+assert.match(manage, /<script src="\/planner-app\.js\?v=8"><\/script>/);
 assert.match(manage, /PlannerBattleIntel/);
 const plannerTablistMarkup =
   manageHtml.match(
