@@ -49,9 +49,76 @@ function workflowRun({
   };
 }
 
+const ROLLING_ACTIONS_WINDOW = [
+  workflowRun({
+    id: 501,
+    name:
+      "Production smoke",
+    event:
+      "schedule",
+    createdAt:
+      "2026-09-30T01:45:00Z"
+  }),
+  workflowRun({
+    id: 401,
+    name:
+      "Planner regression",
+    event:
+      "schedule",
+    createdAt:
+      "2026-09-30T01:30:00Z"
+  }),
+  ...Array.from(
+    {
+      length: 48
+    },
+    (
+      _,
+      index
+    ) =>
+      workflowRun({
+        id:
+          600 +
+          index,
+        name:
+          "Release health",
+        event:
+          "workflow_run",
+        createdAt:
+          `2026-09-30T00:${String(
+            59 -
+            index
+          ).padStart(
+            2,
+            "0"
+          )}:00Z`
+      })
+  )
+];
+
+assert.equal(
+  ROLLING_ACTIONS_WINDOW.length,
+  50
+);
+assert.equal(
+  ROLLING_ACTIONS_WINDOW.some(
+    run =>
+      run.event ===
+        "push"
+  ),
+  false,
+  "The rolling 50-run fixture must simulate the original deployment smoke having aged out of general Actions history"
+);
+
 function healthyFetch({
   latestSmokeConclusion =
     "success",
+  latestSmokeStatus =
+    "completed",
+  deploymentSmokeConclusion =
+    "success",
+  deploymentSmokeStatus =
+    "completed",
   latestSmokeStatus =
     "completed",
   freshnessBody = {
@@ -90,59 +157,98 @@ function healthyFetch({
       parsed.pathname ===
         `/repos/${REPO}/actions/runs`
     ) {
+      assert.equal(
+        parsed.searchParams.get(
+          "branch"
+        ),
+        "main"
+      );
+      assert.equal(
+        parsed.searchParams.get(
+          "per_page"
+        ),
+        "50"
+      );
+
+      return jsonResponse({
+        workflow_runs:
+          ROLLING_ACTIONS_WINDOW.map(
+            run => {
+              if (
+                run.id ===
+                  501
+              ) {
+                return {
+                  ...run,
+                  status:
+                    latestSmokeStatus,
+                  conclusion:
+                    latestSmokeConclusion
+                };
+              }
+
+              return run;
+            }
+          )
+      });
+    }
+
+    if (
+      parsed.pathname ===
+        `/repos/${REPO}/actions/workflows/production-smoke.yml/runs`
+    ) {
+      assert.equal(
+        parsed.searchParams.get(
+          "branch"
+        ),
+        "main"
+      );
+      assert.equal(
+        parsed.searchParams.get(
+          "event"
+        ),
+        "push"
+      );
+      assert.equal(
+        parsed.searchParams.get(
+          "head_sha"
+        ),
+        SHA
+      );
+      assert.equal(
+        parsed.searchParams.get(
+          "per_page"
+        ),
+        "10"
+      );
+
       return jsonResponse({
         workflow_runs: [
           workflowRun({
-            id: 501,
+            id: 302,
             name:
               "Production smoke",
             event:
-              "schedule",
-            status:
-              latestSmokeStatus,
-            conclusion:
-              latestSmokeConclusion,
-            createdAt:
-              "2026-09-30T01:45:00Z"
-          }),
-          workflowRun({
-            id: 401,
-            name:
-              "Planner regression",
-            event:
-              "schedule",
-            createdAt:
-              "2026-09-30T01:30:00Z"
-          }),
-          workflowRun({
-            id: 301,
-            name:
-              "Production smoke",
-            event: "push",
-            createdAt:
-              "2026-09-29T17:15:00Z"
-          }),
-          workflowRun({
-            id: 201,
-            name:
-              "Planner regression",
-            event: "push",
-            createdAt:
-              "2026-09-29T17:14:00Z"
-          }),
-          workflowRun({
-            id: 999,
-            name:
-              "Production smoke",
-            event: "push",
+              "push",
             status:
               "completed",
             conclusion:
               "failure",
             createdAt:
-              "2026-09-29T17:20:00Z",
-            headSha:
-              "1111111111111111111111111111111111111111"
+              "2026-09-29T17:16:00Z"
+          }),
+          workflowRun({
+            id: 301,
+            name:
+              "Production smoke",
+            event:
+              "push",
+            status:
+              deploymentSmokeStatus,
+            conclusion:
+              deploymentSmokeConclusion,
+            createdAt:
+              "2026-09-29T17:15:00Z"
           })
         ]
       });
@@ -203,7 +309,7 @@ assert.equal(
 assert.equal(
   healthy.production_verified,
   true,
-  "A successful push-triggered smoke for the exact main SHA must verify the deployment SHA"
+  "Exact-SHA Production smoke history must keep the deployment verified even after the original push run ages out of the rolling 50-run Actions window"
 );
 assert.equal(
   healthy.smoke.url,
@@ -213,6 +319,27 @@ assert.equal(
 assert.equal(
   healthy.regression.url,
   `https://github.com/${REPO}/actions/runs/401`
+);
+
+const unverified =
+  await collectReleaseHealth({
+    fetchImpl:
+      healthyFetch({
+        deploymentSmokeConclusion:
+          "failure"
+      }),
+    repo: REPO,
+    githubApiUrl:
+      "https://api.github.test",
+    productionUrl:
+      "https://planner.example",
+    timeoutMs: 1000
+  });
+
+assert.equal(
+  unverified.production_verified,
+  false,
+  "An exact-SHA push history with no successful Production smoke must not mark the deployment verified"
 );
 assert.equal(
   healthy.overall,
