@@ -586,7 +586,7 @@ assert.match(manage, /item\.label \|\| "Priority"/);
 // BL-017: the Planner must remain executable with script-src 'self' only.
 assert.match(
   manageHtml,
-  /<script src="\/planner-app\.js\?v=7"><\/script>/
+  /<script src="\/planner-app\.js\?v=8"><\/script>/
 );
 
 const inlineScripts = [
@@ -2217,7 +2217,7 @@ assert.match(
 );
 assert.match(
   manageHtml,
-  /<script src="\/planner-app\.js\?v=7"><\/script>/
+  /<script src="\/planner-app\.js\?v=8"><\/script>/
 );
 assert.match(
   plannerApp,
