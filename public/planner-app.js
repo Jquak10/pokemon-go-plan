@@ -21,6 +21,8 @@ const {
   hundoCp,
   searchMatches:
     searchHundoCatalog,
+  isTransformedRaidForm,
+  raidEncounterForSelection,
   benchmarkData:
     hundoBenchmarkData
 } =
@@ -4509,16 +4511,62 @@ function renderHundoResult() {
     </div>
   `;
 
+  const transformed =
+    isTransformedRaidForm(
+      entry
+    );
+
+  const raidEncounter =
+    raidEncounterForSelection(
+      entry,
+      pokemonCatalog
+    );
+
+  const encounterNote =
+    document.getElementById(
+      "hundoEncounterNote"
+    );
+
+  if (
+    transformed &&
+    encounterNote
+  ) {
+    encounterNote.classList.remove(
+      "hidden"
+    );
+
+    encounterNote.innerHTML =
+      raidEncounter
+        ? `
+          Battle form: <strong>${esc(entry.name)}</strong><br>
+          Raid encounter form: <strong>${esc(raidEncounter.name)}</strong><br>
+          Lv20/Lv25 raid CP uses ${esc(raidEncounter.name)}. Other benchmark and custom-level CP values use ${esc(entry.name)} stats and are theoretical.
+        `
+        : `
+          Battle form: <strong>${esc(entry.name)}</strong><br>
+          The exact raid encounter form is not available in the current catalog, so Lv20/Lv25 raid encounter CP is not shown. Other benchmark and custom-level values use ${esc(entry.name)} stats and are theoretical.
+        `;
+  } else if (
+    encounterNote
+  ) {
+    encounterNote.classList.add(
+      "hidden"
+    );
+    encounterNote.textContent =
+      "";
+  }
+
   const benchmarks =
     hundoBenchmarkData(
-      entry
+      entry,
+      pokemonCatalog
     );
 
   const benchmarkCard =
     item => `
       <article class="${item.level === 20 || item.level === 25 ? "featured" : ""}">
         <span>${esc(item.label)}</span>
-        <strong>${formatNumber(item.cp)}</strong>
+        <strong>${item.cp == null ? "—" : formatNumber(item.cp)}</strong>
         <small>${esc(item.note)}</small>
       </article>
     `;

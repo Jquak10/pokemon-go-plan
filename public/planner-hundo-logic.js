@@ -319,18 +319,164 @@
       );
   }
 
-  function benchmarkData(
+  function isTransformedRaidForm(
     entry
   ) {
-    return BENCHMARKS.map(
-      item => ({
-        ...item,
-        cp:
-          hundoCp(
+    return [
+      "mega",
+      "primal"
+    ].includes(
+      String(
+        entry?.kind || ""
+      ).toLowerCase()
+    );
+  }
+
+  function raidEncounterForSelection(
+    entry,
+    catalog
+  ) {
+    if (!entry) {
+      return null;
+    }
+
+    if (
+      !isTransformedRaidForm(
+        entry
+      )
+    ) {
+      return entry;
+    }
+
+    const dexNr =
+      Number(
+        entry.dex_nr
+      );
+
+    if (
+      !Number.isFinite(
+        dexNr
+      ) ||
+      !Array.isArray(
+        catalog
+      )
+    ) {
+      return null;
+    }
+
+    return (
+      catalog.find(
+        candidate =>
+          Number(
+            candidate?.dex_nr
+          ) === dexNr &&
+          String(
+            candidate?.kind ||
+            ""
+          ).toLowerCase() ===
+            "base"
+      ) ||
+      null
+    );
+  }
+
+  function benchmarkData(
+    entry,
+    catalog = []
+  ) {
+    const transformed =
+      isTransformedRaidForm(
+        entry
+      );
+
+    const raidEncounter =
+      transformed
+        ? raidEncounterForSelection(
             entry,
-            item.level
+            catalog
           )
-      })
+        : entry;
+
+    return BENCHMARKS.map(
+      item => {
+        if (!transformed) {
+          return {
+            ...item,
+            cp:
+              hundoCp(
+                entry,
+                item.level
+              ),
+            cp_subject_name:
+              entry?.name || null,
+            cp_subject_kind:
+              "selected_form",
+            theoretical:
+              false,
+            encounter_missing:
+              false
+          };
+        }
+
+        const isRaidCatchLevel =
+          item.level === 20 ||
+          item.level === 25;
+
+        if (
+          isRaidCatchLevel
+        ) {
+          return {
+            ...item,
+            label:
+              item.level === 20
+                ? "Raid encounter"
+                : "Weather-boosted raid encounter",
+            note:
+              raidEncounter
+                ? `${raidEncounter.name} · Lv ${item.level}`
+                : `Encounter form unavailable · Lv ${item.level}`,
+            cp:
+              raidEncounter
+                ? hundoCp(
+                    raidEncounter,
+                    item.level
+                  )
+                : null,
+            cp_subject_name:
+              raidEncounter?.name ||
+              null,
+            cp_subject_kind:
+              "raid_encounter",
+            theoretical:
+              false,
+            encounter_missing:
+              !raidEncounter
+          };
+        }
+
+        return {
+          ...item,
+          label:
+            item.level <= 35
+              ? "Selected form"
+              : item.label,
+          note:
+            `Theoretical · Lv ${item.level}`,
+          cp:
+            hundoCp(
+              entry,
+              item.level
+            ),
+          cp_subject_name:
+            entry?.name || null,
+          cp_subject_kind:
+            "selected_form",
+          theoretical:
+            true,
+          encounter_missing:
+            false
+        };
+      }
     );
   }
 
@@ -341,6 +487,8 @@
       cpMultiplierForLevel,
       hundoCp,
       searchMatches,
+      isTransformedRaidForm,
+      raidEncounterForSelection,
       benchmarkData
     });
 })();

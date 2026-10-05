@@ -147,13 +147,14 @@ The **Hundo CP** tab calculates CP for a 15/15/15 Pokémon without inventing fix
 
 1. Use **Find a Pokémon** to search by name or Pokédex number.
 2. Select the exact Pokémon or form from the results. Non-base entries are identified with a form badge, and recent selections appear under **RECENT**.
-3. Review the common benchmarks: **Research** at Level 15, **Raid / Egg** at Level 20, and **Weather-boosted raid** at Level 25.
-4. Select **More levels** for wild maximum, weather-boosted wild maximum, Level 40, and Level 50 benchmarks.
-5. Under **CUSTOM LEVEL**, enter Level 1–50 in 0.5 steps.
+3. For ordinary forms, review the common benchmarks: **Research** at Level 15, **Raid / Egg** at Level 20, and **Weather-boosted raid** at Level 25.
+4. For a **Mega** or **Primal** selection, the result explicitly separates the transformed battle form from the post-raid encounter form. The Level 20 and Level 25 cards become **Raid encounter** benchmarks and use the underlying caught form's stats. Other benchmark levels remain selected-form values and are labeled theoretical.
+5. Select **More levels** for wild maximum, weather-boosted wild maximum, Level 40, and Level 50 benchmarks.
+6. Under **CUSTOM LEVEL**, enter Level 1–50 in 0.5 steps. For Mega/Primal selections, custom CP intentionally uses the selected transformed form's stats and is therefore a theoretical/form-state value rather than post-raid catch CP.
 
 Half-level custom results use Pokémon GO's canonical half-level CP-multiplier relationship rather than linearly averaging adjacent whole levels.
 
-Search and calculations are form-specific. On raid recommendation cards, the app distinguishes the raid battle form from the catch encounter: Mega, Primal, Gigantamax, and Dynamax prefixes are removed when resolving the base-form catch encounter. Mega or Primal raid-boss stats therefore are not used as the base-form catch CP.
+Search and calculations remain form-specific. If the exact underlying encounter form for a Mega/Primal selection is unexpectedly unavailable in the current catalog, the Planner shows no Lv20/Lv25 raid encounter CP rather than substituting the transformed-form CP. Raid recommendation cards follow the same battle-form-versus-catch-form invariant.
 
 ### Calendar
 
