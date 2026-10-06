@@ -17,7 +17,7 @@ assert.match(
 );
 assert.match(
   readme,
-  /latest retained numbered migration is `0008_remote_raid_limit_index\.sql`/,
+  /latest retained numbered migration is `0009_pokemon_catalog_snapshot\.sql`/,
   'README must state the current retained migration boundary'
 );
 assert.doesNotMatch(
@@ -27,7 +27,7 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   readme,
-  /wrangler d1 execute DB --remote --file=migrations\/000[1-8][^\s`]*/,
+  /wrangler d1 execute DB --remote --file=migrations\/000[1-9][^\s`]*/,
   'historical production migration commands must not appear in the current README'
 );
 
@@ -47,7 +47,7 @@ assert.match(
   'historical document must preserve the non-repeatable migration 0003 warning'
 );
 
-for (let number = 1; number <= 8; number += 1) {
+for (let number = 1; number <= 9; number += 1) {
   assert.match(
     history,
     new RegExp("`000" + number + "_[^`]+`"),
