@@ -2463,7 +2463,7 @@ async function fetchJsonWithSyncHealth(
   );
 }
 
-async function fetchPokedexWithSnapshotHealth(
+export async function fetchPokedexWithSnapshotHealth(
   env
 ) {
   return withSyncSourceHealth(
