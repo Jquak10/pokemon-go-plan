@@ -486,6 +486,22 @@ assert.match(
 );
 
 assert.match(
+  productionSmokeScript,
+  /\/api\/pokemon-catalog/,
+  "Production smoke must verify the public Pokémon catalog contract"
+);
+assert.match(
+  productionSmokeScript,
+  /snapshot_available/,
+  "Production smoke must require the server-side catalog snapshot to be available"
+);
+assert.match(
+  productionSmokeScript,
+  /last_known_good/,
+  "Production smoke must accept a validated server last-known-good catalog during upstream outage"
+);
+
+assert.match(
   releaseHealthWorkflow,
   /^name: Release health$/m,
   "Release health must remain a distinct repository-owned workflow"
