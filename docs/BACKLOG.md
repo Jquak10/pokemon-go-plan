@@ -1,6 +1,6 @@
 # Pokémon GO Battle Planner — Backlog
 
-Last reviewed: 5 October 2026
+Last reviewed: 6 October 2026
 
 This file is the durable home for **confirmed but unshipped work** and explicitly deferred/rejected ideas that would otherwise exist only in project chats.
 
@@ -27,11 +27,7 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### Repository housekeeping — close superseded PR #88
-
-PR #88 (**Add BL-040 automated theme accessibility checks**) remains open even though BL-040 shipped through the later completed implementation lineage and the current `main` already contains the intended accessibility/theme protections.
-
-Close PR #88 as superseded after confirming it contains no unique unmerged work. This is repository hygiene only and intentionally does **not** receive a BL number.
+No confirmed active backlog items are currently recorded.
 
 ## Deferred
 
@@ -119,5 +115,7 @@ A fresh full product audit on 30 September 2026 reviewed the newest production `
 BL-057 is implemented by PR #112: Mega and Primal selections remain searchable in the Hundo calculator, but Lv20/Lv25 cards now resolve and name the underlying same-dex base raid encounter form instead of using transformed stats. Other Mega/Primal benchmark levels and custom levels intentionally keep the selected transformed form and are labeled theoretical; if the encounter form cannot be resolved, raid CP is omitted rather than substituted. Deterministic coverage now locks known Hundo CP values, half-level behavior, regional-form separation, Mega/Primal encounter semantics, and the missing-encounter fail-safe, while Chromium verifies the real result labels and CP values.
 
 BL-058 is implemented by PR #113: Release health keeps its bounded 50-run Actions window for the newest same-SHA Planner regression and Production smoke **current health**, but deployment verification now comes from a separate `production-smoke.yml` workflow query filtered to `branch=main`, `event=push`, and the exact current `head_sha`. The SHA remains production-verified when that bounded exact-SHA workflow history contains a completed successful push smoke, even after scheduled workflows have displaced that original run from the general recent-run window. Deterministic coverage reproduces a full 50-run rolling window with no push run and proves the historical exact-SHA deployment verification remains intact.
+
+Repository housekeeping completed on 6 October 2026: superseded PR #88 (**Add BL-040 automated theme accessibility checks**) was reviewed against current `main`, confirmed to contain no unique product behavior worth merging, and closed with a supersession note. Current `main` retains the deterministic Light/Dark contrast gate, expanded Chromium contrast/theme-switch accessibility coverage, disabled/focus/live-region invariants, and the evolved semantic theme tokens. No numbered backlog item was created because this was repository hygiene only.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
