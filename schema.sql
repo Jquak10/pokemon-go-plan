@@ -114,6 +114,15 @@ CREATE TABLE IF NOT EXISTS sync_source_health (
 CREATE INDEX IF NOT EXISTS idx_sync_source_health_group
 ON sync_source_health(source_group, source_key);
 
+CREATE TABLE IF NOT EXISTS pokemon_catalog_snapshot (
+  id TEXT PRIMARY KEY,
+  source_url TEXT NOT NULL,
+  generated_at TEXT NOT NULL,
+  entry_count INTEGER NOT NULL CHECK (entry_count > 0),
+  catalog_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS remote_raid_usage (
   user_id TEXT NOT NULL,
   local_date TEXT NOT NULL,

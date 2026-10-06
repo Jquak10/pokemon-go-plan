@@ -310,7 +310,7 @@ assert.match(manage, /<script src="\/planner-calendar-logic\.js\?v=1"><\/script>
 assert.match(manage, /<script src="\/planner-hundo-logic\.js\?v=3"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-plan-logic\.js\?v=1"><\/script>/);
 assert.match(manage, /<script src="\/planner-battle-intel\.js\?v=1"><\/script>/);
-assert.match(manage, /<script src="\/planner-app\.js\?v=8"><\/script>/);
+assert.match(manage, /<script src="\/planner-app\.js\?v=9"><\/script>/);
 assert.match(manage, /PlannerBattleIntel/);
 const plannerTablistMarkup =
   manageHtml.match(
@@ -467,7 +467,7 @@ assert.match(manage, /pokemonCatalogLoadState/);
 assert.match(manage, /POKEMON_CATALOG_CACHE_KEY/);
 assert.match(manage, /data-retry-pokemon-catalog/);
 assert.match(manage, /Battle intel temporarily unavailable\./);
-assert.match(manage, /Using the last saved Pokémon catalog/);
+assert.match(manage, /Using the last-known-good Pokémon catalog/);
 assert.match(manage, /function readPokemonCatalogCache/);
 assert.match(manage, /function writePokemonCatalogCache/);
 assert.match(manage, /function retryPokemonCatalogLoad/);
@@ -586,7 +586,7 @@ assert.match(manage, /item\.label \|\| "Priority"/);
 // BL-017: the Planner must remain executable with script-src 'self' only.
 assert.match(
   manageHtml,
-  /<script src="\/planner-app\.js\?v=8"><\/script>/
+  /<script src="\/planner-app\.js\?v=9"><\/script>/
 );
 
 const inlineScripts = [
@@ -2217,7 +2217,7 @@ assert.match(
 );
 assert.match(
   manageHtml,
-  /<script src="\/planner-app\.js\?v=8"><\/script>/
+  /<script src="\/planner-app\.js\?v=9"><\/script>/
 );
 assert.match(
   plannerApp,

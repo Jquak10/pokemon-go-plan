@@ -69,6 +69,11 @@ import {
   schemaContractFingerprint
 } from "./schema-health.js";
 import {
+  readPokemonCatalogSnapshot,
+  usablePokemonCatalogEntries,
+  writePokemonCatalogSnapshot
+} from "./pokemon-catalog-snapshot.js";
+import {
   PLANNER_STORAGE_LIMITS,
   maxBattleOverrideLimitMessage,
   targetNotesLimitMessage,
@@ -2458,6 +2463,56 @@ async function fetchJsonWithSyncHealth(
   );
 }
 
+export async function fetchPokedexWithSnapshotHealth(
+  env
+) {
+  return withSyncSourceHealth(
+    env,
+    META_SYNC_SOURCES.pokedex,
+    async () => {
+      const pokedex =
+        await fetchJson(
+          POGO_API_POKEDEX,
+          "Pokémon GO API"
+        );
+
+      const entries =
+        buildPokemonCatalog(
+          pokedex
+        );
+
+      if (
+        !usablePokemonCatalogEntries(
+          entries
+        )
+      ) {
+        throw new Error(
+          "Pokémon GO API returned no usable catalog entries."
+        );
+      }
+
+      await writePokemonCatalogSnapshot(
+        env.DB,
+        {
+          sourceUrl:
+            POGO_API_POKEDEX,
+          generatedAt:
+            nowIso(),
+          entries
+        }
+      );
+
+      return pokedex;
+    },
+    result =>
+      Array.isArray(
+        result
+      )
+        ? result.length
+        : 0
+  );
+}
+
 async function raidEventsForMeta(env) {
   const placeholders = [...RAID_SOURCE_TYPES].map(() => "?").join(",");
 
@@ -2597,11 +2652,8 @@ async function syncAutomaticMeta(env) {
     raidEvents,
     maxEligibilityEvents
   ] = await Promise.all([
-    fetchJsonWithSyncHealth(
-      env,
-      META_SYNC_SOURCES.pokedex,
-      POGO_API_POKEDEX,
-      "Pokémon GO API"
+    fetchPokedexWithSnapshotHealth(
+      env
     ),
     fetchJsonWithSyncHealth(
       env,
@@ -11809,7 +11861,7 @@ function buildPokemonCatalog(
     );
 }
 
-async function pokemonCatalogApi(
+export async function pokemonCatalogApi(
   request,
   env
 ) {
@@ -11821,7 +11873,7 @@ async function pokemonCatalogApi(
   const cacheUrl =
     new URL(
       requestUrl.origin +
-      "/api/pokemon-catalog?v=2"
+      "/api/pokemon-catalog?v=3"
     );
 
   const cacheKey =
@@ -11844,50 +11896,167 @@ async function pokemonCatalogApi(
     return cached;
   }
 
-  const response =
-    await fetch(
-      POGO_API_POKEDEX
-    );
+  try {
+    const response =
+      await fetch(
+        POGO_API_POKEDEX,
+        {
+          headers: {
+            "user-agent":
+              "PokemonGoPersonalCalendar/1.0"
+          },
+          redirect:
+            "follow"
+        }
+      );
 
-  if (!response.ok) {
-    return bad(
-      `Pokédex source returned ${response.status}.`,
-      502
+    if (!response.ok) {
+      throw new Error(
+        `Pokédex source returned ${response.status}.`
+      );
+    }
+
+    const pokedex =
+      await response.json();
+
+    const entries =
+      buildPokemonCatalog(
+        pokedex
+      );
+
+    if (
+      !usablePokemonCatalogEntries(
+        entries
+      )
+    ) {
+      throw new Error(
+        "Pokédex source returned no usable catalog entries."
+      );
+    }
+
+    const generatedAt =
+      nowIso();
+
+    let snapshotAvailable =
+      false;
+
+    try {
+      await writePokemonCatalogSnapshot(
+        env.DB,
+        {
+          sourceUrl:
+            POGO_API_POKEDEX,
+          generatedAt,
+          entries
+        }
+      );
+
+      snapshotAvailable =
+        true;
+    } catch (snapshotError) {
+      console.warn(
+        "Pokémon catalog snapshot persistence unavailable:",
+        syncHealthErrorMessage(
+          snapshotError
+        )
+      );
+    }
+
+    const result =
+      json(
+        {
+          source:
+            POGO_API_POKEDEX,
+          catalog_status:
+            "live",
+          snapshot_available:
+            snapshotAvailable,
+          generated_at:
+            generatedAt,
+          entry_count:
+            entries.length,
+          entries
+        },
+        200,
+        {
+          "cache-control":
+            "public, max-age=21600"
+        }
+      );
+
+    if (snapshotAvailable) {
+      await cache.put(
+        cacheKey,
+        result.clone()
+      );
+    }
+
+    return result;
+  } catch (error) {
+    console.warn(
+      "Live Pokémon catalog unavailable:",
+      syncHealthErrorMessage(
+        error
+      )
     );
   }
 
-  const pokedex =
-    await response.json();
+  try {
+    const snapshot =
+      await readPokemonCatalogSnapshot(
+        env.DB
+      );
 
-  const entries =
-    buildPokemonCatalog(
-      pokedex
+    if (snapshot) {
+      return json(
+        {
+          source:
+            snapshot.source,
+          catalog_status:
+            "last_known_good",
+          snapshot_available:
+            true,
+          generated_at:
+            snapshot.generated_at,
+          served_at:
+            nowIso(),
+          entry_count:
+            snapshot.entry_count,
+          entries:
+            snapshot.entries
+        },
+        200,
+        {
+          "cache-control":
+            "public, max-age=300"
+        }
+      );
+    }
+  } catch (snapshotError) {
+    console.warn(
+      "Pokémon catalog snapshot fallback unavailable:",
+      syncHealthErrorMessage(
+        snapshotError
+      )
     );
+  }
 
-  const result =
-    json(
-      {
-        source:
-          POGO_API_POKEDEX,
-        generated_at:
-          nowIso(),
-        entries
-      },
-      200,
-      {
-        "cache-control":
-          "public, max-age=21600"
-      }
-    );
-
-  await cache.put(
-    cacheKey,
-    result.clone()
+  return json(
+    {
+      error:
+        "Pokémon catalog is temporarily unavailable.",
+      catalog_status:
+        "unavailable",
+      snapshot_available:
+        false
+    },
+    503,
+    {
+      "cache-control":
+        "no-store"
+    }
   );
-
-  return result;
 }
-
 
 async function getMe(request, env) {
   const url = new URL(request.url);

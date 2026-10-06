@@ -1114,6 +1114,125 @@ async function runSmokeAttempt({
     "Production schema component snapshot must contain only SHA-256 hex hashes"
   );
 
+  const catalogResponse =
+    await fetchWithTimeout(
+      new URL(
+        "/api/pokemon-catalog",
+        baseUrl
+      ),
+      {
+        headers: {
+          accept:
+            "application/json"
+        }
+      },
+      timeoutMs
+    );
+
+  assertContentType(
+    catalogResponse,
+    /application\/json/i
+  );
+
+  const catalogBody =
+    await catalogResponse.json();
+
+  assert.equal(
+    catalogResponse.status,
+    200,
+    `Production Pokémon catalog returned HTTP ${catalogResponse.status} with status ${healthStatusLabel(catalogBody?.catalog_status, ["live", "last_known_good", "unavailable"])}`
+  );
+  assert.ok(
+    [
+      "live",
+      "last_known_good"
+    ].includes(
+      catalogBody?.catalog_status
+    ),
+    `Unexpected production Pokémon catalog status: ${healthStatusLabel(catalogBody?.catalog_status, ["live", "last_known_good", "unavailable"])}`
+  );
+  assert.equal(
+    catalogBody?.snapshot_available,
+    true,
+    "Production Pokémon catalog must have a server-side last-known-good snapshot"
+  );
+  assert.ok(
+    Number.isInteger(
+      Number(
+        catalogBody?.entry_count
+      )
+    ) &&
+    Number(
+      catalogBody?.entry_count
+    ) > 0,
+    "Production Pokémon catalog must report a positive entry count"
+  );
+  assert.equal(
+    Array.isArray(
+      catalogBody?.entries
+    ),
+    true,
+    "Production Pokémon catalog must return an entries array"
+  );
+  assert.equal(
+    catalogBody?.entries?.length,
+    Number(
+      catalogBody?.entry_count
+    ),
+    "Production Pokémon catalog entry count must match the returned entries"
+  );
+  assert.equal(
+    catalogBody?.entries?.every(
+      entry =>
+        entry &&
+        typeof entry.key ===
+          "string" &&
+        entry.key.length >
+          0 &&
+        typeof entry.name ===
+          "string" &&
+        entry.name.length >
+          0 &&
+        Number.isFinite(
+          Number(
+            entry.dex_nr
+          )
+        ) &&
+        Number.isFinite(
+          Number(
+            entry.attack
+          )
+        ) &&
+        Number.isFinite(
+          Number(
+            entry.defense
+          )
+        ) &&
+        Number.isFinite(
+          Number(
+            entry.stamina
+          )
+        ) &&
+        Array.isArray(
+          entry.types
+        ) &&
+        entry.types.length >
+          0
+    ),
+    true,
+    "Production Pokémon catalog must contain only structurally usable entries"
+  );
+
+  if (
+    catalogBody
+      .catalog_status ===
+      "last_known_good"
+  ) {
+    console.warn(
+      `Production Pokémon catalog is using the server last-known-good snapshot generated at ${String(catalogBody?.generated_at || "unknown")}`
+    );
+  }
+
   const apiResponse =
     await fetchWithTimeout(
       new URL(

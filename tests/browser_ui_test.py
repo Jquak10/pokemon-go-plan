@@ -445,7 +445,10 @@ MOCK_STATE = {
 
 CATALOG = {
     "source": "browser-test-fixture",
+    "catalog_status": "live",
+    "snapshot_available": True,
     "generated_at": "2026-09-18T06:00:00.000Z",
+    "entry_count": 3,
     "entries": [
         {
             "key": "111|base|rhyhorn|rhyhorn",
@@ -652,6 +655,17 @@ class PlannerFixtureHandler(SimpleHTTPRequestHandler):
                     {"error": "Fixture catalog temporarily unavailable."},
                     status=503,
                 )
+
+            if getattr(
+                self.server,
+                "catalog_server_fallback",
+                False,
+            ):
+                return self._json({
+                    **CATALOG,
+                    "catalog_status": "last_known_good",
+                    "served_at": "2026-09-18T07:00:00.000Z",
+                })
 
             return self._json(CATALOG)
 
@@ -928,6 +942,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
     def setUp(self):
         self.server.manage_api_mode = "ok"
         self.server.catalog_failures_remaining = 0
+        self.server.catalog_server_fallback = False
         self.server.last_manage_api_path = None
         self.server.last_manage_authorization = None
         self.server.last_settings_authorization = None
@@ -2646,6 +2661,26 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         self.assertNotIn("temporarily unavailable", card.inner_text().lower())
         self.assertIn("Water", card.locator(".raid-intel").inner_text())
 
+    def test_server_last_known_good_catalog_is_labeled_stale(self):
+        self.server.catalog_server_fallback = True
+        page = self.open_planner(1024, 800)
+
+        page.locator('.tab-button[data-tab="hundo"]').click()
+        status = page.locator("#hundoCatalogStatus")
+        status.get_by_text(
+            "Using the last-known-good Pokémon catalog",
+            exact=False,
+        ).wait_for(state="visible")
+
+        page.locator('.tab-button[data-tab="plan"]').click()
+        card = page.locator(".recommendation-card", has_text="Dynamax Rhyhorn")
+        card.locator(".raid-intel").wait_for(state="visible")
+        self.assertIn("Water", card.locator(".raid-intel").inner_text())
+        self.assertEqual(
+            status.locator("[data-retry-pokemon-catalog]").count(),
+            1,
+        )
+
     def test_catalog_failure_uses_last_known_good_saved_copy(self):
         page = self.open_planner(1024, 800)
 
@@ -2659,7 +2694,7 @@ class PlannerBrowserRegressionTests(unittest.TestCase):
         page.locator('.tab-button[data-tab="hundo"]').click()
         status = page.locator("#hundoCatalogStatus")
         status.get_by_text(
-            "Using the last saved Pokémon catalog",
+            "Using the last-known-good Pokémon catalog",
             exact=False,
         ).wait_for(state="visible")
 

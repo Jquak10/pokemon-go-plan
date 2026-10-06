@@ -3892,7 +3892,7 @@ function renderPokemonCatalogLoadState() {
   ) {
     status.innerHTML = `
       <span>
-        Using the last saved Pokémon catalog because the live catalog could not be refreshed.
+        Using the last-known-good Pokémon catalog because the live catalog could not be refreshed.
       </span>
       ${retryButton}
     `;
@@ -4131,9 +4131,13 @@ async function ensurePokemonCatalogLoaded(
         pokemonCatalog =
           entries;
         pokemonCatalogLoadState =
-          "ready";
+          data.catalog_status ===
+            "last_known_good"
+            ? "stale"
+            : "ready";
         pokemonCatalogError = "";
         pokemonCatalogCachedAt =
+          data.generated_at ||
           new Date().toISOString();
 
         writePokemonCatalogCache(
