@@ -7,6 +7,7 @@ export const REQUIRED_SCHEMA = Object.freeze({
     pokemon_meta: ["pokemon_name","pve_score","pvp_score","rarity_score","mega_score","overall_score","verdict","notes","updated_at"],
     meta_sources: ["id","pokemon_name","source_name","source_url","note","updated_at"],
     sync_source_health: ["source_key","source_group","source_label","source_url","last_attempt_at","last_success_at","last_error","item_count","updated_at"],
+    pokemon_catalog_snapshot: ["id","source_url","generated_at","entry_count","catalog_json","updated_at"],
     remote_raid_usage: ["user_id","local_date","raids_used","updated_at"],
     remote_raid_limit_overrides: ["id","event_name","start_date","end_date","remote_raid_limit","source_url","active","updated_at","is_unlimited","detected_automatically","source_excerpt","detected_at"],
     event_suppression_rules: ["id","event_name","start_date","end_date","suppressed_source_types","note","source_url","active","detected_automatically","source_excerpt","updated_at"],
