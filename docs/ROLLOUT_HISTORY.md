@@ -18,6 +18,7 @@ Before applying any historical migration to an existing database, inspect that d
 - `0006_sync_source_health.sql` — additive synchronization-source health table and index.
 - `0007_feed_link_credentials.sql` — additive signed-calendar generation/revocation state.
 - `0008_remote_raid_limit_index.sql` — idempotent repair for the Remote Raid limit date index verified missing from production by BL-052 schema health.
+- `0009_pokemon_catalog_snapshot.sql` — additive single-row server-side last-known-good Pokémon catalog snapshot used by BL-060.
 
 The presence of a file in `migrations/` does **not** mean it should be run now. A current release that requires a migration must name that migration explicitly in its rollout notes.
 
@@ -138,3 +139,17 @@ npx wrangler d1 execute DB --remote --file=migrations/0008_remote_raid_limit_ind
 ```
 
 After the migration, rerun the repository-owned Production smoke and require `/api/health/schema-compatibility` to return HTTP 200 with `status: compatible`. Do not replay migrations 0001–0007 as part of this repair.
+
+### BL-060 Pokémon catalog snapshot migration
+
+BL-060 adds `pokemon_catalog_snapshot`, a single-row D1 store containing the validated compact Pokémon/form catalog used by Hundo search and Battle Intel. The table is deliberately separate from `pokemon_meta`: meta rows contain only currently relevant assessed Pokémon and cannot reconstruct the complete form-aware catalog.
+
+Migration `0009_pokemon_catalog_snapshot.sql` is additive and idempotent. It creates only the snapshot table and does not modify users, targets, events, battle logs, meta assessments, credentials, or existing rows.
+
+For an existing production database adopting BL-060, apply **only** migration 0009 before merging/deploying the Worker release:
+
+```bash
+npx wrangler d1 execute DB --remote --file=migrations/0009_pokemon_catalog_snapshot.sql
+```
+
+After applying it, require the candidate schema release gate to become green before merge. The old Worker does not read the new table, so pre-merge application is backward compatible. Do not replay migrations 0001–0008. Fresh databases initialized from the current `schema.sql` already include the table and must not replay 0009.
