@@ -27,7 +27,44 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-No confirmed active backlog items are currently recorded.
+### BL-059 — Make Release health resilient to transient GitHub API reads
+
+**Priority: RECOMMENDED**
+
+A real post-BL-058 Release health refresh briefly reported the exact-SHA Planner regression and Production smoke as `missing`, leaving the overall summary `pending`, even though both workflows had completed successfully. Rerunning the same read-only summary job immediately produced the correct healthy state.
+
+The current Release health collector performs a single GitHub metadata request per evidence source. A transient network failure, GitHub 5xx response, rate-limit response, or malformed/non-JSON response therefore collapses into missing/unavailable evidence. That can incorrectly turn a temporary read problem into a misleading operator state. The dedicated deployment-verification lookup also currently collapses unavailable evidence to `production_verified: false`, which is not semantically equivalent to proving that no successful deployment smoke exists.
+
+Required outcome:
+
+- add short, bounded retry/backoff for safe GitHub metadata GETs used by Release health;
+- retry transient network failures, 5xx responses, and appropriate rate-limit responses without retrying definitive client errors indefinitely;
+- distinguish a genuinely missing workflow/run from Actions evidence that is temporarily unavailable;
+- distinguish **not production-verified** from **deployment verification unavailable**;
+- keep the newest same-SHA regression/smoke run as the current operational-health signal;
+- keep exact-SHA successful push smoke as the deployment-verification signal;
+- preserve the workflow's read-only, informational, non-gating and credential-safe design;
+- add deterministic coverage for transient failure followed by recovery, persistent GitHub API failure, deployment evidence unavailable, genuine no-successful-push state, and transient public health-endpoint failure.
+
+### BL-060 — Add server-side last-known-good Pokémon catalog resilience
+
+**Priority: RECOMMENDED**
+
+The Planner's public `/api/pokemon-catalog` endpoint currently fetches the Pokémon GO API Pokédex live whenever its Cloudflare cache misses. If that upstream request fails, the Worker returns an error. The browser already stores a last-known-good catalog locally, which protects returning users after at least one successful load, but first-time users, new devices, cleared storage, and private-browsing sessions have no fallback.
+
+This means a temporary Pokémon GO API outage plus an expired/evicted edge cache can make Hundo search, form selection, and catalog-derived Battle Intel unavailable to users even while scheduled meta freshness remains healthy from an earlier successful sync.
+
+Required outcome:
+
+- add a server-side last-known-good catalog path rather than relying only on browser localStorage;
+- validate that live upstream catalog data is structurally usable and non-empty before treating it as a successful refresh;
+- refresh the server-side safe snapshot on valid upstream success;
+- serve the previous safe snapshot when the live upstream is temporarily unavailable and a valid snapshot exists;
+- expose a safe fallback/staleness signal if useful without leaking raw upstream errors or source internals;
+- never substitute a wrong Pokémon form merely to keep the catalog available;
+- preserve current browser-side last-known-good caching as an additional resilience layer;
+- add deterministic coverage for live success, upstream failure with server-side fallback, malformed/empty upstream, and no-fallback failure;
+- extend production monitoring to verify the public catalog contract read-only and without Planner credentials.
 
 ## Deferred
 
@@ -117,5 +154,7 @@ BL-057 is implemented by PR #112: Mega and Primal selections remain searchable i
 BL-058 is implemented by PR #113: Release health keeps its bounded 50-run Actions window for the newest same-SHA Planner regression and Production smoke **current health**, but deployment verification now comes from a separate `production-smoke.yml` workflow query filtered to `branch=main`, `event=push`, and the exact current `head_sha`. The SHA remains production-verified when that bounded exact-SHA workflow history contains a completed successful push smoke, even after scheduled workflows have displaced that original run from the general recent-run window. Deterministic coverage reproduces a full 50-run rolling window with no push run and proves the historical exact-SHA deployment verification remains intact.
 
 Repository housekeeping completed on 6 October 2026: superseded PR #88 (**Add BL-040 automated theme accessibility checks**) was reviewed against current `main`, confirmed to contain no unique product behavior worth merging, and closed with a supersession note. Current `main` retains the deterministic Light/Dark contrast gate, expanded Chromium contrast/theme-switch accessibility coverage, disabled/focus/live-region invariants, and the evolved semantic theme tokens. No numbered backlog item was created because this was repository hygiene only.
+
+A fresh full product audit on 6 October 2026 reviewed the newest production `main`, exact-SHA Release health, Production smoke history, schema/data freshness, responsive desktop/mobile behavior, accessibility, backup/recovery, bearer-credential security, Hundo and raid-form correctness, Pokémon catalog resilience, repository governance, and recent production incidents. Production remained public-ready with no release-blocking defect. Two concrete reliability follow-ups were promoted into Active: BL-059 hardens Release health against transient GitHub metadata reads and separates unavailable evidence from genuinely missing/unverified state; BL-060 adds a server-side last-known-good Pokémon catalog path so first-time/new-device users retain Hundo and Battle Intel capability through temporary upstream catalog outages. Historical `event:go_pass` freshness failures were reviewed and intentionally not added to the backlog because the existing monitor detected, reported, and later recovered them exactly as designed.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
