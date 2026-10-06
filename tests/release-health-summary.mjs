@@ -17,6 +17,9 @@ const WORKFLOW_NAMES = {
 const WORKFLOW_FILES = {
   smoke: "production-smoke.yml"
 };
+const DEFAULT_FETCH_ATTEMPTS = 3;
+const DEFAULT_RETRY_DELAY_MS = 150;
+const MAX_RETRY_DELAY_MS = 1000;
 
 function safeInteger(
   value
@@ -243,82 +246,229 @@ function chooseSuccessfulPushWorkflowRun(
   );
 }
 
+function shouldRetryHttpResponse(
+  response
+) {
+  const status =
+    Number(
+      response?.status
+    );
+
+  if (
+    status === 429 ||
+    status >= 500
+  ) {
+    return true;
+  }
+
+  if (
+    status !== 403
+  ) {
+    return false;
+  }
+
+  const retryAfter =
+    response.headers?.get?.(
+      "retry-after"
+    );
+  const rateLimitRemaining =
+    response.headers?.get?.(
+      "x-ratelimit-remaining"
+    );
+
+  return Boolean(
+    retryAfter
+  ) ||
+    rateLimitRemaining ===
+      "0";
+}
+
+function retryDelayFor(
+  attempt,
+  retryDelayMs
+) {
+  return Math.min(
+    Math.max(
+      0,
+      retryDelayMs
+    ) *
+      (2 ** Math.max(
+        0,
+        attempt - 1
+      )),
+    MAX_RETRY_DELAY_MS
+  );
+}
+
+async function delay(
+  milliseconds
+) {
+  if (
+    milliseconds <= 0
+  ) {
+    return;
+  }
+
+  await new Promise(
+    resolve =>
+      setTimeout(
+        resolve,
+        milliseconds
+      )
+  );
+}
+
 async function fetchJson(
   fetchImpl,
   url,
   {
     token = null,
-    timeoutMs = 10000
+    timeoutMs = 10000,
+    attempts =
+      DEFAULT_FETCH_ATTEMPTS,
+    retryDelayMs =
+      DEFAULT_RETRY_DELAY_MS
   } = {}
 ) {
-  const controller =
-    new AbortController();
-  const timer =
-    setTimeout(
-      () =>
-        controller.abort(),
-      timeoutMs
+  const safeAttempts =
+    Math.max(
+      1,
+      Math.min(
+        5,
+        Number.isInteger(
+          attempts
+        )
+          ? attempts
+          : DEFAULT_FETCH_ATTEMPTS
+      )
     );
 
-  try {
-    const headers = {
-      accept:
-        "application/vnd.github+json, application/json"
-    };
+  const headers = {
+    accept:
+      "application/vnd.github+json, application/json"
+  };
 
-    if (token) {
-      headers.authorization =
-        `Bearer ${token}`;
-    }
+  if (token) {
+    headers.authorization =
+      `Bearer ${token}`;
+  }
 
-    const response =
-      await fetchImpl(
-        url,
-        {
-          method: "GET",
-          headers,
-          signal:
-            controller.signal
-        }
+  let lastResult = {
+    ok: false,
+    status: null,
+    body: null,
+    evidence_available: false,
+    attempts: 0
+  };
+
+  for (
+    let attempt = 1;
+    attempt <=
+      safeAttempts;
+    attempt += 1
+  ) {
+    const controller =
+      new AbortController();
+    const timer =
+      setTimeout(
+        () =>
+          controller.abort(),
+        timeoutMs
       );
 
-    const contentType =
-      response.headers?.get?.(
-        "content-type"
-      ) || "";
+    let retryable = false;
 
-    if (
-      !/application\/json/i.test(
-        contentType
-      )
-    ) {
-      return {
-        ok: false,
+    try {
+      const response =
+        await fetchImpl(
+          url,
+          {
+            method: "GET",
+            headers,
+            signal:
+              controller.signal
+          }
+        );
+
+      const contentType =
+        response.headers?.get?.(
+          "content-type"
+        ) || "";
+      const isJson =
+        /application\/json/i.test(
+          contentType
+        );
+
+      let body = null;
+      let validJson = false;
+
+      if (isJson) {
+        try {
+          body =
+            await response.json();
+          validJson = true;
+        } catch {
+          validJson = false;
+        }
+      }
+
+      retryable =
+        shouldRetryHttpResponse(
+          response
+        ) ||
+        (
+          response.ok &&
+          !validJson
+        );
+
+      lastResult = {
+        ok:
+          response.ok &&
+          validJson,
         status:
           response.status,
-        body: null
+        body:
+          validJson
+            ? body
+            : null,
+        evidence_available:
+          validJson,
+        attempts:
+          attempt
       };
+    } catch {
+      retryable = true;
+      lastResult = {
+        ok: false,
+        status: null,
+        body: null,
+        evidence_available: false,
+        attempts:
+          attempt
+      };
+    } finally {
+      clearTimeout(
+        timer
+      );
     }
 
-    return {
-      ok:
-        response.ok,
-      status:
-        response.status,
-      body:
-        await response.json()
-    };
-  } catch {
-    return {
-      ok: false,
-      status: null,
-      body: null
-    };
-  } finally {
-    clearTimeout(
-      timer
+    if (
+      !retryable ||
+      attempt ===
+        safeAttempts
+    ) {
+      return lastResult;
+    }
+
+    await delay(
+      retryDelayFor(
+        attempt,
+        retryDelayMs
+      )
     );
   }
+
+  return lastResult;
 }
 
 function githubHeadersToken(
@@ -400,7 +550,11 @@ export async function collectReleaseHealth({
   productionUrl =
     process.env.POGO_PRODUCTION_URL ||
     DEFAULT_PRODUCTION_URL,
-  timeoutMs = 10000
+  timeoutMs = 10000,
+  fetchAttempts =
+    DEFAULT_FETCH_ATTEMPTS,
+  retryDelayMs =
+    DEFAULT_RETRY_DELAY_MS
 } = {}) {
   if (
     !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(
@@ -432,7 +586,10 @@ export async function collectReleaseHealth({
       ),
       {
         token,
-        timeoutMs
+        timeoutMs,
+        attempts:
+          fetchAttempts,
+        retryDelayMs
       }
     );
 
@@ -482,25 +639,29 @@ export async function collectReleaseHealth({
       )
     ]);
 
-  const runs =
+  const runsEvidenceAvailable =
     runsResponse.ok &&
     Array.isArray(
       runsResponse
         ?.body
         ?.workflow_runs
-    )
+    );
+  const runs =
+    runsEvidenceAvailable
       ? runsResponse
           .body
           .workflow_runs
       : [];
 
-  const deploymentRuns =
+  const deploymentEvidenceAvailable =
     deploymentRunsResponse.ok &&
     Array.isArray(
       deploymentRunsResponse
         ?.body
         ?.workflow_runs
-    )
+    );
+  const deploymentRuns =
+    deploymentEvidenceAvailable
       ? deploymentRunsResponse
           .body
           .workflow_runs
@@ -525,26 +686,73 @@ export async function collectReleaseHealth({
       sha
     );
 
-  const regression = {
-    ...workflowState(
-      regressionRun
-    ),
-    url:
-      runUrl(
-        repo,
-        regressionRun
-      )
-  };
-  const smoke = {
-    ...workflowState(
-      smokeRun
-    ),
-    url:
-      runUrl(
-        repo,
-        smokeRun
-      )
-  };
+  const regression =
+    runsEvidenceAvailable
+      ? {
+          ...workflowState(
+            regressionRun
+          ),
+          url:
+            runUrl(
+              repo,
+              regressionRun
+            )
+        }
+      : {
+          status:
+            "unavailable",
+          conclusion:
+            null,
+          healthy:
+            null,
+          url:
+            null
+        };
+
+  const smoke =
+    runsEvidenceAvailable
+      ? {
+          ...workflowState(
+            smokeRun
+          ),
+          url:
+            runUrl(
+              repo,
+              smokeRun
+            )
+        }
+      : {
+          status:
+            "unavailable",
+          conclusion:
+            null,
+          healthy:
+            null,
+          url:
+            null
+        };
+
+  const productionVerification =
+    !deploymentEvidenceAvailable
+      ? {
+          status:
+            "unavailable",
+          verified:
+            null
+        }
+      : deploymentSmokeRun
+        ? {
+            status:
+              "verified",
+            verified:
+              true
+          }
+        : {
+            status:
+              "unverified",
+            verified:
+              false
+          };
 
   const [
     freshnessResponse,
@@ -558,7 +766,10 @@ export async function collectReleaseHealth({
           productionUrl
         ),
         {
-          timeoutMs
+          timeoutMs,
+          attempts:
+            fetchAttempts,
+          retryDelayMs
         }
       ),
       fetchJson(
@@ -568,45 +779,63 @@ export async function collectReleaseHealth({
           productionUrl
         ),
         {
-          timeoutMs
+          timeoutMs,
+          attempts:
+            fetchAttempts,
+          retryDelayMs
         }
       )
     ]);
 
   const freshnessBody =
     freshnessResponse.body;
+  const freshnessAllowedStatuses = [
+    "healthy",
+    "degraded",
+    "stale",
+    "unknown",
+    "unavailable"
+  ];
   const freshnessStatus =
     safeHealthStatus(
       freshnessBody?.status,
-      [
-        "healthy",
-        "degraded",
-        "stale",
-        "unknown",
-        "unavailable"
-      ]
+      freshnessAllowedStatuses
     );
+  const freshnessEvidenceAvailable =
+    freshnessResponse
+      .evidence_available ===
+      true &&
+    typeof freshnessBody
+      ?.monitor_ok ===
+      "boolean" &&
+    freshnessAllowedStatuses
+      .includes(
+        String(
+          freshnessBody
+            ?.status || ""
+        )
+      );
   const freshness = {
     status:
-      freshnessStatus,
+      freshnessEvidenceAvailable
+        ? freshnessStatus
+        : "unavailable",
     healthy:
-      freshnessResponse.ok &&
-      freshnessBody?.monitor_ok ===
-        true &&
-      [
-        "healthy",
-        "degraded"
-      ].includes(
-        freshnessStatus
-      )
-        ? true
+      !freshnessEvidenceAvailable
+        ? null
         : (
-            freshnessResponse.ok ||
-            freshnessResponse.status ===
-              503
+            freshnessBody
+              .monitor_ok ===
+              true &&
+            [
+              "healthy",
+              "degraded"
+            ].includes(
+              freshnessStatus
+            )
           )
-          ? false
-          : null,
+          ? true
+          : false,
     counts:
       healthCounts(
         freshnessBody
@@ -619,32 +848,47 @@ export async function collectReleaseHealth({
 
   const schemaBody =
     schemaResponse.body;
+  const schemaAllowedStatuses = [
+    "compatible",
+    "incompatible",
+    "unavailable"
+  ];
   const schemaStatus =
     safeHealthStatus(
       schemaBody?.status,
-      [
-        "compatible",
-        "incompatible",
-        "unavailable"
-      ]
+      schemaAllowedStatuses
     );
+  const schemaEvidenceAvailable =
+    schemaResponse
+      .evidence_available ===
+      true &&
+    typeof schemaBody
+      ?.monitor_ok ===
+      "boolean" &&
+    schemaAllowedStatuses
+      .includes(
+        String(
+          schemaBody
+            ?.status || ""
+        )
+      );
   const schema = {
     status:
-      schemaStatus,
+      schemaEvidenceAvailable
+        ? schemaStatus
+        : "unavailable",
     healthy:
-      schemaResponse.ok &&
-      schemaBody?.monitor_ok ===
-        true &&
-      schemaStatus ===
-        "compatible"
-        ? true
+      !schemaEvidenceAvailable
+        ? null
         : (
-            schemaResponse.ok ||
-            schemaResponse.status ===
-              503
+            schemaBody
+              .monitor_ok ===
+              true &&
+            schemaStatus ===
+              "compatible"
           )
-          ? false
-          : null,
+          ? true
+          : false,
     missing_count:
       safeInteger(
         schemaBody
@@ -656,7 +900,7 @@ export async function collectReleaseHealth({
       )
   };
 
-  const overall =
+  let overall =
     releaseOverallState({
       regression,
       smoke,
@@ -664,16 +908,27 @@ export async function collectReleaseHealth({
       schema
     });
 
+  if (
+    overall !==
+      "attention" &&
+    productionVerification
+      .status ===
+      "unavailable"
+  ) {
+    overall =
+      "pending";
+  }
+
   return {
     repo,
     sha,
     commit_url:
       `https://github.com/${repo}/commit/${sha}`,
     production_verified:
-      workflowState(
-        deploymentSmokeRun
-      ).healthy ===
-        true,
+      productionVerification
+        .verified,
+    production_verification:
+      productionVerification,
     overall,
     regression,
     smoke,
@@ -806,9 +1061,17 @@ export function renderReleaseHealthSummary(
         );
 
   const deploymentText =
-    health.production_verified
+    health
+      .production_verification
+      ?.status ===
+      "verified"
       ? "production-verified by smoke"
-      : "not yet production-verified by smoke";
+      : health
+          .production_verification
+          ?.status ===
+          "unavailable"
+        ? "deployment verification unavailable"
+        : "not yet production-verified by smoke";
 
   return [
     "# Release health",
