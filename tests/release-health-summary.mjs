@@ -623,7 +623,10 @@ export async function collectReleaseHealth({
         ),
         {
           token,
-          timeoutMs
+          timeoutMs,
+          attempts:
+            fetchAttempts,
+          retryDelayMs
         }
       ),
       fetchJson(
@@ -634,7 +637,10 @@ export async function collectReleaseHealth({
         ),
         {
           token,
-          timeoutMs
+          timeoutMs,
+          attempts:
+            fetchAttempts,
+          retryDelayMs
         }
       )
     ]);
