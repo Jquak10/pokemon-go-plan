@@ -505,6 +505,394 @@ assert.doesNotMatch(
   "Release summary must preserve the BL-055 sanitized diagnostic boundary"
 );
 
+const transientBaseFetch =
+  healthyFetch();
+let transientActionsCalls = 0;
+
+const transientActions =
+  await collectReleaseHealth({
+    fetchImpl: async url => {
+      const parsed =
+        new URL(
+          url
+        );
+
+      if (
+        parsed.pathname ===
+          `/repos/${REPO}/actions/runs`
+      ) {
+        transientActionsCalls +=
+          1;
+
+        if (
+          transientActionsCalls ===
+            1
+        ) {
+          return jsonResponse(
+            {
+              message:
+                "temporary GitHub failure"
+            },
+            503
+          );
+        }
+      }
+
+      return transientBaseFetch(
+        url
+      );
+    },
+    repo: REPO,
+    githubApiUrl:
+      "https://api.github.test",
+    productionUrl:
+      "https://planner.example",
+    timeoutMs: 1000,
+    fetchAttempts: 3,
+    retryDelayMs: 0
+  });
+
+assert.equal(
+  transientActionsCalls,
+  2,
+  "Transient GitHub 5xx responses must recover within the bounded retry budget"
+);
+assert.equal(
+  transientActions.overall,
+  "healthy"
+);
+assert.equal(
+  transientActions.regression.status,
+  "completed"
+);
+assert.equal(
+  transientActions.smoke.status,
+  "completed"
+);
+
+const rateLimitBaseFetch =
+  healthyFetch();
+let rateLimitCalls = 0;
+
+const rateLimitRecovered =
+  await collectReleaseHealth({
+    fetchImpl: async url => {
+      const parsed =
+        new URL(
+          url
+        );
+
+      if (
+        parsed.pathname ===
+          `/repos/${REPO}/actions/runs`
+      ) {
+        rateLimitCalls +=
+          1;
+
+        if (
+          rateLimitCalls ===
+            1
+        ) {
+          return new Response(
+            JSON.stringify({
+              message:
+                "rate limited"
+            }),
+            {
+              status: 403,
+              headers: {
+                "content-type":
+                  "application/json; charset=utf-8",
+                "x-ratelimit-remaining":
+                  "0"
+              }
+            }
+          );
+        }
+      }
+
+      return rateLimitBaseFetch(
+        url
+      );
+    },
+    repo: REPO,
+    githubApiUrl:
+      "https://api.github.test",
+    productionUrl:
+      "https://planner.example",
+    timeoutMs: 1000,
+    fetchAttempts: 3,
+    retryDelayMs: 0
+  });
+
+assert.equal(
+  rateLimitCalls,
+  2,
+  "Rate-limit responses must receive the same bounded retry treatment"
+);
+assert.equal(
+  rateLimitRecovered.overall,
+  "healthy"
+);
+
+const persistentActionsBaseFetch =
+  healthyFetch();
+let persistentActionsCalls = 0;
+
+const unavailableActions =
+  await collectReleaseHealth({
+    fetchImpl: async url => {
+      const parsed =
+        new URL(
+          url
+        );
+
+      if (
+        parsed.pathname ===
+          `/repos/${REPO}/actions/runs`
+      ) {
+        persistentActionsCalls +=
+          1;
+
+        return jsonResponse(
+          {
+            message:
+              "Actions temporarily unavailable"
+          },
+          503
+        );
+      }
+
+      return persistentActionsBaseFetch(
+        url
+      );
+    },
+    repo: REPO,
+    githubApiUrl:
+      "https://api.github.test",
+    productionUrl:
+      "https://planner.example",
+    timeoutMs: 1000,
+    fetchAttempts: 3,
+    retryDelayMs: 0
+  });
+
+assert.equal(
+  persistentActionsCalls,
+  3,
+  "Persistent transient GitHub failures must stop at the bounded attempt count"
+);
+assert.equal(
+  unavailableActions.regression.status,
+  "unavailable",
+  "Unavailable Actions evidence must not be mislabeled as a genuinely missing workflow"
+);
+assert.equal(
+  unavailableActions.smoke.status,
+  "unavailable"
+);
+assert.equal(
+  unavailableActions.production_verified,
+  true,
+  "Independent exact-SHA deployment verification may remain proven when the rolling current-health query is unavailable"
+);
+assert.equal(
+  unavailableActions.overall,
+  "pending"
+);
+
+const unavailableActionsMarkdown =
+  renderReleaseHealthSummary(
+    unavailableActions
+  );
+
+assert.match(
+  unavailableActionsMarkdown,
+  /Planner regression \| ⚪ unavailable/
+);
+assert.match(
+  unavailableActionsMarkdown,
+  /Production smoke \| ⚪ unavailable/
+);
+
+const deploymentUnavailableBaseFetch =
+  healthyFetch();
+let deploymentUnavailableCalls = 0;
+
+const deploymentUnavailable =
+  await collectReleaseHealth({
+    fetchImpl: async url => {
+      const parsed =
+        new URL(
+          url
+        );
+
+      if (
+        parsed.pathname ===
+          `/repos/${REPO}/actions/workflows/production-smoke.yml/runs`
+      ) {
+        deploymentUnavailableCalls +=
+          1;
+
+        return jsonResponse(
+          {
+            message:
+              "GitHub workflow history unavailable"
+          },
+          503
+        );
+      }
+
+      return deploymentUnavailableBaseFetch(
+        url
+      );
+    },
+    repo: REPO,
+    githubApiUrl:
+      "https://api.github.test",
+    productionUrl:
+      "https://planner.example",
+    timeoutMs: 1000,
+    fetchAttempts: 3,
+    retryDelayMs: 0
+  });
+
+assert.equal(
+  deploymentUnavailableCalls,
+  3
+);
+assert.equal(
+  deploymentUnavailable.production_verified,
+  null,
+  "Unavailable deployment evidence must not be collapsed into false/unverified"
+);
+assert.equal(
+  deploymentUnavailable
+    .production_verification
+    .status,
+  "unavailable"
+);
+assert.equal(
+  deploymentUnavailable.overall,
+  "pending"
+);
+assert.match(
+  renderReleaseHealthSummary(
+    deploymentUnavailable
+  ),
+  /deployment verification unavailable/
+);
+
+const definitiveClientBaseFetch =
+  healthyFetch();
+let definitiveClientCalls = 0;
+
+const definitiveClientFailure =
+  await collectReleaseHealth({
+    fetchImpl: async url => {
+      const parsed =
+        new URL(
+          url
+        );
+
+      if (
+        parsed.pathname ===
+          `/repos/${REPO}/actions/runs`
+      ) {
+        definitiveClientCalls +=
+          1;
+
+        return jsonResponse(
+          {
+            message:
+              "forbidden"
+          },
+          401
+        );
+      }
+
+      return definitiveClientBaseFetch(
+        url
+      );
+    },
+    repo: REPO,
+    githubApiUrl:
+      "https://api.github.test",
+    productionUrl:
+      "https://planner.example",
+    timeoutMs: 1000,
+    fetchAttempts: 3,
+    retryDelayMs: 0
+  });
+
+assert.equal(
+  definitiveClientCalls,
+  1,
+  "Definitive client errors must not consume the transient retry budget"
+);
+assert.equal(
+  definitiveClientFailure
+    .regression.status,
+  "unavailable"
+);
+
+const transientHealthBaseFetch =
+  healthyFetch();
+let transientFreshnessCalls = 0;
+
+const transientHealth =
+  await collectReleaseHealth({
+    fetchImpl: async url => {
+      const parsed =
+        new URL(
+          url
+        );
+
+      if (
+        parsed.pathname ===
+          "/api/health/data-freshness"
+      ) {
+        transientFreshnessCalls +=
+          1;
+
+        if (
+          transientFreshnessCalls ===
+            1
+        ) {
+          throw new Error(
+            "fixture network failure"
+          );
+        }
+      }
+
+      return transientHealthBaseFetch(
+        url
+      );
+    },
+    repo: REPO,
+    githubApiUrl:
+      "https://api.github.test",
+    productionUrl:
+      "https://planner.example",
+    timeoutMs: 1000,
+    fetchAttempts: 3,
+    retryDelayMs: 0
+  });
+
+assert.equal(
+  transientFreshnessCalls,
+  2,
+  "Transient public health endpoint failures must recover within the bounded retry budget"
+);
+assert.equal(
+  transientHealth.freshness.status,
+  "healthy"
+);
+assert.equal(
+  transientHealth.overall,
+  "healthy"
+);
+
 const pending =
   await collectReleaseHealth({
     fetchImpl: async url => {
@@ -557,7 +945,9 @@ const pending =
       "https://api.github.test",
     productionUrl:
       "https://planner.example",
-    timeoutMs: 1000
+    timeoutMs: 1000,
+    fetchAttempts: 3,
+    retryDelayMs: 0
   });
 
 assert.equal(
@@ -566,7 +956,16 @@ assert.equal(
 );
 assert.equal(
   pending.regression.status,
-  "missing"
+  "unavailable",
+  "Persistent Actions read failure must remain distinct from a genuinely absent same-SHA workflow"
+);
+assert.equal(
+  pending.production_verified,
+  null
+);
+assert.equal(
+  pending.production_verification.status,
+  "unavailable"
 );
 assert.equal(
   pending.freshness.healthy,
