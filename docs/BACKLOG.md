@@ -27,25 +27,6 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-059 — Make Release health resilient to transient GitHub API reads
-
-**Priority: RECOMMENDED**
-
-A real post-BL-058 Release health refresh briefly reported the exact-SHA Planner regression and Production smoke as `missing`, leaving the overall summary `pending`, even though both workflows had completed successfully. Rerunning the same read-only summary job immediately produced the correct healthy state.
-
-The current Release health collector performs a single GitHub metadata request per evidence source. A transient network failure, GitHub 5xx response, rate-limit response, or malformed/non-JSON response therefore collapses into missing/unavailable evidence. That can incorrectly turn a temporary read problem into a misleading operator state. The dedicated deployment-verification lookup also currently collapses unavailable evidence to `production_verified: false`, which is not semantically equivalent to proving that no successful deployment smoke exists.
-
-Required outcome:
-
-- add short, bounded retry/backoff for safe GitHub metadata GETs used by Release health;
-- retry transient network failures, 5xx responses, and appropriate rate-limit responses without retrying definitive client errors indefinitely;
-- distinguish a genuinely missing workflow/run from Actions evidence that is temporarily unavailable;
-- distinguish **not production-verified** from **deployment verification unavailable**;
-- keep the newest same-SHA regression/smoke run as the current operational-health signal;
-- keep exact-SHA successful push smoke as the deployment-verification signal;
-- preserve the workflow's read-only, informational, non-gating and credential-safe design;
-- add deterministic coverage for transient failure followed by recovery, persistent GitHub API failure, deployment evidence unavailable, genuine no-successful-push state, and transient public health-endpoint failure.
-
 ### BL-060 — Add server-side last-known-good Pokémon catalog resilience
 
 **Priority: RECOMMENDED**
@@ -156,5 +137,7 @@ BL-058 is implemented by PR #113: Release health keeps its bounded 50-run Action
 Repository housekeeping completed on 6 October 2026: superseded PR #88 (**Add BL-040 automated theme accessibility checks**) was reviewed against current `main`, confirmed to contain no unique product behavior worth merging, and closed with a supersession note. Current `main` retains the deterministic Light/Dark contrast gate, expanded Chromium contrast/theme-switch accessibility coverage, disabled/focus/live-region invariants, and the evolved semantic theme tokens. No numbered backlog item was created because this was repository hygiene only.
 
 A fresh full product audit on 6 October 2026 reviewed the newest production `main`, exact-SHA Release health, Production smoke history, schema/data freshness, responsive desktop/mobile behavior, accessibility, backup/recovery, bearer-credential security, Hundo and raid-form correctness, Pokémon catalog resilience, repository governance, and recent production incidents. Production remained public-ready with no release-blocking defect. Two concrete reliability follow-ups were promoted into Active: BL-059 hardens Release health against transient GitHub metadata reads and separates unavailable evidence from genuinely missing/unverified state; BL-060 adds a server-side last-known-good Pokémon catalog path so first-time/new-device users retain Hundo and Battle Intel capability through temporary upstream catalog outages. Historical `event:go_pass` freshness failures were reviewed and intentionally not added to the backlog because the existing monitor detected, reported, and later recovered them exactly as designed.
+
+BL-059 is implemented by PR #116: Release health now uses a bounded three-attempt retry with short capped exponential backoff for safe JSON GETs across GitHub metadata and the public freshness/schema endpoints. Network failures, HTTP 429/5xx responses, GitHub 403 rate-limit exhaustion, and successful-but-unusable JSON responses are retried; definitive client errors are not repeatedly retried. A valid Actions response with no matching exact-SHA workflow remains **missing**, while exhausted read evidence becomes **unavailable**. Exact-SHA deployment verification is now **verified**, **unverified**, or **unavailable**, with `production_verified` represented as `true`, `false`, or `null` accordingly. Deterministic coverage locks transient recovery, persistent GitHub failure, genuine missing state, rate-limit recovery, definitive client errors, deployment-evidence unavailability, and transient public-health recovery. BL-060 remains Active.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
