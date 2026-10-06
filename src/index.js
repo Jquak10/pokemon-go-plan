@@ -11896,8 +11896,6 @@ export async function pokemonCatalogApi(
     return cached;
   }
 
-  let liveError = null;
-
   try {
     const response =
       await fetch(
@@ -11995,9 +11993,6 @@ export async function pokemonCatalogApi(
 
     return result;
   } catch (error) {
-    liveError =
-      error;
-
     console.warn(
       "Live Pokémon catalog unavailable:",
       syncHealthErrorMessage(
