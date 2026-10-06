@@ -283,6 +283,41 @@ let schemaComponentsBody = {
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   ]
 };
+let catalogStatus = 200;
+let catalogBody = {
+  source:
+    "https://example.test/pokedex.json",
+  catalog_status:
+    "live",
+  snapshot_available:
+    true,
+  generated_at:
+    "2026-10-06T05:00:00.000Z",
+  entry_count: 1,
+  entries: [
+    {
+      key:
+        "6|base|charizard|charizard",
+      dex_nr: 6,
+      name:
+        "Charizard",
+      form_id:
+        "CHARIZARD",
+      kind:
+        "base",
+      attack: 223,
+      defense: 173,
+      stamina: 186,
+      types: [
+        "Fire",
+        "Flying"
+      ],
+      sprite_url: null,
+      shiny_sprite_url:
+        null
+    }
+  ]
+};
 
 const server =
   http.createServer(
@@ -516,6 +551,30 @@ const server =
 
       if (
         request.method === "GET" &&
+        request.url ===
+          "/api/pokemon-catalog"
+      ) {
+        response.writeHead(
+          catalogStatus,
+          {
+            "content-type":
+              "application/json; charset=utf-8",
+            "cache-control":
+              catalogStatus === 200
+                ? "public, max-age=21600"
+                : "no-store"
+          }
+        );
+        response.end(
+          JSON.stringify(
+            catalogBody
+          )
+        );
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
         request.url === "/api/me"
       ) {
         response.writeHead(
@@ -598,6 +657,7 @@ try {
       "/api/health/data-freshness",
       "/api/health/schema-compatibility",
       "/api/health/schema-components",
+      "/api/pokemon-catalog",
       "/api/me"
     ],
     "Production smoke must probe the current Planner shell and every versioned Planner asset"
@@ -638,6 +698,60 @@ try {
     false,
     "Production smoke checks must remain read-only"
   );
+
+  requests.length = 0;
+  catalogStatus = 200;
+  catalogBody = {
+    ...catalogBody,
+    catalog_status:
+      "last_known_good",
+    snapshot_available:
+      true,
+    served_at:
+      "2026-10-06T06:00:00.000Z"
+  };
+
+  await runProductionSmoke({
+    baseUrl,
+    attempts: 1,
+    timeoutMs: 1000
+  });
+
+  assert.equal(
+    requests.some(
+      request =>
+        request.url ===
+          "/api/pokemon-catalog"
+    ),
+    true,
+    "Server last-known-good catalog must remain monitor-safe"
+  );
+
+  requests.length = 0;
+  catalogBody = {
+    ...catalogBody,
+    catalog_status:
+      "live",
+    snapshot_available:
+      false
+  };
+
+  await assert.rejects(
+    () =>
+      runProductionSmoke({
+        baseUrl,
+        attempts: 1,
+        timeoutMs: 1000
+      }),
+    /server-side last-known-good snapshot/,
+    "A live catalog without the durable snapshot must fail Production smoke"
+  );
+
+  catalogBody = {
+    ...catalogBody,
+    snapshot_available:
+      true
+  };
 
   requests.length = 0;
   freshnessStatus = 200;
