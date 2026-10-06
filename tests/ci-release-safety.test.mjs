@@ -560,6 +560,31 @@ assert.match(
   /chooseSuccessfulPushWorkflowRun\(\s*deploymentRuns,/,
   "Release health must derive deployment verification from the dedicated exact-SHA workflow response, not the rolling Actions window"
 );
+assert.match(
+  releaseHealthScript,
+  /DEFAULT_FETCH_ATTEMPTS\s*=\s*3/,
+  "Release health must retain a short bounded retry budget"
+);
+assert.match(
+  releaseHealthScript,
+  /status === 429\s*\|\|\s*status >= 500/,
+  "Release health must retry transient 429/5xx metadata responses"
+);
+assert.match(
+  releaseHealthScript,
+  /rateLimitRemaining\s*===\s*"0"/,
+  "Release health must recognize GitHub rate-limit exhaustion as retryable"
+);
+assert.match(
+  releaseHealthScript,
+  /production_verification:\s*productionVerification/,
+  "Release health must expose deployment verification separately from the legacy boolean field"
+);
+assert.match(
+  releaseHealthScript,
+  /status:\s*"unavailable"[\s\S]{0,120}healthy:\s*null/,
+  "Release health must preserve unavailable evidence instead of relabeling it missing or failed"
+);
 assert.doesNotMatch(
   releaseHealthScript,
   /method:\s*["'](?:POST|PUT|PATCH|DELETE)["']|\/api\/create|\/api\/planner|\/calendar\//,
