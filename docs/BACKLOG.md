@@ -27,25 +27,7 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-### BL-060 — Add server-side last-known-good Pokémon catalog resilience
-
-**Priority: RECOMMENDED**
-
-The Planner's public `/api/pokemon-catalog` endpoint currently fetches the Pokémon GO API Pokédex live whenever its Cloudflare cache misses. If that upstream request fails, the Worker returns an error. The browser already stores a last-known-good catalog locally, which protects returning users after at least one successful load, but first-time users, new devices, cleared storage, and private-browsing sessions have no fallback.
-
-This means a temporary Pokémon GO API outage plus an expired/evicted edge cache can make Hundo search, form selection, and catalog-derived Battle Intel unavailable to users even while scheduled meta freshness remains healthy from an earlier successful sync.
-
-Required outcome:
-
-- add a server-side last-known-good catalog path rather than relying only on browser localStorage;
-- validate that live upstream catalog data is structurally usable and non-empty before treating it as a successful refresh;
-- refresh the server-side safe snapshot on valid upstream success;
-- serve the previous safe snapshot when the live upstream is temporarily unavailable and a valid snapshot exists;
-- expose a safe fallback/staleness signal if useful without leaking raw upstream errors or source internals;
-- never substitute a wrong Pokémon form merely to keep the catalog available;
-- preserve current browser-side last-known-good caching as an additional resilience layer;
-- add deterministic coverage for live success, upstream failure with server-side fallback, malformed/empty upstream, and no-fallback failure;
-- extend production monitoring to verify the public catalog contract read-only and without Planner credentials.
+No confirmed active backlog items are currently recorded.
 
 ## Deferred
 
@@ -138,6 +120,8 @@ Repository housekeeping completed on 6 October 2026: superseded PR #88 (**Add BL
 
 A fresh full product audit on 6 October 2026 reviewed the newest production `main`, exact-SHA Release health, Production smoke history, schema/data freshness, responsive desktop/mobile behavior, accessibility, backup/recovery, bearer-credential security, Hundo and raid-form correctness, Pokémon catalog resilience, repository governance, and recent production incidents. Production remained public-ready with no release-blocking defect. Two concrete reliability follow-ups were promoted into Active: BL-059 hardens Release health against transient GitHub metadata reads and separates unavailable evidence from genuinely missing/unverified state; BL-060 adds a server-side last-known-good Pokémon catalog path so first-time/new-device users retain Hundo and Battle Intel capability through temporary upstream catalog outages. Historical `event:go_pass` freshness failures were reviewed and intentionally not added to the backlog because the existing monitor detected, reported, and later recovered them exactly as designed.
 
-BL-059 is implemented by PR #116: Release health now uses a bounded three-attempt retry with short capped exponential backoff for safe JSON GETs across GitHub metadata and the public freshness/schema endpoints. Network failures, HTTP 429/5xx responses, GitHub 403 rate-limit exhaustion, and successful-but-unusable JSON responses are retried; definitive client errors are not repeatedly retried. A valid Actions response with no matching exact-SHA workflow remains **missing**, while exhausted read evidence becomes **unavailable**. Exact-SHA deployment verification is now **verified**, **unverified**, or **unavailable**, with `production_verified` represented as `true`, `false`, or `null` accordingly. Deterministic coverage locks transient recovery, persistent GitHub failure, genuine missing state, rate-limit recovery, definitive client errors, deployment-evidence unavailability, and transient public-health recovery. BL-060 remains Active.
+BL-059 is implemented by PR #116: Release health now uses a bounded three-attempt retry with short capped exponential backoff for safe JSON GETs across GitHub metadata and the public freshness/schema endpoints. Network failures, HTTP 429/5xx responses, GitHub 403 rate-limit exhaustion, and successful-but-unusable JSON responses are retried; definitive client errors are not repeatedly retried. A valid Actions response with no matching exact-SHA workflow remains **missing**, while exhausted read evidence becomes **unavailable**. Exact-SHA deployment verification is now **verified**, **unverified**, or **unavailable**, with `production_verified` represented as `true`, `false`, or `null` accordingly. Deterministic coverage locks transient recovery, persistent GitHub failure, genuine missing state, rate-limit recovery, definitive client errors, deployment-evidence unavailability, and transient public-health recovery.
+
+BL-060 is implemented by PR #117: the Worker now maintains one validated compact Pokémon/form catalog snapshot in D1, refreshed by successful scheduled Pokédex syncs and live catalog refreshes. A live upstream failure, malformed/empty catalog, or other unusable response falls back to that exact snapshot when available; if neither source is usable the endpoint returns a sanitized 503 instead of substituting another form. The Planner labels a server snapshot as stale/retryable and retains browser localStorage as an additional device-level fallback. Production smoke now verifies the public catalog is structurally usable and that a durable server snapshot is available. Existing production D1 must apply additive migration `0009_pokemon_catalog_snapshot.sql` **before PR #117 can merge**; the BL-054 candidate schema gate intentionally remains red until that table and its six required columns exist.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
