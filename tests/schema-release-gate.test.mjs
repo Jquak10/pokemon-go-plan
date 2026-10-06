@@ -69,10 +69,33 @@ const currentFingerprint =
     REQUIRED_SCHEMA
   );
 
+const {
+  pokemon_catalog_snapshot:
+    _catalogSnapshotRequirement,
+  ...bootstrapTables
+} =
+  REQUIRED_SCHEMA.tables;
+
+const bootstrapRequiredSchema = {
+  ...REQUIRED_SCHEMA,
+  tables:
+    bootstrapTables
+};
+
+const bootstrapSchemaFingerprint =
+  await schemaContractFingerprint(
+    bootstrapRequiredSchema
+  );
+
 assert.equal(
+  bootstrapSchemaFingerprint,
+  BL054_BOOTSTRAP_SCHEMA_FINGERPRINT,
+  "BL-054 bootstrap fingerprint must remain pinned to the pre-BL-060 required schema contract"
+);
+assert.notEqual(
   currentFingerprint,
   BL054_BOOTSTRAP_SCHEMA_FINGERPRINT,
-  "BL-054 bootstrap fingerprint must match the current required schema contract"
+  "BL-060 must be recognized as a real schema-changing candidate until production migration 0009 is applied"
 );
 
 const hashedRequests = [];
@@ -180,6 +203,8 @@ const bootstrapResult =
     },
     baseUrl:
       "https://planner.example",
+    requiredSchema:
+      bootstrapRequiredSchema,
     timeoutMs: 1000,
     attempts: 1
   });
@@ -209,9 +234,9 @@ assert.deepEqual(
 );
 
 const changedSchema = {
-  ...REQUIRED_SCHEMA,
+  ...bootstrapRequiredSchema,
   tables: {
-    ...REQUIRED_SCHEMA.tables,
+    ...bootstrapRequiredSchema.tables,
     future_release_table: [
       "id"
     ]
@@ -271,6 +296,8 @@ const unavailableBootstrapResult =
     },
     baseUrl:
       "https://planner.example",
+    requiredSchema:
+      bootstrapRequiredSchema,
     timeoutMs: 1000,
     attempts: 1
   });
