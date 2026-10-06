@@ -27,7 +27,70 @@ It is intentionally different from the other repository references:
 
 ## Active
 
-No confirmed active backlog items are currently recorded.
+### BL-061 — Make PvP recommendation scoring league-complete
+
+**Priority:** High
+
+The Planner exposes a generic **PvP importance** preference and describes PvPoke as a general PvP analytical input, but the automatic meta pipeline currently imports only PvPoke Master League overall rankings.
+
+This can undervalue Pokémon whose primary PvP usefulness is in Great League or Ultra League when a user gives PvP meaningful weight.
+
+Implement a league-complete PvP scoring model that:
+
+- imports Great League, Ultra League, and Master League overall ranking inputs;
+- preserves exact Pokémon/form identity and does not silently substitute regional or other forms;
+- derives and documents a stable general-PvP value for recommendation weighting;
+- exposes enough explanation to tell the user which league or leagues contributed to the score;
+- adds deterministic regression coverage for league specialists and form-specific matching.
+
+If a full league-complete model is intentionally deferred, the interim UI must explicitly scope the preference and source copy to **Master League** rather than presenting the current input as general PvP value.
+
+### BL-062 — Make Planner browser storage failure-safe
+
+**Priority:** High
+
+Optional Planner UI state currently uses direct `localStorage` and `sessionStorage` reads/writes in several paths, including top-level startup reads for Battle Plan filtering and Target view mode. Browsers or privacy/security policies can make Web Storage unavailable or throw `SecurityError`; optional local UI state must not prevent the Planner itself from booting.
+
+Introduce a shared failure-safe browser-storage boundary that:
+
+- catches read, write, and remove failures;
+- falls back to product defaults when storage is unavailable;
+- covers selected Planner tab, Battle Plan filter, Target view mode, desktop density, last battle participation type, Hundo recents, and other optional browser-local state;
+- preserves the existing best-effort catalog/theme behavior;
+- adds a browser regression where Web Storage throws and the Planner still loads and remains usable.
+
+No planner-owned D1 state should be moved into browser storage as part of this work.
+
+### BL-063 — Add recoverable Planner load and refresh state
+
+**Priority:** High
+
+Planner API failures are already normalized into actionable user-facing messages, but an initial `/api/me` failure has no in-app Retry action. In addition, the shared `load()` helper catches refresh failures internally, so a mutation can succeed while the subsequent state refresh fails and the caller cannot distinguish that partial-success state.
+
+Harden Planner recovery so that:
+
+- initial Planner load failures expose an explicit Retry action without requiring a full-page reload;
+- retryable refresh failures preserve already rendered state instead of replacing it with misleading stale-success presentation;
+- mutation flows can distinguish **mutation failed** from **mutation succeeded but the latest Planner state could not be refreshed**;
+- successful recovery clears prior error styling/state;
+- duplicate submissions remain prevented by the existing mutation/idempotency protections;
+- Chromium coverage extends the existing HTTP/network failure tests through successful Retry/recovery and post-mutation refresh failure.
+
+### BL-064 — Cover the successful Planner read model in production monitoring
+
+**Priority:** Recommended
+
+Production smoke currently validates public assets, schema compatibility, source freshness, the public Pokémon catalog, and the invalid-management-token `/api/me` contract without using a real planner credential. That intentionally safe design leaves one monitoring gap: it does not execute the successful authenticated Planner read-model assembly path in production.
+
+Add a sanitized, credential-free and read-only production health/canary contract that:
+
+- exercises the D1/query/composition dependencies required to assemble a normal Planner read model;
+- uses no real management or calendar bearer credential and exposes no planner-owned row data;
+- fails when the successful Planner read model would be structurally unavailable even though generic schema/freshness endpoints remain healthy;
+- remains suitable for the existing Production smoke workflow and BL-055 sanitized diagnostics boundary;
+- has deterministic local coverage for healthy and failed dependency states.
+
+Do not introduce a synthetic mutable production planner or secret credential into CI merely to satisfy this monitor.
 
 ## Deferred
 
@@ -123,5 +186,8 @@ A fresh full product audit on 6 October 2026 reviewed the newest production `mai
 BL-059 is implemented by PR #116: Release health now uses a bounded three-attempt retry with short capped exponential backoff for safe JSON GETs across GitHub metadata and the public freshness/schema endpoints. Network failures, HTTP 429/5xx responses, GitHub 403 rate-limit exhaustion, and successful-but-unusable JSON responses are retried; definitive client errors are not repeatedly retried. A valid Actions response with no matching exact-SHA workflow remains **missing**, while exhausted read evidence becomes **unavailable**. Exact-SHA deployment verification is now **verified**, **unverified**, or **unavailable**, with `production_verified` represented as `true`, `false`, or `null` accordingly. Deterministic coverage locks transient recovery, persistent GitHub failure, genuine missing state, rate-limit recovery, definitive client errors, deployment-evidence unavailability, and transient public-health recovery.
 
 BL-060 is implemented by PR #117: the Worker now maintains one validated compact Pokémon/form catalog snapshot in D1, refreshed by successful scheduled Pokédex syncs and live catalog refreshes. A live upstream failure, malformed/empty catalog, or other unusable response falls back to that exact snapshot when available; if neither source is usable the endpoint returns a sanitized 503 instead of substituting another form. The Planner labels a server snapshot as stale/retryable and retains browser localStorage as an additional device-level fallback. Production smoke now verifies the public catalog is structurally usable and that a durable server snapshot is available. Existing production D1 must apply additive migration `0009_pokemon_catalog_snapshot.sql` **before PR #117 can merge**; the BL-054 candidate schema gate intentionally remains red until that table and its six required columns exist.
+
+
+A fresh product audit on 6 October 2026 after BL-060 reviewed current production health, branch enforcement, recommendation inputs, Planner browser/runtime resilience, and production monitoring coverage. Production remained healthy and public-ready with no release-blocking defect. The user explicitly promoted four confirmed follow-ups into Active: **BL-061** makes the generic PvP preference league-complete instead of relying only on Master League input; **BL-062** makes optional Web Storage state failure-safe; **BL-063** adds explicit Planner load/refresh recovery and distinguishes successful mutations from failed follow-up refreshes; and **BL-064** closes the production-monitoring gap around successful Planner read-model assembly. The shiny/collection scoring idea remains intentionally untracked pending a sufficiently strict form-specific evidence model, and repository-description cleanup remains housekeeping rather than numbered product backlog scope.
 
 The explicitly non-planned Max-team tracking idea remains preserved below Active work. Future work should not infer additional requirements from deleted chat history; it should use newest `main`, the durable docs, this backlog, and the user's current request.
