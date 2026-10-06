@@ -340,6 +340,17 @@ assert.equal(
   "An exact-SHA push history with no successful Production smoke must not mark the deployment verified"
 );
 assert.equal(
+  unverified.production_verification.status,
+  "unverified",
+  "A valid exact-SHA workflow response with no successful push smoke must remain distinct from unavailable verification evidence"
+);
+assert.match(
+  renderReleaseHealthSummary(
+    unverified
+  ),
+  /not yet production-verified by smoke/
+);
+assert.equal(
   healthy.overall,
   "healthy"
 );
@@ -503,6 +514,59 @@ assert.doesNotMatch(
   incompatibleMarkdown,
   /CREATE TABLE|sensitive internal SQL detail|[a-f0-9]{64}/i,
   "Release summary must preserve the BL-055 sanitized diagnostic boundary"
+);
+
+const missingWorkflowBaseFetch =
+  healthyFetch();
+
+const genuinelyMissingWorkflows =
+  await collectReleaseHealth({
+    fetchImpl: async url => {
+      const parsed =
+        new URL(
+          url
+        );
+
+      if (
+        parsed.pathname ===
+          `/repos/${REPO}/actions/runs`
+      ) {
+        return jsonResponse({
+          workflow_runs: []
+        });
+      }
+
+      return missingWorkflowBaseFetch(
+        url
+      );
+    },
+    repo: REPO,
+    githubApiUrl:
+      "https://api.github.test",
+    productionUrl:
+      "https://planner.example",
+    timeoutMs: 1000,
+    fetchAttempts: 3,
+    retryDelayMs: 0
+  });
+
+assert.equal(
+  genuinelyMissingWorkflows.regression.status,
+  "missing",
+  "A successful Actions response with no matching same-SHA regression is genuinely missing rather than unavailable"
+);
+assert.equal(
+  genuinelyMissingWorkflows.smoke.status,
+  "missing"
+);
+assert.equal(
+  genuinelyMissingWorkflows.production_verified,
+  true,
+  "Deployment verification remains independent from the rolling current-health lookup"
+);
+assert.equal(
+  genuinelyMissingWorkflows.overall,
+  "pending"
 );
 
 const transientBaseFetch =
