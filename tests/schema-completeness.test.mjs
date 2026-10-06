@@ -9,6 +9,7 @@ const maxCostMigration = read('../migrations/0005_max_battle_cost_overrides.sql'
 const syncHealthMigration = read('../migrations/0006_sync_source_health.sql');
 const feedCredentialMigration = read('../migrations/0007_feed_link_credentials.sql');
 const remoteRaidLimitIndexMigration = read('../migrations/0008_remote_raid_limit_index.sql');
+const catalogSnapshotMigration = read('../migrations/0009_pokemon_catalog_snapshot.sql');
 
 const expectedColumns = {
   event_suppression_rules: [
@@ -70,6 +71,23 @@ const feedCredentialColumns = [
   ['updated_at', 'TEXT', 1, null, 0]
 ];
 
+const catalogSnapshotColumns = [
+  ['id', 'TEXT', 0, null, 1],
+  ['source_url', 'TEXT', 1, null, 0],
+  ['generated_at', 'TEXT', 1, null, 0],
+  ['entry_count', 'INTEGER', 1, null, 0],
+  ['catalog_json', 'TEXT', 1, null, 0],
+  ['updated_at', 'TEXT', 1, null, 0]
+];
+
+function assertCatalogSnapshotShape(db) {
+  assert.deepEqual(
+    columnShape(db, 'pokemon_catalog_snapshot'),
+    catalogSnapshotColumns,
+    'pokemon_catalog_snapshot columns must match migration 0009'
+  );
+}
+
 function assertFeedCredentialShape(db) {
   assert.deepEqual(
     columnShape(db, 'feed_link_credentials'),
@@ -126,12 +144,17 @@ assertOperationalShape(fresh);
 assertMaxCostOverrideShape(fresh);
 assertSyncHealthShape(fresh);
 assertFeedCredentialShape(fresh);
+assertCatalogSnapshotShape(fresh);
 fresh.exec(maxCostMigration);
 assertMaxCostOverrideShape(fresh);
 fresh.exec(syncHealthMigration);
 assertSyncHealthShape(fresh);
 fresh.exec(feedCredentialMigration);
 assertFeedCredentialShape(fresh);
+fresh.exec(catalogSnapshotMigration);
+assertCatalogSnapshotShape(fresh);
+fresh.exec(catalogSnapshotMigration);
+assertCatalogSnapshotShape(fresh);
 fresh.exec(feedCredentialMigration);
 assertFeedCredentialShape(fresh);
 
@@ -150,6 +173,10 @@ existing.exec(syncHealthMigration);
 assertSyncHealthShape(existing);
 existing.exec(feedCredentialMigration);
 assertFeedCredentialShape(existing);
+existing.exec(catalogSnapshotMigration);
+assertCatalogSnapshotShape(existing);
+existing.exec(catalogSnapshotMigration);
+assertCatalogSnapshotShape(existing);
 existing.exec(feedCredentialMigration);
 assertFeedCredentialShape(existing);
 
@@ -300,6 +327,33 @@ assert.equal(
   `).get().count,
   0,
   'feed credential state must cascade when its user is deleted'
+);
+
+existing.prepare(`
+  INSERT INTO pokemon_catalog_snapshot (
+    id, source_url, generated_at, entry_count, catalog_json, updated_at
+  ) VALUES (?, ?, ?, ?, ?, ?)
+`).run(
+  'pokemon-go-api-pokedex',
+  'https://example.test/pokedex.json',
+  '2026-10-06T00:00:00.000Z',
+  1,
+  '[{"key":"1|base|bulbasaur|bulbasaur"}]',
+  '2026-10-06T00:00:00.000Z'
+);
+
+existing.exec(catalogSnapshotMigration);
+
+assert.equal(
+  existing.prepare(`
+    SELECT entry_count AS count
+    FROM pokemon_catalog_snapshot
+    WHERE id = ?
+  `).get(
+    'pokemon-go-api-pokedex'
+  ).count,
+  1,
+  're-running migration 0009 must preserve the existing catalog snapshot'
 );
 
 const legacyRemoteLimitDb = new DatabaseSync(':memory:');
